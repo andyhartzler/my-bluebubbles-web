@@ -5,6 +5,8 @@
 [build.environment]
   # Flutter requires Git
   GIT_LFS_ENABLED = "true"
+  # Pin the Flutter version so Netlify uses the same toolchain as local builds
+  FLUTTER_VERSION = "3.24.4"
 
 [[redirects]]
   # Handle client-side routing

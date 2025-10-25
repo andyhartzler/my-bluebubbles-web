@@ -1,5 +1,7 @@
 library google_ml_kit;
 
+export 'package:google_mlkit_smart_reply/google_mlkit_smart_reply.dart';
+
 class GoogleMlKit {
   GoogleMlKit._();
   static final nlp = _Nlp();
@@ -7,6 +9,8 @@ class GoogleMlKit {
 
 class _Nlp {
   EntityExtractor entityExtractor(EntityExtractorLanguage language) => EntityExtractor._();
+
+  SmartReply smartReply() => SmartReply();
 }
 
 enum EntityExtractorLanguage { english }
@@ -45,6 +49,12 @@ class TrackingNumberEntity extends Entity {
   final String? carrier;
   final String? number;
   TrackingNumberEntity({required String rawValue, this.carrier, this.number}) : super(rawValue: rawValue, type: EntityType.trackingNumber);
+}
+
+class TrackingCarrier {
+  final String name;
+
+  const TrackingCarrier(this.name);
 }
 
 class FlightNumberEntity extends Entity {

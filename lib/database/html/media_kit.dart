@@ -120,6 +120,8 @@ class Player {
   /// Enables or disables shuffle for [Player].
   /// Default is `false`.
   FutureOr<void> setShuffle(bool shuffle) {}
+
+  FutureOr<void> stop() {}
 }
 
 class VideoController {
@@ -138,7 +140,7 @@ class VideoController {
       int? height,
       bool enableHardwareAcceleration = true,
     }) async {
-      throw Exception();
+      return VideoController(player);
     }
 
   /// Disposes the [VideoController].
@@ -149,15 +151,22 @@ class VideoController {
 class Video extends StatefulWidget {
   /// The [VideoController] reference to control this [Video] output & connect with [Player] from `package:media_kit`.
   final VideoController? controller;
+  final Widget? Function(dynamic state)? controls;
 
   /// {@macro video}
   const Video({
     super.key,
     required this.controller,
+    this.controls,
   });
 
   @override
-  State<Video> createState() => throw Exception();
+  State<Video> createState() => _StubVideoState();
+}
+
+class _StubVideoState extends State<Video> {
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 class Media {
