@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:universal_io/io.dart';
 
 import 'package:bluebubbles/app/layouts/settings/pages/advanced/firebase_panel.dart';
 import 'package:bluebubbles/app/layouts/settings/pages/advanced/unified_push.dart';
