@@ -1,9 +1,10 @@
 import 'dart:async';
-import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:bluebubbles/app/components/custom_text_editing_controllers.dart';
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
+import 'package:bluebubbles/database/global/isolate.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:emojis/emoji.dart';
@@ -192,11 +193,7 @@ class ConversationViewController extends StatefulController with GetSingleTicker
     // If it's an image, compress the image when loading it
     if (kIsWeb || file.path == null) {
       if (attachment.mimeType?.contains("image/tif") ?? false) {
-        final receivePort = ReceivePort();
-        await Isolate.spawn(unsupportedToPngIsolate, IsolateData(file, receivePort.sendPort));
-        // Get the processed image from the isolate.
-        final image = await receivePort.first as Uint8List?;
-        tmpData = image;
+        tmpData = await convertTiffToPng(file);
       } else {
         tmpData = file.bytes;
       }

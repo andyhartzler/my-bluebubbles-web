@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:isolate';
 import 'dart:math';
 import 'dart:ui';
 
@@ -68,6 +67,8 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
   runZonedGuarded<Future<void>>(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+
+      await dotenv.load(fileName: '.env', isOptional: true);
 
       await StartupTasks.initStartupServices(isBubble: bubble);
 
@@ -168,9 +169,6 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
               socket;
             }
           });
-
-          /* ----- GIPHY API KEY INITIALIZATION ----- */
-          await dotenv.load(fileName: '.env', isOptional: true);
         }
 
         /* ----- EMOJI FONT INITIALIZATION ----- */
@@ -422,7 +420,6 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayListener {
-  final ReceivePort port = ReceivePort();
   bool serverCompatible = true;
   bool fullyLoaded = false;
 

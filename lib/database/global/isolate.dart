@@ -1,6 +1,7 @@
-import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:bluebubbles/database/models.dart';
+import 'package:bluebubbles/utils/isolate_compat.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart';
 import 'package:universal_io/io.dart';
@@ -11,6 +12,34 @@ Future<Image?> decodeIsolate(PlatformFile file) async {
   } catch (_) {
     return null;
   }
+}
+
+Future<Uint8List?> convertTiffToPng(PlatformFile file) async {
+  Uint8List? bytes = file.bytes;
+
+  if (bytes == null && file.path != null && !kIsWeb) {
+    try {
+      bytes = await File(file.path!).readAsBytes();
+    } catch (_) {
+      bytes = null;
+    }
+  }
+
+  if (bytes == null) {
+    return null;
+  }
+
+  final image = decodeImage(bytes);
+  if (image == null) return null;
+
+  if (kIsWeb || file.path == null) {
+    return Uint8List.fromList(encodePng(image));
+  }
+
+  final receivePort = ReceivePort();
+  await Isolate.spawn(unsupportedToPngIsolate, IsolateData(file, receivePort.sendPort));
+  final result = await receivePort.first as Uint8List?;
+  return result ?? Uint8List.fromList(encodePng(image));
 }
 
 void unsupportedToPngIsolate(IsolateData param) {

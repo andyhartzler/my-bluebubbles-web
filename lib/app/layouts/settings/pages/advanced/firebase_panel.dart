@@ -1,5 +1,5 @@
 
-import 'dart:io';
+import 'package:universal_io/io.dart';
 
 import 'package:bluebubbles/app/layouts/settings/pages/server/oauth_panel.dart';
 import 'package:bluebubbles/app/layouts/settings/widgets/content/next_button.dart';
