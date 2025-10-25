@@ -47,24 +47,45 @@ class StartupTasks {
     // Setup the settings service
     await ss.init();
 
+    // Environment variables for web builds
+    // Priority: 1) Build-time --dart-define, 2) .env file (dev only), 3) defaults (empty for security)
     final hostFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_HOST');
     final passwordFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD');
-    final envHost = hostFromDefine.isNotEmpty
-        ? hostFromDefine
-        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_HOST')
-            ?? (kIsWeb ? _defaultWebHost : ''));
-    final envPassword = passwordFromDefine.isNotEmpty
-        ? passwordFromDefine
-        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD')
-            ?? (kIsWeb ? _defaultWebPassword : ''));
+
+    String envHost = hostFromDefine;
+    String envPassword = passwordFromDefine;
+
+    // Fallback to .env file for local development (won't work in production builds)
+    if (envHost.isEmpty) {
+      envHost = dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_HOST') ?? '';
+    }
+    if (envPassword.isEmpty) {
+      envPassword = dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD') ?? '';
+    }
+
+    // Final fallback to defaults (empty for web for security)
+    if (envHost.isEmpty && kIsWeb) {
+      envHost = _defaultWebHost;
+    }
+    if (envPassword.isEmpty && kIsWeb) {
+      envPassword = _defaultWebPassword;
+    }
 
     // Warn if web build is missing required environment variables
     if (kIsWeb && (envHost.isEmpty || envPassword.isEmpty)) {
       Logger.warn(
-        "Web build requires environment variables:\n"
-        "  NEXT_PUBLIC_BLUEBUBBLES_HOST (current: ${envHost.isEmpty ? 'NOT SET' : 'set'})\n"
-        "  NEXT_PUBLIC_BLUEBUBBLES_PASSWORD (current: ${envPassword.isEmpty ? 'NOT SET' : 'set'})\n"
-        "Please set these in your .env file or build command."
+        "⚠️  WEB BUILD CONFIGURATION MISSING ⚠️\n"
+        "  NEXT_PUBLIC_BLUEBUBBLES_HOST: ${envHost.isEmpty ? '❌ NOT SET' : '✅ set'}\n"
+        "  NEXT_PUBLIC_BLUEBUBBLES_PASSWORD: ${envPassword.isEmpty ? '❌ NOT SET' : '✅ set'}\n"
+        "\n"
+        "For local development, create a .env file:\n"
+        "  cp .env.example .env\n"
+        "  (then edit .env with your server details)\n"
+        "\n"
+        "For production builds, use --dart-define:\n"
+        "  flutter build web \\\n"
+        "    --dart-define=NEXT_PUBLIC_BLUEBUBBLES_HOST=https://your-server.com \\\n"
+        "    --dart-define=NEXT_PUBLIC_BLUEBUBBLES_PASSWORD=your-password\n"
       );
     }
 

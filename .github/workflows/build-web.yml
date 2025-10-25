@@ -39,12 +39,10 @@ jobs:
         run: |
           flutter build web \
             --web-renderer auto \
+            --dart-define=NEXT_PUBLIC_BLUEBUBBLES_HOST="${{ secrets.BLUEBUBBLES_HOST || '' }}" \
+            --dart-define=NEXT_PUBLIC_BLUEBUBBLES_PASSWORD="${{ secrets.BLUEBUBBLES_PASSWORD || '' }}" \
             --dart-define=FLUTTER_WEB_USE_SKIA=false \
-            --dart-define=FLUTTER_WEB_CANVASKIT_URL=https://unpkg.com/canvaskit-wasm@latest/bin/ \
             --release
-        env:
-          NEXT_PUBLIC_BLUEBUBBLES_HOST: ${{ secrets.BLUEBUBBLES_HOST || 'https://your-server-url.com' }}
-          NEXT_PUBLIC_BLUEBUBBLES_PASSWORD: ${{ secrets.BLUEBUBBLES_PASSWORD || '' }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
