@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'dart:isolate';
+import 'dart:typed_data';
 
+import 'package:bluebubbles/database/global/isolate.dart';
 import 'package:bluebubbles/database/models.dart';
-import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
+import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:exif/exif.dart';
@@ -360,20 +361,11 @@ class AttachmentsService extends GetxService {
       if (await File("$filePath.png").exists()) {
         originalFile = File("$filePath.png");
       } else {
-        final receivePort = ReceivePort();
-        await Isolate.spawn(
-            unsupportedToPngIsolate,
-            IsolateData(
-                PlatformFile(
-                  name: randomString(8),
-                  path: originalFile.path,
-                  size: 0,
-                ),
-                receivePort.sendPort
-            ),
-        );
-        // Get the processed image from the isolate.
-        final image = await receivePort.first as Uint8List?;
+        final image = await convertTiffToPng(PlatformFile(
+          name: randomString(8),
+          path: originalFile.path,
+          size: 0,
+        ));
         if (onlyFetchData) return image;
         if (image != null) {
           final cacheFile = File("$filePath.png");

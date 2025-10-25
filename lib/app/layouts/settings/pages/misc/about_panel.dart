@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:universal_io/io.dart';
 import 'dart:math';
 
 import 'package:bluebubbles/app/layouts/settings/widgets/content/next_button.dart';

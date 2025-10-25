@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:universal_io/io.dart';
 import 'dart:math';
 
 import 'package:animated_size_and_fade/animated_size_and_fade.dart';

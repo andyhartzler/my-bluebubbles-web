@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'package:universal_io/io.dart';
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
-import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/database/database.dart';
+import 'package:bluebubbles/helpers/backend/settings_helpers.dart';
+import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:on_exit/init.dart';
 import 'package:app_install_date/app_install_date.dart';
@@ -16,6 +18,9 @@ import 'package:tuple/tuple.dart';
 import 'package:window_manager/window_manager.dart';
 
 class StartupTasks {
+
+  static const String _defaultWebHost = 'https://messages.moydchat.org';
+  static const String _defaultWebPassword = 'fucktrump';
 
   static final Completer<void> uiReady = Completer<void>();
 
@@ -39,6 +44,37 @@ class StartupTasks {
 
     // Setup the settings service
     await ss.init();
+
+    final hostFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_HOST');
+    final passwordFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD');
+    final envHost = hostFromDefine.isNotEmpty
+        ? hostFromDefine
+        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_HOST')
+            ?? (kIsWeb ? _defaultWebHost : ''));
+    final envPassword = passwordFromDefine.isNotEmpty
+        ? passwordFromDefine
+        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD')
+            ?? (kIsWeb ? _defaultWebPassword : ''));
+
+    if (envHost.isNotEmpty) {
+      final additional = <String>[];
+      if (envPassword.isNotEmpty) {
+        ss.settings.guidAuthKey.value = envPassword;
+        additional.add('guidAuthKey');
+      }
+      await saveNewServerUrl(
+        envHost,
+        restartSocket: false,
+        tryRestartForegroundService: false,
+        force: true,
+        saveAdditionalSettings: additional,
+      );
+
+      if (!ss.settings.finishedSetup.value) {
+        ss.settings.finishedSetup.value = true;
+        await ss.settings.saveMany(['finishedSetup']);
+      }
+    }
 
     // The next thing we need to do is initialize the database.
     // If the database is not initialized, we cannot do anything.

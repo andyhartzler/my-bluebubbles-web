@@ -1,0 +1,9 @@
+name: flutter_isolate
+version: 2.0.4+bb.2
+description: >-
+  Minimal in-repo replacement for the unmaintained flutter_isolate package.
+  Provides just enough functionality for BlueBubbles web builds.
+publish_to: none
+
+environment:
+  sdk: '>=2.19.0 <4.0.0'

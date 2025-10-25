@@ -63,3 +63,28 @@ After downloading both, follow our tutorial [here](https://bluebubbles.app/insta
 ## Contributing
 
 Please check out our contribution guide here: [Contribution Guide](https://docs.bluebubbles.app/client/build-yourself-contribution-guide)
+
+## Running the web client in GitHub Codespaces
+
+The repository now includes a helper script that installs dependencies, builds the web bundle, and launches the development server inside a Codespace. It assumes you already have the Flutter SDK installed in the container (the default BlueBubbles devcontainer includes it).
+
+1. Set the BlueBubbles server connection details as environment variables. These mirror the keys consumed by the Flutter app:
+
+   ```bash
+   export NEXT_PUBLIC_BLUEBUBBLES_HOST="https://messages.moydchat.org"
+   export NEXT_PUBLIC_BLUEBUBBLES_PASSWORD="<your-guid-auth-key>"
+   ```
+
+   The app ships with the host above as a default for web builds, but exporting explicit values keeps local testing predictable.
+
+2. Launch the helper script. It runs `flutter pub get`, `flutter build web`, and finally `flutter run` bound to a Codespaces-friendly interface and port. The script also forwards your environment variables to Flutter via `--dart-define` so the connection settings are compiled into the web build:
+
+   ```bash
+   scripts/run_web.sh
+   ```
+
+   The script exposes the development server on port `3000` and binds to `0.0.0.0` by default so GitHub Codespaces can auto-forward it. Override the defaults by exporting `FLUTTER_WEB_PORT` or `FLUTTER_WEB_HOST` beforehand.
+
+3. Once `flutter run` starts, Codespaces should offer to forward the selected port. Accept the prompt to open the live web client in your browser and connect it to your BlueBubbles server.
+
+If you prefer to run the commands manually, replicate the steps shown in `scripts/run_web.sh`.
