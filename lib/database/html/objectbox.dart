@@ -103,6 +103,8 @@ class Store {
 
   Store.attach(dynamic _, String? directoryPath,
       {bool queriesCaseSensitiveDefault = true});
+
+  static bool isOpen(String? directoryPath) => false;
 }
 
 class Query<T> {

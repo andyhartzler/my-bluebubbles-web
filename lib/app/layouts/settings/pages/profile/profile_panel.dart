@@ -11,7 +11,6 @@ import 'package:bluebubbles/services/services.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:skeletonizer/skeletonizer.dart';
 import 'package:universal_io/io.dart';
 
 class ProfilePanel extends StatefulWidget {
@@ -308,54 +307,66 @@ class _ProfilePanelState extends OptimizedState<ProfilePanel> with WidgetsBindin
                     iosSubtitle: iosSubtitle,
                     materialSubtitle: materialSubtitle,
                     text: "iCloud Account Info"),
-                Skeletonizer(
-                  enabled: accountInfo.isEmpty,
-                  child: SettingsSection(
+                SettingsSection(
                     backgroundColor: tileColor,
                     children: [
                       Obx(() {
                         bool redact = ss.settings.redactedMode.value;
-                        return Container(
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0, left: 15, top: 8.0, right: 15),
-                            child: AnimatedOpacity(
-                              duration: const Duration(milliseconds: 300),
-                              opacity: opacity.value,
-                              child: SelectableText.rich(
-                                TextSpan(children: [
-                                  TextSpan(text: redact ? "Account Name - Apple ID" : "${accountInfo['account_name']} - ${accountInfo['apple_id']}"),
-                                  const TextSpan(text: "\n"),
-                                  const TextSpan(text: "iMessage Status: ", style: TextStyle(height: 3.0)),
-                                  TextSpan(
-                                      text: accountInfo['login_status_message']?.toUpperCase(),
-                                      style: TextStyle(color: getIndicatorColor(accountInfo['login_status_message'] == "Connected" ? SocketState.connected : SocketState.disconnected))),
-                                  const TextSpan(text: "\n"),
-                                  const TextSpan(text: "SMS Forwarding Status: "),
-                                  TextSpan(
-                                      text: accountInfo['sms_forwarding_enabled'] == true ? "ENABLED" : "DISABLED",
-                                      style: TextStyle(color: getIndicatorColor(accountInfo['sms_forwarding_enabled'] == true ? SocketState.connected : SocketState.disconnected))),
-                                  const TextSpan(text: "  |  "),
-                                  TextSpan(
-                                      text: accountInfo['sms_forwarding_capable'] == true ? "CAPABLE" : "INCAPABLE",
-                                      style: TextStyle(color: getIndicatorColor(accountInfo['sms_forwarding_capable'] == true ? SocketState.connected : SocketState.disconnected))),
-                                  const TextSpan(text: "\n"),
-                                  const TextSpan(text: "VETTED ALIASES\n", style: TextStyle(fontWeight: FontWeight.w700, height: 3.0)),
-                                  ...((accountInfo['vetted_aliases'] as List<dynamic>? ?? [])).map((e) => [
-                                    TextSpan(text: "⬤  ", style: TextStyle(color: getIndicatorColor(e['Status'] == 3 ? SocketState.connected : SocketState.disconnected))),
-                                    TextSpan(text: redact ? "Alias\n" : "${e['Alias']}\n")
-                                  ]).toList().flattened,
-                                  const TextSpan(text: "\n"),
-                                  const TextSpan(text: "Tap to update values...", style: TextStyle(fontStyle: FontStyle.italic)),
-                                ]),
-                                onTap: () {
-                                  opacity.value = 0.0;
-                                  getDetails();
-                                },
-                              ),
-                            ),
-                          ));
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0, left: 15, top: 8.0, right: 15),
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 300),
+                            opacity: opacity.value,
+                            child: accountInfo.isEmpty
+                                ? Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "Loading account information...",
+                                        style: context.theme.textTheme.bodyLarge,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      LinearProgressIndicator(
+                                        color: context.theme.colorScheme.primary,
+                                        backgroundColor: context.theme.colorScheme.surfaceVariant,
+                                      ),
+                                    ],
+                                  )
+                                : SelectableText.rich(
+                                    TextSpan(children: [
+                                      TextSpan(text: redact ? "Account Name - Apple ID" : "${accountInfo['account_name']} - ${accountInfo['apple_id']}"),
+                                      const TextSpan(text: "\n"),
+                                      const TextSpan(text: "iMessage Status: ", style: TextStyle(height: 3.0)),
+                                      TextSpan(
+                                          text: accountInfo['login_status_message']?.toUpperCase(),
+                                          style: TextStyle(color: getIndicatorColor(accountInfo['login_status_message'] == "Connected" ? SocketState.connected : SocketState.disconnected))),
+                                      const TextSpan(text: "\n"),
+                                      const TextSpan(text: "SMS Forwarding Status: "),
+                                      TextSpan(
+                                          text: accountInfo['sms_forwarding_enabled'] == true ? "ENABLED" : "DISABLED",
+                                          style: TextStyle(color: getIndicatorColor(accountInfo['sms_forwarding_enabled'] == true ? SocketState.connected : SocketState.disconnected))),
+                                      const TextSpan(text: "  |  "),
+                                      TextSpan(
+                                          text: accountInfo['sms_forwarding_capable'] == true ? "CAPABLE" : "INCAPABLE",
+                                          style: TextStyle(color: getIndicatorColor(accountInfo['sms_forwarding_capable'] == true ? SocketState.connected : SocketState.disconnected))),
+                                      const TextSpan(text: "\n"),
+                                      const TextSpan(text: "VETTED ALIASES\n", style: TextStyle(fontWeight: FontWeight.w700, height: 3.0)),
+                                      ...((accountInfo['vetted_aliases'] as List<dynamic>? ?? [])).map((e) => [
+                                            TextSpan(text: "⬤  ", style: TextStyle(color: getIndicatorColor(e['Status'] == 3 ? SocketState.connected : SocketState.disconnected))),
+                                            TextSpan(text: redact ? "Alias\n" : "${e['Alias']}\n")
+                                          ]).toList().flattened,
+                                      const TextSpan(text: "\n"),
+                                      const TextSpan(text: "Tap to update values...", style: TextStyle(fontStyle: FontStyle.italic)),
+                                    ]),
+                                    onTap: () {
+                                      opacity.value = 0.0;
+                                      getDetails();
+                                    },
+                                  ),
+                          ),
+                        );
                       }),
-                      if (accountInfo['active_alias'] != null)
+                      if (accountInfo.isNotEmpty && accountInfo['active_alias'] != null)
                         Container(
                           color: tileColor,
                           child: Padding(
@@ -363,7 +374,7 @@ class _ProfilePanelState extends OptimizedState<ProfilePanel> with WidgetsBindin
                             child: SettingsDivider(color: context.theme.colorScheme.surfaceVariant),
                           ),
                         ),
-                      if (accountInfo['active_alias'] != null)
+                      if (accountInfo.isNotEmpty && accountInfo['active_alias'] != null)
                         SettingsOptions<String>(
                           title: "Start Chats Using",
                           initial: accountInfo['active_alias'],
@@ -381,7 +392,7 @@ class _ProfilePanelState extends OptimizedState<ProfilePanel> with WidgetsBindin
                           },
                         ),
                     ],
-                  )),
+                  ),
                 if (!isNullOrEmpty(accountContact['name']))
                   SettingsHeader(
                       iosSubtitle: iosSubtitle,

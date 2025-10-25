@@ -15,7 +15,7 @@ class TrayManager {
 
 final TrayManager trayManager = TrayManager.instance;
 
-abstract class TrayListener {
+mixin TrayListener {
   void onTrayIconMouseDown() {}
   void onTrayIconRightMouseDown() {}
   void onTrayMenuItemClick(MenuItem menuItem) {}
