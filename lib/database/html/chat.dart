@@ -94,6 +94,8 @@ class Chat {
   bool lockChatIcon;
   String? lastReadMessageGuid;
 
+  RxDouble sendProgress = 0.0.obs;
+
   final RxnString _customAvatarPath = RxnString();
   String? get customAvatarPath => _customAvatarPath.value;
   set customAvatarPath(String? s) => _customAvatarPath.value = s;
@@ -554,6 +556,8 @@ class Chat {
     // Compare the last message dates
     return -(a.latestMessage.dateCreated)!.compareTo(b.latestMessage.dateCreated!);
   }
+
+  static Future<void> deleteChat(Chat chat) async {}
 
   static Future<void> getIcon(Chat c, {bool force = false}) async {}
 

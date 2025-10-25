@@ -1,29 +1,47 @@
 #!/bin/bash
 # Netlify build script for Flutter web
 
-set -e
+set -eo pipefail
 
-echo "Installing Flutter SDK..."
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$REPO_ROOT"
 
-# Clone Flutter SDK if not already present
-if [ ! -d "/opt/buildhome/.flutter" ]; then
-  git clone https://github.com/flutter/flutter.git -b stable --depth 1 /opt/buildhome/.flutter
-fi
+FLUTTER_ROOT="${FLUTTER_ROOT:-/opt/buildhome/.flutter}"
+FLUTTER_VERSION="${FLUTTER_VERSION:-3.24.4}"
 
-# Add Flutter to PATH
-export PATH="$PATH:/opt/buildhome/.flutter/bin"
+function ensure_flutter() {
+  if [ ! -d "$FLUTTER_ROOT/.git" ]; then
+    echo "Installing Flutter SDK ($FLUTTER_VERSION) from scratch..."
+    rm -rf "$FLUTTER_ROOT"
+    git clone --branch "$FLUTTER_VERSION" --depth 1 https://github.com/flutter/flutter.git "$FLUTTER_ROOT"
+    return
+  fi
 
-# Verify Flutter installation
+  if ! git -C "$FLUTTER_ROOT" rev-parse "refs/tags/$FLUTTER_VERSION" >/dev/null 2>&1; then
+    echo "Fetching Flutter tag $FLUTTER_VERSION..."
+    git -C "$FLUTTER_ROOT" fetch --depth 1 origin "refs/tags/$FLUTTER_VERSION:refs/tags/$FLUTTER_VERSION"
+  fi
+
+  echo "Switching Flutter SDK to $FLUTTER_VERSION..."
+  git -C "$FLUTTER_ROOT" checkout --quiet "refs/tags/$FLUTTER_VERSION" || git -C "$FLUTTER_ROOT" checkout --quiet "$FLUTTER_VERSION"
+}
+
+ensure_flutter
+
+export PATH="$FLUTTER_ROOT/bin:$PATH"
+
 flutter --version
-
-# Enable web support
 flutter config --enable-web
+flutter precache --web
 
-# Get dependencies
 echo "Installing dependencies..."
 flutter pub get
 
-# Build for web
+if grep -q "build_runner" pubspec.yaml; then
+  echo "Running code generation..."
+  flutter pub run build_runner build --delete-conflicting-outputs
+fi
+
 echo "Building web app..."
 flutter build web --release
 

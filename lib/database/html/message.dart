@@ -67,6 +67,10 @@ class Message {
   DateTime? get dateDelivered => _dateDelivered.value;
   set dateDelivered(DateTime? d) => _dateDelivered.value = d;
 
+  final RxBool _isDelivered = RxBool(false);
+  bool get isDelivered => (dateDelivered != null) ? true : _isDelivered.value;
+  set isDelivered(bool b) => _isDelivered.value = b;
+
   final Rxn<DateTime> _dateEdited = Rxn<DateTime>();
   DateTime? get dateEdited => _dateEdited.value;
   set dateEdited(DateTime? d) => _dateEdited.value = d;
@@ -119,6 +123,7 @@ class Message {
     if (error != null) _error.value = error;
     if (dateRead != null) _dateRead.value = dateRead;
     if (dateDelivered != null) _dateDelivered.value = dateDelivered;
+    if (dateDelivered != null) _isDelivered.value = true;
     if (dateEdited != null) _dateEdited.value = dateEdited;
     if (attachments.isEmpty) attachments = [];
     if (associatedMessages.isEmpty) associatedMessages = [];
@@ -166,7 +171,7 @@ class Message {
       Logger.error('Failed to parse payload data!', error: e, trace: stack);
     }
 
-    return Message(
+    final message = Message(
       id: json["ROWID"] ?? json['id'],
       originalROWID: json["originalROWID"],
       guid: json["guid"],
@@ -207,6 +212,10 @@ class Message {
       didNotifyRecipient: json['didNotifyRecipient'] ?? false,
       isBookmarked: json['isBookmarked'] ?? false,
     );
+
+    message._isDelivered.value = json['isDelivered'] == true;
+
+    return message;
   }
 
   Message save({Chat? chat, bool updateIsBookmarked = false}) {
@@ -307,6 +316,18 @@ class Message {
 
   String get fullText => sanitizeString([subject, text].where((e) => !isNullOrEmpty(e)).join("\n"));
 
+  static int sort(Message a, Message b, {bool descending = true}) {
+    final DateTime aDateToUse = a.dateDelivered == null
+        ? (a.dateCreated ?? DateTime.fromMillisecondsSinceEpoch(0))
+        : (a.dateCreated != null && a.dateCreated!.isBefore(a.dateDelivered!) ? a.dateCreated! : a.dateDelivered!);
+
+    final DateTime bDateToUse = b.dateDelivered == null
+        ? (b.dateCreated ?? DateTime.fromMillisecondsSinceEpoch(0))
+        : (b.dateCreated != null && b.dateCreated!.isBefore(b.dateDelivered!) ? b.dateCreated! : b.dateDelivered!);
+
+    return descending ? bDateToUse.compareTo(aDateToUse) : aDateToUse.compareTo(bDateToUse);
+  }
+
   // first condition is for macOS < 11 and second condition is for macOS >= 11
   bool get isLegacyUrlPreview => (balloonBundleId == "com.apple.messages.URLBalloonProvider" && hasDdResults!)
       || (hasDdResults! && (text ?? "").trim().isURL);
@@ -378,6 +399,51 @@ class Message {
     if (dateDelivered != null) return Indicator.DELIVERED;
     if (dateCreated != null) return Indicator.SENT;
     return Indicator.NONE;
+  }
+
+  String getLastUpdate() {
+    if (dateEdited != null) {
+      return "Edited at $dateEdited";
+    } else if (datePlayed != null) {
+      return "Played at $datePlayed";
+    } else if (dateRead != null) {
+      return "Read at $dateRead";
+    } else if (dateDelivered != null || isDelivered) {
+      return dateDelivered != null ? "Delivered at $dateDelivered" : "Delivered";
+    }
+
+    return "Sent at $dateCreated";
+  }
+
+  bool isNewerThan(Message other) {
+    if (error == 0 && other.error != 0) return false;
+
+    if (dateCreated == null && other.dateCreated != null) return false;
+    if (dateCreated != null && other.dateCreated == null) return true;
+    if (!isDelivered && other.isDelivered) return false;
+    if (isDelivered && !other.isDelivered) return true;
+    if (dateDelivered == null && other.dateDelivered != null) return false;
+    if (dateDelivered != null && other.dateDelivered == null) return true;
+    if (dateRead == null && other.dateRead != null) return false;
+    if (dateRead != null && other.dateRead == null) return true;
+    if (datePlayed == null && other.datePlayed != null) return false;
+    if (datePlayed != null && other.datePlayed == null) return true;
+    if (dateEdited == null && other.dateEdited != null) return false;
+    if (dateEdited != null && other.dateEdited == null) return true;
+
+    DateTime? selectMostRecent(Message message) {
+      return message.dateEdited ??
+          message.datePlayed ??
+          message.dateRead ??
+          message.dateDelivered ??
+          message.dateCreated;
+    }
+
+    final DateTime? a = selectMostRecent(this);
+    final DateTime? b = selectMostRecent(other);
+
+    if (a == null || b == null) return false;
+    return a.millisecondsSinceEpoch > b.millisecondsSinceEpoch;
   }
 
   bool showTail(Message? newer) {

@@ -1,5 +1,7 @@
 library flutter_acrylic;
 
+import 'dart:ui';
+
 enum WindowEffect {
   disabled,
   transparent,
@@ -11,13 +13,13 @@ enum WindowEffect {
 
 class WindowEffectOptions {
   final WindowEffect effect;
-  final int color;
+  final Color? color;
   final bool dark;
 
   const WindowEffectOptions({
     required this.effect,
-    required this.color,
-    required this.dark,
+    this.color,
+    this.dark = false,
   });
 }
 
@@ -25,5 +27,5 @@ class Window {
   static Future<void> initialize() async {}
   static Future<void> hideWindowControls() async {}
 
-  static Future<void> setEffect({required WindowEffect effect, int? color, bool dark = false}) async {}
+  static Future<void> setEffect({required WindowEffect effect, Color? color, bool dark = false}) async {}
 }

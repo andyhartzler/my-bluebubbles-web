@@ -32,3 +32,9 @@ class Permission {
   Future<bool> get isDenied async => false;
   Future<bool> get isPermanentlyDenied async => false;
 }
+
+extension PermissionStatusFutureGetters on Future<PermissionStatus> {
+  Future<bool> get isGranted async => (await this).isGranted;
+  Future<bool> get isDenied async => (await this).isDenied;
+  Future<bool> get isPermanentlyDenied async => (await this).isPermanentlyDenied;
+}

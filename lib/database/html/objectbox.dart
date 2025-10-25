@@ -316,6 +316,10 @@ class Message_ {
   static final isBookmarked = Temp();
 }
 
+class ThemeStruct_ {
+  static final name = Temp();
+}
+
 Future<Store> openStore(
         {String? directory,
         int? maxDBSizeInKB,

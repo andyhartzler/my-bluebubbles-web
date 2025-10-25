@@ -5,6 +5,8 @@ class DisplayMode {
   final int height;
   final double refreshRate;
 
+  static const DisplayMode auto = DisplayMode();
+
   const DisplayMode({this.width = 1920, this.height = 1080, this.refreshRate = 60});
 }
 
