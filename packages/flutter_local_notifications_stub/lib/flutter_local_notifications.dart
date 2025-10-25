@@ -30,15 +30,49 @@ enum Importance { max }
 
 enum Priority { max }
 
+class BigTextStyleInformation {
+  const BigTextStyleInformation(String _);
+}
+
+class PendingNotificationRequest {
+  final int id;
+  final String? title;
+  final String? body;
+  final String? payload;
+
+  const PendingNotificationRequest(this.id, this.title, this.body, this.payload);
+}
+
+class ActiveNotification {
+  final int? id;
+  final String? title;
+  final String? body;
+
+  const ActiveNotification({this.id, this.title, this.body});
+}
+
 class AndroidNotificationDetails {
   final String channelId;
   final String channelName;
   final String? channelDescription;
   final Priority? priority;
   final Importance? importance;
-  final int? color;
+  final Object? color;
+  final bool? ongoing;
+  final bool? onlyAlertOnce;
+  final BigTextStyleInformation? styleInformation;
 
-  AndroidNotificationDetails(this.channelId, this.channelName, {this.channelDescription, this.priority, this.importance, this.color});
+  AndroidNotificationDetails(
+    this.channelId,
+    this.channelName, {
+    this.channelDescription,
+    this.priority,
+    this.importance,
+    this.color,
+    this.ongoing,
+    this.onlyAlertOnce,
+    this.styleInformation,
+  });
 }
 
 class NotificationDetails {
@@ -47,7 +81,10 @@ class NotificationDetails {
 }
 
 class FlutterLocalNotificationsPlugin {
-  Future<void> initialize(InitializationSettings settings, {Future<void> Function(NotificationResponse?)? onDidReceiveNotificationResponse}) async {}
+  Future<void> initialize(
+    InitializationSettings settings, {
+    Future<void> Function(NotificationResponse?)? onDidReceiveNotificationResponse,
+  }) async {}
 
   Future<NotificationAppLaunchDetails?> getNotificationAppLaunchDetails() async => null;
 
@@ -69,4 +106,11 @@ class FlutterLocalNotificationsPlugin {
     NotificationDetails? notificationDetails, {
     String? payload,
   }) async {}
+
+  Future<void> cancel(int id) async {}
+
+  Future<List<PendingNotificationRequest>> pendingNotificationRequests() async =>
+      const <PendingNotificationRequest>[];
+
+  Future<List<ActiveNotification>> getActiveNotifications() async => const <ActiveNotification>[];
 }
