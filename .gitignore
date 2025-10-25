@@ -53,3 +53,12 @@ pubspec.lock
 *.env
 .vscode/launch.json
 /lib/database/html/giphy.dart
+
+# Web-only project - ignore native platform directories
+/android/
+/ios/
+/linux/
+/macos/
+/windows/
+/snap/
+/screenshots/
