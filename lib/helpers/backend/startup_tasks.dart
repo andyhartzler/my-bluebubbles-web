@@ -19,8 +19,10 @@ import 'package:window_manager/window_manager.dart';
 
 class StartupTasks {
 
-  static const String _defaultWebHost = 'https://messages.moydchat.org';
-  static const String _defaultWebPassword = 'fucktrump';
+  // SECURITY: Default credentials removed. Web builds must set environment variables:
+  // NEXT_PUBLIC_BLUEBUBBLES_HOST and NEXT_PUBLIC_BLUEBUBBLES_PASSWORD
+  static const String _defaultWebHost = '';
+  static const String _defaultWebPassword = '';
 
   static final Completer<void> uiReady = Completer<void>();
 
@@ -55,6 +57,16 @@ class StartupTasks {
         ? passwordFromDefine
         : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD')
             ?? (kIsWeb ? _defaultWebPassword : ''));
+
+    // Warn if web build is missing required environment variables
+    if (kIsWeb && (envHost.isEmpty || envPassword.isEmpty)) {
+      Logger.warn(
+        "Web build requires environment variables:\n"
+        "  NEXT_PUBLIC_BLUEBUBBLES_HOST (current: ${envHost.isEmpty ? 'NOT SET' : 'set'})\n"
+        "  NEXT_PUBLIC_BLUEBUBBLES_PASSWORD (current: ${envPassword.isEmpty ? 'NOT SET' : 'set'})\n"
+        "Please set these in your .env file or build command."
+      );
+    }
 
     if (envHost.isNotEmpty) {
       final additional = <String>[];

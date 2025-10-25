@@ -50,5 +50,14 @@ pubspeck.lock
 
 #private keys
 *.env
+.env.local
+.env.*.local
 .vscode/launch.json
 /lib/models/html/giphy.dart
+
+# Deployment
+.vercel
+.netlify
+.firebase
+node_modules/
+functions/node_modules/

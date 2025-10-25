@@ -1,0 +1,67 @@
+name: Build and Test Web App
+
+on:
+  push:
+    branches: [ main, development, 'claude/**' ]
+  pull_request:
+    branches: [ main, development ]
+  workflow_dispatch:
+
+jobs:
+  build-web:
+    name: Build Flutter Web
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Flutter installation
+        run: |
+          flutter --version
+          flutter doctor -v
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Run code analysis
+        run: flutter analyze --no-fatal-infos
+        continue-on-error: true
+
+      - name: Build web (development)
+        run: |
+          flutter build web \
+            --web-renderer auto \
+            --dart-define=FLUTTER_WEB_USE_SKIA=false \
+            --dart-define=FLUTTER_WEB_CANVASKIT_URL=https://unpkg.com/canvaskit-wasm@latest/bin/ \
+            --release
+        env:
+          NEXT_PUBLIC_BLUEBUBBLES_HOST: ${{ secrets.BLUEBUBBLES_HOST || 'https://your-server-url.com' }}
+          NEXT_PUBLIC_BLUEBUBBLES_PASSWORD: ${{ secrets.BLUEBUBBLES_PASSWORD || '' }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web/
+          retention-days: 7
+
+      - name: Generate build report
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Flutter Version:** $(flutter --version | head -n 1)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **Web Renderer:** auto" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Size:** $(du -sh build/web | cut -f1)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check build output
+        run: |
+          ls -lah build/web/
+          echo "Main.dart.js size: $(stat -c%s build/web/main.dart.js | numfmt --to=iec-i --suffix=B)"
