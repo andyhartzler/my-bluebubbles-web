@@ -28,7 +28,8 @@
 .pub-cache/
 .pub/
 /build/
-pubspeck.lock
+pubspec.lock
+**/Flutter/ephemeral/
 
 # Web related
 
@@ -51,4 +52,4 @@ pubspeck.lock
 #private keys
 *.env
 .vscode/launch.json
-/lib/models/html/giphy.dart
+/lib/database/html/giphy.dart
