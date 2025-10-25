@@ -28,7 +28,8 @@ dependencies:
   async_task: ^1.1.1
   audio_waveforms: ^1.0.5
   auto_size_text: ^3.0.0
-  bitsdojo_window: ^0.1.6
+  bitsdojo_window:
+    path: packages/bitsdojo_window_stub
   chunked_stream: ^1.4.2
   collection: ^1.18.0
   confetti: ^0.7.0
@@ -38,15 +39,11 @@ dependencies:
   cupertino_icons: ^1.0.6
   defer_pointer: ^0.0.2
   desktop_webview_auth:
-    git:
-      url: https://github.com/BlueBubblesApp/flutter_desktop_webview_auth.git
-      ref: webkit2gtk-4.1
+    path: packages/desktop_webview_auth_stub
   device_info_plus: ^10.1.0
   dio: ^5.4.2+1
-  disable_battery_optimization: # for jcenter() gradle deprecation
-    git:
-      url: https://github.com/BlueBubblesApp/Disable-Battery-Optimizations.git
-      ref: master
+  disable_battery_optimization:
+    path: packages/disable_battery_optimization_stub
   dlibphonenumber: ^1.1.12 # phone number parsing
   # todo linux
   dynamic_color: ^1.7.0
@@ -56,7 +53,8 @@ dependencies:
   encrypt: ^5.0.3
   exif: ^3.3.0
   faker: ^2.1.0
-  fast_contacts: ^4.0.0  # mobile only
+  fast_contacts:
+    path: packages/fast_contacts_stub
   file_picker: ^8.0.0+1
   firebase_dart:
     git:
@@ -65,23 +63,27 @@ dependencies:
       path: packages/firebase_dart
   flex_color_picker: ^3.4.1
   flex_color_scheme: ^7.3.1
-  flutter_acrylic: ^1.1.3
+  flutter_acrylic:
+    path: packages/flutter_acrylic_stub
   flutter_audio_waveforms: ^1.2.1+8
-  flutter_displaymode: ^0.6.0 # android only
+  flutter_displaymode:
+    path: packages/flutter_displaymode_stub
   flutter_dotenv: ^5.1.0
   flutter_image_compress: ^2.2.0
   flutter_improved_scrolling: ^0.0.3
   flutter_isolate:
     path: packages/flutter_isolate
   flutter_keyboard_visibility: ^6.0.0 # no desktop support
-  flutter_local_notifications: ^17.2.1+2 # mobile only
+  flutter_local_notifications:
+    path: packages/flutter_local_notifications_stub
   flutter_map: ^7.0.1
   flutter_map_marker_popup: ^7.0.0
   flutter_markdown: ^0.7.2+1
   flutter_slidable: ^3.1.0
   flutter_staggered_grid_view: ^0.7.0
   flutter_svg: ^2.0.10+1
-  flutter_timezone: ^3.0.1 # no desktop support
+  flutter_timezone:
+    path: packages/flutter_timezone_stub
   geolocator: ^13.0.1
   gesture_x_detector: # support touchscreens properly
     git:
@@ -91,8 +93,10 @@ dependencies:
   giphy_get: ^3.5.4
   github: ^9.24.0
   google_fonts: ^6.2.1
-  google_ml_kit: ^0.18.0 # mobile only
-  google_mlkit_smart_reply: ^0.11.0
+  google_ml_kit:
+    path: packages/google_ml_kit_stub
+  google_mlkit_smart_reply:
+    path: packages/google_mlkit_smart_reply_stub
   google_sign_in: ^6.2.1
   hand_signature: ^3.0.2
   idb_shim: ^2.4.1+1
@@ -102,12 +106,12 @@ dependencies:
   intl: ^0.19.0
   js: ^0.7.1
   languagetool_textfield: ^0.0.6
-  launch_at_startup: ^0.3.1
-  local_auth: ^2.2.0
+  launch_at_startup:
+    path: packages/launch_at_startup_stub
+  local_auth:
+    path: packages/local_auth_stub
   local_notifier:
-    git:
-      url: https://github.com/BlueBubblesApp/local_notifier.git
-      ref: 7526556fe2beb5c61ddede34e1992726907cd7ae
+    path: packages/local_notifier_stub
   maps_launcher: # gradle namespace issue
     git:
       url: https://github.com/pikaju/flutter-maps-launcher.git
@@ -121,7 +125,8 @@ dependencies:
   media_kit_libs_linux: ^1.1.3                   # GNU/Linux dependency package.
   metadata_fetch: ^0.4.1
   mime_type: ^1.0.0
-  mobile_scanner: ^5.1.1 # no desktop support
+  mobile_scanner:
+    path: packages/mobile_scanner_stub
   msix: ^3.16.8
   multi_value_listenable_builder: ^0.0.2
   network_info_plus: ^6.0.1
@@ -137,16 +142,20 @@ dependencies:
   path: ^1.9.0
   path_provider: ^2.1.2 # no web support
   pdf: ^3.10.8
-  permission_handler: ^11.3.1 # mobile only
-  photo_manager: ^3.2.0 # only mobile
+  permission_handler:
+    path: packages/permission_handler_stub
+  photo_manager:
+    path: packages/photo_manager_stub
   photo_view: ^0.15.0
   printing: ^5.12.0
   qr_flutter: ^4.1.0
-  receive_intent: ^0.2.5 # mobile only
+  receive_intent:
+    path: packages/receive_intent_stub
   record: ^5.0.5
   reorderables: ^0.6.0
   saver_gallery: ^3.0.3
-  screen_retriever: ^0.1.9
+  screen_retriever:
+    path: packages/screen_retriever_stub
   scroll_to_index: ^3.0.1
   secure_application:  # no linux support, gradle namespace issue
     git:
@@ -167,11 +176,13 @@ dependencies:
       url: https://github.com/ravitejaavv/store_checker
       ref: master
   synchronized: ^3.1.0+1
-  system_tray: ^2.0.3
+  system_tray:
+    path: packages/system_tray_stub
   super_drag_and_drop: ^0.8.20
   supercharged: ^2.1.1
   system_info2: ^4.0.0
-  tray_manager: ^0.2.3
+  tray_manager:
+    path: packages/tray_manager_stub
   tuple: ^2.0.2
   unifiedpush: ^5.0.1
   universal_html: ^2.2.4 # cross-platform dart:html implementation
@@ -184,13 +195,17 @@ dependencies:
     git:
       url: https://github.com/BlueBubblesApp/video_thumbnail.git
       ref: master
-  window_manager: ^0.4.2
-  windows_taskbar: ^1.1.2
+  window_manager:
+    path: packages/window_manager_stub
+  windows_taskbar:
+    path: packages/windows_taskbar_stub
   logger: ^2.4.0
   archive: ^3.6.1
-  in_app_review: ^2.0.9
+  in_app_review:
+    path: packages/in_app_review_stub
   pull_down_button: ^0.10.1
-  app_install_date: ^0.1.5
+  app_install_date:
+    path: packages/app_install_date_stub
 
 dependency_overrides:
   # overrides for packages stuck on outdated versions

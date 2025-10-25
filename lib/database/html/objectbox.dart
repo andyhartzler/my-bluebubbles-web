@@ -153,7 +153,15 @@ class Temp {
     return this;
   }
 
-  dynamic contains(dynamic thing) {
+  dynamic contains(dynamic thing, {bool caseSensitive = true}) {
+    return this;
+  }
+
+  dynamic greaterOrEqual(dynamic thing) {
+    return this;
+  }
+
+  dynamic and(dynamic condition) {
     return this;
   }
 

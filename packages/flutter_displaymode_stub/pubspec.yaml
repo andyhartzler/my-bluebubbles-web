@@ -1,0 +1,6 @@
+name: flutter_displaymode
+version: 1.0.0
+publish_to: 'none'
+description: Web stub for flutter_displaymode.
+environment:
+  sdk: '>=3.1.3 <4.0.0'
