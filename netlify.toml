@@ -1,0 +1,13 @@
+[build]
+  command = "bash netlify-build.sh"
+  publish = "build/web"
+
+[build.environment]
+  # Flutter requires Git
+  GIT_LFS_ENABLED = "true"
+
+[[redirects]]
+  # Handle client-side routing
+  from = "/*"
+  to = "/index.html"
+  status = 200
