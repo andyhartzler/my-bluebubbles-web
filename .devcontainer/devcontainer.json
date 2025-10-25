@@ -1,0 +1,70 @@
+{
+  "name": "BlueBubbles Web Development",
+  "image": "cirrusci/flutter:stable",
+
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dart-code.dart-code",
+        "dart-code.flutter",
+        "usernamehw.errorlens",
+        "eamodio.gitlens",
+        "ms-vscode.live-server",
+        "esbenp.prettier-vscode"
+      ],
+      "settings": {
+        "dart.flutterSdkPath": "/sdks/flutter",
+        "dart.lineLength": 120,
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll": "explicit"
+        },
+        "[dart]": {
+          "editor.formatOnSave": true,
+          "editor.selectionHighlight": false,
+          "editor.suggest.snippetsPreventQuickSuggestions": false,
+          "editor.suggestSelection": "first",
+          "editor.tabCompletion": "onlySnippets",
+          "editor.wordBasedSuggestions": "off"
+        }
+      }
+    }
+  },
+
+  "forwardPorts": [3000, 8080, 5000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Flutter Web",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "Dev Server",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "postCreateCommand": "flutter pub get && flutter doctor",
+
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/sdks/flutter/bin",
+    "FLUTTER_ROOT": "/sdks/flutter"
+  },
+
+  "mounts": [
+    "source=${localWorkspaceFolder}/.flutter-pub-cache,target=/root/.pub-cache,type=bind,consistency=cached"
+  ],
+
+  "remoteUser": "root"
+}
