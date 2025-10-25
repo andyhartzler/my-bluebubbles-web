@@ -1,0 +1,6 @@
+name: launch_at_startup
+version: 1.0.0
+publish_to: 'none'
+description: Web stub for launch_at_startup.
+environment:
+  sdk: '>=3.1.3 <4.0.0'

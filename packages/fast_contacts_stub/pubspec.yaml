@@ -1,0 +1,6 @@
+name: fast_contacts
+version: 1.0.0
+publish_to: 'none'
+description: Web stub for fast_contacts.
+environment:
+  sdk: '>=3.1.3 <4.0.0'
