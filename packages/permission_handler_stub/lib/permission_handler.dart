@@ -1,19 +1,18 @@
 library permission_handler;
 
-class PermissionStatus {
-  final bool _granted;
-  final bool _permanentlyDenied;
-
-  const PermissionStatus._(this._granted, this._permanentlyDenied);
-
-  bool get isGranted => _granted;
-  bool get isDenied => !_granted && !_permanentlyDenied;
-  bool get isPermanentlyDenied => _permanentlyDenied;
+enum PermissionStatus {
+  denied,
+  granted,
+  restricted,
+  limited,
+  permanentlyDenied,
+  provisional,
 }
 
-class PermissionRequestResult {
-  final PermissionStatus status;
-  const PermissionRequestResult(this.status);
+extension PermissionStatusGetters on PermissionStatus {
+  bool get isGranted => this == PermissionStatus.granted;
+  bool get isDenied => this == PermissionStatus.denied;
+  bool get isPermanentlyDenied => this == PermissionStatus.permanentlyDenied;
 }
 
 class Permission {
@@ -27,8 +26,8 @@ class Permission {
 
   const Permission._();
 
-  Future<PermissionStatus> request() async => const PermissionStatus._(true, false);
-  Future<PermissionStatus> get status async => const PermissionStatus._(true, false);
+  Future<PermissionStatus> request() async => PermissionStatus.granted;
+  Future<PermissionStatus> get status async => PermissionStatus.granted;
   Future<bool> get isGranted async => true;
   Future<bool> get isDenied async => false;
   Future<bool> get isPermanentlyDenied async => false;
