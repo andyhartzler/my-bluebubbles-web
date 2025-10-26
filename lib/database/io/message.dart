@@ -243,11 +243,13 @@ class Message {
   String? country;
 
   @Index()
+  @Property(type: PropertyType.date)
   DateTime? dateCreated;
 
   bool? isFromMe;
   // Data detector results
   bool? hasDdResults;
+  @Property(type: PropertyType.date)
   DateTime? datePlayed;
   int? itemType;
   String? groupTitle;
@@ -257,18 +259,26 @@ class Message {
   int? associatedMessagePart;
   String? associatedMessageType;
   String? expressiveSendStyleId;
+  @Transient()
   Handle? handle;
   bool hasAttachments;
   bool hasReactions;
+  @Property(type: PropertyType.date)
   DateTime? dateDeleted;
+  @Transient()
   Map<String, dynamic>? metadata;
   String? threadOriginatorGuid;
   String? threadOriginatorPart;
+  @Transient()
   List<Attachment?> attachments = [];
+  @Transient()
   List<Message> associatedMessages = [];
   bool? bigEmoji;
+  @Transient()
   List<AttributedBody> attributedBody;
+  @Transient()
   List<MessageSummaryInfo> messageSummaryInfo;
+  @Transient()
   PayloadData? payloadData;
   bool hasApplePayloadData;
   bool wasDeliveredQuietly;

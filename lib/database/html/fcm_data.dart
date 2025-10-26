@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bluebubbles/services/services.dart';
 
 class FCMData {
@@ -33,9 +35,9 @@ class FCMData {
     );
   }
 
-  FCMData save() {
+  Future<FCMData> save({bool wait = false}) async {
     if (isNull) return this;
-    Future.delayed(Duration.zero, () async {
+    final operation = Future<void>.delayed(Duration.zero, () async {
       await ss.prefs.setString('projectID', projectID!);
       await ss.prefs.setString('storageBucket', storageBucket!);
       await ss.prefs.setString('apiKey', apiKey!);
@@ -43,6 +45,9 @@ class FCMData {
       await ss.prefs.setString('clientID', clientID!);
       await ss.prefs.setString('applicationID', applicationID!);
     });
+    if (wait) {
+      await operation;
+    }
     return this;
   }
 
