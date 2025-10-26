@@ -19,9 +19,6 @@ import 'package:window_manager/window_manager.dart';
 
 class StartupTasks {
 
-  static const String _defaultWebHost = 'https://messages.moydchat.org';
-  static const String _defaultWebPassword = 'fucktrump';
-
   static final Completer<void> uiReady = Completer<void>();
 
   static Future<void> waitForUI() async {
@@ -49,12 +46,10 @@ class StartupTasks {
     final passwordFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD');
     final envHost = hostFromDefine.isNotEmpty
         ? hostFromDefine
-        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_HOST')
-            ?? (kIsWeb ? _defaultWebHost : ''));
+        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_HOST') ?? '');
     final envPassword = passwordFromDefine.isNotEmpty
         ? passwordFromDefine
-        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD')
-            ?? (kIsWeb ? _defaultWebPassword : ''));
+        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD') ?? '');
 
     if (envHost.isNotEmpty) {
       final additional = <String>[];
@@ -69,11 +64,6 @@ class StartupTasks {
         force: true,
         saveAdditionalSettings: additional,
       );
-
-      if (!ss.settings.finishedSetup.value) {
-        ss.settings.finishedSetup.value = true;
-        await ss.settings.saveMany(['finishedSetup']);
-      }
     }
 
     // The next thing we need to do is initialize the database.

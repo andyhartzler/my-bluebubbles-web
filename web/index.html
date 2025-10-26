@@ -122,6 +122,25 @@
   </picture>
   
   <script>
+    window.addEventListener('load', function () {
+      const loader = window._flutter?.loader;
+      if (!loader) {
+        console.error('Flutter loader not found. Ensure flutter.js is loaded.');
+        return;
+      }
+
+      loader.load({
+        serviceWorker: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        },
+        onEntrypointLoaded: function (engineInitializer) {
+          engineInitializer
+            .initializeEngine({
+              useColorEmoji: true,
+            })
+            .then(function (appRunner) {
+              appRunner.runApp();
+            });
     window.addEventListener('load', function(ev) {
       const loader = new FlutterLoader();
       loader.load({
