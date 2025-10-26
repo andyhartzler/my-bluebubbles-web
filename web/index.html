@@ -141,6 +141,18 @@
             .then(function (appRunner) {
               appRunner.runApp();
             });
+    window.addEventListener('load', function(ev) {
+      const loader = new FlutterLoader();
+      loader.load({
+        serviceWorkerSettings: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        },
+        onEntrypointLoaded: function(engineInitializer) {
+          engineInitializer.initializeEngine({
+            useColorEmoji: true,
+          }).then(function(appRunner) {
+            appRunner.runApp();
+          });
         },
       });
     });
