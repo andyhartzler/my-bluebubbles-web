@@ -16,6 +16,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart' hide Response;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:universal_io/io.dart';
@@ -41,6 +42,37 @@ class _ServerCredentialsState extends OptimizedState<ServerCredentials> {
   List<RxBool> triedConnecting = [];
   List<RxBool> reachable = [];
   bool fetchingFirebase = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final hostFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_HOST');
+    final passwordFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD');
+    final envHost = hostFromDefine.isNotEmpty
+        ? hostFromDefine
+        : dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_HOST');
+    final envPassword = passwordFromDefine.isNotEmpty
+        ? passwordFromDefine
+        : dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD');
+
+    if ((envHost?.isNotEmpty ?? false) || (envPassword?.isNotEmpty ?? false)) {
+      showLoginButtons = false;
+      if (envHost?.isNotEmpty ?? false) {
+        urlController.text = envHost!.trim();
+      }
+      if (envPassword?.isNotEmpty ?? false) {
+        passwordController.text = envPassword!.trim();
+      }
+
+      if (!ss.settings.finishedSetup.value && (envHost?.isNotEmpty ?? false) && (envPassword?.isNotEmpty ?? false)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          connect(envHost!, envPassword!);
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

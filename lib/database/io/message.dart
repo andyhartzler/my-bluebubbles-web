@@ -243,11 +243,13 @@ class Message {
   String? country;
 
   @Index()
+  @Property(type: PropertyType.date)
   DateTime? dateCreated;
 
   bool? isFromMe;
   // Data detector results
   bool? hasDdResults;
+  @Property(type: PropertyType.date)
   DateTime? datePlayed;
   int? itemType;
   String? groupTitle;
@@ -257,18 +259,26 @@ class Message {
   int? associatedMessagePart;
   String? associatedMessageType;
   String? expressiveSendStyleId;
+  @Transient()
   Handle? handle;
   bool hasAttachments;
   bool hasReactions;
+  @Property(type: PropertyType.date)
   DateTime? dateDeleted;
+  @Transient()
   Map<String, dynamic>? metadata;
   String? threadOriginatorGuid;
   String? threadOriginatorPart;
+  @Transient()
   List<Attachment?> attachments = [];
+  @Transient()
   List<Message> associatedMessages = [];
   bool? bigEmoji;
+  @Transient()
   List<AttributedBody> attributedBody;
+  @Transient()
   List<MessageSummaryInfo> messageSummaryInfo;
+  @Transient()
   PayloadData? payloadData;
   bool hasApplePayloadData;
   bool wasDeliveredQuietly;
@@ -280,10 +290,12 @@ class Message {
   set error(int i) => _error.value = i;
 
   final Rxn<DateTime> _dateRead = Rxn<DateTime>();
+  @Property(type: PropertyType.date)
   DateTime? get dateRead => _dateRead.value;
   set dateRead(DateTime? d) => _dateRead.value = d;
 
   final Rxn<DateTime> _dateDelivered = Rxn<DateTime>();
+  @Property(type: PropertyType.date)
   DateTime? get dateDelivered => _dateDelivered.value;
   set dateDelivered(DateTime? d) => _dateDelivered.value = d;
 
@@ -292,6 +304,7 @@ class Message {
   set isDelivered(bool b) => _isDelivered.value = b;
 
   final Rxn<DateTime> _dateEdited = Rxn<DateTime>();
+  @Property(type: PropertyType.date)
   DateTime? get dateEdited => _dateEdited.value;
   set dateEdited(DateTime? d) => _dateEdited.value = d;
 

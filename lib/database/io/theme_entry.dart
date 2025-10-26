@@ -15,7 +15,9 @@ class ThemeEntry {
   int? fontSize;
   int? fontWeight;
 
+  @Transient()
   Color? color;
+  @Property(type: PropertyType.string)
   String? get dbColor => color?.value.toRadixString(16);
   set dbColor(String? s) => s == null ? color = null : color = HexColor(s);
 
