@@ -375,9 +375,9 @@ class Message {
     this.isBookmarked = false,
   }) {
       if (error != null) _error.value = error;
-      if (dateRead != null) _dateRead.value = dateRead;
-      if (dateDelivered != null) _dateDelivered.value = dateDelivered;
-      if (dateEdited != null) _dateEdited.value = dateEdited;
+      if (dateRead != null) this.dateRead = dateRead;
+      if (dateDelivered != null) this.dateDelivered = dateDelivered;
+      if (dateEdited != null) this.dateEdited = dateEdited;
       if (isDelievered != null) _isDelivered.value = isDelievered;
       if (attachments.isEmpty) attachments = [];
       if (associatedMessages.isEmpty) associatedMessages = [];
@@ -591,10 +591,10 @@ class Message {
       existing.text = newMessage.text;
     }
     
-    existing._dateDelivered.value = newMessage._dateDelivered.value ?? existing._dateDelivered.value;
+    existing.dateDelivered = newMessage.dateDelivered ?? existing.dateDelivered;
     existing._isDelivered.value = newMessage._isDelivered.value;
-    existing._dateRead.value = newMessage._dateRead.value ?? existing._dateRead.value;
-    existing._dateEdited.value = newMessage._dateEdited.value ?? existing._dateEdited.value;
+    existing.dateRead = newMessage.dateRead ?? existing.dateRead;
+    existing.dateEdited = newMessage.dateEdited ?? existing.dateEdited;
     existing.attributedBody = newMessage.attributedBody.isNotEmpty ? newMessage.attributedBody : existing.attributedBody;
     existing.messageSummaryInfo = newMessage.messageSummaryInfo.isNotEmpty ? newMessage.messageSummaryInfo : existing.messageSummaryInfo;
     existing.payloadData = newMessage.payloadData ?? existing.payloadData;
@@ -1003,12 +1003,13 @@ class Message {
     }
 
     // Update date delivered
-    if ((existing._dateDelivered.value == null && newMessage._dateDelivered.value != null) ||
-        (existing._dateDelivered.value != null &&
-            newMessage.dateDelivered != null &&
-            existing._dateDelivered.value!.millisecondsSinceEpoch <
-                newMessage._dateDelivered.value!.millisecondsSinceEpoch)) {
-      existing._dateDelivered.value = newMessage.dateDelivered;
+    final existingDelivered = existing.dateDelivered;
+    final newDelivered = newMessage.dateDelivered;
+    if ((existingDelivered == null && newDelivered != null) ||
+        (existingDelivered != null &&
+            newDelivered != null &&
+            existingDelivered.millisecondsSinceEpoch < newDelivered.millisecondsSinceEpoch)) {
+      existing.dateDelivered = newDelivered;
     }
 
     // Update is delivered
@@ -1017,11 +1018,13 @@ class Message {
     }
 
     // Update date read
-    if ((existing._dateRead.value == null && newMessage._dateRead.value != null) ||
-        (existing._dateRead.value != null &&
-            newMessage._dateRead.value != null &&
-            existing._dateRead.value!.millisecondsSinceEpoch < newMessage._dateRead.value!.millisecondsSinceEpoch)) {
-      existing._dateRead.value = newMessage.dateRead;
+    final existingRead = existing.dateRead;
+    final newRead = newMessage.dateRead;
+    if ((existingRead == null && newRead != null) ||
+        (existingRead != null &&
+            newRead != null &&
+            existingRead.millisecondsSinceEpoch < newRead.millisecondsSinceEpoch)) {
+      existing.dateRead = newRead;
     }
 
     // Update date played
@@ -1178,8 +1181,8 @@ class Message {
       "country": country,
       "_error": _error.value,
       "dateCreated": dateCreated?.millisecondsSinceEpoch,
-      "dateRead": _dateRead.value?.millisecondsSinceEpoch,
-      "dateDelivered":  _dateDelivered.value?.millisecondsSinceEpoch,
+      "dateRead": dateRead?.millisecondsSinceEpoch,
+      "dateDelivered":  dateDelivered?.millisecondsSinceEpoch,
       "isDelivered": _isDelivered.value,
       "isFromMe": isFromMe!,
       "hasDdResults": hasDdResults!,

@@ -299,6 +299,7 @@ class Chat {
   String? displayName;
   @Transient()
   List<Handle> _participants = [];
+  @Transient()
   List<Handle> get participants {
     if (_participants.isEmpty) {
       getParticipants();
@@ -311,6 +312,7 @@ class Chat {
   List<String> textFieldAttachments = [];
   @Transient()
   Message? _latestMessage;
+  @Transient()
   Message get latestMessage {
     if (_latestMessage != null) return _latestMessage!;
     _latestMessage = Chat.getMessages(this, limit: 1, getDetails: true).firstOrNull ?? Message(
@@ -319,6 +321,7 @@ class Chat {
     );
     return _latestMessage!;
   }
+  @Transient()
   Message get dbLatestMessage {
     _latestMessage = Chat.getMessages(this, limit: 1, getDetails: true).firstOrNull ?? Message(
       dateCreated: DateTime.fromMillisecondsSinceEpoch(0),

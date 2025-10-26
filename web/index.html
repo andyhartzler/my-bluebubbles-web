@@ -129,7 +129,7 @@
         return;
       }
 
-      loader.load({
+      loader.loadEntrypoint({
         serviceWorker: {
           serviceWorkerVersion: serviceWorkerVersion,
         },
@@ -139,20 +139,9 @@
               useColorEmoji: true,
             })
             .then(function (appRunner) {
+              removeSplashFromWeb();
               appRunner.runApp();
             });
-    window.addEventListener('load', function(ev) {
-      const loader = new FlutterLoader();
-      loader.load({
-        serviceWorkerSettings: {
-          serviceWorkerVersion: serviceWorkerVersion,
-        },
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine({
-            useColorEmoji: true,
-          }).then(function(appRunner) {
-            appRunner.runApp();
-          });
         },
       });
     });

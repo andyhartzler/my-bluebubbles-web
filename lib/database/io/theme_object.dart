@@ -100,6 +100,7 @@ class ThemeObject {
     return entries;
   }
 
+  @Transient()
   ThemeData get themeData {
     assert(entries.length == ThemeColors.Colors.length);
     Map<String, ThemeEntry> data = {};

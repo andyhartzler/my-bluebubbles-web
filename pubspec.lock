@@ -13,10 +13,10 @@ packages:
     dependency: transitive
     description:
       name: _fe_analyzer_shared
-      sha256: "0b2f2bd91ba804e53a61d757b986f89f1f9eaed5b11e4b2f5a2468d86d6c9fc7"
+      sha256: "5aaf60d96c4cd00fe7f21594b5ad6a1b699c80a27420f8a837f4d68473ef09e3"
       url: "https://pub.dev"
     source: hosted
-    version: "67.0.0"
+    version: "68.0.0"
   adaptive_theme:
     dependency: "direct main"
     description:
@@ -29,10 +29,10 @@ packages:
     dependency: transitive
     description:
       name: analyzer
-      sha256: "37577842a27e4338429a1cbc32679d508836510b056f1eedf0c8d20e39c1383d"
+      sha256: "21f1d3720fd1c70316399d5e2bccaebb415c434592d778cce8acb967b8578808"
       url: "https://pub.dev"
     source: hosted
-    version: "6.4.1"
+    version: "6.5.0"
   animated_size_and_fade:
     dependency: "direct main"
     description:
