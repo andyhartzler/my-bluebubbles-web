@@ -21,8 +21,10 @@ class ThemeStruct {
   String name;
   bool gradientBg = false;
   String googleFont;
+  @Transient()
   ThemeData data;
 
+  @Property(type: PropertyType.string)
   String get dbThemeData {
     final map = toMap()['data'];
     return jsonEncode(map);
