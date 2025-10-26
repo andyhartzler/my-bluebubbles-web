@@ -290,10 +290,12 @@ class Message {
   set error(int i) => _error.value = i;
 
   final Rxn<DateTime> _dateRead = Rxn<DateTime>();
+  @Property(type: PropertyType.date)
   DateTime? get dateRead => _dateRead.value;
   set dateRead(DateTime? d) => _dateRead.value = d;
 
   final Rxn<DateTime> _dateDelivered = Rxn<DateTime>();
+  @Property(type: PropertyType.date)
   DateTime? get dateDelivered => _dateDelivered.value;
   set dateDelivered(DateTime? d) => _dateDelivered.value = d;
 
@@ -302,6 +304,7 @@ class Message {
   set isDelivered(bool b) => _isDelivered.value = b;
 
   final Rxn<DateTime> _dateEdited = Rxn<DateTime>();
+  @Property(type: PropertyType.date)
   DateTime? get dateEdited => _dateEdited.value;
   set dateEdited(DateTime? d) => _dateEdited.value = d;
 
