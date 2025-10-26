@@ -193,7 +193,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
 
     if (results.status == SmartReplySuggestionResultStatus.success) {
       Logger.info("Smart Replies found: ${results.suggestions.length}");
-      smartReplies.value = results.suggestions.map((e) => _buildReply(e)).toList();
+      smartReplies.value = results.suggestions.map((e) => _buildReply(e.text)).toList();
       Logger.debug(smartReplies.toString());
     } else {
       smartReplies.clear();
