@@ -131,7 +131,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
 
   @override
   void dispose() {
-    if (!kIsWeb && !kIsDesktop) smartReply.close();
+    if (!kIsWeb && !kIsDesktop) (smartReply as dynamic).close();
     chat.lastReadMessageGuid = _messages.first.guid;
     chat.save(updateLastReadMessageGuid: true);
     messageService.close(force: widget.customService != null);
@@ -193,7 +193,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
 
     if (results.status == SmartReplySuggestionResultStatus.success) {
       Logger.info("Smart Replies found: ${results.suggestions.length}");
-      smartReplies.value = results.suggestions.map((e) => _buildReply(e)).toList();
+      smartReplies.value = results.suggestions.map((e) => _buildReply(e.text)).toList();
       Logger.debug(smartReplies.toString());
     } else {
       smartReplies.clear();

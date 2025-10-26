@@ -1,5 +1,7 @@
 library google_ml_kit;
 
+import 'package:google_mlkit_smart_reply/google_mlkit_smart_reply.dart';
+
 export 'package:google_mlkit_smart_reply/google_mlkit_smart_reply.dart';
 
 class GoogleMlKit {
