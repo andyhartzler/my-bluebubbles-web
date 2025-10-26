@@ -131,7 +131,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
 
   @override
   void dispose() {
-    if (!kIsWeb && !kIsDesktop) smartReply.close();
+    if (!kIsWeb && !kIsDesktop) (smartReply as dynamic).close();
     chat.lastReadMessageGuid = _messages.first.guid;
     chat.save(updateLastReadMessageGuid: true);
     messageService.close(force: widget.customService != null);

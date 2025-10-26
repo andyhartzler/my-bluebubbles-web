@@ -62,7 +62,8 @@ class NotificationsService extends GetxService {
       const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('ic_stat_icon');
       const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
       await flnp.initialize(initializationSettings,
-          onDidReceiveNotificationResponse: (NotificationResponse response) async {
+          onDidReceiveNotificationResponse: (NotificationResponse? response) async {
+        if (response == null) return;
         final payload = response.payload;
         if (payload != null) {
           await intents.openChat(payload);
