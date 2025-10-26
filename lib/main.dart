@@ -49,6 +49,7 @@ import 'package:windows_taskbar/windows_taskbar.dart';
 
 bool isAuthing = false;
 final systemTray = st.SystemTray();
+final LocalNotifier localNotifier = LocalNotifier();
 
 @pragma('vm:entry-point')
 //ignore: prefer_void_to_null
