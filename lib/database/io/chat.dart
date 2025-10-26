@@ -297,6 +297,7 @@ class Chat {
     return title!;
   }
   String? displayName;
+  @Transient()
   List<Handle> _participants = [];
   List<Handle> get participants {
     if (_participants.isEmpty) {
@@ -308,6 +309,7 @@ class Chat {
   bool? autoSendTypingIndicators;
   String? textFieldText;
   List<String> textFieldAttachments = [];
+  @Transient()
   Message? _latestMessage;
   Message get latestMessage {
     if (_latestMessage != null) return _latestMessage!;
@@ -325,8 +327,9 @@ class Chat {
     return _latestMessage!;
   }
   set latestMessage(Message m) => _latestMessage = m;
-  @Property(uid: 526293286661780207)
+  @Property(uid: 526293286661780207, type: PropertyType.date)
   DateTime? dbOnlyLatestMessageDate;
+  @Property(type: PropertyType.date)
   DateTime? dateDeleted;
   int? style;
   bool lockChatName;

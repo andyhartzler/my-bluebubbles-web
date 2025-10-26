@@ -20,7 +20,9 @@ class ThemeObject {
   bool gradientBg = false;
   bool previousLightTheme = false;
   bool previousDarkTheme = false;
+  @Transient()
   ThemeData? data;
+  @Transient()
   List<ThemeEntry> entries = [];
 
   @Backlink('themeObject')
