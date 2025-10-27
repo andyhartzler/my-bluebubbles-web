@@ -512,16 +512,22 @@ class MessagesViewState extends OptimizedState<MessagesView> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: <Widget>[
                                     if (controller.showTypingIndicator.value && ss.settings.alwaysShowAvatars.value && iOS)
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 10.0),
-                                        child: ContactAvatarWidget(
-                                          key: Key("${chat.participants.first.address}-typing-indicator"),
-                                          handle: chat.participants.first,
-                                          size: 30,
-                                          fontSize: 14,
-                                          borderThickness: 0.1,
-                                        ),
-                                      ),
+                                      Builder(builder: (context) {
+                                        final typingHandle = chat.participants.firstOrNull;
+                                        if (typingHandle == null) {
+                                          return const SizedBox.shrink();
+                                        }
+                                        return Padding(
+                                          padding: const EdgeInsets.only(left: 10.0),
+                                          child: ContactAvatarWidget(
+                                            key: Key("${typingHandle.address}-typing-indicator"),
+                                            handle: typingHandle,
+                                            size: 30,
+                                            fontSize: 14,
+                                            borderThickness: 0.1,
+                                          ),
+                                        );
+                                      }),
                                     Padding(
                                       padding: const EdgeInsets.only(top: 5),
                                       child: TypingIndicator(
