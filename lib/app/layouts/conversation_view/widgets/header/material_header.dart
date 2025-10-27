@@ -368,9 +368,12 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
                 final firstParticipant = controller.chat.participants.isNotEmpty ? controller.chat.participants.first : null;
                 Text(
                   controller.chat.isGroup
-                    ? "${controller.chat.participants.length} recipients"
-                    : (firstParticipant?.address ?? controller.chat.chatIdentifier ?? ""),
-                  style: context.theme.textTheme.labelLarge!.apply(color: context.theme.colorScheme.outline),
+                      ? "${controller.chat.participants.length} recipients"
+                      : (controller.chat.participants.isNotEmpty
+                              ? (controller.chat.participants.first.address ?? controller.chat.chatIdentifier ?? "")
+                              : (controller.chat.chatIdentifier ?? "")),
+                  style: context.theme.textTheme.labelLarge!
+                      .apply(color: context.theme.colorScheme.outline),
                   maxLines: 1,
                   overflow: TextOverflow.fade,
                 ),
