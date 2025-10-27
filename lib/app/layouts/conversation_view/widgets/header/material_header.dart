@@ -365,6 +365,7 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
                 );
               }),
               if (samsung && (controller.chat.isGroup || (!title.isPhoneNumber && !title.isEmail)) && !hideInfo)
+                final firstParticipant = controller.chat.participants.isNotEmpty ? controller.chat.participants.first : null;
                 Text(
                   controller.chat.isGroup
                       ? "${controller.chat.participants.length} recipients"
