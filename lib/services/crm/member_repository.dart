@@ -273,21 +273,18 @@ class MemberRepository {
     try {
       final PostgrestResponse totalResponse = await _supabase.client
           .from('members')
-          .select('id')
-          .withCount(CountOption.exact);
+          .select('id', head: true, count: CountOption.exact);
       final total = totalResponse.count ?? 0;
 
       final PostgrestResponse optedOutResponse = await _supabase.client
           .from('members')
-          .select('id')
-          .withCount(CountOption.exact)
+          .select('id', head: true, count: CountOption.exact)
           .eq('opt_out', true);
       final optedOut = optedOutResponse.count ?? 0;
 
       final PostgrestResponse withPhoneResponse = await _supabase.client
           .from('members')
-          .select('id')
-          .withCount(CountOption.exact)
+          .select('id', head: true, count: CountOption.exact)
           .not('phone_e164', 'is', null);
       final withPhone = withPhoneResponse.count ?? 0;
 
