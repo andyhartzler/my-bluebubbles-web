@@ -115,7 +115,10 @@ class MemberRepository {
           .not('county', 'is', null);
 
       final counties = (response as List<dynamic>)
-          .map((item) => item['county'] as String)
+          .map((item) => Member.normalizeText(item['county']))
+          .whereType<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
           .toSet()
           .toList();
 
@@ -138,7 +141,10 @@ class MemberRepository {
           .not('congressional_district', 'is', null);
 
       final districts = (response as List<dynamic>)
-          .map((item) => item['congressional_district'] as String)
+          .map((item) => Member.normalizeDistrict(item['congressional_district']))
+          .whereType<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
           .toSet()
           .toList();
 
@@ -162,10 +168,9 @@ class MemberRepository {
 
       final allCommittees = <String>{};
       for (final item in response as List<dynamic>) {
-        final committees = item['committee'] as List<dynamic>?;
-        if (committees != null) {
-          allCommittees.addAll(committees.map((c) => c.toString()));
-        }
+        final committees = item['committee'];
+        final normalized = Member.normalizeTextList(committees);
+        allCommittees.addAll(normalized.map((value) => value.trim()).where((value) => value.isNotEmpty));
       }
 
       final sorted = allCommittees.toList()..sort();

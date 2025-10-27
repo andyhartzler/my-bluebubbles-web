@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/services/services.dart';
 
 /// Detailed view of a single member
 class MemberDetailScreen extends StatefulWidget {
@@ -95,15 +97,25 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   }
 
   void _startChat() {
-    if (_member.phoneE164 == null) {
+    final address = _member.phoneE164 ?? _member.phone;
+    if (address == null || address.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No phone number available')),
       );
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Would start chat with ${_member.name}')),
+    ns.pushAndRemoveUntil(
+      context,
+      ChatCreator(
+        initialSelected: [
+          SelectedContact(
+            displayName: _member.name,
+            address: address,
+          ),
+        ],
+      ),
+      (route) => route.isFirst,
     );
   }
 

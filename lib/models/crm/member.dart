@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Member model - maps to Supabase 'members' table
 /// This is a separate model from BlueBubbles Contact/Handle
 class Member {
@@ -107,82 +109,178 @@ class Member {
     this.areasOfInterest,
   });
 
+  /// Helper used to normalize free-form Supabase fields that may be stored as
+  /// raw strings, JSON objects, or Airtable-style maps.
+  static String? normalizeText(dynamic value) => _normalizeText(value);
+
+  /// Helper specifically for congressional district strings which may include
+  /// prefixes such as "District" from Airtable exports.
+  static String? normalizeDistrict(dynamic value) {
+    final normalized = _normalizeText(value);
+    if (normalized == null || normalized.isEmpty) return normalized;
+
+    final withoutPrefix =
+        normalized.replaceFirst(RegExp(r'^District\s+', caseSensitive: false), '').trim();
+    return withoutPrefix.isEmpty ? null : withoutPrefix;
+  }
+
+  /// Helper used to normalize lists of free-form values.
+  static List<String> normalizeTextList(dynamic value) => _normalizeTextList(value);
+
+  static String? _normalizeText(dynamic value) {
+    if (value == null) return null;
+
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+
+      final startsWithBrace = trimmed.startsWith('{') || trimmed.startsWith('[');
+      final endsWithBrace = trimmed.endsWith('}') || trimmed.endsWith(']');
+      if (startsWithBrace && endsWithBrace) {
+        try {
+          final decoded = jsonDecode(trimmed);
+          return _normalizeText(decoded);
+        } catch (_) {
+          const fallbackKeys = ['name', 'value', 'label', 'title', 'text'];
+          for (final key in fallbackKeys) {
+            final pattern = RegExp('"$key"\s*:\s*"([^"\\]+)"');
+            final match = pattern.firstMatch(trimmed);
+            if (match != null) {
+              return match.group(1)?.trim();
+            }
+          }
+          return trimmed;
+        }
+      }
+
+      return trimmed;
+    }
+
+    if (value is Map) {
+      const preferredKeys = ['name', 'value', 'label', 'title', 'text'];
+      for (final key in preferredKeys) {
+        if (value.containsKey(key)) {
+          final result = _normalizeText(value[key]);
+          if (result != null && result.isNotEmpty) {
+            return result;
+          }
+        }
+      }
+
+      for (final entry in value.entries) {
+        final result = _normalizeText(entry.value);
+        if (result != null && result.isNotEmpty) {
+          return result;
+        }
+      }
+
+      return null;
+    }
+
+    if (value is Iterable) {
+      for (final element in value) {
+        final result = _normalizeText(element);
+        if (result != null && result.isNotEmpty) {
+          return result;
+        }
+      }
+      return null;
+    }
+
+    final stringValue = value.toString().trim();
+    return stringValue.isEmpty ? null : stringValue;
+  }
+
+  /// Normalize a list of free-form Supabase values to readable strings.
+  static List<String> _normalizeTextList(dynamic value) {
+    final normalized = <String>{};
+    if (value is Iterable) {
+      for (final element in value) {
+        final result = _normalizeText(element);
+        if (result != null && result.isNotEmpty) {
+          normalized.add(result);
+        }
+      }
+    } else {
+      final result = _normalizeText(value);
+      if (result != null && result.isNotEmpty) {
+        normalized.add(result);
+      }
+    }
+    return normalized.toList();
+  }
+
   /// Create Member from Supabase JSON response
   factory Member.fromJson(Map<String, dynamic> json) {
-    List<String>? committee;
-    if (json['committee'] is List) {
-      committee = (json['committee'] as List)
-          .where((item) => item != null)
-          .map((item) => item.toString())
-          .toList();
-    }
+    final committeeValues = _normalizeTextList(json['committee']);
+    final committees = committeeValues.isEmpty ? null : committeeValues;
 
     return Member(
       id: json['id'] as String,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
-      name: json['name'] as String,
-      email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      phoneE164: json['phone_e164'] as String?,
+      name: _normalizeText(json['name']) ?? (json['name'] as String),
+      email: _normalizeText(json['email']),
+      phone: _normalizeText(json['phone']),
+      phoneE164: _normalizeText(json['phone_e164']),
       dateOfBirth: json['date_of_birth'] != null
           ? DateTime.parse(json['date_of_birth'] as String)
           : null,
-      preferredPronouns: json['preferred_pronouns'] as String?,
-      genderIdentity: json['gender_identity'] as String?,
-      address: json['address'] as String?,
-      county: json['county'] as String?,
-      congressionalDistrict: json['congressional_district'] as String?,
-      race: json['race'] as String?,
-      sexualOrientation: json['sexual_orientation'] as String?,
-      desireToLead: json['desire_to_lead'] as String?,
-      hoursPerWeek: json['hours_per_week'] as String?,
-      educationLevel: json['education_level'] as String?,
+      preferredPronouns: _normalizeText(json['preferred_pronouns']),
+      genderIdentity: _normalizeText(json['gender_identity']),
+      address: _normalizeText(json['address']),
+      county: _normalizeText(json['county']),
+      congressionalDistrict: normalizeDistrict(json['congressional_district']),
+      race: _normalizeText(json['race']),
+      sexualOrientation: _normalizeText(json['sexual_orientation']),
+      desireToLead: _normalizeText(json['desire_to_lead']),
+      hoursPerWeek: _normalizeText(json['hours_per_week']),
+      educationLevel: _normalizeText(json['education_level']),
       registeredVoter: json['registered_voter'] as bool?,
-      inSchool: json['in_school'] as String?,
-      schoolName: json['school_name'] as String?,
-      employed: json['employed'] as String?,
-      industry: json['industry'] as String?,
+      inSchool: _normalizeText(json['in_school']),
+      schoolName: _normalizeText(json['school_name']),
+      employed: _normalizeText(json['employed']),
+      industry: _normalizeText(json['industry']),
       hispanicLatino: json['hispanic_latino'] as bool?,
-      accommodations: json['accommodations'] as String?,
-      communityType: json['community_type'] as String?,
-      languages: json['languages'] as String?,
-      whyJoin: json['why_join'] as String?,
+      accommodations: _normalizeText(json['accommodations']),
+      communityType: _normalizeText(json['community_type']),
+      languages: _normalizeText(json['languages']),
+      whyJoin: _normalizeText(json['why_join']),
       lastContacted: json['last_contacted'] != null
           ? DateTime.parse(json['last_contacted'] as String)
           : null,
       optOut: json['opt_out'] as bool? ?? false,
-      committee: committee,
-      notes: json['notes'] as String?,
+      committee: committees,
+      notes: _normalizeText(json['notes']),
       introSentAt: json['intro_sent_at'] != null
           ? DateTime.parse(json['intro_sent_at'] as String)
           : null,
-      optOutReason: json['opt_out_reason'] as String?,
+      optOutReason: _normalizeText(json['opt_out_reason']),
       optOutDate: json['opt_out_date'] != null
           ? DateTime.parse(json['opt_out_date'] as String)
           : null,
       optInDate: json['opt_in_date'] != null
           ? DateTime.parse(json['opt_in_date'] as String)
           : null,
-      disability: json['disability'] as String?,
-      politicalExperience: json['political_experience'] as String?,
-      currentInvolvement: json['current_involvement'] as String?,
-      religion: json['religion'] as String?,
-      instagram: json['instagram'] as String?,
-      tiktok: json['tiktok'] as String?,
-      x: json['x'] as String?,
-      zodiacSign: json['zodiac_sign'] as String?,
-      leadershipExperience: json['leadership_experience'] as String?,
+      disability: _normalizeText(json['disability']),
+      politicalExperience: _normalizeText(json['political_experience']),
+      currentInvolvement: _normalizeText(json['current_involvement']),
+      religion: _normalizeText(json['religion']),
+      instagram: _normalizeText(json['instagram']),
+      tiktok: _normalizeText(json['tiktok']),
+      x: _normalizeText(json['x']),
+      zodiacSign: _normalizeText(json['zodiac_sign']),
+      leadershipExperience: _normalizeText(json['leadership_experience']),
       dateJoined: json['date_joined'] != null
           ? DateTime.parse(json['date_joined'] as String)
           : null,
-      goalsAndAmbitions: json['goals_and_ambitions'] as String?,
-      qualifiedExperience: json['qualified_experience'] as String?,
-      referralSource: json['referral_source'] as String?,
-      passionateIssues: json['passionate_issues'] as String?,
-      whyIssuesMatter: json['why_issues_matter'] as String?,
-      areasOfInterest: json['areas_of_interest'] as String?,
+      goalsAndAmbitions: _normalizeText(json['goals_and_ambitions']),
+      qualifiedExperience: _normalizeText(json['qualified_experience']),
+      referralSource: _normalizeText(json['referral_source']),
+      passionateIssues: _normalizeText(json['passionate_issues']),
+      whyIssuesMatter: _normalizeText(json['why_issues_matter']),
+      areasOfInterest: _normalizeText(json['areas_of_interest']),
     );
   }
 
