@@ -53,9 +53,13 @@ class SyncService extends GetxService {
     } else {
       final completer = Completer<List<List<int>>>();
       final port = RawReceivePort();
-      port.handler = (List<List<int>> response) {
+      port.handler = (dynamic response) {
         port.close();
-        completer.complete(response);
+        if (response is List<List<int>>) {
+          completer.complete(response);
+        } else {
+          completer.complete(<List<int>>[]);
+        }
       };
 
       FlutterIsolate? isolate;

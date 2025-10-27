@@ -68,6 +68,7 @@ class MaterialHeader extends StatelessWidget implements PreferredSizeWidget {
               ),
             );
           } : () async {
+            if (controller.chat.participants.isEmpty) return;
             final handle = controller.chat.participants.first;
             final contact = handle.contact;
             if (contact == null) {
@@ -91,14 +92,20 @@ class MaterialHeader extends StatelessWidget implements PreferredSizeWidget {
           padding: EdgeInsets.only(top: kIsDesktop ? 20 : 0),
           child: ManualMark(controller: controller),
         ),
-        if (Platform.isAndroid && !controller.chat.isGroup && controller.chat.participants.first.address.isPhoneNumber)
+        if (Platform.isAndroid &&
+            !controller.chat.isGroup &&
+            controller.chat.participants.isNotEmpty &&
+            controller.chat.participants.first.address.isPhoneNumber)
           IconButton(
             icon: Icon(Icons.call_outlined, color: context.theme.colorScheme.onBackground),
             onPressed: () {
               launchUrl(Uri(scheme: "tel", path: controller.chat.participants.first.address));
             },
           ),
-        if (Platform.isAndroid && !controller.chat.isGroup && controller.chat.participants.first.address.isEmail)
+        if (Platform.isAndroid &&
+            !controller.chat.isGroup &&
+            controller.chat.participants.isNotEmpty &&
+            controller.chat.participants.first.address.isEmail)
           IconButton(
             icon: Icon(Icons.mail_outlined, color: context.theme.colorScheme.onBackground),
             onPressed: () {
@@ -342,7 +349,13 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
                 if (controller.inSelectMode.value) {
                   _title = "${controller.selected.length} selected";
                 } else if (hideInfo) {
-                  _title = controller.chat.participants.length > 1 ? "Group Chat" : controller.chat.participants[0].fakeName;
+                  if (controller.chat.participants.length > 1) {
+                    _title = "Group Chat";
+                  } else if (controller.chat.participants.isNotEmpty) {
+                    _title = controller.chat.participants.first.fakeName;
+                  } else {
+                    _title = "Conversation";
+                  }
                 }
                 return Text(
                   _title,
@@ -352,10 +365,11 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
                 );
               }),
               if (samsung && (controller.chat.isGroup || (!title.isPhoneNumber && !title.isEmail)) && !hideInfo)
+                final firstParticipant = controller.chat.participants.isNotEmpty ? controller.chat.participants.first : null;
                 Text(
                   controller.chat.isGroup
                     ? "${controller.chat.participants.length} recipients"
-                    : controller.chat.participants[0].address,
+                    : (firstParticipant?.address ?? controller.chat.chatIdentifier ?? ""),
                   style: context.theme.textTheme.labelLarge!.apply(color: context.theme.colorScheme.outline),
                   maxLines: 1,
                   overflow: TextOverflow.fade,

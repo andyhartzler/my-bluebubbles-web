@@ -157,13 +157,15 @@ class ContactsService extends GetxService {
         displayName: e.displayName,
         emails: e.emails.map((e) => e.address).toList(),
         phones: e.phones.map((e) => e.number).toList(),
-        structuredName: e.structuredName == null ? null : StructuredName(
-          namePrefix: e.structuredName!.namePrefix,
-          givenName: e.structuredName!.givenName,
-          middleName: e.structuredName!.middleName,
-          familyName: e.structuredName!.familyName,
-          nameSuffix: e.structuredName!.nameSuffix,
-        ),
+        structuredName: e.structuredName == null
+            ? null
+            : StructuredName(
+                namePrefix: e.structuredName!.namePrefix ?? '',
+                givenName: e.structuredName!.givenName ?? '',
+                middleName: e.structuredName!.middleName ?? '',
+                familyName: e.structuredName!.familyName ?? '',
+                nameSuffix: e.structuredName!.nameSuffix ?? '',
+              ),
         id: e.id,
       )));
 
