@@ -103,7 +103,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
       _messages.forEachIndexed((i, m) {
         final c = mwc(m);
         c.cvController = controller;
-        listKey.currentState!.insertItem(i, duration: const Duration(milliseconds: 0));
+        _insertAnimatedItem(i);
       });
       // scroll to message if needed
       if (searchMessage != null) {
@@ -131,7 +131,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
 
   @override
   void dispose() {
-    if (!kIsWeb && !kIsDesktop) smartReply.close();
+    if (!kIsWeb && !kIsDesktop) (smartReply as dynamic).close();
     chat.lastReadMessageGuid = _messages.first.guid;
     chat.save(updateLastReadMessageGuid: true);
     messageService.close(force: widget.customService != null);
@@ -193,7 +193,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
 
     if (results.status == SmartReplySuggestionResultStatus.success) {
       Logger.info("Smart Replies found: ${results.suggestions.length}");
-      smartReplies.value = results.suggestions.map((e) => _buildReply(e)).toList();
+      smartReplies.value = results.suggestions.map((e) => _buildReply(e.text)).toList();
       Logger.debug(smartReplies.toString());
     } else {
       smartReplies.clear();
@@ -229,7 +229,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
       if (!mounted) return;
       final c = mwc(m);
       c.cvController = controller;
-      listKey.currentState!.insertItem(i, duration: const Duration(milliseconds: 0));
+      _insertAnimatedItem(i);
     });
     // should only happen when a reaction is the most recent message
     if (oldLength == 0) {
@@ -242,12 +242,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
     _messages.sort(Message.sort);
     final insertIndex = _messages.indexOf(message);
 
-    if (listKey.currentState != null) {
-      listKey.currentState!.insertItem(
-        insertIndex,
-        duration: const Duration(milliseconds: 500),
-      );
-    }
+    _insertAnimatedItem(insertIndex, duration: const Duration(milliseconds: 500));
 
     if (insertIndex == 0 && showSmartReplies) {
       _addMessageToSmartReply(message);
@@ -289,7 +284,37 @@ class MessagesViewState extends OptimizedState<MessagesView> {
     final index = _messages.indexWhere((e) => e.guid == message.guid);
     if (index != -1) {
       _messages.removeAt(index);
-      listKey.currentState!.removeItem(index, (context, animation) => const SizedBox.shrink());
+      _removeAnimatedItem(index);
+    }
+  }
+
+  void _insertAnimatedItem(int index, {Duration duration = Duration.zero}) {
+    if (!mounted) return;
+    final state = listKey.currentState;
+    if (state == null) {
+      Logger.debug("Skipping animated insert for index $index; SliverAnimatedListState not yet available.");
+      return;
+    }
+
+    try {
+      state.insertItem(index, duration: duration);
+    } catch (error, stack) {
+      Logger.error('Failed to insert animated message at index $index', error: error, trace: stack);
+    }
+  }
+
+  void _removeAnimatedItem(int index) {
+    if (!mounted) return;
+    final state = listKey.currentState;
+    if (state == null) {
+      Logger.debug("Skipping animated removal for index $index; SliverAnimatedListState not yet available.");
+      return;
+    }
+
+    try {
+      state.removeItem(index, (context, animation) => const SizedBox.shrink());
+    } catch (error, stack) {
+      Logger.error('Failed to remove animated message at index $index', error: error, trace: stack);
     }
   }
 
@@ -487,16 +512,22 @@ class MessagesViewState extends OptimizedState<MessagesView> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: <Widget>[
                                     if (controller.showTypingIndicator.value && ss.settings.alwaysShowAvatars.value && iOS)
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 10.0),
-                                        child: ContactAvatarWidget(
-                                          key: Key("${chat.participants.first.address}-typing-indicator"),
-                                          handle: chat.participants.first,
-                                          size: 30,
-                                          fontSize: 14,
-                                          borderThickness: 0.1,
-                                        ),
-                                      ),
+                                      Builder(builder: (context) {
+                                        final typingHandle = chat.participants.firstOrNull;
+                                        if (typingHandle == null) {
+                                          return const SizedBox.shrink();
+                                        }
+                                        return Padding(
+                                          padding: const EdgeInsets.only(left: 10.0),
+                                          child: ContactAvatarWidget(
+                                            key: Key("${typingHandle.address}-typing-indicator"),
+                                            handle: typingHandle,
+                                            size: 30,
+                                            fontSize: 14,
+                                            borderThickness: 0.1,
+                                          ),
+                                        );
+                                      }),
                                     Padding(
                                       padding: const EdgeInsets.only(top: 5),
                                       child: TypingIndicator(

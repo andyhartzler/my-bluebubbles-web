@@ -20,7 +20,9 @@ class ThemeObject {
   bool gradientBg = false;
   bool previousLightTheme = false;
   bool previousDarkTheme = false;
+  @Transient()
   ThemeData? data;
+  @Transient()
   List<ThemeEntry> entries = [];
 
   @Backlink('themeObject')
@@ -98,6 +100,7 @@ class ThemeObject {
     return entries;
   }
 
+  @Transient()
   ThemeData get themeData {
     assert(entries.length == ThemeColors.Colors.length);
     Map<String, ThemeEntry> data = {};

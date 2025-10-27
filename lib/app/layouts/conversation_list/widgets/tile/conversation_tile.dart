@@ -273,7 +273,13 @@ class _ChatTitleState extends CustomState<ChatTitle, void, ConversationTileContr
       final hideInfo = ss.settings.redactedMode.value && ss.settings.hideContactInfo.value;
       String _title = title;
       if (hideInfo) {
-        _title = controller.chat.participants.length > 1 ? "Group Chat" : controller.chat.participants[0].fakeName;
+        if (controller.chat.participants.length > 1) {
+          _title = "Group Chat";
+        } else if (controller.chat.participants.isNotEmpty) {
+          _title = controller.chat.participants.first.fakeName;
+        } else {
+          _title = "Conversation";
+        }
       }
 
       return RichText(

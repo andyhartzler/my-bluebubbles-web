@@ -56,15 +56,16 @@ class _TypingIndicatorState extends OptimizedState<TypingIndicator> {
         ),
       ) : Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 10, right: 10),
-            child: ContactAvatarWidget(
-              handle: cm.activeChat!.chat.participants.first,
-              size: 25,
-              fontSize: context.theme.textTheme.bodyMedium!.fontSize!,
-              borderThickness: 0.1,
+          if (cm.activeChat?.chat.participants.isNotEmpty ?? false)
+            Padding(
+              padding: const EdgeInsets.only(left: 10, right: 10),
+              child: ContactAvatarWidget(
+                handle: cm.activeChat!.chat.participants.first,
+                size: 25,
+                fontSize: context.theme.textTheme.bodyMedium!.fontSize!,
+                borderThickness: 0.1,
+              ),
             ),
-          ),
           AnimatedDot(index: 2),
           AnimatedDot(index: 1),
           AnimatedDot(index: 0),
