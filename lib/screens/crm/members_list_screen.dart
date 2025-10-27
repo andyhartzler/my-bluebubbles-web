@@ -123,6 +123,10 @@ class _MembersListScreenState extends State<MembersListScreen> {
     });
   }
 
+  bool _hasText(String? value) => value != null && value.trim().isNotEmpty;
+
+  String? _formatDistrict(String? value) => Member.formatDistrictLabel(value);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -273,6 +277,16 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   Widget _buildMemberTile(Member member) {
+    final phoneDisplay = _hasText(member.phone)
+        ? member.phone!.trim()
+        : (_hasText(member.phoneE164) ? member.phoneE164!.trim() : null);
+
+    final locationBits = <String>[
+      if (_hasText(member.county)) member.county!.trim(),
+      if (_formatDistrict(member.congressionalDistrict) != null)
+        _formatDistrict(member.congressionalDistrict)!,
+    ];
+
     return ListTile(
       leading: CircleAvatar(
         child: Text(member.name[0].toUpperCase()),
@@ -281,15 +295,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (member.phone != null) Text(member.phone!),
-          if (member.county != null || member.congressionalDistrict != null)
-            Text(
-              [
-                if (member.county != null) member.county!,
-                if (member.congressionalDistrict != null) 'CD-${member.congressionalDistrict}',
-              ].join(' • '),
-              style: const TextStyle(fontSize: 12),
-            ),
+          if (phoneDisplay != null) Text(phoneDisplay),
+          if (locationBits.isNotEmpty)
+            Text(locationBits.join(' • '), style: const TextStyle(fontSize: 12)),
         ],
       ),
       trailing: Row(
@@ -378,8 +386,10 @@ class _MembersListScreenState extends State<MembersListScreen> {
                   },
                 ),
               ),
-              ..._districts.map((district) => ListTile(
-                    title: Text('District $district'),
+              ..._districts.map((district) {
+                final label = _formatDistrict(district) ?? district;
+                return ListTile(
+                    title: Text('District $label'),
                     leading: Radio<String?>(
                       value: district,
                       groupValue: _selectedDistrict,
@@ -389,7 +399,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
                         Navigator.pop(context);
                       },
                     ),
-                  )),
+                  );
+              }),
             ],
           ),
         ),

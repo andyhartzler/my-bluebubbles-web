@@ -26,6 +26,10 @@ class _CRMMemberPanelState extends State<CRMMemberPanel> {
 
   bool get _isReady => _supabaseService.isInitialized && CRMConfig.crmEnabled;
 
+  bool _hasText(String? value) => value != null && value.trim().isNotEmpty;
+
+  String? _districtLabel(String? value) => Member.formatDistrictLabel(value);
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +85,8 @@ class _CRMMemberPanelState extends State<CRMMemberPanel> {
       );
     }
 
+    final districtLabel = _districtLabel(_member!.congressionalDistrict);
+
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
@@ -106,10 +112,10 @@ class _CRMMemberPanelState extends State<CRMMemberPanel> {
             ),
           ),
         const Divider(height: 32),
-        if (_member!.county != null)
-          _buildInfoTile(Icons.location_on, 'County', _member!.county!),
-        if (_member!.congressionalDistrict != null)
-          _buildInfoTile(Icons.account_balance, 'District', 'CD-${_member!.congressionalDistrict}'),
+        if (_hasText(_member!.county))
+          _buildInfoTile(Icons.location_on, 'County', _member!.county!.trim()),
+        if (districtLabel != null)
+          _buildInfoTile(Icons.account_balance, 'District', districtLabel),
         if (_member!.committee != null && _member!.committee!.isNotEmpty)
           _buildInfoTile(Icons.group, 'Committees', _member!.committeesString),
         if (_member!.age != null)

@@ -142,6 +142,7 @@ class MemberRepository {
 
       final districts = (response as List<dynamic>)
           .map((item) => Member.normalizeDistrict(item['congressional_district']))
+          .map((value) => Member.formatDistrictLabel(value))
           .whereType<String>()
           .map((value) => value.trim())
           .where((value) => value.isNotEmpty)

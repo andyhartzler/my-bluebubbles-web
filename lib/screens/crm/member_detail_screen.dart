@@ -96,27 +96,37 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
   }
 
-  void _startChat() {
-    final address = _member.phoneE164 ?? _member.phone;
-    if (address == null || address.isEmpty) {
+  Future<void> _startChat() async {
+    final address = _cleanText(_member.phoneE164) ?? _cleanText(_member.phone);
+    if (address == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No phone number available')),
       );
       return;
     }
 
-    ns.pushAndRemoveUntil(
-      context,
-      ChatCreator(
-        initialSelected: [
-          SelectedContact(
-            displayName: _member.name,
-            address: address,
-          ),
-        ],
-      ),
-      (route) => route.isFirst,
-    );
+    final navContext = ns.key.currentContext ?? context;
+
+    try {
+      await ns.pushAndRemoveUntil(
+        navContext,
+        ChatCreator(
+          initialSelected: [
+            SelectedContact(
+              displayName: _member.name,
+              address: address,
+            ),
+          ],
+        ),
+        (route) => route.isFirst,
+        closeActiveChat: false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to open chat composer: $e')),
+      );
+    }
   }
 
   @override
@@ -142,177 +152,239 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                 ),
               ),
             )
-          : ListView(
-              padding: const EdgeInsets.all(16.0),
-              children: [
-                Center(
-                  child: CircleAvatar(
-                    radius: 50,
+          : () {
+              final phoneDisplay = _cleanText(_member.phone);
+              final phoneE164 = _cleanText(_member.phoneE164);
+              final email = _cleanText(_member.email);
+              final address = _cleanText(_member.address);
+              final county = _cleanText(_member.county);
+              final districtLabel = _formatDistrict(_member.congressionalDistrict);
+              final committees = (_member.committee != null && _member.committee!.isNotEmpty)
+                  ? _member.committeesString
+                  : null;
+              final notesValue = _cleanText(_member.notes);
+
+              final sections = <Widget?>[
+                _buildOptionalSection('Contact Information', [
+                  _copyRow('Phone', phoneDisplay),
+                  if (phoneE164 != null && phoneE164 != phoneDisplay)
+                    _copyRow('Phone (E.164)', phoneE164),
+                  _copyRow('Email', email),
+                  _infoRowOrNull('Address', address),
+                ]),
+                _buildOptionalSection('Social Profiles', [
+                  _copyRow('Instagram', _member.instagram),
+                  _copyRow('TikTok', _member.tiktok),
+                  _copyRow('X (Twitter)', _member.x),
+                ]),
+                _buildOptionalSection('Political & Civic', [
+                  _infoRowOrNull('County', county),
+                  if (districtLabel != null) _buildInfoRow('Congressional District', districtLabel),
+                  if (committees != null) _buildInfoRow('Committees', committees),
+                  if (_member.registeredVoter != null)
+                    _buildInfoRow('Registered Voter', _member.registeredVoter! ? 'Yes' : 'No'),
+                  _infoRowOrNull('Political Experience', _member.politicalExperience),
+                  _infoRowOrNull('Current Involvement', _member.currentInvolvement),
+                ]),
+                _buildOptionalSection('Education & Employment', [
+                  _infoRowOrNull('Education Level', _member.educationLevel),
+                  _infoRowOrNull('In School', _member.inSchool),
+                  _infoRowOrNull('School Name', _member.schoolName),
+                  _infoRowOrNull('Employed', _member.employed),
+                  _infoRowOrNull('Industry', _member.industry),
+                  _infoRowOrNull('Leadership Experience', _member.leadershipExperience),
+                ]),
+                _buildOptionalSection('Personal Details', [
+                  if (_member.dateOfBirth != null)
+                    _buildInfoRow('Date of Birth', _formatDateOnly(_member.dateOfBirth!)),
+                  if (_member.age != null)
+                    _buildInfoRow('Age', '${_member.age} years old'),
+                  _infoRowOrNull('Pronouns', _member.preferredPronouns),
+                  _infoRowOrNull('Gender Identity', _member.genderIdentity),
+                  _infoRowOrNull('Race', _member.race),
+                  _infoRowOrNull('Sexual Orientation', _member.sexualOrientation),
+                  if (_member.hispanicLatino != null)
+                    _buildInfoRow('Hispanic/Latino', _member.hispanicLatino! ? 'Yes' : 'No'),
+                  _infoRowOrNull('Languages', _member.languages),
+                  _infoRowOrNull('Community Type', _member.communityType),
+                  _infoRowOrNull('Disability', _member.disability),
+                  _infoRowOrNull('Religion', _member.religion),
+                  _infoRowOrNull('Zodiac Sign', _member.zodiacSign),
+                ]),
+                _buildOptionalSection('Engagement & Interests', [
+                  _infoRowOrNull('Desire to Lead', _member.desireToLead),
+                  _infoRowOrNull('Hours per Week', _member.hoursPerWeek),
+                  _infoRowOrNull('Why Join', _member.whyJoin),
+                  _infoRowOrNull('Goals & Ambitions', _member.goalsAndAmbitions),
+                  _infoRowOrNull('Qualified Experience', _member.qualifiedExperience),
+                  _infoRowOrNull('Referral Source', _member.referralSource),
+                  _infoRowOrNull('Passionate Issues', _member.passionateIssues),
+                  _infoRowOrNull('Why Issues Matter', _member.whyIssuesMatter),
+                  _infoRowOrNull('Areas of Interest', _member.areasOfInterest),
+                  _infoRowOrNull('Accommodations', _member.accommodations),
+                ]),
+              ].whereType<Widget>().toList();
+
+              final metadataSection = _buildOptionalSection('CRM Metadata', [
+                _copyRow('Member ID', _member.id),
+                if (_member.lastContacted != null)
+                  _buildInfoRow('Last Contacted', _formatDate(_member.lastContacted!)),
+                if (_member.introSentAt != null)
+                  _buildInfoRow('Intro Sent', _formatDate(_member.introSentAt!)),
+                if (_member.dateJoined != null)
+                  _buildInfoRow('Date Joined', _formatDate(_member.dateJoined!)),
+                if (_member.createdAt != null)
+                  _buildInfoRow('Added to System', _formatDate(_member.createdAt!)),
+                _infoRowOrNull('Opt-Out Reason', _member.optOutReason),
+                if (_member.optOutDate != null)
+                  _buildInfoRow('Opt-Out Date', _formatDateOnly(_member.optOutDate!)),
+                if (_member.optInDate != null)
+                  _buildInfoRow('Opt-In Date', _formatDateOnly(_member.optInDate!)),
+              ]);
+
+              final notesChildren = <Widget>[];
+              if (!_editingNotes && notesValue == null) {
+                notesChildren.add(TextButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add notes'),
+                  onPressed: () => setState(() => _editingNotes = true),
+                ));
+              }
+              if (!_editingNotes && notesValue != null) {
+                notesChildren.add(Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(notesValue),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Edit'),
+                      onPressed: () => setState(() => _editingNotes = true),
+                    ),
+                  ],
+                ));
+              }
+              if (_editingNotes) {
+                notesChildren.add(Column(
+                  children: [
+                    TextField(
+                      controller: _notesController,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        hintText: 'Add notes about this member...',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            _notesController.text = _member.notes ?? '';
+                            setState(() => _editingNotes = false);
+                          },
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _saveNotes,
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ));
+              }
+              final notesSection =
+                  notesChildren.isEmpty ? null : _buildSection('Notes', notesChildren);
+
+              return ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  Center(
+                    child: CircleAvatar(
+                      radius: 50,
+                      child: Text(
+                        _member.name[0].toUpperCase(),
+                        style: const TextStyle(fontSize: 32),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
                     child: Text(
-                      _member.name[0].toUpperCase(),
-                      style: const TextStyle(fontSize: 32),
+                      _member.name,
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: Text(
-                    _member.name,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (_member.optOut)
-                  const Center(
-                    child: Chip(
-                      label: Text('OPTED OUT'),
-                      backgroundColor: Colors.red,
-                      labelStyle: TextStyle(color: Colors.white),
+                  const SizedBox(height: 8),
+                  if (_member.optOut)
+                    const Center(
+                      child: Chip(
+                        label: Text('OPTED OUT'),
+                        backgroundColor: Colors.red,
+                        labelStyle: TextStyle(color: Colors.white),
+                      ),
                     ),
+                  const SizedBox(height: 24),
+                  ...sections,
+                  if (notesSection != null) notesSection,
+                  if (metadataSection != null) metadataSection,
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    icon: Icon(_member.optOut ? Icons.check_circle : Icons.block),
+                    label: Text(_member.optOut ? 'Opt In' : 'Opt Out'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _member.optOut ? Colors.green : Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _crmReady ? _toggleOptOut : null,
                   ),
-                const SizedBox(height: 24),
-                _buildSection(
-                  'Contact Information',
-                  [
-                    if (_member.phone != null)
-                      _buildInfoRow('Phone', _member.phone!,
-                          trailing: IconButton(
-                            icon: const Icon(Icons.copy, size: 20),
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: _member.phone!));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Phone copied')),
-                              );
-                            },
-                          )),
-                    if (_member.email != null)
-                      _buildInfoRow('Email', _member.email!,
-                          trailing: IconButton(
-                            icon: const Icon(Icons.copy, size: 20),
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: _member.email!));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Email copied')),
-                              );
-                            },
-                          )),
-                    if (_member.address != null)
-                      _buildInfoRow('Address', _member.address!),
-                  ],
-                ),
-                _buildSection(
-                  'Political Information',
-                  [
-                    if (_member.county != null)
-                      _buildInfoRow('County', _member.county!),
-                    if (_member.congressionalDistrict != null)
-                      _buildInfoRow('Congressional District', 'CD-${_member.congressionalDistrict}'),
-                    if (_member.committee != null && _member.committee!.isNotEmpty)
-                      _buildInfoRow('Committees', _member.committeesString),
-                    if (_member.registeredVoter != null)
-                      _buildInfoRow('Registered Voter', _member.registeredVoter! ? 'Yes' : 'No'),
-                    if (_member.politicalExperience != null)
-                      _buildInfoRow('Political Experience', _member.politicalExperience!),
-                    if (_member.currentInvolvement != null)
-                      _buildInfoRow('Current Involvement', _member.currentInvolvement!),
-                  ],
-                ),
-                _buildSection(
-                  'Personal Information',
-                  [
-                    if (_member.age != null)
-                      _buildInfoRow('Age', '${_member.age} years old'),
-                    if (_member.preferredPronouns != null)
-                      _buildInfoRow('Pronouns', _member.preferredPronouns!),
-                    if (_member.genderIdentity != null)
-                      _buildInfoRow('Gender Identity', _member.genderIdentity!),
-                    if (_member.race != null)
-                      _buildInfoRow('Race', _member.race!),
-                    if (_member.hispanicLatino != null)
-                      _buildInfoRow('Hispanic/Latino', _member.hispanicLatino! ? 'Yes' : 'No'),
-                  ],
-                ),
-                _buildSection(
-                  'Notes',
-                  [
-                    if (!_editingNotes && (_member.notes == null || _member.notes!.isEmpty))
-                      TextButton.icon(
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add notes'),
-                        onPressed: () => setState(() => _editingNotes = true),
-                      ),
-                    if (!_editingNotes && _member.notes != null && _member.notes!.isNotEmpty)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_member.notes!),
-                          const SizedBox(height: 8),
-                          TextButton.icon(
-                            icon: const Icon(Icons.edit),
-                            label: const Text('Edit'),
-                            onPressed: () => setState(() => _editingNotes = true),
-                          ),
-                        ],
-                      ),
-                    if (_editingNotes)
-                      Column(
-                        children: [
-                          TextField(
-                            controller: _notesController,
-                            maxLines: 5,
-                            decoration: const InputDecoration(
-                              hintText: 'Add notes about this member...',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton(
-                                onPressed: () {
-                                  _notesController.text = _member.notes ?? '';
-                                  setState(() => _editingNotes = false);
-                                },
-                                child: const Text('Cancel'),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: _saveNotes,
-                                child: const Text('Save'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-                _buildSection(
-                  'Metadata',
-                  [
-                    if (_member.lastContacted != null)
-                      _buildInfoRow('Last Contacted', _formatDate(_member.lastContacted!)),
-                    if (_member.introSentAt != null)
-                      _buildInfoRow('Intro Sent', _formatDate(_member.introSentAt!)),
-                    if (_member.dateJoined != null)
-                      _buildInfoRow('Date Joined', _formatDate(_member.dateJoined!)),
-                    if (_member.createdAt != null)
-                      _buildInfoRow('Added to System', _formatDate(_member.createdAt!)),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  icon: Icon(_member.optOut ? Icons.check_circle : Icons.block),
-                  label: Text(_member.optOut ? 'Opt In' : 'Opt Out'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _member.optOut ? Colors.green : Colors.red,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: _crmReady ? _toggleOptOut : null,
-                ),
-              ],
-            ),
+                ],
+              );
+            }(),
     );
+  }
+
+  String? _cleanText(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  bool _hasText(String? value) => _cleanText(value) != null;
+
+  String? _formatDistrict(String? value) => Member.formatDistrictLabel(value);
+
+  Widget? _infoRowOrNull(String label, String? value, {Widget? trailing}) {
+    final cleaned = _cleanText(value);
+    if (cleaned == null) return null;
+    return _buildInfoRow(label, cleaned, trailing: trailing);
+  }
+
+  Widget? _copyRow(String label, String? value) {
+    final cleaned = _cleanText(value);
+    if (cleaned == null) return null;
+    return _buildInfoRow(
+      label,
+      cleaned,
+      trailing: IconButton(
+        icon: const Icon(Icons.copy, size: 20),
+        onPressed: () {
+          Clipboard.setData(ClipboardData(text: cleaned));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$label copied')),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget? _buildOptionalSection(String title, Iterable<Widget?> rows) {
+    final visible = rows.whereType<Widget>().toList();
+    if (visible.isEmpty) return null;
+    return _buildSection(title, visible);
   }
 
   Widget _buildSection(String title, List<Widget> children) {
@@ -386,4 +458,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       return '${date.month}/${date.day}/${date.year}';
     }
   }
+
+  String _formatDateOnly(DateTime date) => '${date.month}/${date.day}/${date.year}';
 }

@@ -114,14 +114,24 @@ class Member {
   static String? normalizeText(dynamic value) => _normalizeText(value);
 
   /// Helper specifically for congressional district strings which may include
-  /// prefixes such as "District" from Airtable exports.
+  /// prefixes such as "District" or embedded JSON blobs from Airtable exports.
   static String? normalizeDistrict(dynamic value) {
     final normalized = _normalizeText(value);
-    if (normalized == null || normalized.isEmpty) return normalized;
+    if (normalized == null || normalized.isEmpty) return null;
 
     final withoutPrefix =
         normalized.replaceFirst(RegExp(r'^District\s+', caseSensitive: false), '').trim();
-    return withoutPrefix.isEmpty ? null : withoutPrefix;
+    if (withoutPrefix.isEmpty) return null;
+
+    final secondPass = _normalizeText(withoutPrefix) ?? withoutPrefix;
+    return _formatDistrictString(secondPass);
+  }
+
+  /// Format a district value for display, ensuring we only show a single CD-
+  /// prefix when the value is numeric.
+  static String? formatDistrictLabel(String? value) {
+    if (value == null) return null;
+    return _formatDistrictString(value);
   }
 
   /// Helper used to normalize lists of free-form values.
@@ -141,17 +151,13 @@ class Member {
           final decoded = jsonDecode(trimmed);
           return _normalizeText(decoded);
         } catch (_) {
-          const fallbackKeys = ['name', 'value', 'label', 'title', 'text'];
-          for (final key in fallbackKeys) {
-            final pattern = RegExp('"$key"\s*:\s*"([^"\\]+)"');
-            final match = pattern.firstMatch(trimmed);
-            if (match != null) {
-              return match.group(1)?.trim();
-            }
-          }
-          return trimmed;
+          final fallback = _extractCommonValue(trimmed);
+          return fallback ?? trimmed;
         }
       }
+
+      final fallback = _extractCommonValue(trimmed);
+      return fallback ?? trimmed;
 
       return trimmed;
     }
@@ -188,7 +194,10 @@ class Member {
     }
 
     final stringValue = value.toString().trim();
-    return stringValue.isEmpty ? null : stringValue;
+    if (stringValue.isEmpty) return null;
+
+    final fallback = _extractCommonValue(stringValue);
+    return fallback ?? stringValue;
   }
 
   /// Normalize a list of free-form Supabase values to readable strings.
@@ -208,6 +217,51 @@ class Member {
       }
     }
     return normalized.toList();
+  }
+
+
+  /// Attempt to pull a human readable value out of loosely formatted JSON blobs.
+  static String? _extractCommonValue(String source) {
+    const fallbackKeys = ['name', 'value', 'label', 'title', 'text'];
+    for (final key in fallbackKeys) {
+      final pattern = RegExp('"$key"\s*:\s*"([^"\\]+)"');
+      final match = pattern.firstMatch(source);
+      if (match != null) {
+        final extracted = match.group(1)?.trim();
+        if (extracted != null && extracted.isNotEmpty) {
+          return extracted;
+        }
+      }
+    }
+
+    final cdMatch = RegExp(r'CD[-\s]?(\d+)', caseSensitive: false).firstMatch(source);
+    if (cdMatch != null) {
+      return 'CD-${cdMatch.group(1)}';
+    }
+
+    return null;
+  }
+
+  static String? _formatDistrictString(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+
+    final cdMatch = RegExp(r'^CD[-\s]?(\d+)$', caseSensitive: false).firstMatch(trimmed);
+    if (cdMatch != null) {
+      return 'CD-${cdMatch.group(1)}';
+    }
+
+    final digitsMatch = RegExp(r'^(\d+)$').firstMatch(trimmed);
+    if (digitsMatch != null) {
+      return 'CD-${digitsMatch.group(1)}';
+    }
+
+    final embeddedCd = RegExp(r'CD[-\s]?(\d+)', caseSensitive: false).firstMatch(trimmed);
+    if (embeddedCd != null) {
+      return 'CD-${embeddedCd.group(1)}';
+    }
+
+    return trimmed;
   }
 
   /// Create Member from Supabase JSON response
