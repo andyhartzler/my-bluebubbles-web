@@ -291,13 +291,21 @@ class Message {
 
   final Rxn<DateTime> _dateRead = Rxn<DateTime>();
   @Property(type: PropertyType.date)
-  DateTime? get dateRead => _dateRead.value;
-  set dateRead(DateTime? d) => _dateRead.value = d;
+  DateTime? dateReadDb;
+  DateTime? get dateRead => _dateRead.value ?? dateReadDb;
+  set dateRead(DateTime? d) {
+    _dateRead.value = d;
+    dateReadDb = d;
+  }
 
   final Rxn<DateTime> _dateDelivered = Rxn<DateTime>();
   @Property(type: PropertyType.date)
-  DateTime? get dateDelivered => _dateDelivered.value;
-  set dateDelivered(DateTime? d) => _dateDelivered.value = d;
+  DateTime? dateDeliveredDb;
+  DateTime? get dateDelivered => _dateDelivered.value ?? dateDeliveredDb;
+  set dateDelivered(DateTime? d) {
+    _dateDelivered.value = d;
+    dateDeliveredDb = d;
+  }
 
   final RxBool _isDelivered = RxBool(false);
   bool get isDelivered => (dateDelivered != null) ? true : _isDelivered.value;
@@ -305,8 +313,12 @@ class Message {
 
   final Rxn<DateTime> _dateEdited = Rxn<DateTime>();
   @Property(type: PropertyType.date)
-  DateTime? get dateEdited => _dateEdited.value;
-  set dateEdited(DateTime? d) => _dateEdited.value = d;
+  DateTime? dateEditedDb;
+  DateTime? get dateEdited => _dateEdited.value ?? dateEditedDb;
+  set dateEdited(DateTime? d) {
+    _dateEdited.value = d;
+    dateEditedDb = d;
+  }
 
   @Backlink('message')
   final dbAttachments = ToMany<Attachment>();

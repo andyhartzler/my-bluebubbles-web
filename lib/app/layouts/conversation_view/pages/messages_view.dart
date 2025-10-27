@@ -291,26 +291,30 @@ class MessagesViewState extends OptimizedState<MessagesView> {
   void _insertAnimatedItem(int index, {Duration duration = Duration.zero}) {
     if (!mounted) return;
     final state = listKey.currentState;
-    if (state != null) {
+    if (state == null) {
+      Logger.debug("Skipping animated insert for index $index; SliverAnimatedListState not yet available.");
+      return;
+    }
+
+    try {
       state.insertItem(index, duration: duration);
-    } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        listKey.currentState?.insertItem(index, duration: duration);
-      });
+    } catch (error, stack) {
+      Logger.error('Failed to insert animated message at index $index', error: error, trace: stack);
     }
   }
 
   void _removeAnimatedItem(int index) {
     if (!mounted) return;
     final state = listKey.currentState;
-    if (state != null) {
+    if (state == null) {
+      Logger.debug("Skipping animated removal for index $index; SliverAnimatedListState not yet available.");
+      return;
+    }
+
+    try {
       state.removeItem(index, (context, animation) => const SizedBox.shrink());
-    } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        listKey.currentState?.removeItem(index, (context, animation) => const SizedBox.shrink());
-      });
+    } catch (error, stack) {
+      Logger.error('Failed to remove animated message at index $index', error: error, trace: stack);
     }
   }
 
