@@ -364,18 +364,37 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
                   overflow: TextOverflow.fade,
                 );
               }),
-              if (samsung && (controller.chat.isGroup || (!title.isPhoneNumber && !title.isEmail)) && !hideInfo)
-                final firstParticipant = controller.chat.participants.isNotEmpty ? controller.chat.participants.first : null;
-                Text(
-                  controller.chat.isGroup
-                      ? "${controller.chat.participants.length} recipients"
-                      : (controller.chat.participants.isNotEmpty
-                              ? (controller.chat.participants.first.address ?? controller.chat.chatIdentifier ?? "")
-                              : (controller.chat.chatIdentifier ?? "")),
-                  style: context.theme.textTheme.labelLarge!
-                      .apply(color: context.theme.colorScheme.outline),
-                  maxLines: 1,
-                  overflow: TextOverflow.fade,
+              if (samsung && !hideInfo)
+                Builder(
+                  builder: (context) {
+                    if (!controller.chat.isGroup && title.isPhoneNumber) {
+                      return const SizedBox.shrink();
+                    }
+
+                    if (!controller.chat.isGroup && title.isEmail) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final subtitleText = controller.chat.isGroup
+                        ? "${controller.chat.participants.length} recipients"
+                        : controller.chat.participants.isNotEmpty
+                            ? (controller.chat.participants.first.address ??
+                                controller.chat.chatIdentifier ??
+                                "")
+                            : (controller.chat.chatIdentifier ?? "");
+
+                    if (subtitleText.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Text(
+                      subtitleText,
+                      style: context.theme.textTheme.labelLarge!
+                          .apply(color: context.theme.colorScheme.outline),
+                      maxLines: 1,
+                      overflow: TextOverflow.fade,
+                    );
+                  },
                 ),
             ],
           ),
