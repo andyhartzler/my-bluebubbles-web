@@ -30,6 +30,7 @@ class Contact {
   String displayName;
   List<String> phones;
   List<String> emails;
+  @Transient()
   StructuredName? structuredName;
   Uint8List? avatar;
 

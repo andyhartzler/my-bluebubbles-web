@@ -134,8 +134,11 @@ class SettingsService extends GetxService {
   }
 
   Future<void> saveFCMData(FCMData data) async {
-    fcmData = data;
-    await fcmData.save(wait: true);
+    if (kIsWeb) {
+      fcmData = await data.save();
+    } else {
+      fcmData = await data.save(wait: true);
+    }
   }
 
   Future<Tuple4<int, int, String, int>> getServerDetails({bool refresh = false}) async {
