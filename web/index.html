@@ -12,7 +12,7 @@
     This is a placeholder for base href that will be replaced by the value of
     the `--base-href` argument provided to `flutter build`.
   -->
-  <base href="/web/">
+  <base href="/">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
@@ -35,7 +35,7 @@
 
   <script>
     // The value below is injected by flutter build, do not touch.
-    var serviceWorkerVersion = null;
+    const serviceWorkerVersion = '{{flutter_service_worker_version}}';
   </script>
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer=""></script>
@@ -122,18 +122,27 @@
   </picture>
   
   <script>
-    window.addEventListener('load', function(ev) {
-      // Download main.dart.js
-      _flutter.loader.loadEntrypoint({
+    window.addEventListener('load', function () {
+      const loader = window._flutter?.loader;
+      if (!loader) {
+        console.error('Flutter loader not found. Ensure flutter.js is loaded.');
+        return;
+      }
+
+      loader.loadEntrypoint({
         serviceWorker: {
           serviceWorkerVersion: serviceWorkerVersion,
-        }
-      }).then(function(engineInitializer) {
-        return engineInitializer.initializeEngine({
-          useColorEmoji: true,
-        });
-      }).then(function(appRunner) {
-        return appRunner.runApp();
+        },
+        onEntrypointLoaded: function (engineInitializer) {
+          engineInitializer
+            .initializeEngine({
+              useColorEmoji: true,
+            })
+            .then(function (appRunner) {
+              removeSplashFromWeb();
+              appRunner.runApp();
+            });
+        },
       });
     });
   </script>

@@ -61,9 +61,12 @@ class NotificationsService extends GetxService {
     if (!kIsWeb && !kIsDesktop) {
       const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('ic_stat_icon');
       const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-      await flnp.initialize(initializationSettings, onDidReceiveNotificationResponse: (NotificationResponse? response) {
-        if (response?.payload != null) {
-          intents.openChat(response!.payload);
+      await flnp.initialize(initializationSettings,
+          onDidReceiveNotificationResponse: (NotificationResponse? response) async {
+        if (response == null) return;
+        final payload = response.payload;
+        if (payload != null) {
+          await intents.openChat(payload);
         }
       });
       final details = await flnp.getNotificationAppLaunchDetails();

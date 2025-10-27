@@ -143,7 +143,13 @@ class _ChatInfoState extends OptimizedState<ChatInfo> {
     final hideInfo = ss.settings.redactedMode.value && ss.settings.hideContactInfo.value;
     String _title = chat.properTitle;
     if (hideInfo) {
-      _title = chat.participants.length > 1 ? "Group Chat" : chat.participants[0].fakeName;
+      if (chat.participants.length > 1) {
+        _title = "Group Chat";
+      } else if (chat.participants.isNotEmpty) {
+        _title = chat.participants.first.fakeName;
+      } else {
+        _title = "Conversation";
+      }
     }
 
     bool canCall = !kIsWeb &&
