@@ -36,6 +36,7 @@ class Attachment {
 
   final message = ToOne<Message>();
 
+  @Transient()
   Map<String, dynamic>? metadata;
 
   String? get dbMetadata => metadata == null

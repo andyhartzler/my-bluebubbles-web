@@ -243,11 +243,13 @@ class Message {
   String? country;
 
   @Index()
+  @Property(type: PropertyType.date)
   DateTime? dateCreated;
 
   bool? isFromMe;
   // Data detector results
   bool? hasDdResults;
+  @Property(type: PropertyType.date)
   DateTime? datePlayed;
   int? itemType;
   String? groupTitle;
@@ -257,18 +259,26 @@ class Message {
   int? associatedMessagePart;
   String? associatedMessageType;
   String? expressiveSendStyleId;
+  @Transient()
   Handle? handle;
   bool hasAttachments;
   bool hasReactions;
+  @Property(type: PropertyType.date)
   DateTime? dateDeleted;
+  @Transient()
   Map<String, dynamic>? metadata;
   String? threadOriginatorGuid;
   String? threadOriginatorPart;
+  @Transient()
   List<Attachment?> attachments = [];
+  @Transient()
   List<Message> associatedMessages = [];
   bool? bigEmoji;
+  @Transient()
   List<AttributedBody> attributedBody;
+  @Transient()
   List<MessageSummaryInfo> messageSummaryInfo;
+  @Transient()
   PayloadData? payloadData;
   bool hasApplePayloadData;
   bool wasDeliveredQuietly;
@@ -280,20 +290,35 @@ class Message {
   set error(int i) => _error.value = i;
 
   final Rxn<DateTime> _dateRead = Rxn<DateTime>();
-  DateTime? get dateRead => _dateRead.value;
-  set dateRead(DateTime? d) => _dateRead.value = d;
+  @Property(type: PropertyType.date)
+  DateTime? dateReadDb;
+  DateTime? get dateRead => _dateRead.value ?? dateReadDb;
+  set dateRead(DateTime? d) {
+    _dateRead.value = d;
+    dateReadDb = d;
+  }
 
   final Rxn<DateTime> _dateDelivered = Rxn<DateTime>();
-  DateTime? get dateDelivered => _dateDelivered.value;
-  set dateDelivered(DateTime? d) => _dateDelivered.value = d;
+  @Property(type: PropertyType.date)
+  DateTime? dateDeliveredDb;
+  DateTime? get dateDelivered => _dateDelivered.value ?? dateDeliveredDb;
+  set dateDelivered(DateTime? d) {
+    _dateDelivered.value = d;
+    dateDeliveredDb = d;
+  }
 
   final RxBool _isDelivered = RxBool(false);
   bool get isDelivered => (dateDelivered != null) ? true : _isDelivered.value;
   set isDelivered(bool b) => _isDelivered.value = b;
 
   final Rxn<DateTime> _dateEdited = Rxn<DateTime>();
-  DateTime? get dateEdited => _dateEdited.value;
-  set dateEdited(DateTime? d) => _dateEdited.value = d;
+  @Property(type: PropertyType.date)
+  DateTime? dateEditedDb;
+  DateTime? get dateEdited => _dateEdited.value ?? dateEditedDb;
+  set dateEdited(DateTime? d) {
+    _dateEdited.value = d;
+    dateEditedDb = d;
+  }
 
   @Backlink('message')
   final dbAttachments = ToMany<Attachment>();
@@ -362,9 +387,9 @@ class Message {
     this.isBookmarked = false,
   }) {
       if (error != null) _error.value = error;
-      if (dateRead != null) _dateRead.value = dateRead;
-      if (dateDelivered != null) _dateDelivered.value = dateDelivered;
-      if (dateEdited != null) _dateEdited.value = dateEdited;
+      if (dateRead != null) this.dateRead = dateRead;
+      if (dateDelivered != null) this.dateDelivered = dateDelivered;
+      if (dateEdited != null) this.dateEdited = dateEdited;
       if (isDelievered != null) _isDelivered.value = isDelievered;
       if (attachments.isEmpty) attachments = [];
       if (associatedMessages.isEmpty) associatedMessages = [];
@@ -578,10 +603,10 @@ class Message {
       existing.text = newMessage.text;
     }
     
-    existing._dateDelivered.value = newMessage._dateDelivered.value ?? existing._dateDelivered.value;
+    existing.dateDelivered = newMessage.dateDelivered ?? existing.dateDelivered;
     existing._isDelivered.value = newMessage._isDelivered.value;
-    existing._dateRead.value = newMessage._dateRead.value ?? existing._dateRead.value;
-    existing._dateEdited.value = newMessage._dateEdited.value ?? existing._dateEdited.value;
+    existing.dateRead = newMessage.dateRead ?? existing.dateRead;
+    existing.dateEdited = newMessage.dateEdited ?? existing.dateEdited;
     existing.attributedBody = newMessage.attributedBody.isNotEmpty ? newMessage.attributedBody : existing.attributedBody;
     existing.messageSummaryInfo = newMessage.messageSummaryInfo.isNotEmpty ? newMessage.messageSummaryInfo : existing.messageSummaryInfo;
     existing.payloadData = newMessage.payloadData ?? existing.payloadData;
@@ -990,12 +1015,13 @@ class Message {
     }
 
     // Update date delivered
-    if ((existing._dateDelivered.value == null && newMessage._dateDelivered.value != null) ||
-        (existing._dateDelivered.value != null &&
-            newMessage.dateDelivered != null &&
-            existing._dateDelivered.value!.millisecondsSinceEpoch <
-                newMessage._dateDelivered.value!.millisecondsSinceEpoch)) {
-      existing._dateDelivered.value = newMessage.dateDelivered;
+    final existingDelivered = existing.dateDelivered;
+    final newDelivered = newMessage.dateDelivered;
+    if ((existingDelivered == null && newDelivered != null) ||
+        (existingDelivered != null &&
+            newDelivered != null &&
+            existingDelivered.millisecondsSinceEpoch < newDelivered.millisecondsSinceEpoch)) {
+      existing.dateDelivered = newDelivered;
     }
 
     // Update is delivered
@@ -1004,11 +1030,13 @@ class Message {
     }
 
     // Update date read
-    if ((existing._dateRead.value == null && newMessage._dateRead.value != null) ||
-        (existing._dateRead.value != null &&
-            newMessage._dateRead.value != null &&
-            existing._dateRead.value!.millisecondsSinceEpoch < newMessage._dateRead.value!.millisecondsSinceEpoch)) {
-      existing._dateRead.value = newMessage.dateRead;
+    final existingRead = existing.dateRead;
+    final newRead = newMessage.dateRead;
+    if ((existingRead == null && newRead != null) ||
+        (existingRead != null &&
+            newRead != null &&
+            existingRead.millisecondsSinceEpoch < newRead.millisecondsSinceEpoch)) {
+      existing.dateRead = newRead;
     }
 
     // Update date played
@@ -1165,8 +1193,8 @@ class Message {
       "country": country,
       "_error": _error.value,
       "dateCreated": dateCreated?.millisecondsSinceEpoch,
-      "dateRead": _dateRead.value?.millisecondsSinceEpoch,
-      "dateDelivered":  _dateDelivered.value?.millisecondsSinceEpoch,
+      "dateRead": dateRead?.millisecondsSinceEpoch,
+      "dateDelivered":  dateDelivered?.millisecondsSinceEpoch,
       "isDelivered": _isDelivered.value,
       "isFromMe": isFromMe!,
       "hasDdResults": hasDdResults!,
