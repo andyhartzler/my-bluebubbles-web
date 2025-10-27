@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:postgrest/postgrest.dart' show CountOption, FetchOptions, PostgrestResponse;
+import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 
 import 'package:bluebubbles/models/crm/member.dart';
 
@@ -273,37 +273,22 @@ class MemberRepository {
     try {
       final PostgrestResponse totalResponse = await _supabase.client
           .from('members')
-          .select(
-            'id',
-            fetchOptions: const FetchOptions(
-              head: true,
-              count: CountOption.exact,
-            ),
-          );
+          .select('id')
+          .count(CountOption.exact);
       final total = totalResponse.count ?? 0;
 
       final PostgrestResponse optedOutResponse = await _supabase.client
           .from('members')
-          .select(
-            'id',
-            fetchOptions: const FetchOptions(
-              head: true,
-              count: CountOption.exact,
-            ),
-          )
-          .eq('opt_out', true);
+          .select('id')
+          .eq('opt_out', true)
+          .count(CountOption.exact);
       final optedOut = optedOutResponse.count ?? 0;
 
       final PostgrestResponse withPhoneResponse = await _supabase.client
           .from('members')
-          .select(
-            'id',
-            fetchOptions: const FetchOptions(
-              head: true,
-              count: CountOption.exact,
-            ),
-          )
-          .not('phone_e164', 'is', null);
+          .select('id')
+          .not('phone_e164', 'is', null)
+          .count(CountOption.exact);
       final withPhone = withPhoneResponse.count ?? 0;
 
       return {
