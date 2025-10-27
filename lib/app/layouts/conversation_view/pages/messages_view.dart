@@ -103,7 +103,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
       _messages.forEachIndexed((i, m) {
         final c = mwc(m);
         c.cvController = controller;
-        listKey.currentState!.insertItem(i, duration: const Duration(milliseconds: 0));
+        _insertAnimatedItem(i);
       });
       // scroll to message if needed
       if (searchMessage != null) {
@@ -229,7 +229,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
       if (!mounted) return;
       final c = mwc(m);
       c.cvController = controller;
-      listKey.currentState!.insertItem(i, duration: const Duration(milliseconds: 0));
+      _insertAnimatedItem(i);
     });
     // should only happen when a reaction is the most recent message
     if (oldLength == 0) {
@@ -242,12 +242,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
     _messages.sort(Message.sort);
     final insertIndex = _messages.indexOf(message);
 
-    if (listKey.currentState != null) {
-      listKey.currentState!.insertItem(
-        insertIndex,
-        duration: const Duration(milliseconds: 500),
-      );
-    }
+    _insertAnimatedItem(insertIndex, duration: const Duration(milliseconds: 500));
 
     if (insertIndex == 0 && showSmartReplies) {
       _addMessageToSmartReply(message);
@@ -289,7 +284,33 @@ class MessagesViewState extends OptimizedState<MessagesView> {
     final index = _messages.indexWhere((e) => e.guid == message.guid);
     if (index != -1) {
       _messages.removeAt(index);
-      listKey.currentState!.removeItem(index, (context, animation) => const SizedBox.shrink());
+      _removeAnimatedItem(index);
+    }
+  }
+
+  void _insertAnimatedItem(int index, {Duration duration = Duration.zero}) {
+    if (!mounted) return;
+    final state = listKey.currentState;
+    if (state != null) {
+      state.insertItem(index, duration: duration);
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        listKey.currentState?.insertItem(index, duration: duration);
+      });
+    }
+  }
+
+  void _removeAnimatedItem(int index) {
+    if (!mounted) return;
+    final state = listKey.currentState;
+    if (state != null) {
+      state.removeItem(index, (context, animation) => const SizedBox.shrink());
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        listKey.currentState?.removeItem(index, (context, animation) => const SizedBox.shrink());
+      });
     }
   }
 
