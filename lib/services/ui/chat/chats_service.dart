@@ -162,6 +162,7 @@ class ChatsService extends GetxService {
       // this is so the list doesn't re-render
       // ignore: invalid_use_of_protected_member
       chats.value[index] = override ? updated : updated.merge(toUpdate);
+      GlobalChatService.updateFromChat(chats[index]);
       if (shouldSort) sort();
     }
 
@@ -170,13 +171,16 @@ class ChatsService extends GetxService {
 
   Future<void> addChat(Chat toAdd) async {
     chats.add(toAdd);
+    GlobalChatService.updateFromChat(toAdd);
     cm.createChatController(toAdd);
     sort();
   }
 
   void removeChat(Chat toRemove) {
     final index = chats.indexWhere((e) => toRemove.guid == e.guid);
+    if (index == -1) return;
     chats.removeAt(index);
+    GlobalChatService.removeChatState(toRemove.guid);
   }
 
   void markAllAsRead() {
