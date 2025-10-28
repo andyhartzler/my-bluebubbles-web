@@ -224,13 +224,18 @@ class Member {
   static String? _extractCommonValue(String source) {
     const fallbackKeys = ['name', 'value', 'label', 'title', 'text'];
     for (final key in fallbackKeys) {
-      final pattern = RegExp('"$key"\s*:\s*"([^"\\]+)"');
-      final match = pattern.firstMatch(source);
-      if (match != null) {
-        final extracted = match.group(1)?.trim();
-        if (extracted != null && extracted.isNotEmpty) {
-          return extracted;
+      try {
+        final escapedKey = RegExp.escape(key);
+        final pattern = RegExp('"$escapedKey"\\s*:\s*"([^"]+)"');
+        final match = pattern.firstMatch(source);
+        if (match != null) {
+          final extracted = match.group(1)?.trim();
+          if (extracted != null && extracted.isNotEmpty) {
+            return extracted;
+          }
         }
+      } catch (_) {
+        continue;
       }
     }
 
@@ -246,17 +251,20 @@ class Member {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return null;
 
-    final cdMatch = RegExp(r'^CD[-\s]?(\d+)$', caseSensitive: false).firstMatch(trimmed);
-    if (cdMatch != null) {
-      return 'CD-${cdMatch.group(1)}';
+    final upper = trimmed.toUpperCase();
+    final collapsed = upper.replaceFirst(RegExp(r'^(?:CD[-\s]*)+'), 'CD-');
+
+    final directMatch = RegExp(r'^CD-(\d+)$').firstMatch(collapsed);
+    if (directMatch != null) {
+      return 'CD-${directMatch.group(1)}';
     }
 
-    final digitsMatch = RegExp(r'^(\d+)$').firstMatch(trimmed);
-    if (digitsMatch != null) {
-      return 'CD-${digitsMatch.group(1)}';
+    final digitsOnly = RegExp(r'^(\d+)$').firstMatch(trimmed);
+    if (digitsOnly != null) {
+      return 'CD-${digitsOnly.group(1)}';
     }
 
-    final embeddedCd = RegExp(r'CD[-\s]?(\d+)', caseSensitive: false).firstMatch(trimmed);
+    final embeddedCd = RegExp(r'(?:CD|DISTRICT)[-\s]*(\d+)', caseSensitive: false).firstMatch(trimmed);
     if (embeddedCd != null) {
       return 'CD-${embeddedCd.group(1)}';
     }
