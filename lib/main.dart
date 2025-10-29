@@ -18,6 +18,8 @@ import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/foundation.dart';
@@ -70,6 +72,15 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
       WidgetsFlutterBinding.ensureInitialized();
 
       await dotenv.load(fileName: '.env', isOptional: true);
+
+      if (CRMConfig.crmEnabled) {
+        try {
+          await CRMSupabaseService().initialize();
+          Logger.info('CRM system initialized');
+        } catch (e, s) {
+          Logger.warn('CRM system failed to initialize: $e', trace: s);
+        }
+      }
 
       await StartupTasks.initStartupServices(isBubble: bubble);
 

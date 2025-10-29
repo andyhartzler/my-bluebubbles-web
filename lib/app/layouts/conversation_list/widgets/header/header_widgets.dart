@@ -1,16 +1,18 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bluebubbles/app/components/avatars/contact_avatar_widget.dart';
+import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/search/search_view.dart';
 import 'package:bluebubbles/app/layouts/conversation_view/pages/conversation_view.dart';
 import 'package:bluebubbles/app/layouts/findmy/findmy_page.dart';
 import 'package:bluebubbles/app/layouts/settings/pages/profile/profile_panel.dart';
-import 'package:bluebubbles/helpers/helpers.dart';
-import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/app/layouts/settings/settings_page.dart';
 import 'package:bluebubbles/app/layouts/setup/setup_view.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/helpers/helpers.dart';
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/models.dart';
+import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -117,6 +119,8 @@ class MaterialOverflowMenu extends StatelessWidget {
           await goToSearch(context);
         } else if (value == 7) {
           controller?.openNewChatCreator(context);
+        } else if (value == 8) {
+          await goToCRM(context);
         }
       },
       itemBuilder: (context) {
@@ -135,6 +139,14 @@ class MaterialOverflowMenu extends StatelessWidget {
               style: context.textTheme.bodyLarge!.apply(color: context.theme.colorScheme.properOnSurface),
             ),
           ),
+          if (CRMConfig.crmEnabled)
+            PopupMenuItem(
+              value: 8,
+              child: Text(
+                'CRM Members',
+                style: context.textTheme.bodyLarge!.apply(color: context.theme.colorScheme.properOnSurface),
+              ),
+            ),
           if (ss.settings.filterUnknownSenders.value)
             PopupMenuItem(
               value: 3,
@@ -265,6 +277,12 @@ class CupertinoOverflowMenu extends StatelessWidget {
           icon: CupertinoIcons.archivebox,
           onTap: () => goToArchived(context),
         ),
+        if (CRMConfig.crmEnabled)
+          PullDownMenuItem(
+            title: 'CRM Members',
+            icon: CupertinoIcons.person_2,
+            onTap: () => goToCRM(context),
+          ),
         if (ss.settings.filterUnknownSenders.value)
           PullDownMenuItem(
             title: 'Unknown Senders',
@@ -332,6 +350,14 @@ Future<void> goToSearch(BuildContext context) async {
   eventDispatcher.emit("override-split", 0.3);
   await ns.pushLeft(context, SearchView());
   eventDispatcher.emit("override-split", current);
+}
+
+Future<void> goToCRM(BuildContext context) async {
+  await Navigator.of(Get.context!).push(
+    ThemeSwitcher.buildPageRoute(
+      builder: (BuildContext context) => const MembersListScreen(),
+    ),
+  );
 }
 
 Future<void> goToFindMy(BuildContext context) async {
