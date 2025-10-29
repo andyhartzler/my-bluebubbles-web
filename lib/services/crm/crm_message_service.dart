@@ -511,6 +511,7 @@ class CRMMessageService {
       'FN:Missouri Young Democrats',
       'ORG:Missouri Young Democrats',
       'X-ABShowAs:COMPANY',
+      'X-ABCompany:Missouri Young Democrats',
       'TEL;TYPE=WORK,VOICE:+18165300773',
       'EMAIL;TYPE=WORK,INTERNET:info@moyoungdemocrats.org',
       'ADR;TYPE=WORK:;;PO Box 270043;Kansas City;MO;64127;US',

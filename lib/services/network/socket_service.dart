@@ -28,6 +28,8 @@ class SocketService extends GetxService {
   Timer? _reconnectTimer;
   Timer? _healthCheckTimer;
   late Socket socket;
+  String? _socketOverride;
+  bool _attemptedDowngrade = false;
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
@@ -69,9 +71,12 @@ class SocketService extends GetxService {
         // Disable so that we can create the listeners first
         .disableAutoConnect()
         .enableReconnection();
-    socket = io(serverAddress, options.build());
-    // placed here so that [socket] is still initialized
-    if (isNullOrEmpty(serverAddress)) return;
+    final target = _socketOverride ?? serverAddress;
+    if (isNullOrEmpty(target)) {
+      return;
+    }
+
+    socket = io(target, options.build());
 
     socket.onConnect((data) => handleStatusUpdate(SocketState.connected, data));
     socket.onReconnect((data) => handleStatusUpdate(SocketState.connected, data));
@@ -142,6 +147,7 @@ class SocketService extends GetxService {
 
   void forgetConnection() {
     closeSocket();
+    clearOverride();
     ss.settings.guidAuthKey.value = "";
     clearServerUrl(saveAdditionalSettings: ["guidAuthKey"]);
   }
@@ -175,6 +181,7 @@ class SocketService extends GetxService {
         _reconnectTimer = null;
         NetworkTasks.onConnect();
         notif.clearSocketError();
+        _attemptedDowngrade = false;
         return;
       case SocketState.disconnected:
         Logger.info("Disconnected from socket...");
@@ -192,12 +199,49 @@ class SocketService extends GetxService {
           handleSocketException(data);
         }
 
+        if (_maybeDowngradeSocketScheme()) {
+          return;
+        }
+
         state.value = SocketState.error;
         _scheduleReconnect(fetchNewUrl: true);
         return;
       default:
         return;
     }
+  }
+
+  bool _maybeDowngradeSocketScheme() {
+    final origin = serverAddress;
+    if (origin.isEmpty) {
+      return false;
+    }
+
+    if (_socketOverride != null) {
+      Logger.warn('Socket fallback also failed. Clearing override and retrying default scheme.');
+      _socketOverride = null;
+      return false;
+    }
+
+    if (_attemptedDowngrade) {
+      return false;
+    }
+
+    final uri = Uri.tryParse(origin);
+    if (uri == null || uri.scheme.toLowerCase() != 'https') {
+      return false;
+    }
+
+    final downgraded = uri.replace(scheme: 'http');
+    if (downgraded.toString() == origin) {
+      return false;
+    }
+
+    _attemptedDowngrade = true;
+    _socketOverride = downgraded.toString();
+    Logger.warn('HTTPS socket failed, retrying over HTTP/WebSocket fallback...');
+    restartSocket();
+    return true;
   }
 
   void _scheduleReconnect({bool fetchNewUrl = false}) {
@@ -232,5 +276,10 @@ class SocketService extends GetxService {
     } else {
       lastError.value = msg;
     }
+  }
+
+  void clearOverride() {
+    _socketOverride = null;
+    _attemptedDowngrade = false;
   }
 }
