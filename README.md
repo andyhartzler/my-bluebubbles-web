@@ -81,9 +81,34 @@ The built files will be in `build/web/` ready for deployment.
 Set these before building/running:
 
 ```bash
+# Preferred: supply the Private API endpoint & password (auto-falls back to the values below)
+export NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_HOST="https://your-bluebubbles-server.com"
+export NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_PASSWORD="your-server-password"
+export NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_AUTH_KEY="your-server-password"
+
+# Legacy aliases that are still honored
 export NEXT_PUBLIC_BLUEBUBBLES_HOST="https://your-bluebubbles-server.com"
 export NEXT_PUBLIC_BLUEBUBBLES_PASSWORD="your-server-password"
+export NEXT_PUBLIC_BLUEBUBBLES_AUTH_KEY="your-server-password"
+
+# CRM (Supabase) configuration
+export SUPABASE_URL="https://your-project.supabase.co"
+export SUPABASE_ANON_KEY="your-public-anon-key"
+# Optional: if your deployment already uses NEXT_PUBLIC_* variables
+# they will be picked up automatically.
+export NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
+export NEXT_PUBLIC_SUPABASE_ANON_KEY="your-public-anon-key"
+# Never expose the service role key in a public build.
+export SUPABASE_SERVICE_ROLE_KEY="your-private-service-role-key"
 ```
+
+> 💡 Copy `.env.example` to `.env` for local development and fill in your
+> server credentials. Keep `.env` out of version control.
+
+The build also looks for `BLUEBUBBLES_PRIVATE_API_HOST` / `BLUEBUBBLES_PRIVATE_API_PASSWORD`
+and their `BLUEBUBBLES_PRIVATE_API_AUTH_KEY` / legacy `BLUEBUBBLES_HOST` /
+`BLUEBUBBLES_PASSWORD` pairs for platforms that cannot expose `NEXT_PUBLIC_*`
+environment variables.
 
 ### Server Setup
 

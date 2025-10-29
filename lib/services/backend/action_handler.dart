@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart' hide Response;
 import 'package:tuple/tuple.dart';
 import 'package:universal_io/io.dart';
+import 'package:bluebubbles/services/crm/crm_message_service.dart';
 
 ActionHandler ah = Get.isRegistered<ActionHandler>() ? Get.find<ActionHandler>() : Get.put(ActionHandler());
 
@@ -358,6 +359,7 @@ class ActionHandler extends GetxService {
       await MessageHelper.handleNotification(m, c);
     }
     await c.addMessage(m);
+    unawaited(CRMMessageService().handleIncomingAutomation(c, m));
   }
 
   Future<void> handleUpdatedMessage(Chat c, Message m, String? tempGuid, {bool checkExisting = true}) async {
