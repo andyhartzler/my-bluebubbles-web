@@ -64,6 +64,12 @@ class StartupTasks {
         force: true,
         saveAdditionalSettings: additional,
       );
+
+      try {
+        socket.restartSocket();
+      } catch (e) {
+        Logger.error('Failed to restart socket after applying environment server URL', error: e);
+      }
     }
 
     // The next thing we need to do is initialize the database.
