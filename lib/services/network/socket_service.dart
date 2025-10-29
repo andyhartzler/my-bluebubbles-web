@@ -26,7 +26,10 @@ class SocketService extends GetxService {
   SocketState _lastState = SocketState.disconnected;
   RxString lastError = "".obs;
   Timer? _reconnectTimer;
+  Timer? _healthCheckTimer;
   late Socket socket;
+  String? _socketOverride;
+  bool _attemptedDowngrade = false;
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
@@ -59,12 +62,21 @@ class SocketService extends GetxService {
         .setQuery({"guid": password})
         .setTransports(['websocket', 'polling'])
         .setExtraHeaders(http.headers)
+        .setPath('/socket.io')
+        .setTimeout(20000)
+        .setReconnectionAttempts(999999)
+        .setReconnectionDelay(2000)
+        .setReconnectionDelayMax(10000)
+        .setRandomizationFactor(0.35)
         // Disable so that we can create the listeners first
         .disableAutoConnect()
         .enableReconnection();
-    socket = io(serverAddress, options.build());
-    // placed here so that [socket] is still initialized
-    if (isNullOrEmpty(serverAddress)) return;
+    final target = _socketOverride ?? serverAddress;
+    if (isNullOrEmpty(target)) {
+      return;
+    }
+
+    socket = io(target, options.build());
 
     socket.onConnect((data) => handleStatusUpdate(SocketState.connected, data));
     socket.onReconnect((data) => handleStatusUpdate(SocketState.connected, data));
@@ -76,8 +88,10 @@ class SocketService extends GetxService {
     socket.onDisconnect((data) => handleStatusUpdate(SocketState.disconnected, data));
 
     socket.onConnectError((data) => handleStatusUpdate(SocketState.error, data));
+    socket.onReconnectError((data) => handleStatusUpdate(SocketState.error, data));
     socket.onConnectTimeout((data) => handleStatusUpdate(SocketState.error, data));
     socket.onError((data) => handleStatusUpdate(SocketState.error, data));
+    socket.onReconnectFailed((_) => _scheduleReconnect(fetchNewUrl: true));
 
     // custom events
     // only listen to these events from socket on web/desktop (FCM handles on Android)
@@ -97,12 +111,20 @@ class SocketService extends GetxService {
     socket.on("imessage-aliases-removed", (data) => ah.handleEvent("imessage-aliases-removed", data, 'DartSocket'));
 
     socket.connect();
+    _healthCheckTimer?.cancel();
+    _healthCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (state.value == SocketState.connected || _reconnectTimer != null) {
+        return;
+      }
+      _scheduleReconnect();
+    });
   }
 
   void disconnect() {
     if (isNullOrEmpty(serverAddress)) return;
     socket.disconnect();
     state.value = SocketState.disconnected;
+    _healthCheckTimer?.cancel();
   }
 
   void reconnect() {
@@ -115,6 +137,7 @@ class SocketService extends GetxService {
     if (isNullOrEmpty(serverAddress)) return;
     socket.dispose();
     state.value = SocketState.disconnected;
+    _healthCheckTimer?.cancel();
   }
 
   void restartSocket() {
@@ -124,6 +147,7 @@ class SocketService extends GetxService {
 
   void forgetConnection() {
     closeSocket();
+    clearOverride();
     ss.settings.guidAuthKey.value = "";
     clearServerUrl(saveAdditionalSettings: ["guidAuthKey"]);
   }
@@ -145,7 +169,9 @@ class SocketService extends GetxService {
   }
 
   void handleStatusUpdate(SocketState status, dynamic data) {
-    if (_lastState == status) return;
+    if (_lastState == status && status != SocketState.error && status != SocketState.disconnected) {
+      return;
+    }
     _lastState = status;
 
     switch (status) {
@@ -155,10 +181,12 @@ class SocketService extends GetxService {
         _reconnectTimer = null;
         NetworkTasks.onConnect();
         notif.clearSocketError();
+        _attemptedDowngrade = false;
         return;
       case SocketState.disconnected:
         Logger.info("Disconnected from socket...");
         state.value = SocketState.disconnected;
+        _scheduleReconnect();
         return;
       case SocketState.connecting:
         Logger.info("Connecting to socket...");
@@ -171,24 +199,74 @@ class SocketService extends GetxService {
           handleSocketException(data);
         }
 
+        if (_maybeDowngradeSocketScheme()) {
+          return;
+        }
+
         state.value = SocketState.error;
-        // After 5 seconds of an error, we should retry the connection
-        _reconnectTimer = Timer(const Duration(seconds: 5), () async {
-          if (state.value == SocketState.connected) return;
-
-          await fdb.fetchNewUrl();
-          restartSocket();
-
-          if (state.value == SocketState.connected) return;
-
-          if (!ss.settings.keepAppAlive.value) {
-            notif.createSocketError();
-          }
-        });
+        _scheduleReconnect(fetchNewUrl: true);
         return;
       default:
         return;
     }
+  }
+
+  bool _maybeDowngradeSocketScheme() {
+    final origin = serverAddress;
+    if (origin.isEmpty) {
+      return false;
+    }
+
+    if (_socketOverride != null) {
+      Logger.warn('Socket fallback also failed. Clearing override and retrying default scheme.');
+      _socketOverride = null;
+      return false;
+    }
+
+    if (_attemptedDowngrade) {
+      return false;
+    }
+
+    final uri = Uri.tryParse(origin);
+    if (uri == null || uri.scheme.toLowerCase() != 'https') {
+      return false;
+    }
+
+    final downgraded = uri.replace(scheme: 'http');
+    if (downgraded.toString() == origin) {
+      return false;
+    }
+
+    _attemptedDowngrade = true;
+    _socketOverride = downgraded.toString();
+    Logger.warn('HTTPS socket failed, retrying over HTTP/WebSocket fallback...');
+    restartSocket();
+    return true;
+  }
+
+  void _scheduleReconnect({bool fetchNewUrl = false}) {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 5), () async {
+      if (state.value == SocketState.connected) {
+        _reconnectTimer = null;
+        return;
+      }
+
+      if (fetchNewUrl) {
+        try {
+          await fdb.fetchNewUrl();
+        } catch (e, stack) {
+          Logger.warn('Failed to refresh server URL before reconnecting', error: e, trace: stack);
+        }
+      }
+
+      restartSocket();
+
+      if (state.value != SocketState.connected && !ss.settings.keepAppAlive.value) {
+        notif.createSocketError();
+      }
+      _reconnectTimer = null;
+    });
   }
 
   void handleSocketException(SocketException e) {
@@ -198,5 +276,10 @@ class SocketService extends GetxService {
     } else {
       lastError.value = msg;
     }
+  }
+
+  void clearOverride() {
+    _socketOverride = null;
+    _attemptedDowngrade = false;
   }
 }
