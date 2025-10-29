@@ -15,15 +15,9 @@ String? sanitizeServerAddress({String? address}) {
   Uri? uri = Uri.tryParse(sanitized);
   if (uri?.scheme.isEmpty ?? false) {
     final String lower = sanitized.toLowerCase();
-    final bool isLocalHost = lower.contains('localhost') ||
-        lower.startsWith('127.') ||
-        lower.startsWith('10.') ||
-        lower.startsWith('192.168.') ||
-        lower.startsWith('::1');
     final bool preferHttps = lower.contains('ngrok.io') ||
         lower.contains('trycloudflare.com') ||
-        lower.contains('zrok.io') ||
-        !isLocalHost;
+        lower.contains('zrok.io');
 
     final String scheme = preferHttps ? 'https://' : 'http://';
     uri = Uri.tryParse('$scheme$sanitized');
