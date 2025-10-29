@@ -864,7 +864,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     if (selection == 0) {
       await Navigator.of(context, rootNavigator: true).push(
         ThemeSwitcher.buildPageRoute(
-          builder: (context) => const TitleBarWrapper(child: ChatCreator()),
+          builder: (context) => TitleBarWrapper(child: ChatCreator()),
         ),
       );
     } else if (selection == 1) {
@@ -876,7 +876,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       }
 
       await Navigator.of(context).push(ThemeSwitcher.buildPageRoute(
-        builder: (context) => const TitleBarWrapper(child: BulkMessageScreen()),
+        builder: (context) => TitleBarWrapper(child: BulkMessageScreen()),
       ));
     }
   }
