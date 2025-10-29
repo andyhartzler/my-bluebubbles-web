@@ -69,6 +69,9 @@ dependencies:
   flutter_displaymode:
     path: packages/flutter_displaymode_stub
   flutter_dotenv: ^5.1.0
+  # NEW CRM DEPENDENCIES
+  supabase_flutter: ^2.3.4
+  fl_chart: ^0.66.0
   flutter_image_compress: ^2.2.0
   flutter_improved_scrolling: ^0.0.3
   flutter_isolate:
@@ -292,6 +295,7 @@ flutter:
     - assets/images/no-video-preview.png
     - assets/images/unplayable-video.png
     - assets/icon/icon.png
+    - assets/icon/contact-photo.png
     - assets/changelog/changelog.md
     - assets/icon/icon.ico
     - assets/badges/badge-1.ico

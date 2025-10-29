@@ -40,11 +40,15 @@ class ChatCreator extends StatefulWidget {
     this.initialText = "",
     this.initialAttachments = const [],
     this.initialSelected = const [],
+    this.onMessageSent,
+    this.popOnSend = false,
   });
 
   final String? initialText;
   final List<PlatformFile> initialAttachments;
   final List<SelectedContact> initialSelected;
+  final Future<void> Function(Chat chat)? onMessageSent;
+  final bool popOnSend;
 
   @override
   ChatCreatorState createState() => ChatCreatorState();
@@ -72,6 +76,21 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   Completer<void>? createCompleter;
 
   bool canCreateGroupChats = ss.canCreateGroupChatSync();
+
+  void _clearComposer() {
+    final empty = const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
+    textController.value = empty;
+    subjectController.clear();
+    if (fakeController.value != null) {
+      try {
+        fakeController.value!.textController.value = empty;
+        fakeController.value!.pickedAttachments.clear();
+        fakeController.value!.subjectTextController.clear();
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() {});
+  }
 
   @override
   void initState() {
@@ -760,24 +779,40 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
                               fakeController.value!.pickedAttachments.clear();
                               fakeController.value!.textController.clear();
                               fakeController.value!.subjectTextController.clear();
+                              _clearComposer();
                             }
 
-                            ns.pushAndRemoveUntil(
-                              Get.context!,
-                              ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage),
-                              (route) => route.isFirst,
-                              // don't force close the active chat in tablet mode
-                              closeActiveChat: false,
-                              // only used in non-tablet mode context
-                              customRoute: PageRouteBuilder(
-                                pageBuilder: (_, __, ___) =>
-                                    TitleBarWrapper(child: ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage)),
-                                transitionDuration: Duration.zero,
-                              ),
-                            );
+                            if (widget.popOnSend) {
+                              await sendInitialMessage();
+                            } else {
+                              ns.pushAndRemoveUntil(
+                                Get.context!,
+                                ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage),
+                                (route) => route.isFirst,
+                                // don't force close the active chat in tablet mode
+                                closeActiveChat: false,
+                                // only used in non-tablet mode context
+                                customRoute: PageRouteBuilder(
+                                  pageBuilder: (_, __, ___) =>
+                                      TitleBarWrapper(child: ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage)),
+                                  transitionDuration: Duration.zero,
+                                ),
+                              );
 
-                            await Future.delayed(const Duration(milliseconds: 500));
-                            
+                              await Future.delayed(const Duration(milliseconds: 500));
+                            }
+
+                            if (widget.onMessageSent != null) {
+                              await widget.onMessageSent!(chat);
+                            }
+
+                            if (widget.popOnSend && mounted) {
+                              final navigator = Navigator.of(context, rootNavigator: true);
+                              if (navigator.canPop()) {
+                                navigator.pop(true);
+                              }
+                            }
+
                           } else {
                             if (!(createCompleter?.isCompleted ?? true)) return;
                             // hard delete a chat that exists on BB but not on the server to make way for the proper server data
@@ -848,20 +883,35 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
 
                               // Navigate to the new chat
                               Navigator.of(context).pop();
-                              ns.pushAndRemoveUntil(
-                                Get.context!,
-                                ConversationView(chat: newChat),
-                                (route) => route.isFirst,
-                                customRoute: PageRouteBuilder(
-                                  pageBuilder: (_, __, ___) => TitleBarWrapper(
-                                    child: ConversationView(
-                                      chat: newChat,
-                                      fromChatCreator: true,
+                              if (!widget.popOnSend) {
+                                ns.pushAndRemoveUntil(
+                                  Get.context!,
+                                  ConversationView(chat: newChat),
+                                  (route) => route.isFirst,
+                                  customRoute: PageRouteBuilder(
+                                    pageBuilder: (_, __, ___) => TitleBarWrapper(
+                                      child: ConversationView(
+                                        chat: newChat,
+                                        fromChatCreator: true,
+                                      ),
                                     ),
+                                    transitionDuration: Duration.zero,
                                   ),
-                                  transitionDuration: Duration.zero,
-                                ),
-                              );
+                                );
+                              }
+
+                              if (widget.onMessageSent != null) {
+                                await widget.onMessageSent!(newChat);
+                              }
+
+                              if (widget.popOnSend && mounted) {
+                                final navigator = Navigator.of(context, rootNavigator: true);
+                                if (navigator.canPop()) {
+                                  navigator.pop(true);
+                                }
+                              }
+
+                              _clearComposer();
                             }).catchError((error) {
                               Navigator.of(context).pop();
                               showDialog(
