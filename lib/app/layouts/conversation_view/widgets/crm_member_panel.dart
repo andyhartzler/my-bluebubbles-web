@@ -118,6 +118,12 @@ class _CRMMemberPanelState extends State<CRMMemberPanel> {
           _buildInfoTile(Icons.account_balance, 'District', districtLabel),
         if (_member!.committee != null && _member!.committee!.isNotEmpty)
           _buildInfoTile(Icons.group, 'Committees', _member!.committeesString),
+        if (_hasText(_member!.currentChapterMember))
+          _buildInfoTile(Icons.groups, 'Chapter Member', _member!.currentChapterMember!.trim()),
+        if (_hasText(_member!.chapterName))
+          _buildInfoTile(Icons.school, 'Chapter Name', _member!.chapterName!.trim()),
+        if (_hasText(_member!.graduationYear))
+          _buildInfoTile(Icons.calendar_today, 'Graduation Year', _member!.graduationYear!.trim()),
         if (_member!.age != null)
           _buildInfoTile(Icons.cake, 'Age', '${_member!.age} years old'),
         if (_member!.lastContacted != null)

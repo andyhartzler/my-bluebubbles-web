@@ -54,6 +54,9 @@ class Member {
   final String? passionateIssues;
   final String? whyIssuesMatter;
   final String? areasOfInterest;
+  final String? currentChapterMember;
+  final String? chapterName;
+  final String? graduationYear;
 
   Member({
     required this.id,
@@ -107,6 +110,9 @@ class Member {
     this.passionateIssues,
     this.whyIssuesMatter,
     this.areasOfInterest,
+    this.currentChapterMember,
+    this.chapterName,
+    this.graduationYear,
   });
 
   /// Helper used to normalize free-form Supabase fields that may be stored as
@@ -343,6 +349,9 @@ class Member {
       passionateIssues: _normalizeText(json['passionate_issues']),
       whyIssuesMatter: _normalizeText(json['why_issues_matter']),
       areasOfInterest: _normalizeText(json['areas_of_interest']),
+      currentChapterMember: _normalizeText(json['current_chapter_member']),
+      chapterName: _normalizeText(json['chapter_name']),
+      graduationYear: _normalizeText(json['graduation_year']),
     );
   }
 
@@ -400,6 +409,9 @@ class Member {
       'passionate_issues': passionateIssues,
       'why_issues_matter': whyIssuesMatter,
       'areas_of_interest': areasOfInterest,
+      'current_chapter_member': currentChapterMember,
+      'chapter_name': chapterName,
+      'graduation_year': graduationYear,
     };
   }
 
@@ -474,6 +486,9 @@ class Member {
     String? passionateIssues,
     String? whyIssuesMatter,
     String? areasOfInterest,
+    String? currentChapterMember,
+    String? chapterName,
+    String? graduationYear,
   }) {
     return Member(
       id: id ?? this.id,
@@ -527,6 +542,9 @@ class Member {
       passionateIssues: passionateIssues ?? this.passionateIssues,
       whyIssuesMatter: whyIssuesMatter ?? this.whyIssuesMatter,
       areasOfInterest: areasOfInterest ?? this.areasOfInterest,
+      currentChapterMember: currentChapterMember ?? this.currentChapterMember,
+      chapterName: chapterName ?? this.chapterName,
+      graduationYear: graduationYear ?? this.graduationYear,
     );
   }
 }

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+enum _SocialPlatform { instagram, tiktok, x }
 
 import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -119,7 +122,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           ],
         ),
         (route) => route.isFirst,
-        closeActiveChat: false,
       );
     } catch (e) {
       if (!mounted) return;
@@ -155,6 +157,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           : () {
               final phoneDisplay = _cleanText(_member.phone);
               final phoneE164 = _cleanText(_member.phoneE164);
+              final primaryPhone = phoneDisplay ?? phoneE164;
+              final phoneCopyValue = phoneE164 ?? phoneDisplay;
               final email = _cleanText(_member.email);
               final address = _cleanText(_member.address);
               final county = _cleanText(_member.county);
@@ -163,19 +167,25 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   ? _member.committeesString
                   : null;
               final notesValue = _cleanText(_member.notes);
+              final chapterStatus = _cleanText(_member.currentChapterMember);
+              final chapterName = _cleanText(_member.chapterName);
+              final graduationYear = _cleanText(_member.graduationYear);
 
               final sections = <Widget?>[
                 _buildOptionalSection('Contact Information', [
-                  _copyRow('Phone', phoneDisplay),
-                  if (phoneE164 != null && phoneE164 != phoneDisplay)
-                    _copyRow('Phone (E.164)', phoneE164),
+                  _copyRow('Phone', primaryPhone, copyValue: phoneCopyValue),
                   _copyRow('Email', email),
                   _infoRowOrNull('Address', address),
                 ]),
+                _buildOptionalSection('Chapter Involvement', [
+                  _infoRowOrNull('Current Chapter Member', chapterStatus),
+                  _infoRowOrNull('Chapter Name', chapterName),
+                  _infoRowOrNull('Graduation Year', graduationYear),
+                ]),
                 _buildOptionalSection('Social Profiles', [
-                  _copyRow('Instagram', _member.instagram),
-                  _copyRow('TikTok', _member.tiktok),
-                  _copyRow('X (Twitter)', _member.x),
+                  _socialRow(_SocialPlatform.instagram, 'Instagram', _member.instagram),
+                  _socialRow(_SocialPlatform.tiktok, 'TikTok', _member.tiktok),
+                  _socialRow(_SocialPlatform.x, 'X (Twitter)', _member.x),
                 ]),
                 _buildOptionalSection('Political & Civic', [
                   _infoRowOrNull('County', county),
@@ -357,28 +367,58 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
   String? _formatDistrict(String? value) => Member.formatDistrictLabel(value);
 
-  Widget? _infoRowOrNull(String label, String? value, {Widget? trailing}) {
+  Widget? _infoRowOrNull(String label, String? value, {Widget? trailing, Uri? link}) {
     final cleaned = _cleanText(value);
     if (cleaned == null) return null;
-    return _buildInfoRow(label, cleaned, trailing: trailing);
+    return _buildInfoRow(label, cleaned, trailing: trailing, link: link);
   }
 
-  Widget? _copyRow(String label, String? value) {
+  Widget? _copyRow(String label, String? value, {String? copyValue, Uri? link}) {
     final cleaned = _cleanText(value);
     if (cleaned == null) return null;
-    return _buildInfoRow(
-      label,
-      cleaned,
-      trailing: IconButton(
+
+    final toCopy = _cleanText(copyValue) ?? cleaned;
+    final actions = <Widget>[
+      IconButton(
         icon: const Icon(Icons.copy, size: 20),
+        tooltip: 'Copy $label',
         onPressed: () {
-          Clipboard.setData(ClipboardData(text: cleaned));
+          Clipboard.setData(ClipboardData(text: toCopy));
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('$label copied')),
           );
         },
       ),
+      if (link != null)
+        IconButton(
+          icon: const Icon(Icons.open_in_new, size: 20),
+          tooltip: 'Open $label',
+          onPressed: () => _openLink(link),
+        ),
+    ];
+
+    return _buildInfoRow(
+      label,
+      cleaned,
+      trailing: actions.isEmpty
+          ? null
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: actions,
+            ),
+      link: link,
     );
+  }
+
+  Widget? _socialRow(_SocialPlatform platform, String label, String? value) {
+    final cleaned = _cleanText(value);
+    if (cleaned == null) return null;
+
+    final uri = _resolveSocialLink(platform, cleaned);
+    final display = _formatSocialDisplay(platform, cleaned, uri);
+    final copyTarget = uri?.toString() ?? cleaned;
+
+    return _copyRow(label, display, copyValue: copyTarget, link: uri);
   }
 
   Widget? _buildOptionalSection(String title, Iterable<Widget?> rows) {
@@ -414,7 +454,21 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {Widget? trailing}) {
+  Widget _buildInfoRow(String label, String value, {Widget? trailing, Uri? link}) {
+    final theme = Theme.of(context);
+    final valueWidget = link != null
+        ? InkWell(
+            onTap: () => _openLink(link),
+            child: Text(
+              value,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          )
+        : Text(value);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(
@@ -434,14 +488,95 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             flex: 3,
             child: Row(
               children: [
-                Expanded(child: Text(value)),
-                if (trailing != null) trailing,
+                Expanded(child: valueWidget),
+                if (trailing != null) ...[
+                  const SizedBox(width: 4),
+                  Flexible(child: trailing),
+                ],
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Uri? _resolveSocialLink(_SocialPlatform platform, String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+
+    Uri? parseUrl(String input) {
+      final candidate = input.startsWith('http://') || input.startsWith('https://')
+          ? input
+          : 'https://$input';
+      final uri = Uri.tryParse(candidate);
+      if (uri == null || uri.host.isEmpty) return null;
+      return uri;
+    }
+
+    final lower = trimmed.toLowerCase();
+    const knownDomains = [
+      'instagram.com',
+      'www.instagram.com',
+      'tiktok.com',
+      'www.tiktok.com',
+      'twitter.com',
+      'www.twitter.com',
+      'x.com',
+      'www.x.com',
+    ];
+
+    if (lower.startsWith('http://') || lower.startsWith('https://') ||
+        knownDomains.any((domain) => lower.contains(domain))) {
+      return parseUrl(trimmed);
+    }
+
+    final username = trimmed.replaceFirst(RegExp(r'^@+'), '');
+    if (username.isEmpty) return null;
+
+    switch (platform) {
+      case _SocialPlatform.instagram:
+        return Uri.https('instagram.com', '/$username');
+      case _SocialPlatform.tiktok:
+        return Uri.https('www.tiktok.com', '/@$username');
+      case _SocialPlatform.x:
+        return Uri.https('x.com', '/$username');
+    }
+  }
+
+  String _formatSocialDisplay(_SocialPlatform _platform, String raw, Uri? link) {
+    final trimmed = raw.trim();
+
+    if (link != null) {
+      final segments = link.pathSegments.where((segment) => segment.isNotEmpty).toList();
+      if (segments.isNotEmpty) {
+        final last = segments.last;
+        final normalized = last.replaceFirst(RegExp(r'^@+'), '');
+        if (normalized.isNotEmpty) {
+          return '@$normalized';
+        }
+      }
+
+      final host = link.host.replaceFirst(RegExp(r'^www\.'), '');
+      final path = link.pathSegments.where((segment) => segment.isNotEmpty).join('/');
+      if (path.isNotEmpty) {
+        return '$host/$path';
+      }
+      return host;
+    }
+
+    final username = trimmed.replaceFirst(RegExp(r'^@+'), '');
+    if (username.isEmpty) return trimmed;
+    return '@$username';
+  }
+
+  Future<void> _openLink(Uri url) async {
+    final success = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open ${url.toString()}')),
+      );
+    }
   }
 
   String _formatDate(DateTime date) {
