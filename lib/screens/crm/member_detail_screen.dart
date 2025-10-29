@@ -109,10 +109,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
 
     try {
-      final navContext = ns.key.currentContext ?? context;
-
-      await ns.pushAndRemoveUntil(
-        navContext,
+      ns.push(
+        context,
         ChatCreator(
           initialSelected: [
             SelectedContact(
@@ -121,7 +119,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             ),
           ],
         ),
-        (route) => route.isFirst,
       );
     } catch (e) {
       if (!mounted) return;
