@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
-import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
-import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
+import 'package:bluebubbles/services/services.dart';
 
 enum _SocialPlatform { instagram, tiktok, x }
 
@@ -110,18 +109,15 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
 
     try {
-      Navigator.of(context).push(
-        ThemeSwitcher.buildPageRoute(
-          builder: (BuildContext context) => TitleBarWrapper(
-            child: ChatCreator(
-              initialSelected: [
-                SelectedContact(
-                  displayName: _member.name,
-                  address: address,
-                ),
-              ],
+      ns.push(
+        context,
+        ChatCreator(
+          initialSelected: [
+            SelectedContact(
+              displayName: _member.name,
+              address: address,
             ),
-          ),
+          ],
         ),
       );
     } catch (e) {
