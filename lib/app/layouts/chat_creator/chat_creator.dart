@@ -40,11 +40,13 @@ class ChatCreator extends StatefulWidget {
     this.initialText = "",
     this.initialAttachments = const [],
     this.initialSelected = const [],
+    this.onMessageSent,
   });
 
   final String? initialText;
   final List<PlatformFile> initialAttachments;
   final List<SelectedContact> initialSelected;
+  final Future<void> Function(Chat chat)? onMessageSent;
 
   @override
   ChatCreatorState createState() => ChatCreatorState();
@@ -777,7 +779,11 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
                             );
 
                             await Future.delayed(const Duration(milliseconds: 500));
-                            
+
+                            if (widget.onMessageSent != null) {
+                              await widget.onMessageSent!(chat);
+                            }
+
                           } else {
                             if (!(createCompleter?.isCompleted ?? true)) return;
                             // hard delete a chat that exists on BB but not on the server to make way for the proper server data
@@ -862,6 +868,10 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
                                   transitionDuration: Duration.zero,
                                 ),
                               );
+
+                              if (widget.onMessageSent != null) {
+                                await widget.onMessageSent!(newChat);
+                              }
                             }).catchError((error) {
                               Navigator.of(context).pop();
                               showDialog(
