@@ -6,6 +6,7 @@ import 'package:bluebubbles/app/layouts/conversation_list/widgets/header/header_
 import 'package:bluebubbles/app/layouts/conversation_list/pages/search/search_view.dart';
 import 'package:bluebubbles/app/wrappers/fade_on_scroll.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -74,6 +75,26 @@ class CupertinoHeader extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (CRMConfig.crmEnabled)
+                        const SizedBox(width: 10.0),
+                      if (CRMConfig.crmEnabled)
+                        ClipOval(
+                          child: Material(
+                            color: context.theme.colorScheme.properSurface,
+                            child: InkWell(
+                              child: SizedBox(
+                                width: 30,
+                                height: 30,
+                                child: Icon(
+                                  CupertinoIcons.person_2,
+                                  color: context.theme.colorScheme.properOnSurface,
+                                  size: 18,
+                                ),
+                              ),
+                              onTap: () => goToCRM(context),
+                            ),
+                          ),
+                        ),
                       const SizedBox(width: 10.0),
                       if (ss.settings.moveChatCreatorToHeader.value)
                         ClipOval(
