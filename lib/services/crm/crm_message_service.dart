@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/database/global/queue_items.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/helpers/types/helpers/string_helpers.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -315,23 +316,19 @@ class CRMMessageService {
 
   Future<bool> _sendContactCardForAddress(String cleaned, Chat? initialChat) async {
     try {
-      var chat = initialChat;
-      if (chat == null) {
-        for (var attempt = 0; attempt < 5 && chat == null; attempt++) {
-          chat = await _findExistingChat(cleaned);
-          if (chat != null) break;
-          await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
-        }
-      }
-
+      final chat = await _waitForChat(cleaned, seed: initialChat);
       if (chat == null) {
         Logger.warn('Unable to locate chat for $cleaned to send contact card');
         return false;
       }
 
       final message = await _buildContactCardMessage(chat);
-      await ah.prepAttachment(chat, message);
-      await ah.sendAttachment(chat, message, false);
+      await outq.queue(OutgoingItem(
+        type: QueueType.sendAttachment,
+        chat: chat,
+        message: message,
+        customArgs: {'audio': false},
+      ));
       return true;
     } catch (e, stack) {
       Logger.warn('Unable to send contact card', error: e, trace: stack);
@@ -341,10 +338,7 @@ class CRMMessageService {
 
   Future<Message> _buildContactCardMessage(Chat chat) async {
     final bytes = await _buildContactCardBytes();
-    final messageGuid = 'temp-${randomString(8)}';
-    final transferName = '${messageGuid}_moyd.vcf';
     final message = Message(
-      guid: messageGuid,
       text: '',
       dateCreated: DateTime.now(),
       hasAttachments: true,
@@ -352,11 +346,10 @@ class CRMMessageService {
       handleId: 0,
       attachments: [
         Attachment(
-          guid: messageGuid,
-          mimeType: 'text/vcard',
+          mimeType: 'text/x-vcard',
           uti: 'public.vcard',
           isOutgoing: true,
-          transferName: transferName,
+          transferName: 'Missouri_Young_Democrats.vcf',
           totalBytes: bytes.length,
           bytes: bytes,
         ),
@@ -364,7 +357,29 @@ class CRMMessageService {
     );
 
     message.chat.target = chat;
+    message.generateTempGuid();
+    final attachment = message.attachments.first;
+    if (attachment != null) {
+      attachment.guid = message.guid;
+      attachment.bytes = bytes;
+      attachment.totalBytes = bytes.length;
+    }
     return message;
+  }
+
+  Future<Chat?> _waitForChat(String cleaned, {Chat? seed}) async {
+    var chat = seed ?? await _findExistingChat(cleaned);
+    if (chat != null) return chat;
+
+    for (var attempt = 0; attempt < 5; attempt++) {
+      await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
+      chat = await _findExistingChat(cleaned);
+      if (chat != null) {
+        return chat;
+      }
+    }
+
+    return null;
   }
 
   Future<Uint8List> _buildContactCardBytes() async {

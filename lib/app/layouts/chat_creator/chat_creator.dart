@@ -766,7 +766,9 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
                               fakeController.value!.subjectTextController.clear();
                             }
 
-                            if (!widget.popOnSend) {
+                            if (widget.popOnSend) {
+                              await sendInitialMessage();
+                            } else {
                               ns.pushAndRemoveUntil(
                                 Get.context!,
                                 ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage),
