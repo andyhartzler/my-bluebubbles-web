@@ -4,6 +4,7 @@ import 'package:bluebubbles/app/layouts/conversation_list/widgets/header/header_
 import 'package:bluebubbles/app/layouts/conversation_list/pages/search/search_view.dart';
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:get/get.dart';
@@ -127,6 +128,15 @@ class _SamsungHeaderState extends CustomState<SamsungHeader, void, ConversationL
                                       color: context.theme.colorScheme.properOnSurface,
                                     ),
                                   )),
+                              if (!showArchived && !showUnknown && CRMConfig.crmEnabled)
+                                IconButton(
+                                  onPressed: () => goToCRM(context),
+                                  icon: Icon(
+                                    Icons.people_outline,
+                                    color: context.theme.colorScheme.properOnSurface,
+                                  ),
+                                  tooltip: 'CRM Members',
+                                ),
                               if (!showArchived && !showUnknown)
                                 IconButton(
                                   onPressed: () async {
