@@ -61,10 +61,10 @@ class SocketService extends GetxService {
         .setTransports(['websocket', 'polling'])
         .setExtraHeaders(http.headers)
         .setPath('/socket.io')
-        .setTimeout(const Duration(seconds: 20))
+        .setTimeout(20000)
         .setReconnectionAttempts(999999)
-        .setReconnectionDelay(const Duration(seconds: 2))
-        .setReconnectionDelayMax(const Duration(seconds: 10))
+        .setReconnectionDelay(2000)
+        .setReconnectionDelayMax(10000)
         .setRandomizationFactor(0.35)
         // Disable so that we can create the listeners first
         .disableAutoConnect()

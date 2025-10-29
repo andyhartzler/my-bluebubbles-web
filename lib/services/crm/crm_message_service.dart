@@ -14,7 +14,7 @@ import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:mime_type/mime_type.dart';
 import 'package:slugify/slugify.dart';
 import 'package:universal_io/io.dart';
@@ -83,7 +83,7 @@ class CRMMessageService {
     bool includeContactCard = false,
     bool markIntro = false,
     List<Member>? explicitMembers,
-    List<PlatformFile> attachments = const [],
+    List<file_picker.PlatformFile> attachments = const [],
   }) async {
     final results = <String, bool>{};
 
@@ -217,7 +217,7 @@ class CRMMessageService {
     required String phoneNumber,
     required String message,
     bool includeContactCard = false,
-    List<PlatformFile> attachments = const [],
+    List<file_picker.PlatformFile> attachments = const [],
   }) async {
     if (phoneNumber.isEmpty) return false;
 
@@ -596,7 +596,7 @@ class CRMMessageService {
     return combined.values.toList();
   }
 
-  Future<bool> _sendAttachments(Chat chat, List<PlatformFile> attachments) async {
+  Future<bool> _sendAttachments(Chat chat, List<file_picker.PlatformFile> attachments) async {
     for (final file in attachments) {
       try {
         final bytes = await _resolveFileBytes(file);
@@ -606,10 +606,11 @@ class CRMMessageService {
 
         final name = file.name.isNotEmpty ? file.name : 'attachment';
         final ext = file.extension ?? '';
-        final mime = mimeFromExtension(ext) ?? mime(name) ?? 'application/octet-stream';
+        final resolvedMime =
+            mimeFromExtension(ext) ?? mime(name) ?? 'application/octet-stream';
 
         final attachment = Attachment(
-          mimeType: mime,
+          mimeType: resolvedMime,
           isOutgoing: true,
           uti: null,
           transferName: name,
@@ -647,7 +648,7 @@ class CRMMessageService {
     return true;
   }
 
-  Future<Uint8List?> _resolveFileBytes(PlatformFile file) async {
+  Future<Uint8List?> _resolveFileBytes(file_picker.PlatformFile file) async {
     if (file.bytes != null) {
       return file.bytes!;
     }
