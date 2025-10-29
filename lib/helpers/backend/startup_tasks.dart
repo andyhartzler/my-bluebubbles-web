@@ -18,6 +18,78 @@ import 'package:tuple/tuple.dart';
 import 'package:window_manager/window_manager.dart';
 
 class StartupTasks {
+  static const Map<String, String> _defineEnv = <String, String>{
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_HOST':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_HOST'),
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_URL':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_URL'),
+    'BLUEBUBBLES_PRIVATE_API_HOST':
+        const String.fromEnvironment('BLUEBUBBLES_PRIVATE_API_HOST'),
+    'BLUEBUBBLES_PRIVATE_API_URL':
+        const String.fromEnvironment('BLUEBUBBLES_PRIVATE_API_URL'),
+    'NEXT_PUBLIC_BLUEBUBBLES_HOST':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_HOST'),
+    'NEXT_PUBLIC_BLUEBUBBLES_URL':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_URL'),
+    'BLUEBUBBLES_HOST': const String.fromEnvironment('BLUEBUBBLES_HOST'),
+    'BLUEBUBBLES_URL': const String.fromEnvironment('BLUEBUBBLES_URL'),
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_PASSWORD':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_PASSWORD'),
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_AUTH_KEY':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_AUTH_KEY'),
+    'BLUEBUBBLES_PRIVATE_API_PASSWORD':
+        const String.fromEnvironment('BLUEBUBBLES_PRIVATE_API_PASSWORD'),
+    'BLUEBUBBLES_PRIVATE_API_AUTH_KEY':
+        const String.fromEnvironment('BLUEBUBBLES_PRIVATE_API_AUTH_KEY'),
+    'NEXT_PUBLIC_BLUEBUBBLES_PASSWORD':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD'),
+    'NEXT_PUBLIC_BLUEBUBBLES_AUTH_KEY':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_AUTH_KEY'),
+    'BLUEBUBBLES_PASSWORD':
+        const String.fromEnvironment('BLUEBUBBLES_PASSWORD'),
+    'BLUEBUBBLES_AUTH_KEY':
+        const String.fromEnvironment('BLUEBUBBLES_AUTH_KEY'),
+  };
+
+  static const List<String> _hostEnvKeys = <String>[
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_HOST',
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_URL',
+    'BLUEBUBBLES_PRIVATE_API_HOST',
+    'BLUEBUBBLES_PRIVATE_API_URL',
+    'NEXT_PUBLIC_BLUEBUBBLES_HOST',
+    'NEXT_PUBLIC_BLUEBUBBLES_URL',
+    'BLUEBUBBLES_HOST',
+    'BLUEBUBBLES_URL',
+  ];
+
+  static const List<String> _passwordEnvKeys = <String>[
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_PASSWORD',
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_AUTH_KEY',
+    'BLUEBUBBLES_PRIVATE_API_PASSWORD',
+    'BLUEBUBBLES_PRIVATE_API_AUTH_KEY',
+    'NEXT_PUBLIC_BLUEBUBBLES_PASSWORD',
+    'NEXT_PUBLIC_BLUEBUBBLES_AUTH_KEY',
+    'BLUEBUBBLES_PASSWORD',
+    'BLUEBUBBLES_AUTH_KEY',
+  ];
+
+  static String _resolveEnvValue(List<String> keys) {
+    for (final String key in keys) {
+      final String value = (_defineEnv[key] ?? '').trim();
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    for (final String key in keys) {
+      final String? value = dotenv.maybeGet(key)?.trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return '';
+  }
 
   static final Completer<void> uiReady = Completer<void>();
 
@@ -42,19 +114,15 @@ class StartupTasks {
     // Setup the settings service
     await ss.init();
 
-    final hostFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_HOST');
-    final passwordFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD');
-    final envHost = hostFromDefine.isNotEmpty
-        ? hostFromDefine
-        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_HOST') ?? '');
-    final envPassword = passwordFromDefine.isNotEmpty
-        ? passwordFromDefine
-        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD') ?? '');
+    await _applyMYDAutoConfiguration();
+
+    final String envHost = _resolveEnvValue(_hostEnvKeys);
+    final String envPassword = _resolveEnvValue(_passwordEnvKeys);
 
     if (envHost.isNotEmpty) {
       final additional = <String>[];
       if (envPassword.isNotEmpty) {
-        ss.settings.guidAuthKey.value = envPassword;
+        ss.settings.guidAuthKey.value = envPassword.trim();
         additional.add('guidAuthKey');
       }
       await saveNewServerUrl(
@@ -64,6 +132,12 @@ class StartupTasks {
         force: true,
         saveAdditionalSettings: additional,
       );
+
+      try {
+        socket.restartSocket();
+      } catch (e) {
+        Logger.error('Failed to restart socket after applying environment server URL', error: e);
+      }
     }
 
     // The next thing we need to do is initialize the database.
@@ -89,6 +163,60 @@ class StartupTasks {
 
     await notif.init();
     await intents.init();
+  }
+
+  static Future<void> _applyMYDAutoConfiguration() async {
+    bool updated = false;
+
+    if (!ss.settings.enablePrivateAPI.value) {
+      ss.settings.enablePrivateAPI.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateAPISend.value) {
+      ss.settings.privateAPISend.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateAPIAttachmentSend.value) {
+      ss.settings.privateAPIAttachmentSend.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateSendTypingIndicators.value) {
+      ss.settings.privateSendTypingIndicators.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateMarkChatAsRead.value) {
+      ss.settings.privateMarkChatAsRead.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateManualMarkAsRead.value) {
+      ss.settings.privateManualMarkAsRead.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateSubjectLine.value) {
+      ss.settings.privateSubjectLine.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.finishedSetup.value) {
+      ss.settings.finishedSetup.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.reachedConversationList.value) {
+      ss.settings.reachedConversationList.value = true;
+      updated = true;
+    }
+
+    if (updated) {
+      await ss.saveSettings();
+      await ss.prefs.setBool('private-api-enable-tip', true);
+    }
   }
 
   static Future<void> initIsolateServices() async {
