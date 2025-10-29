@@ -4,6 +4,9 @@ class MessageFilter {
   final String? county;
   final String? congressionalDistrict;
   final List<String>? committees;
+  final String? schoolName;
+  final String? chapterName;
+  final String? chapterStatus;
   final int? minAge;
   final int? maxAge;
   final bool excludeOptedOut;
@@ -14,6 +17,9 @@ class MessageFilter {
     this.county,
     this.congressionalDistrict,
     this.committees,
+    this.schoolName,
+    this.chapterName,
+    this.chapterStatus,
     this.minAge,
     this.maxAge,
     this.excludeOptedOut = true,
@@ -26,6 +32,9 @@ class MessageFilter {
       county != null ||
       congressionalDistrict != null ||
       (committees != null && committees!.isNotEmpty) ||
+      schoolName != null ||
+      chapterName != null ||
+      chapterStatus != null ||
       minAge != null ||
       maxAge != null;
 
@@ -38,6 +47,9 @@ class MessageFilter {
     if (committees != null && committees!.isNotEmpty) {
       parts.add('Committees: ${committees!.join(", ")}');
     }
+    if (schoolName != null) parts.add('School: $schoolName');
+    if (chapterName != null) parts.add('Chapter: $chapterName');
+    if (chapterStatus != null) parts.add('Chapter Status: $chapterStatus');
     if (minAge != null || maxAge != null) {
       if (minAge != null && maxAge != null) {
         parts.add('Age: $minAge-$maxAge');
@@ -60,6 +72,9 @@ class MessageFilter {
     String? county,
     String? congressionalDistrict,
     List<String>? committees,
+    String? schoolName,
+    String? chapterName,
+    String? chapterStatus,
     int? minAge,
     int? maxAge,
     bool? excludeOptedOut,
@@ -70,6 +85,9 @@ class MessageFilter {
       county: county ?? this.county,
       congressionalDistrict: congressionalDistrict ?? this.congressionalDistrict,
       committees: committees ?? this.committees,
+      schoolName: schoolName ?? this.schoolName,
+      chapterName: chapterName ?? this.chapterName,
+      chapterStatus: chapterStatus ?? this.chapterStatus,
       minAge: minAge ?? this.minAge,
       maxAge: maxAge ?? this.maxAge,
       excludeOptedOut: excludeOptedOut ?? this.excludeOptedOut,

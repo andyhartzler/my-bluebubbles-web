@@ -32,6 +32,9 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   List<String> _counties = [];
   List<String> _districts = [];
   List<String> _committees = [];
+  List<String> _schools = [];
+  List<String> _chapters = [];
+  List<String> _chapterStatuses = [];
 
   @override
   void initState() {
@@ -54,14 +57,20 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       _memberRepo.getUniqueCounties(),
       _memberRepo.getUniqueCongressionalDistricts(),
       _memberRepo.getUniqueCommittees(),
+      _memberRepo.getUniqueSchools(),
+      _memberRepo.getUniqueChapterNames(),
+      _memberRepo.getChapterStatusCounts(),
     ]);
 
     if (!mounted) return;
 
     setState(() {
-      _counties = results[0];
-      _districts = results[1];
-      _committees = results[2];
+      _counties = List<String>.from(results[0] as List);
+      _districts = List<String>.from(results[1] as List);
+      _committees = List<String>.from(results[2] as List);
+      _schools = List<String>.from(results[3] as List);
+      _chapters = List<String>.from(results[4] as List);
+      _chapterStatuses = (results[5] as Map<String, int>).keys.toList()..sort();
     });
   }
 
@@ -168,6 +177,81 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
     }
   }
 
+  Future<void> _sendIntroMessages() async {
+    if (_totalMessages == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No members match the filter')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Send Intro Message'),
+        content: Text(
+          'Send the Missouri Young Democrats intro message to $_totalMessages members?\n\n'
+          'This will send individually at a rate of ${CRMMessageService.messagesPerMinute} per minute and include the contact card.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Send Intro'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _sending = true;
+      _currentProgress = 0;
+    });
+
+    try {
+      final results = await _messageService.sendIntroToFilteredMembers(
+        _filter,
+        onProgress: (current, total) {
+          if (!mounted) return;
+          setState(() {
+            _currentProgress = current;
+            _totalMessages = total;
+          });
+        },
+      );
+
+      final successCount = results.values.where((v) => v).length;
+
+      if (!mounted) return;
+      setState(() => _sending = false);
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Intro Messages Sent'),
+          content: Text('Successfully sent intro to $successCount of $_totalMessages members'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _sending = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sending intro messages: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -248,6 +332,12 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             const SizedBox(height: 12),
             _buildDistrictDropdown(),
             const SizedBox(height: 12),
+            _buildSchoolDropdown(),
+            const SizedBox(height: 12),
+            _buildChapterDropdown(),
+            const SizedBox(height: 12),
+            _buildChapterStatusDropdown(),
+            const SizedBox(height: 12),
             _buildAgeFields(),
             const SizedBox(height: 12),
             CheckboxListTile(
@@ -320,6 +410,78 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       onChanged: (value) {
         setState(() {
           _filter = _filter.copyWith(congressionalDistrict: value);
+        });
+        _updatePreview();
+      },
+    );
+  }
+
+  Widget _buildSchoolDropdown() {
+    final items = <DropdownMenuItem<String?>>[
+      const DropdownMenuItem<String?>(value: null, child: Text('All Schools')),
+      ..._schools.map(
+        (s) => DropdownMenuItem<String?>(value: s, child: Text(s)),
+      ),
+    ];
+
+    return DropdownButtonFormField<String?>(
+      value: _filter.schoolName,
+      decoration: const InputDecoration(
+        labelText: 'School',
+        border: OutlineInputBorder(),
+      ),
+      items: items,
+      onChanged: (value) {
+        setState(() {
+          _filter = _filter.copyWith(schoolName: value);
+        });
+        _updatePreview();
+      },
+    );
+  }
+
+  Widget _buildChapterDropdown() {
+    final items = <DropdownMenuItem<String?>>[
+      const DropdownMenuItem<String?>(value: null, child: Text('All Chapters')),
+      ..._chapters.map(
+        (s) => DropdownMenuItem<String?>(value: s, child: Text(s)),
+      ),
+    ];
+
+    return DropdownButtonFormField<String?>(
+      value: _filter.chapterName,
+      decoration: const InputDecoration(
+        labelText: 'Chapter',
+        border: OutlineInputBorder(),
+      ),
+      items: items,
+      onChanged: (value) {
+        setState(() {
+          _filter = _filter.copyWith(chapterName: value);
+        });
+        _updatePreview();
+      },
+    );
+  }
+
+  Widget _buildChapterStatusDropdown() {
+    final items = <DropdownMenuItem<String?>>[
+      const DropdownMenuItem<String?>(value: null, child: Text('All Chapter Statuses')),
+      ..._chapterStatuses.map(
+        (s) => DropdownMenuItem<String?>(value: s, child: Text(s)),
+      ),
+    ];
+
+    return DropdownButtonFormField<String?>(
+      value: _filter.chapterStatus,
+      decoration: const InputDecoration(
+        labelText: 'Chapter Membership Status',
+        border: OutlineInputBorder(),
+      ),
+      items: items,
+      onChanged: (value) {
+        setState(() {
+          _filter = _filter.copyWith(chapterStatus: value);
         });
         _updatePreview();
       },
@@ -472,6 +634,10 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   }
 
   Widget _buildFooter() {
+    if (!_crmReady) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -494,18 +660,32 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                 Text('Sending $_currentProgress of $_totalMessages...'),
               ],
             )
-          : SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.send),
-                label: Text('Send to $_totalMessages Members'),
-                onPressed: _messageController.text.trim().isEmpty || _totalMessages == 0
-                    ? null
-                    : _sendMessages,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
+          : Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Send Intro'),
+                    onPressed: _totalMessages == 0 ? null : _sendIntroMessages,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.send),
+                    label: Text('Send to $_totalMessages Members'),
+                    onPressed: _messageController.text.trim().isEmpty || _totalMessages == 0
+                        ? null
+                        : _sendMessages,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }

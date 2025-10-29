@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -22,6 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   _DashboardData? _data;
   bool _loading = true;
   String? _error;
+  String _selectedMetric = 'counties';
 
   @override
   void initState() {
@@ -48,6 +50,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final counties = await _memberRepo.getCountyCounts();
       final districts = await _memberRepo.getDistrictCounts();
       final committees = await _memberRepo.getCommitteeCounts();
+      final schools = await _memberRepo.getSchoolCounts();
+      final chapters = await _memberRepo.getChapterCounts();
       final chapterStatuses = await _memberRepo.getChapterStatusCounts();
       final graduationYears = await _memberRepo.getGraduationYearCounts();
       final recentMembers = await _memberRepo.getRecentMembers(limit: 6);
@@ -70,6 +74,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           counties: counties,
           districts: districts,
           committees: committees,
+          schools: schools,
+          chapters: chapters,
           chapterStatuses: chapterStatuses,
           graduationYears: graduationYears,
           recentMembers: recentMembers,
@@ -156,6 +162,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _buildHeader(theme, data),
               const SizedBox(height: 24),
               _buildStatsGrid(context, data),
+              const SizedBox(height: 32),
+              _buildInteractiveChart(context, data),
               const SizedBox(height: 32),
               _buildBreakdownRow(context, data),
               const SizedBox(height: 32),
@@ -286,6 +294,208 @@ class _DashboardScreenState extends State<DashboardScreen> {
           itemBuilder: (context, index) => _StatCard(data: cards[index]),
         );
       },
+    );
+  }
+
+  Widget _buildInteractiveChart(BuildContext context, _DashboardData data) {
+    final theme = Theme.of(context);
+    final metricLabels = <String, String>{
+      'counties': 'Top Counties',
+      'districts': 'Top Districts',
+      'committees': 'Committees',
+      'schools': 'Schools',
+      'chapters': 'Chapters',
+      'chapterStatuses': 'Chapter Status',
+      'graduationYears': 'Graduation Years',
+    };
+
+    final metricValues = <String, Map<String, int>>{
+      'counties': data.counties,
+      'districts': data.districts,
+      'committees': data.committees,
+      'schools': data.schools,
+      'chapters': data.chapters,
+      'chapterStatuses': data.chapterStatuses,
+      'graduationYears': data.graduationYears,
+    };
+
+    final selectedData = metricValues[_selectedMetric] ?? const {};
+    final entries = selectedData.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topEntries = entries.take(8).toList();
+
+    if (topEntries.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Member Distribution',
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  DropdownButton<String>(
+                    value: _selectedMetric,
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _selectedMetric = value);
+                      }
+                    },
+                    items: metricLabels.entries
+                        .map(
+                          (entry) => DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No data available for ${metricLabels[_selectedMetric] ?? 'selected metric'}.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final maxValue = topEntries.fold<int>(0, (prev, element) => element.value > prev ? element.value : prev);
+    final barGroups = List.generate(topEntries.length, (index) {
+      final entry = topEntries[index];
+      return BarChartGroupData(
+        x: index,
+        barRods: [
+          BarChartRodData(
+            toY: entry.value.toDouble(),
+            width: 18,
+            borderRadius: BorderRadius.circular(6),
+            gradient: LinearGradient(
+              colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+            ),
+          ),
+        ],
+      );
+    });
+
+    String formatLabel(String label) {
+      const maxChars = 14;
+      if (label.length <= maxChars) return label;
+      return '${label.substring(0, maxChars - 1)}…';
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Member Distribution',
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                DropdownButton<String>(
+                  value: _selectedMetric,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedMetric = value);
+                    }
+                  },
+                  items: metricLabels.entries
+                      .map(
+                        (entry) => DropdownMenuItem<String>(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 280,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: (maxValue * 1.2).clamp(1, double.infinity).toDouble(),
+                  barGroups: barGroups,
+                  borderData: FlBorderData(show: false),
+                  gridData: FlGridData(show: false),
+                  titlesData: FlTitlesData(
+                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 52,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index < 0 || index >= topEntries.length) {
+                            return const SizedBox.shrink();
+                          }
+                          final label = formatLabel(topEntries[index].key);
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              label,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) => Text(
+                          value.toInt().toString(),
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                    ),
+                  ),
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    touchTooltipData: BarTouchTooltipData(
+                      tooltipBgColor: theme.colorScheme.surfaceVariant.withOpacity(0.9),
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final entry = topEntries[groupIndex];
+                        return BarTooltipItem(
+                          '${entry.key}\n',
+                          theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold) ?? const TextStyle(fontWeight: FontWeight.bold),
+                          children: [
+                            TextSpan(
+                              text: '${entry.value} members',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -429,6 +639,8 @@ class _DashboardData {
   final Map<String, int> counties;
   final Map<String, int> districts;
   final Map<String, int> committees;
+  final Map<String, int> schools;
+  final Map<String, int> chapters;
   final Map<String, int> chapterStatuses;
   final Map<String, int> graduationYears;
   final List<Member> recentMembers;
@@ -444,6 +656,8 @@ class _DashboardData {
     required this.counties,
     required this.districts,
     required this.committees,
+    required this.schools,
+    required this.chapters,
     required this.chapterStatuses,
     required this.graduationYears,
     required this.recentMembers,
@@ -460,6 +674,8 @@ class _DashboardData {
         counties = const {},
         districts = const {},
         committees = const {},
+        schools = const {},
+        chapters = const {},
         chapterStatuses = const {},
         graduationYears = const {},
         recentMembers = const [];

@@ -17,6 +17,9 @@ class MemberRepository {
     String? county,
     String? congressionalDistrict,
     List<String>? committees,
+    String? schoolName,
+    String? chapterName,
+    String? chapterStatus,
     int? minAge,
     int? maxAge,
     bool? optedOut,
@@ -36,6 +39,18 @@ class MemberRepository {
 
       if (committees != null && committees.isNotEmpty) {
         query = query.overlaps('committee', committees);
+      }
+
+      if (schoolName != null && schoolName.isNotEmpty) {
+        query = query.eq('school_name', schoolName);
+      }
+
+      if (chapterName != null && chapterName.isNotEmpty) {
+        query = query.eq('chapter_name', chapterName);
+      }
+
+      if (chapterStatus != null && chapterStatus.isNotEmpty) {
+        query = query.eq('current_chapter_member', chapterStatus);
       }
 
       if (optedOut != null) {
@@ -138,6 +153,11 @@ class MemberRepository {
         postProcess: Member.formatDistrictLabel,
       );
 
+  Future<Map<String, int>> getSchoolCounts() => _aggregateTextField(
+        'school_name',
+        normalize: Member.normalizeText,
+      );
+
   Future<Map<String, int>> getCommitteeCounts() async {
     if (!_isReady) return {};
 
@@ -163,6 +183,11 @@ class MemberRepository {
 
   Future<Map<String, int>> getChapterStatusCounts() => _aggregateTextField(
         'current_chapter_member',
+        normalize: Member.normalizeText,
+      );
+
+  Future<Map<String, int>> getChapterCounts() => _aggregateTextField(
+        'chapter_name',
         normalize: Member.normalizeText,
       );
 
@@ -238,6 +263,56 @@ class MemberRepository {
       return sorted;
     } catch (e) {
       print('❌ Error fetching committees: $e');
+      return [];
+    }
+  }
+
+  Future<List<String>> getUniqueSchools() async {
+    if (!_isReady) return [];
+
+    try {
+      final response = await _supabase.client
+          .from('members')
+          .select('school_name')
+          .not('school_name', 'is', null);
+
+      final schools = (response as List<dynamic>)
+          .map((item) => Member.normalizeText(item['school_name']))
+          .whereType<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toSet()
+          .toList();
+
+      schools.sort();
+      return schools;
+    } catch (e) {
+      print('❌ Error fetching schools: $e');
+      return [];
+    }
+  }
+
+  Future<List<String>> getUniqueChapterNames() async {
+    if (!_isReady) return [];
+
+    try {
+      final response = await _supabase.client
+          .from('members')
+          .select('chapter_name')
+          .not('chapter_name', 'is', null);
+
+      final chapters = (response as List<dynamic>)
+          .map((item) => Member.normalizeText(item['chapter_name']))
+          .whereType<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toSet()
+          .toList();
+
+      chapters.sort();
+      return chapters;
+    } catch (e) {
+      print('❌ Error fetching chapter names: $e');
       return [];
     }
   }

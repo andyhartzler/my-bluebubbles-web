@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
-import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
-import 'package:bluebubbles/services/services.dart';
 
 enum _SocialPlatform { instagram, tiktok, x }
 
@@ -26,9 +28,11 @@ class MemberDetailScreen extends StatefulWidget {
 class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final MemberRepository _memberRepo = MemberRepository();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
+  final CRMMessageService _messageService = CRMMessageService();
   late Member _member;
   final TextEditingController _notesController = TextEditingController();
   bool _editingNotes = false;
+  bool _sendingIntro = false;
 
   bool get _crmReady => _supabaseService.isInitialized;
 
@@ -123,21 +127,90 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
 
     try {
-      ns.push(
-        context,
-        ChatCreator(
-          initialSelected: [
-            SelectedContact(
-              displayName: _member.name,
-              address: address,
-            ),
-          ],
+      await Navigator.of(context, rootNavigator: true).push(ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(
+          child: ChatCreator(
+            initialSelected: [
+              SelectedContact(
+                displayName: _member.name,
+                address: address,
+              ),
+            ],
+          ),
         ),
-      );
+      ));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Unable to open chat composer: $e')),
+      );
+    }
+  }
+
+  Future<void> _sendIntro() async {
+    if (!_crmReady || !_member.canContact || _sendingIntro) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Send Intro Message'),
+        content: const Text(
+          'Send the Missouri Young Democrats intro message and contact card to this member?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Send Intro'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _sendingIntro = true);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    bool success = false;
+    Object? error;
+    try {
+      success = await _messageService.sendIntroToMember(_member);
+    } catch (e) {
+      error = e;
+    }
+
+    if (!mounted) return;
+
+    Navigator.of(context).pop();
+    setState(() => _sendingIntro = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sending intro: $error')),
+      );
+      return;
+    }
+
+    if (success) {
+      final now = DateTime.now();
+      setState(() {
+        _member = _member.copyWith(introSentAt: now, lastContacted: now);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Intro message sent')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to send intro message')),
       );
     }
   }
@@ -152,6 +225,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             icon: const Icon(Icons.message),
             onPressed: _member.canContact ? _startChat : null,
             tooltip: 'Start Chat',
+          ),
+          IconButton(
+            icon: const Icon(Icons.auto_awesome),
+            onPressed: _member.canContact && !_sendingIntro ? _sendIntro : null,
+            tooltip: 'Send Intro Message',
           ),
         ],
       ),

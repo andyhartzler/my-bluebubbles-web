@@ -10,17 +10,20 @@ import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/services/network/http_overrides.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/window_effects.dart';
+import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/app/layouts/startup/failure_to_start.dart';
 import 'package:bluebubbles/app/layouts/setup/setup_view.dart';
 import 'package:bluebubbles/app/layouts/startup/splash_screen.dart';
 import 'package:bluebubbles/app/layouts/startup/myd_loading_screen.dart';
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:collection/collection.dart';
@@ -834,8 +837,48 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     setState(() => _currentSection = section);
   }
 
-  void _openNewMessage(BuildContext context) {
-    Actions.invoke(context, const OpenNewChatCreatorIntent());
+  void _openNewMessage(BuildContext context) async {
+    final selection = await showModalBottomSheet<int>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Single Message'),
+              subtitle: const Text('Compose a conversation with one member'),
+              onTap: () => Navigator.pop(context, 0),
+            ),
+            ListTile(
+              leading: const Icon(Icons.groups),
+              title: const Text('Member Outreach'),
+              subtitle: const Text('Send individual messages to a filtered group'),
+              onTap: () => Navigator.pop(context, 1),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selection == 0) {
+      await Navigator.of(context, rootNavigator: true).push(
+        ThemeSwitcher.buildPageRoute(
+          builder: (context) => const TitleBarWrapper(child: ChatCreator()),
+        ),
+      );
+    } else if (selection == 1) {
+      if (!CRMConfig.crmEnabled || !CRMSupabaseService().isInitialized) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('CRM Supabase is not configured.')),
+        );
+        return;
+      }
+
+      await Navigator.of(context).push(ThemeSwitcher.buildPageRoute(
+        builder: (context) => const TitleBarWrapper(child: BulkMessageScreen()),
+      ));
+    }
   }
 }
 
