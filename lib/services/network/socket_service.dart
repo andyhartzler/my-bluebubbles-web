@@ -76,6 +76,7 @@ class SocketService extends GetxService {
       return;
     }
 
+    Logger.info('Connecting to socket at $target');
     socket = io(target, options.build());
 
     socket.onConnect((data) => handleStatusUpdate(SocketState.connected, data));
@@ -213,13 +214,7 @@ class SocketService extends GetxService {
 
   bool _maybeDowngradeSocketScheme() {
     final origin = serverAddress;
-    if (origin.isEmpty) {
-      return false;
-    }
-
-    if (_socketOverride != null) {
-      Logger.warn('Socket fallback also failed. Clearing override and retrying default scheme.');
-      _socketOverride = null;
+    if (origin.isEmpty || _socketOverride != null) {
       return false;
     }
 
@@ -239,7 +234,7 @@ class SocketService extends GetxService {
 
     _attemptedDowngrade = true;
     _socketOverride = downgraded.toString();
-    Logger.warn('HTTPS socket failed, retrying over HTTP/WebSocket fallback...');
+    Logger.warn('HTTPS socket failed, retrying over HTTP/WebSocket fallback at $_socketOverride');
     restartSocket();
     return true;
   }
