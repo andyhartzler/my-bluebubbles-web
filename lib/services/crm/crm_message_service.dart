@@ -330,11 +330,8 @@ class CRMMessageService {
       }
 
       final message = await _buildContactCardMessage(chat);
-      await outq.queue(OutgoingItem(
-        type: QueueType.sendAttachment,
-        chat: chat,
-        message: message,
-      ));
+      await ah.prepAttachment(chat, message);
+      await ah.sendAttachment(chat, message, false);
       return true;
     } catch (e, stack) {
       Logger.warn('Unable to send contact card', error: e, trace: stack);
@@ -345,7 +342,7 @@ class CRMMessageService {
   Future<Message> _buildContactCardMessage(Chat chat) async {
     final bytes = await _buildContactCardBytes();
     final messageGuid = 'temp-${randomString(8)}';
-    final attachmentGuid = 'temp-${randomString(8)}';
+    final transferName = '${messageGuid}_moyd.vcf';
     final message = Message(
       guid: messageGuid,
       text: '',
@@ -355,11 +352,11 @@ class CRMMessageService {
       handleId: 0,
       attachments: [
         Attachment(
-          guid: attachmentGuid,
-          mimeType: 'text/x-vcard',
+          guid: messageGuid,
+          mimeType: 'text/vcard',
           uti: 'public.vcard',
           isOutgoing: true,
-          transferName: 'MOYDA Contact.vcf',
+          transferName: transferName,
           totalBytes: bytes.length,
           bytes: bytes,
         ),
