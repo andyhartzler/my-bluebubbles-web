@@ -213,58 +213,65 @@ class CRMMessageService {
 
     final cleaned = phoneNumber.contains('@') ? phoneNumber : cleansePhoneNumber(phoneNumber);
     Chat? chat = await _findExistingChat(cleaned);
-    bool textQueued = false;
-
-    try {
-      if (chat == null) {
-        final service = await _determineService(cleaned);
-        final response = await http.createChat([cleaned], message, service);
-        final payload = response.data?['data'];
-        if (payload is Map<String, dynamic>) {
-          var created = Chat.fromMap(payload);
-          created = created.save();
-          final saved = await cm.fetchChat(created.guid) ?? created;
-          chat = saved;
-        } else {
-          chat = await _findExistingChat(cleaned);
-          if (chat == null) {
-            await Future.delayed(const Duration(milliseconds: 300));
-            chat = await _findExistingChat(cleaned);
-          }
-        }
-        textQueued = true;
-      } else {
-        final msg = Message(
-          text: message,
-          dateCreated: DateTime.now(),
-          isFromMe: true,
-          hasAttachments: false,
-          handleId: 0,
-        );
-        msg.chat.target = chat;
-        await outq.queue(OutgoingItem(
-          type: QueueType.sendMessage,
-          chat: chat,
-          message: msg,
-        ));
-        textQueued = true;
-      }
-    } catch (e, stack) {
-      Logger.error('Failed to queue CRM text message', error: e, trace: stack);
-      return false;
-    }
-
-    if (!textQueued) {
-      return false;
-    }
+    bool sentViaCreate = false;
 
     if (chat == null) {
-      Logger.warn('Queued CRM message but could not locate chat for $cleaned');
+      final service = await _determineService(cleaned);
+      try {
+        final response = await http.createChat([cleaned], message, service);
+        sentViaCreate = true;
+        final body = response.data;
+        Map<String, dynamic>? payload;
+        if (body is Map<String, dynamic>) {
+          final raw = body['data'];
+          if (raw is Map<String, dynamic>) {
+            payload = raw;
+          }
+        }
+        if (payload != null) {
+          try {
+            var created = Chat.fromMap(payload);
+            created = created.save();
+            try {
+              await chats.addChat(created);
+            } catch (_) {}
+            chat = created;
+          } catch (e, stack) {
+            Logger.warn('Unable to register created chat locally for $cleaned', error: e, trace: stack);
+          }
+        }
+      } catch (e, stack) {
+        Logger.warn('Failed to create chat for $cleaned via API, attempting fallback send', error: e, trace: stack);
+        chat = await _waitForChat(cleaned);
+        if (chat == null) {
+          return false;
+        }
+        final queued = await _queueTextMessage(chat, message);
+        if (!queued) {
+          return false;
+        }
+      }
+    }
+
+    if (!sentViaCreate) {
+      chat ??= await _waitForChat(cleaned);
+      if (chat == null) {
+        return false;
+      }
+      final queued = await _queueTextMessage(chat, message);
+      if (!queued) {
+        return false;
+      }
+    }
+
+    final readyChat = await _waitForChat(cleaned, seed: chat);
+    if (readyChat == null) {
+      Logger.warn('Queued CRM message but could not confirm chat for $cleaned');
       return true;
     }
 
     if (includeContactCard) {
-      final sent = await _sendContactCardForAddress(cleaned, chat);
+      final sent = await _sendContactCardForAddress(cleaned, readyChat);
       if (!sent) {
         Logger.warn('Unable to send CRM contact card for $cleaned');
       }
@@ -346,10 +353,10 @@ class CRMMessageService {
       handleId: 0,
       attachments: [
         Attachment(
-          mimeType: 'text/vcard',
+          mimeType: 'text/x-vcard',
           uti: 'public.vcard',
           isOutgoing: true,
-          transferName: 'Missouri Young Democrats.vcf',
+          transferName: 'Missouri_Young_Democrats.vcf',
           totalBytes: bytes.length,
           bytes: bytes,
         ),
@@ -371,12 +378,72 @@ class CRMMessageService {
     var chat = seed ?? await _findExistingChat(cleaned);
     if (chat != null) return chat;
 
-    for (var attempt = 0; attempt < 5; attempt++) {
+    for (var attempt = 0; attempt < 8; attempt++) {
       await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
       chat = await _findExistingChat(cleaned);
       if (chat != null) {
         return chat;
       }
+    }
+
+    return await _pullChatForAddress(cleaned);
+  }
+
+  Future<bool> _queueTextMessage(Chat chat, String message) async {
+    try {
+      final msg = Message(
+        text: message,
+        dateCreated: DateTime.now(),
+        isFromMe: true,
+        hasAttachments: false,
+        handleId: 0,
+      );
+      msg.chat.target = chat;
+      await outq.queue(OutgoingItem(
+        type: QueueType.sendMessage,
+        chat: chat,
+        message: msg,
+      ));
+      return true;
+    } catch (e, stack) {
+      Logger.error('Failed to queue CRM text message', error: e, trace: stack);
+      return false;
+    }
+  }
+
+  Future<Chat?> _pullChatForAddress(String cleaned) async {
+    final slug = slugify(cleaned, delimiter: '');
+    try {
+      final response = await http.chats(withQuery: const ['participants'], limit: 50);
+      final body = response.data;
+      final data = body is Map<String, dynamic> ? body['data'] : null;
+      if (data is List) {
+        for (final entry in data) {
+          if (entry is! Map<String, dynamic>) continue;
+          final participants = entry['participants'];
+          if (participants is! List) continue;
+          final match = participants.any((participant) {
+            if (participant is! Map<String, dynamic>) return false;
+            final address = participant['address'] as String?;
+            if (address == null) return false;
+            return slugify(address, delimiter: '') == slug;
+          });
+          if (match) {
+            try {
+              var chat = Chat.fromMap(entry);
+              chat = chat.save();
+              try {
+                await chats.addChat(chat);
+              } catch (_) {}
+              return chat;
+            } catch (e, stack) {
+              Logger.warn('Failed to hydrate chat metadata for $cleaned', error: e, trace: stack);
+            }
+          }
+        }
+      }
+    } catch (e, stack) {
+      Logger.warn('Failed to fetch chat list when locating $cleaned', error: e, trace: stack);
     }
 
     return null;
