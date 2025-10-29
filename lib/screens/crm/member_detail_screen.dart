@@ -429,6 +429,25 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      if (_member.lastContacted != null)
+                        Chip(
+                          avatar: const Icon(Icons.schedule_send, size: 18),
+                          label: Text('Last contacted ${_formatDate(_member.lastContacted!)}'),
+                        ),
+                      if (_member.introSentAt != null)
+                        Chip(
+                          avatar: const Icon(Icons.auto_awesome, size: 18),
+                          label: Text('Intro sent ${_formatDate(_member.introSentAt!)}'),
+                        ),
+                    ],
+                  ),
+                  if (_member.lastContacted != null || _member.introSentAt != null)
+                    const SizedBox(height: 8),
                   if (_member.optOut)
                     const Center(
                       child: Chip(

@@ -196,6 +196,44 @@ class MemberRepository {
         normalize: Member.normalizeText,
       );
 
+  Future<Map<String, int>> getPronounCounts() => _aggregateTextField(
+        'preferred_pronouns',
+        normalize: Member.normalizeText,
+      );
+
+  Future<Map<String, int>> getGenderIdentityCounts() => _aggregateTextField(
+        'gender_identity',
+        normalize: Member.normalizeText,
+      );
+
+  Future<Map<String, int>> getRaceCounts() => _aggregateTextField(
+        'race',
+        normalize: Member.normalizeText,
+      );
+
+  Future<Map<String, int>> getCommunityTypeCounts() => _aggregateTextField(
+        'community_type',
+        normalize: Member.normalizeText,
+      );
+
+  Future<Map<String, int>> getIndustryCounts() => _aggregateTextField(
+        'industry',
+        normalize: Member.normalizeText,
+      );
+
+  Future<Map<String, int>> getEducationLevelCounts() => _aggregateTextField(
+        'education_level',
+        normalize: Member.normalizeText,
+      );
+
+  Future<Map<String, int>> getLanguageCounts() => _aggregateDelimitedField('languages');
+
+  Future<Map<String, int>> getRegisteredVoterCounts() => _aggregateBooleanField(
+        'registered_voter',
+        trueLabel: 'Registered',
+        falseLabel: 'Not Registered',
+      );
+
   Future<List<Member>> getRecentMembers({int limit = 5}) async {
     if (!_isReady) return [];
 
@@ -431,6 +469,80 @@ class MemberRepository {
       return _sortCounts(counts);
     } catch (e) {
       print('❌ Error aggregating $column counts: $e');
+      return {};
+    }
+  }
+
+  Future<Map<String, int>> _aggregateDelimitedField(String column) async {
+    if (!_isReady) return {};
+
+    try {
+      final response = await _supabase.client.from('members').select(column);
+      final counts = <String, int>{};
+      final delimiter = RegExp(r'[;,/\n|]+');
+
+      for (final item in response as List<dynamic>) {
+        final raw = item[column];
+        if (raw == null) continue;
+
+        Iterable<String> values;
+        if (raw is Iterable) {
+          values = Member.normalizeTextList(raw);
+        } else {
+          final normalized = Member.normalizeText(raw);
+          if (normalized == null || normalized.isEmpty) continue;
+          values = normalized.split(delimiter).map((value) => value.trim()).where((value) => value.isNotEmpty);
+        }
+
+        final normalizedValues = <String>{};
+        for (final value in values) {
+          final cleaned = Member.normalizeText(value) ?? value;
+          final trimmed = cleaned.trim();
+          if (trimmed.isEmpty) continue;
+          normalizedValues.add(trimmed);
+        }
+
+        for (final entry in normalizedValues) {
+          counts[entry] = (counts[entry] ?? 0) + 1;
+        }
+      }
+
+      return _sortCounts(counts);
+    } catch (e) {
+      print('❌ Error aggregating $column list counts: $e');
+      return {};
+    }
+  }
+
+  Future<Map<String, int>> _aggregateBooleanField(
+    String column, {
+    String trueLabel = 'Yes',
+    String falseLabel = 'No',
+  }) async {
+    if (!_isReady) return {};
+
+    try {
+      final response = await _supabase.client.from('members').select(column);
+      int trueCount = 0;
+      int falseCount = 0;
+
+      for (final item in response as List<dynamic>) {
+        final value = item[column];
+        if (value is bool) {
+          if (value) {
+            trueCount += 1;
+          } else {
+            falseCount += 1;
+          }
+        }
+      }
+
+      final counts = <String, int>{};
+      if (trueCount > 0) counts[trueLabel] = trueCount;
+      if (falseCount > 0) counts[falseLabel] = falseCount;
+      return _sortCounts(counts);
+    } catch (e) {
+      print('❌ Error aggregating $column boolean counts: $e');
       return {};
     }
   }

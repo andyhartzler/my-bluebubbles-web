@@ -95,4 +95,41 @@ class MessageFilter {
       recentContactThreshold: recentContactThreshold ?? this.recentContactThreshold,
     );
   }
+
+  MessageFilter copyWithOverrides({
+    String? county,
+    bool clearCounty = false,
+    String? congressionalDistrict,
+    bool clearCongressionalDistrict = false,
+    List<String>? committees,
+    bool clearCommittees = false,
+    String? schoolName,
+    bool clearSchoolName = false,
+    String? chapterName,
+    bool clearChapterName = false,
+    String? chapterStatus,
+    bool clearChapterStatus = false,
+    int? minAge,
+    bool clearMinAge = false,
+    int? maxAge,
+    bool clearMaxAge = false,
+    bool? excludeOptedOut,
+    bool? excludeRecentlyContacted,
+    Duration? recentContactThreshold,
+  }) {
+    return MessageFilter(
+      county: clearCounty ? null : (county ?? this.county),
+      congressionalDistrict:
+          clearCongressionalDistrict ? null : (congressionalDistrict ?? this.congressionalDistrict),
+      committees: clearCommittees ? null : (committees ?? this.committees),
+      schoolName: clearSchoolName ? null : (schoolName ?? this.schoolName),
+      chapterName: clearChapterName ? null : (chapterName ?? this.chapterName),
+      chapterStatus: clearChapterStatus ? null : (chapterStatus ?? this.chapterStatus),
+      minAge: clearMinAge ? null : (minAge ?? this.minAge),
+      maxAge: clearMaxAge ? null : (maxAge ?? this.maxAge),
+      excludeOptedOut: excludeOptedOut ?? this.excludeOptedOut,
+      excludeRecentlyContacted: excludeRecentlyContacted ?? this.excludeRecentlyContacted,
+      recentContactThreshold: recentContactThreshold ?? this.recentContactThreshold,
+    );
+  }
 }

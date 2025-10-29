@@ -14,7 +14,10 @@ import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:mime_type/mime_type.dart';
 import 'package:slugify/slugify.dart';
+import 'package:universal_io/io.dart';
 
 import 'member_repository.dart';
 import 'supabase_service.dart';
@@ -23,6 +26,7 @@ import 'supabase_service.dart';
 /// Handles bulk messaging by creating individual chats
 class CRMMessageService {
   final MemberRepository _memberRepo = MemberRepository();
+  final Map<String, String> _serviceCache = {};
 
   // Rate limiting
   static const int messagesPerMinute = CRMConfig.messagesPerMinute;
@@ -79,6 +83,7 @@ class CRMMessageService {
     bool includeContactCard = false,
     bool markIntro = false,
     List<Member>? explicitMembers,
+    List<PlatformFile> attachments = const [],
   }) async {
     final results = <String, bool>{};
 
@@ -91,6 +96,7 @@ class CRMMessageService {
       final members = await _resolveRecipients(
         filter,
         explicitMembers: explicitMembers,
+        excludeIntroRecipients: markIntro,
       );
       final total = members.length;
 
@@ -109,6 +115,7 @@ class CRMMessageService {
             phoneNumber: member.phoneE164!,
             message: messageText,
             includeContactCard: includeContactCard,
+            attachments: attachments,
           );
 
           results[member.id] = success;
@@ -148,6 +155,7 @@ class CRMMessageService {
       phoneNumber: member.phoneE164!,
       message: _introMessage,
       includeContactCard: true,
+      attachments: const [],
     );
 
     if (success) {
@@ -170,6 +178,7 @@ class CRMMessageService {
       markIntro: true,
       onProgress: onProgress,
       explicitMembers: explicitMembers,
+      attachments: const [],
     );
   }
 
@@ -208,6 +217,7 @@ class CRMMessageService {
     required String phoneNumber,
     required String message,
     bool includeContactCard = false,
+    List<PlatformFile> attachments = const [],
   }) async {
     if (phoneNumber.isEmpty) return false;
 
@@ -258,9 +268,11 @@ class CRMMessageService {
       if (chat == null) {
         return false;
       }
-      final queued = await _queueTextMessage(chat, message);
-      if (!queued) {
-        return false;
+      if (message.trim().isNotEmpty) {
+        final queued = await _queueTextMessage(chat, message);
+        if (!queued) {
+          return false;
+        }
       }
     }
 
@@ -268,6 +280,13 @@ class CRMMessageService {
     if (readyChat == null) {
       Logger.warn('Queued CRM message but could not confirm chat for $cleaned');
       return true;
+    }
+
+    if (attachments.isNotEmpty) {
+      final sentAttachments = await _sendAttachments(readyChat, attachments);
+      if (!sentAttachments) {
+        return false;
+      }
     }
 
     if (includeContactCard) {
@@ -288,6 +307,7 @@ class CRMMessageService {
     final members = await _resolveRecipients(
       filter,
       explicitMembers: explicitMembers,
+      excludeIntroRecipients: false,
     );
     return members.length;
   }
@@ -310,15 +330,48 @@ class CRMMessageService {
   }
 
   Future<String> _determineService(String address) async {
-    if (address.contains('@')) return 'iMessage';
+    if (address.contains('@')) {
+      _serviceCache[address] = 'iMessage';
+      return 'iMessage';
+    }
+
+    final cached = _serviceCache[address];
+    if (cached != null) {
+      return cached;
+    }
 
     try {
       final response = await http.handleiMessageState(address);
       final available = response.data['data']['available'] as bool? ?? false;
-      return available ? 'iMessage' : 'SMS';
+      final service = available ? 'iMessage' : 'SMS';
+      _serviceCache[address] = service;
+      return service;
     } catch (_) {
+      _serviceCache[address] = 'iMessage';
       return 'iMessage';
     }
+  }
+
+  Future<Map<String, int>> previewTransportBreakdown(List<Member> members) async {
+    final counts = <String, int>{'iMessage': 0, 'SMS': 0};
+    final futures = <Future<void>>[];
+
+    for (final member in members) {
+      final address = member.phoneE164 ?? member.phone;
+      if (address == null || address.isEmpty) {
+        continue;
+      }
+
+      futures.add(() async {
+        final normalized = address.contains('@') ? address : cleansePhoneNumber(address);
+        final service = await _determineService(normalized);
+        counts[service] = (counts[service] ?? 0) + 1;
+      }());
+    }
+
+    await Future.wait(futures);
+    counts.removeWhere((key, value) => value == 0);
+    return counts;
   }
 
   Future<bool> _sendContactCardForAddress(String cleaned, Chat? initialChat) async {
@@ -356,7 +409,7 @@ class CRMMessageService {
           mimeType: 'text/x-vcard',
           uti: 'public.vcard',
           isOutgoing: true,
-          transferName: 'Missouri_Young_Democrats.vcf',
+          transferName: 'Missouri Young Democrats.vcf',
           totalBytes: bytes.length,
           bytes: bytes,
         ),
@@ -454,9 +507,10 @@ class CRMMessageService {
     final lines = <String>[
       'BEGIN:VCARD',
       'VERSION:3.0',
-      'N:Young Democrats;Missouri;;;',
+      'N:;;;;',
       'FN:Missouri Young Democrats',
       'ORG:Missouri Young Democrats',
+      'X-ABShowAs:COMPANY',
       'TEL;TYPE=WORK,VOICE:+18165300773',
       'EMAIL;TYPE=WORK,INTERNET:info@moyoungdemocrats.org',
       'ADR;TYPE=WORK:;;PO Box 270043;Kansas City;MO;64127;US',
@@ -514,19 +568,23 @@ class CRMMessageService {
   Future<List<Member>> _resolveRecipients(
     MessageFilter filter, {
     List<Member>? explicitMembers,
+    bool excludeIntroRecipients = false,
   }) async {
     final combined = LinkedHashMap<String, Member>();
 
     void add(Member member) {
       if (!member.canContact) return;
+      if (excludeIntroRecipients && member.introSentAt != null) return;
       final key = member.id ?? member.phoneE164 ?? member.phone;
       if (key == null) return;
       combined[key] = member;
     }
 
-    final filtered = await getFilteredMembers(filter);
-    for (final member in filtered) {
-      add(member);
+    if (filter.hasActiveFilters) {
+      final filtered = await getFilteredMembers(filter);
+      for (final member in filtered) {
+        add(member);
+      }
     }
 
     if (explicitMembers != null) {
@@ -536,5 +594,73 @@ class CRMMessageService {
     }
 
     return combined.values.toList();
+  }
+
+  Future<bool> _sendAttachments(Chat chat, List<PlatformFile> attachments) async {
+    for (final file in attachments) {
+      try {
+        final bytes = await _resolveFileBytes(file);
+        if (bytes == null || bytes.isEmpty) {
+          continue;
+        }
+
+        final name = file.name.isNotEmpty ? file.name : 'attachment';
+        final ext = file.extension ?? '';
+        final mime = mimeFromExtension(ext) ?? mime(name) ?? 'application/octet-stream';
+
+        final attachment = Attachment(
+          mimeType: mime,
+          isOutgoing: true,
+          uti: null,
+          transferName: name,
+          totalBytes: bytes.length,
+          bytes: bytes,
+        );
+
+        final message = Message(
+          text: '',
+          dateCreated: DateTime.now(),
+          hasAttachments: true,
+          isFromMe: true,
+          handleId: 0,
+          attachments: [attachment],
+        );
+
+        message.chat.target = chat;
+        message.generateTempGuid();
+        attachment.guid = message.guid;
+        attachment.totalBytes = bytes.length;
+        attachment.bytes = bytes;
+
+        await outq.queue(OutgoingItem(
+          type: QueueType.sendAttachment,
+          chat: chat,
+          message: message,
+          customArgs: const {'audio': false},
+        ));
+      } catch (e, stack) {
+        Logger.warn('Failed to queue CRM attachment ${file.name}', error: e, trace: stack);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Future<Uint8List?> _resolveFileBytes(PlatformFile file) async {
+    if (file.bytes != null) {
+      return file.bytes!;
+    }
+
+    final path = file.path;
+    if (path != null && path.isNotEmpty && !kIsWeb) {
+      try {
+        return await File(path).readAsBytes();
+      } catch (e, stack) {
+        Logger.warn('Unable to read attachment bytes from $path', error: e, trace: stack);
+      }
+    }
+
+    return null;
   }
 }

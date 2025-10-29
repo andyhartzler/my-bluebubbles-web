@@ -3,8 +3,11 @@ import 'package:dio/dio.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/services.dart';
@@ -54,6 +57,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final chapters = await _memberRepo.getChapterCounts();
       final chapterStatuses = await _memberRepo.getChapterStatusCounts();
       final graduationYears = await _memberRepo.getGraduationYearCounts();
+      final pronouns = await _memberRepo.getPronounCounts();
+      final genders = await _memberRepo.getGenderIdentityCounts();
+      final races = await _memberRepo.getRaceCounts();
+      final languages = await _memberRepo.getLanguageCounts();
+      final communityTypes = await _memberRepo.getCommunityTypeCounts();
+      final industries = await _memberRepo.getIndustryCounts();
+      final educationLevels = await _memberRepo.getEducationLevelCounts();
+      final registeredVoters = await _memberRepo.getRegisteredVoterCounts();
       final recentMembers = await _memberRepo.getRecentMembers(limit: 6);
 
       final chatCount = await _fetchChatCount();
@@ -78,6 +89,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           chapters: chapters,
           chapterStatuses: chapterStatuses,
           graduationYears: graduationYears,
+          pronouns: pronouns,
+          genders: genders,
+          races: races,
+          languages: languages,
+          communityTypes: communityTypes,
+          industries: industries,
+          educationLevels: educationLevels,
+          registeredVoters: registeredVoters,
           recentMembers: recentMembers,
         );
         _loading = false;
@@ -307,6 +326,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'chapters': 'Chapters',
       'chapterStatuses': 'Chapter Status',
       'graduationYears': 'Graduation Years',
+      'pronouns': 'Pronouns',
+      'genders': 'Gender Identity',
+      'races': 'Race & Ethnicity',
+      'languages': 'Languages',
+      'communityTypes': 'Community Type',
+      'industries': 'Industries',
+      'educationLevels': 'Education Level',
+      'registeredVoters': 'Voter Registration',
     };
 
     final metricValues = <String, Map<String, int>>{
@@ -317,6 +344,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'chapters': data.chapters,
       'chapterStatuses': data.chapterStatuses,
       'graduationYears': data.graduationYears,
+      'pronouns': data.pronouns,
+      'genders': data.genders,
+      'races': data.races,
+      'languages': data.languages,
+      'communityTypes': data.communityTypes,
+      'industries': data.industries,
+      'educationLevels': data.educationLevels,
+      'registeredVoters': data.registeredVoters,
     };
 
     final selectedData = metricValues[_selectedMetric] ?? const {};
@@ -542,6 +577,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
             total: data.totalMembers,
             accentColor: theme.colorScheme.secondaryContainer,
           ),
+          _BreakdownCard(
+            title: 'Pronouns',
+            metricLabel: 'responses',
+            data: data.pronouns,
+            total: data.pronouns.values.sum,
+            accentColor: theme.colorScheme.tertiaryContainer,
+          ),
+          _BreakdownCard(
+            title: 'Gender Identity',
+            metricLabel: 'responses',
+            data: data.genders,
+            total: data.genders.values.sum,
+            accentColor: theme.colorScheme.surfaceVariant,
+          ),
+          _BreakdownCard(
+            title: 'Race & Ethnicity',
+            metricLabel: 'responses',
+            data: data.races,
+            total: data.races.values.sum,
+            accentColor: theme.colorScheme.inversePrimary,
+          ),
+          _BreakdownCard(
+            title: 'Languages',
+            metricLabel: 'speakers',
+            data: data.languages,
+            total: data.languages.values.sum,
+            accentColor: theme.colorScheme.secondaryContainer,
+          ),
+          _BreakdownCard(
+            title: 'Community Type',
+            metricLabel: 'responses',
+            data: data.communityTypes,
+            total: data.communityTypes.values.sum,
+            accentColor: theme.colorScheme.surfaceVariant,
+          ),
+          _BreakdownCard(
+            title: 'Industries',
+            metricLabel: 'members',
+            data: data.industries,
+            total: data.industries.values.sum,
+            accentColor: theme.colorScheme.primary,
+          ),
+          _BreakdownCard(
+            title: 'Education',
+            metricLabel: 'responses',
+            data: data.educationLevels,
+            total: data.educationLevels.values.sum,
+            accentColor: theme.colorScheme.secondary,
+          ),
+          _BreakdownCard(
+            title: 'Voter Registration',
+            metricLabel: 'members',
+            data: data.registeredVoters,
+            total: data.registeredVoters.values.sum,
+            accentColor: theme.colorScheme.errorContainer,
+          ),
         ];
 
         if (isWide) {
@@ -643,6 +734,14 @@ class _DashboardData {
   final Map<String, int> chapters;
   final Map<String, int> chapterStatuses;
   final Map<String, int> graduationYears;
+  final Map<String, int> pronouns;
+  final Map<String, int> genders;
+  final Map<String, int> races;
+  final Map<String, int> languages;
+  final Map<String, int> communityTypes;
+  final Map<String, int> industries;
+  final Map<String, int> educationLevels;
+  final Map<String, int> registeredVoters;
   final List<Member> recentMembers;
 
   const _DashboardData({
@@ -660,6 +759,14 @@ class _DashboardData {
     required this.chapters,
     required this.chapterStatuses,
     required this.graduationYears,
+    required this.pronouns,
+    required this.genders,
+    required this.races,
+    required this.languages,
+    required this.communityTypes,
+    required this.industries,
+    required this.educationLevels,
+    required this.registeredVoters,
     required this.recentMembers,
   });
 
@@ -678,6 +785,14 @@ class _DashboardData {
         chapters = const {},
         chapterStatuses = const {},
         graduationYears = const {},
+        pronouns = const {},
+        genders = const {},
+        races = const {},
+        languages = const {},
+        communityTypes = const {},
+        industries = const {},
+        educationLevels = const {},
+        registeredVoters = const {},
         recentMembers = const [];
 }
 
@@ -910,46 +1025,58 @@ class _RecentMemberTile extends StatelessWidget {
         Member.formatDistrictLabel(member.congressionalDistrict) ?? member.congressionalDistrict!,
     ];
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.45),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: Text(
-              member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-              style: theme.textTheme.titleMedium,
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        Navigator.of(context).push(
+          ThemeSwitcher.buildPageRoute(
+            builder: (_) => TitleBarWrapper(
+              child: MemberDetailScreen(member: member),
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  member.name,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                if (details.isNotEmpty)
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceVariant.withOpacity(0.45),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: theme.colorScheme.primaryContainer,
+              child: Text(
+                member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    details.join(' • '),
-                    style: theme.textTheme.bodySmall,
+                    member.name,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
-              ],
+                  if (details.isNotEmpty)
+                    Text(
+                      details.join(' • '),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                ],
+              ),
             ),
-          ),
-          if (member.createdAt != null)
-            Text(
-              _timeAgo(member.createdAt!),
-              style: theme.textTheme.labelSmall,
-            ),
-        ],
+            if (member.createdAt != null)
+              Text(
+                _timeAgo(member.createdAt!),
+                style: theme.textTheme.labelSmall,
+              ),
+          ],
+        ),
       ),
     );
   }

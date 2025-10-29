@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -9,6 +12,16 @@ import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+
+enum _RecipientMode {
+  manual,
+  county,
+  district,
+  school,
+  committee,
+  chapter,
+  chapterStatus,
+}
 
 /// Screen for sending bulk individual messages
 class BulkMessageScreen extends StatefulWidget {
@@ -25,12 +38,17 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
 
   MessageFilter _filter = MessageFilter();
+  final List<PlatformFile> _attachments = [];
+  _RecipientMode _mode = _RecipientMode.manual;
   List<Member> _previewMembers = [];
   bool _loadingPreview = false;
   bool _sending = false;
   int _currentProgress = 0;
   int _totalMessages = 0;
   bool _crmReady = false;
+  int _alreadyIntroducedPreview = 0;
+  Map<String, int> _transportPreview = const {};
+  final DateFormat _dateFormat = DateFormat.yMMMd();
 
   final TextEditingController _searchController = TextEditingController();
   final List<Member> _selectedMembers = [];
@@ -90,10 +108,21 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   Future<void> _updatePreview() async {
     if (!_crmReady) return;
 
+    final hasFilters = _filter.hasActiveFilters;
+
+    if (!hasFilters && _selectedMembers.isEmpty) {
+      setState(() {
+        _previewMembers = [];
+        _totalMessages = 0;
+        _alreadyIntroducedPreview = 0;
+        _loadingPreview = false;
+      });
+      return;
+    }
+
     setState(() => _loadingPreview = true);
 
     try {
-      final members = await _messageService.getFilteredMembers(_filter);
       final Map<String, Member> combined = LinkedHashMap<String, Member>();
 
       void addMember(Member member) {
@@ -102,8 +131,11 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
         combined[key] = member;
       }
 
-      for (final member in members) {
-        addMember(member);
+      if (hasFilters) {
+        final members = await _messageService.getFilteredMembers(_filter);
+        for (final member in members) {
+          addMember(member);
+        }
       }
 
       for (final member in _selectedMembers) {
@@ -111,10 +143,22 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       }
 
       final combinedList = combined.values.toList();
+      final alreadyIntroduced = combinedList.where((m) => m.introSentAt != null).length;
+      Map<String, int> transports = const {};
+
+      if (combinedList.isNotEmpty) {
+        try {
+          transports = await _messageService.previewTransportBreakdown(combinedList);
+        } catch (_) {
+          transports = const {};
+        }
+      }
       if (!mounted) return;
       setState(() {
         _previewMembers = combinedList.take(5).toList();
         _totalMessages = combinedList.length;
+        _alreadyIntroducedPreview = alreadyIntroduced;
+        _transportPreview = transports;
         _loadingPreview = false;
       });
     } catch (e) {
@@ -181,6 +225,84 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
     return member.id ?? member.phoneE164 ?? member.phone;
   }
 
+  void _setMode(_RecipientMode mode, {bool notify = true}) {
+    void updateMode() {
+      _mode = mode;
+      switch (mode) {
+        case _RecipientMode.manual:
+          _filter = _filter.copyWithOverrides(
+            clearCounty: true,
+            clearCongressionalDistrict: true,
+            clearSchoolName: true,
+            clearChapterName: true,
+            clearChapterStatus: true,
+            clearCommittees: true,
+          );
+          break;
+        case _RecipientMode.county:
+          _filter = _filter.copyWithOverrides(
+            clearCongressionalDistrict: true,
+            clearSchoolName: true,
+            clearChapterName: true,
+            clearChapterStatus: true,
+            clearCommittees: true,
+          );
+          break;
+        case _RecipientMode.district:
+          _filter = _filter.copyWithOverrides(
+            clearCounty: true,
+            clearSchoolName: true,
+            clearChapterName: true,
+            clearChapterStatus: true,
+            clearCommittees: true,
+          );
+          break;
+        case _RecipientMode.school:
+          _filter = _filter.copyWithOverrides(
+            clearCounty: true,
+            clearCongressionalDistrict: true,
+            clearChapterName: true,
+            clearChapterStatus: true,
+            clearCommittees: true,
+          );
+          break;
+        case _RecipientMode.committee:
+          _filter = _filter.copyWithOverrides(
+            clearCounty: true,
+            clearCongressionalDistrict: true,
+            clearSchoolName: true,
+            clearChapterName: true,
+            clearChapterStatus: true,
+          );
+          break;
+        case _RecipientMode.chapter:
+          _filter = _filter.copyWithOverrides(
+            clearCounty: true,
+            clearCongressionalDistrict: true,
+            clearSchoolName: true,
+            clearChapterStatus: true,
+            clearCommittees: true,
+          );
+          break;
+        case _RecipientMode.chapterStatus:
+          _filter = _filter.copyWithOverrides(
+            clearCounty: true,
+            clearCongressionalDistrict: true,
+            clearSchoolName: true,
+            clearChapterName: true,
+            clearCommittees: true,
+          );
+          break;
+      }
+    }
+
+    if (notify) {
+      setState(updateMode);
+    } else {
+      updateMode();
+    }
+  }
+
   Future<void> _sendMessages() async {
     if (_messageController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -236,6 +358,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
           });
         },
         explicitMembers: List<Member>.from(_selectedMembers),
+        attachments: List<PlatformFile>.from(_attachments),
       );
 
       final successCount = results.values.where((v) => v).length;
@@ -266,19 +389,24 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   }
 
   Future<void> _sendIntroMessages() async {
-    if (_totalMessages == 0) {
+    final eligibleTotal = _totalMessages - _alreadyIntroducedPreview;
+    if (eligibleTotal <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No members match the filter')),
+        const SnackBar(content: Text('No eligible members to receive the intro message')),
       );
       return;
     }
+
+    final manualEligible =
+        _selectedMembers.where((member) => member.introSentAt == null).toList();
+    final manualSkipped = _selectedMembers.length - manualEligible.length;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Send Intro Message'),
         content: Text(
-          'Send the Missouri Young Democrats intro message to $_totalMessages members?\n\n'
+          'Send the Missouri Young Democrats intro message to $eligibleTotal members?\n\n'
           'This will send individually at a rate of ${CRMMessageService.messagesPerMinute} per minute and include the contact card.',
         ),
         actions: [
@@ -311,7 +439,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             _totalMessages = total;
           });
         },
-        explicitMembers: List<Member>.from(_selectedMembers),
+        explicitMembers: manualEligible,
       );
 
       final successCount = results.values.where((v) => v).length;
@@ -323,7 +451,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Intro Messages Sent'),
-          content: Text('Successfully sent intro to $successCount of $_totalMessages members'),
+          content: Text('Successfully sent intro to $successCount of $eligibleTotal members'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -332,6 +460,12 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
           ],
         ),
       );
+
+      if (manualSkipped > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Skipped $manualSkipped members who already received the intro message.')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
@@ -363,9 +497,9 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(16.0),
                     children: [
-                      _buildMessageCard(),
-                      const SizedBox(height: 16),
                       _buildRecipientsCard(),
+                      const SizedBox(height: 16),
+                      _buildMessageCard(),
                       const SizedBox(height: 16),
                       _buildFiltersCard(),
                       const SizedBox(height: 16),
@@ -380,6 +514,9 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   }
 
   Widget _buildMessageCard() {
+    final hasRecipients =
+        _totalMessages > 0 || _selectedMembers.isNotEmpty || _filter.hasActiveFilters;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -391,6 +528,19 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
+            if (!hasRecipients)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Select recipients to enable composing. Once at least one member is chosen the message editor will unlock.',
+                ),
+              ),
+            if (!hasRecipients) const SizedBox(height: 12),
             TextField(
               controller: _messageController,
               maxLines: 5,
@@ -399,7 +549,27 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                 hintText: 'Enter your message here...',
                 border: OutlineInputBorder(),
               ),
+              enabled: hasRecipients,
               onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ..._attachments.map(
+                  (file) => InputChip(
+                    label: Text(file.name),
+                    avatar: const Icon(Icons.attachment, size: 18),
+                    onDeleted: () => _removeAttachment(file),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: hasRecipients ? _pickAttachments : null,
+                  icon: const Icon(Icons.attach_file),
+                  label: Text(_attachments.isEmpty ? 'Add attachments' : 'Add more attachments'),
+                ),
+              ],
             ),
           ],
         ),
@@ -420,63 +590,172 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Combine filters with manual selections to tailor your outreach.',
+              'Choose a targeting strategy, then optionally add individual members to the list.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Search members by name or phone',
-                border: const OutlineInputBorder(),
-                suffixIcon: _searching
-                    ? const Padding(
-                        padding: EdgeInsets.all(12.0),
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : (_searchController.text.isNotEmpty
-                        ? IconButton(
-                            onPressed: _clearSearch,
-                            icon: const Icon(Icons.clear),
-                          )
-                        : const Icon(Icons.search)),
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildModeChip(_RecipientMode.manual, 'Manual', Icons.person_add_alt_1),
+                _buildModeChip(_RecipientMode.county, 'County', Icons.map_outlined),
+                _buildModeChip(_RecipientMode.district, 'District', Icons.apartment_outlined),
+                _buildModeChip(_RecipientMode.school, 'School', Icons.school_outlined),
+                _buildModeChip(_RecipientMode.committee, 'Committee', Icons.groups_2_outlined),
+                _buildModeChip(_RecipientMode.chapter, 'Chapter', Icons.flag_outlined),
+                _buildModeChip(_RecipientMode.chapterStatus, 'Chapter Status', Icons.badge_outlined),
+              ],
             ),
-            const SizedBox(height: 12),
-            if (_selectedMembers.isNotEmpty) ...[
-              Text(
-                'Selected members (${_selectedMembers.length})',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _selectedMembers.map((member) {
-                  return InputChip(
-                    label: Text(member.name),
-                    onDeleted: () => _toggleMemberSelection(member),
-                    avatar: const Icon(Icons.person, size: 18),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (_searchController.text.trim().length >= 2)
-              _buildSearchResults()
-            else
-              const Text('Type at least 2 characters to search the member directory.'),
+            const SizedBox(height: 16),
+            _buildModeSelector(),
+            if (_mode != _RecipientMode.manual) const SizedBox(height: 20),
+            _buildManualSelectionSection(),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildModeChip(_RecipientMode mode, String label, IconData icon) {
+    final selected = _mode == mode;
+    return ChoiceChip(
+      avatar: Icon(icon, size: 16, color: selected ? Colors.white : null),
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) {
+        _setMode(mode);
+        _updatePreview();
+      },
+    );
+  }
+
+  Widget _buildModeSelector() {
+    switch (_mode) {
+      case _RecipientMode.county:
+        return _buildCountyDropdown();
+      case _RecipientMode.district:
+        return _buildDistrictDropdown();
+      case _RecipientMode.school:
+        return _buildSchoolDropdown();
+      case _RecipientMode.committee:
+        return _buildCommitteesSelector();
+      case _RecipientMode.chapter:
+        return _buildChapterDropdown();
+      case _RecipientMode.chapterStatus:
+        return _buildChapterStatusDropdown();
+      case _RecipientMode.manual:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildManualSelectionSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Add individual members',
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            labelText: 'Search members by name or phone',
+            border: const OutlineInputBorder(),
+            suffixIcon: _searching
+                ? const Padding(
+                    padding: EdgeInsets.all(12.0),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : (_searchController.text.isNotEmpty
+                    ? IconButton(
+                        onPressed: _clearSearch,
+                        icon: const Icon(Icons.clear),
+                      )
+                    : const Icon(Icons.search)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_selectedMembers.isNotEmpty) ...[
+          Text(
+            'Selected members (${_selectedMembers.length})',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _selectedMembers.map((member) {
+              final introduced = member.introSentAt != null;
+              return InputChip(
+                label: Text(member.name),
+                avatar: Icon(
+                  introduced ? Icons.check_circle_outline : Icons.person,
+                  size: 18,
+                ),
+                backgroundColor: introduced
+                    ? Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.4)
+                    : null,
+                labelStyle: introduced
+                    ? Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)
+                    : null,
+                tooltip: introduced ? 'Intro sent ${_formatDate(member.introSentAt!)}' : null,
+                onDeleted: () => _toggleMemberSelection(member),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (_searchController.text.trim().length >= 2)
+          _buildSearchResults()
+        else
+          const Text('Type at least 2 characters to search the member directory.'),
+      ],
+    );
+  }
+
+  Future<void> _pickAttachments() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      withData: kIsWeb,
+    );
+
+    if (result == null) return;
+
+    setState(() {
+      for (final file in result.files) {
+        final alreadyExists = _attachments.any((existing) {
+          if (existing.identifier != null && file.identifier != null) {
+            return existing.identifier == file.identifier;
+          }
+          if (existing.path != null && file.path != null) {
+            return existing.path == file.path;
+          }
+          return existing.name == file.name && existing.bytes == file.bytes;
+        });
+
+        if (!alreadyExists) {
+          _attachments.add(file);
+        }
+      }
+    });
+  }
+
+  void _removeAttachment(PlatformFile file) {
+    setState(() {
+      _attachments.remove(file);
+    });
   }
 
   Widget _buildSearchResults() {
@@ -502,16 +781,28 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
         final member = _searchResults[index];
         final selected = _isMemberSelected(member);
         final subtitleParts = <String>[
-          if (member.phoneE164 != null) member.phoneE164!
-          else if (member.phone != null) member.phone!,
+          if (member.phoneE164 != null)
+            member.phoneE164!
+          else if (member.phone != null)
+            member.phone!,
           if (member.county != null) member.county!,
-          if (member.congressionalDistrict != null) 'District ${member.congressionalDistrict!}',
+          if (member.congressionalDistrict != null)
+            Member.formatDistrictLabel(member.congressionalDistrict) ?? member.congressionalDistrict!,
         ].where((value) => value.trim().isNotEmpty).toList();
+
+        final infoLines = <String>[];
+        if (subtitleParts.isNotEmpty) {
+          infoLines.add(subtitleParts.join(' • '));
+        }
+        if (member.introSentAt != null) {
+          infoLines.add('Intro sent ${_formatDate(member.introSentAt!)}');
+        }
+        final subtitleText = infoLines.isEmpty ? null : infoLines.join(' — ');
 
         return ListTile(
           leading: Icon(selected ? Icons.check_circle : Icons.person_add_alt_1),
           title: Text(member.name),
-          subtitle: subtitleParts.isEmpty ? null : Text(subtitleParts.join(' • ')),
+          subtitle: subtitleText == null ? null : Text(subtitleText),
           trailing: IconButton(
             icon: Icon(selected ? Icons.remove_circle_outline : Icons.add_circle_outline),
             onPressed: () => _toggleMemberSelection(member),
@@ -522,6 +813,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
     );
   }
 
+  String _formatDate(DateTime date) => _dateFormat.format(date);
+
   Widget _buildFiltersCard() {
     return Card(
       child: Padding(
@@ -530,19 +823,9 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Filters',
+              'Advanced Filters',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 12),
-            _buildCountyDropdown(),
-            const SizedBox(height: 12),
-            _buildDistrictDropdown(),
-            const SizedBox(height: 12),
-            _buildSchoolDropdown(),
-            const SizedBox(height: 12),
-            _buildChapterDropdown(),
-            const SizedBox(height: 12),
-            _buildChapterStatusDropdown(),
             const SizedBox(height: 12),
             _buildAgeFields(),
             const SizedBox(height: 12),
@@ -551,7 +834,9 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
               value: _filter.excludeOptedOut,
               onChanged: (value) {
                 setState(() {
-                  _filter = _filter.copyWith(excludeOptedOut: value ?? true);
+                  _filter = _filter.copyWithOverrides(
+                    excludeOptedOut: value ?? true,
+                  );
                 });
                 _updatePreview();
               },
@@ -561,13 +846,13 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
               value: _filter.excludeRecentlyContacted,
               onChanged: (value) {
                 setState(() {
-                  _filter = _filter.copyWith(excludeRecentlyContacted: value ?? false);
+                  _filter = _filter.copyWithOverrides(
+                    excludeRecentlyContacted: value ?? false,
+                  );
                 });
                 _updatePreview();
               },
             ),
-            const SizedBox(height: 12),
-            _buildCommitteesSelector(),
           ],
         ),
       ),
@@ -591,7 +876,11 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       items: items,
       onChanged: (value) {
         setState(() {
-          _filter = _filter.copyWith(county: value);
+          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.county, notify: false);
+          _filter = _filter.copyWithOverrides(
+            county: value,
+            clearCounty: value == null,
+          );
         });
         _updatePreview();
       },
@@ -615,7 +904,11 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       items: items,
       onChanged: (value) {
         setState(() {
-          _filter = _filter.copyWith(congressionalDistrict: value);
+          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.district, notify: false);
+          _filter = _filter.copyWithOverrides(
+            congressionalDistrict: value,
+            clearCongressionalDistrict: value == null,
+          );
         });
         _updatePreview();
       },
@@ -639,7 +932,11 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       items: items,
       onChanged: (value) {
         setState(() {
-          _filter = _filter.copyWith(schoolName: value);
+          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.school, notify: false);
+          _filter = _filter.copyWithOverrides(
+            schoolName: value,
+            clearSchoolName: value == null,
+          );
         });
         _updatePreview();
       },
@@ -663,7 +960,11 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       items: items,
       onChanged: (value) {
         setState(() {
-          _filter = _filter.copyWith(chapterName: value);
+          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.chapter, notify: false);
+          _filter = _filter.copyWithOverrides(
+            chapterName: value,
+            clearChapterName: value == null,
+          );
         });
         _updatePreview();
       },
@@ -687,7 +988,11 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       items: items,
       onChanged: (value) {
         setState(() {
-          _filter = _filter.copyWith(chapterStatus: value);
+          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.chapterStatus, notify: false);
+          _filter = _filter.copyWithOverrides(
+            chapterStatus: value,
+            clearChapterStatus: value == null,
+          );
         });
         _updatePreview();
       },
@@ -707,7 +1012,10 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             onChanged: (value) {
               final age = int.tryParse(value);
               setState(() {
-                _filter = _filter.copyWith(minAge: age);
+                _filter = _filter.copyWithOverrides(
+                  minAge: age,
+                  clearMinAge: value.isEmpty,
+                );
               });
               _updatePreview();
             },
@@ -724,7 +1032,10 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             onChanged: (value) {
               final age = int.tryParse(value);
               setState(() {
-                _filter = _filter.copyWith(maxAge: age);
+                _filter = _filter.copyWithOverrides(
+                  maxAge: age,
+                  clearMaxAge: value.isEmpty,
+                );
               });
               _updatePreview();
             },
@@ -780,8 +1091,13 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
               TextButton(
                 onPressed: () {
                   setState(() {
-                    _filter = _filter.copyWith(
+                    _setMode(
+                      tempSelected.isEmpty ? _RecipientMode.manual : _RecipientMode.committee,
+                      notify: false,
+                    );
+                    _filter = _filter.copyWithOverrides(
                       committees: tempSelected.isEmpty ? null : tempSelected,
+                      clearCommittees: tempSelected.isEmpty,
                     );
                   });
                   _updatePreview();
@@ -797,6 +1113,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   }
 
   Widget _buildPreviewCard() {
+    final smsCount = _transportPreview['SMS'] ?? 0;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -816,10 +1133,52 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
+              if (_transportPreview.isNotEmpty) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: _transportPreview.entries
+                      .map(
+                        (entry) => Chip(
+                          avatar: Icon(
+                            entry.key == 'iMessage' ? Icons.message_outlined : Icons.sms_outlined,
+                            size: 16,
+                          ),
+                          label: Text('${entry.value} ${entry.key == 'SMS' ? 'SMS' : 'iMessage'}'),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (_attachments.isNotEmpty) ...[
+                Text(
+                  'Attachments: ${_attachments.length}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                if (smsCount > 0)
+                  Text(
+                    '$smsCount SMS recipient(s) may receive attachments as MMS when available.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.tertiary,
+                        ),
+                  ),
+                if (smsCount > 0) const SizedBox(height: 8),
+              ],
               Text(
                 _filter.description,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              if (_alreadyIntroducedPreview > 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '$_alreadyIntroducedPreview recipient(s) already received the intro message and will be skipped for "Send Intro".',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
+                ),
+              ],
               if (_selectedMembers.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
@@ -831,12 +1190,32 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                 const SizedBox(height: 12),
                 const Text('First 5 recipients:'),
                 ..._previewMembers.map(
-                  (m) => ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.person, size: 16),
-                    title: Text(m.name, style: const TextStyle(fontSize: 14)),
-                    subtitle: Text(m.phone ?? 'No phone', style: const TextStyle(fontSize: 12)),
-                  ),
+                  (m) {
+                    final details = <String>[
+                      if (m.phoneE164 != null)
+                        m.phoneE164!
+                      else if (m.phone != null)
+                        m.phone!,
+                      if (m.county != null) m.county!,
+                      if (m.congressionalDistrict != null)
+                        Member.formatDistrictLabel(m.congressionalDistrict) ?? m.congressionalDistrict!,
+                    ].where((value) => value.trim().isNotEmpty).toList();
+
+                    final info = <String>[];
+                    if (details.isNotEmpty) {
+                      info.add(details.join(' • '));
+                    }
+                    if (m.introSentAt != null) {
+                      info.add('Intro sent ${_formatDate(m.introSentAt!)}');
+                    }
+
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.person, size: 16),
+                      title: Text(m.name, style: const TextStyle(fontSize: 14)),
+                      subtitle: info.isEmpty ? null : Text(info.join(' — '), style: const TextStyle(fontSize: 12)),
+                    );
+                  },
                 ),
               ],
             ],
@@ -850,6 +1229,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
     if (!_crmReady) {
       return const SizedBox.shrink();
     }
+
+    final introEligible = (_totalMessages - _alreadyIntroducedPreview).clamp(0, _totalMessages);
 
     return Container(
       padding: const EdgeInsets.all(16.0),
@@ -878,8 +1259,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                 Expanded(
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.auto_awesome),
-                    label: const Text('Send Intro'),
-                    onPressed: _totalMessages == 0 ? null : _sendIntroMessages,
+                    label: Text(introEligible > 0 ? 'Send Intro ($introEligible)' : 'Send Intro'),
+                    onPressed: introEligible == 0 ? null : _sendIntroMessages,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.all(16),
                     ),

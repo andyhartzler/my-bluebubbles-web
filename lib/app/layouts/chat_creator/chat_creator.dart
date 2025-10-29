@@ -77,6 +77,21 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
 
   bool canCreateGroupChats = ss.canCreateGroupChatSync();
 
+  void _clearComposer() {
+    final empty = const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
+    textController.value = empty;
+    subjectController.clear();
+    if (fakeController.value != null) {
+      try {
+        fakeController.value!.textController.value = empty;
+        fakeController.value!.pickedAttachments.clear();
+        fakeController.value!.subjectTextController.clear();
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
@@ -764,6 +779,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
                               fakeController.value!.pickedAttachments.clear();
                               fakeController.value!.textController.clear();
                               fakeController.value!.subjectTextController.clear();
+                              _clearComposer();
                             }
 
                             if (widget.popOnSend) {
@@ -894,6 +910,8 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
                                   navigator.pop(true);
                                 }
                               }
+
+                              _clearComposer();
                             }).catchError((error) {
                               Navigator.of(context).pop();
                               showDialog(
