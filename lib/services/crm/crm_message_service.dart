@@ -346,10 +346,10 @@ class CRMMessageService {
       handleId: 0,
       attachments: [
         Attachment(
-          mimeType: 'text/x-vcard',
+          mimeType: 'text/vcard',
           uti: 'public.vcard',
           isOutgoing: true,
-          transferName: 'Missouri_Young_Democrats.vcf',
+          transferName: 'Missouri Young Democrats.vcf',
           totalBytes: bytes.length,
           bytes: bytes,
         ),
@@ -384,29 +384,64 @@ class CRMMessageService {
 
   Future<Uint8List> _buildContactCardBytes() async {
     const newline = '\r\n';
-    final buffer = StringBuffer()
-      ..write('BEGIN:VCARD$newline')
-      ..write('VERSION:3.0$newline')
-      ..write('N:Young Democrats;Missouri;;;$newline')
-      ..write('FN:Missouri Young Democrats$newline')
-      ..write('ORG:Missouri Young Democrats$newline')
-      ..write('TEL;TYPE=WORK,VOICE:+18165300773$newline')
-      ..write('EMAIL;TYPE=WORK:info@moyoungdemocrats.org$newline')
-      ..write('ADR;TYPE=WORK:;;PO Box 270043;Kansas City;MO;64127;USA$newline')
-      ..write('URL:https://moyoungdemocrats.org$newline');
+    final lines = <String>[
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      'N:Young Democrats;Missouri;;;',
+      'FN:Missouri Young Democrats',
+      'ORG:Missouri Young Democrats',
+      'TEL;TYPE=WORK,VOICE:+18165300773',
+      'EMAIL;TYPE=WORK,INTERNET:info@moyoungdemocrats.org',
+      'ADR;TYPE=WORK:;;PO Box 270043;Kansas City;MO;64127;US',
+      'URL:https://moyoungdemocrats.org',
+    ];
 
+    final photoLines = await _buildPhotoLines();
+    if (photoLines != null) {
+      lines.addAll(photoLines);
+    }
+
+    lines.add('END:VCARD');
+
+    final buffer = StringBuffer();
+    for (final line in lines) {
+      buffer
+        ..write(line)
+        ..write(newline);
+    }
+
+    return Uint8List.fromList(utf8.encode(buffer.toString()));
+  }
+
+  Future<List<String>?> _buildPhotoLines() async {
     try {
       final data = await rootBundle.load('assets/icon/contact-photo.png');
       final encoded = base64Encode(data.buffer.asUint8List());
-      buffer.write('PHOTO;ENCODING=b;TYPE=PNG:$encoded$newline');
+      return _foldVCardLine('PHOTO;ENCODING=b;TYPE=PNG:$encoded');
     } catch (_) {
-      // Ignore missing asset
+      return null;
+    }
+  }
+
+  List<String> _foldVCardLine(String line) {
+    const maxLineLength = 75;
+    if (line.length <= maxLineLength) {
+      return [line];
     }
 
-    buffer
-      ..write('END:VCARD$newline');
+    final lines = <String>[];
+    lines.add(line.substring(0, maxLineLength));
 
-    return Uint8List.fromList(utf8.encode(buffer.toString()));
+    var index = maxLineLength;
+    while (index < line.length) {
+      final remaining = line.length - index;
+      final take = remaining > maxLineLength - 1 ? maxLineLength - 1 : remaining;
+      final chunk = line.substring(index, index + take);
+      lines.add(' $chunk');
+      index += take;
+    }
+
+    return lines;
   }
 
   Future<List<Member>> _resolveRecipients(

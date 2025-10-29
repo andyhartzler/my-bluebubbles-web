@@ -1,7 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -9,6 +5,11 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/utils/string_utils.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum _SocialPlatform { instagram, tiktok, x }
 
@@ -127,13 +128,16 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
 
     try {
+      final normalized = address.contains('@') ? address : cleansePhoneNumber(address);
+      final isIMessage = await _lookupServiceAvailability(normalized);
       final result = await Navigator.of(context, rootNavigator: true).push(ThemeSwitcher.buildPageRoute(
         builder: (context) => TitleBarWrapper(
           child: ChatCreator(
             initialSelected: [
               SelectedContact(
                 displayName: _member.name,
-                address: address,
+                address: normalized,
+                isIMessage: isIMessage,
               ),
             ],
             popOnSend: true,
@@ -457,6 +461,20 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     if (value == null) return null;
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  Future<bool?> _lookupServiceAvailability(String address) async {
+    try {
+      final response = await http.handleiMessageState(address);
+      final data = response.data['data'];
+      if (data is Map<String, dynamic>) {
+        final available = data['available'];
+        if (available is bool) {
+          return available;
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   bool _hasText(String? value) => _cleanText(value) != null;
