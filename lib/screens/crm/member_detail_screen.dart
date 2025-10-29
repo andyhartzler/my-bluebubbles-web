@@ -1,12 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
+import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:slugify/slugify.dart';
 
 enum _SocialPlatform { instagram, tiktok, x }
 
@@ -108,9 +111,23 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       return;
     }
 
-    final navContext = ns.key.currentContext ?? context;
-
     try {
+      final chatIdentifier = slugify(address, delimiter: '');
+      Chat? existingChat;
+
+      if (kIsWeb) {
+        existingChat = await Chat.findOneWeb(chatIdentifier: chatIdentifier);
+      } else {
+        existingChat = Chat.findOne(chatIdentifier: chatIdentifier);
+      }
+
+      if (existingChat != null && existingChat.guid.isNotEmpty) {
+        await intents.openChat(existingChat.guid);
+        return;
+      }
+
+      final navContext = ns.key.currentContext ?? context;
+
       await ns.pushAndRemoveUntil(
         navContext,
         ChatCreator(
