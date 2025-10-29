@@ -19,12 +19,28 @@ import 'package:window_manager/window_manager.dart';
 
 class StartupTasks {
   static const Map<String, String> _defineEnv = <String, String>{
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_HOST':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_HOST'),
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_URL':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_URL'),
+    'BLUEBUBBLES_PRIVATE_API_HOST':
+        const String.fromEnvironment('BLUEBUBBLES_PRIVATE_API_HOST'),
+    'BLUEBUBBLES_PRIVATE_API_URL':
+        const String.fromEnvironment('BLUEBUBBLES_PRIVATE_API_URL'),
     'NEXT_PUBLIC_BLUEBUBBLES_HOST':
         const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_HOST'),
     'NEXT_PUBLIC_BLUEBUBBLES_URL':
         const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_URL'),
     'BLUEBUBBLES_HOST': const String.fromEnvironment('BLUEBUBBLES_HOST'),
     'BLUEBUBBLES_URL': const String.fromEnvironment('BLUEBUBBLES_URL'),
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_PASSWORD':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_PASSWORD'),
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_AUTH_KEY':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_AUTH_KEY'),
+    'BLUEBUBBLES_PRIVATE_API_PASSWORD':
+        const String.fromEnvironment('BLUEBUBBLES_PRIVATE_API_PASSWORD'),
+    'BLUEBUBBLES_PRIVATE_API_AUTH_KEY':
+        const String.fromEnvironment('BLUEBUBBLES_PRIVATE_API_AUTH_KEY'),
     'NEXT_PUBLIC_BLUEBUBBLES_PASSWORD':
         const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD'),
     'NEXT_PUBLIC_BLUEBUBBLES_AUTH_KEY':
@@ -36,6 +52,10 @@ class StartupTasks {
   };
 
   static const List<String> _hostEnvKeys = <String>[
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_HOST',
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_URL',
+    'BLUEBUBBLES_PRIVATE_API_HOST',
+    'BLUEBUBBLES_PRIVATE_API_URL',
     'NEXT_PUBLIC_BLUEBUBBLES_HOST',
     'NEXT_PUBLIC_BLUEBUBBLES_URL',
     'BLUEBUBBLES_HOST',
@@ -43,6 +63,10 @@ class StartupTasks {
   ];
 
   static const List<String> _passwordEnvKeys = <String>[
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_PASSWORD',
+    'NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_AUTH_KEY',
+    'BLUEBUBBLES_PRIVATE_API_PASSWORD',
+    'BLUEBUBBLES_PRIVATE_API_AUTH_KEY',
     'NEXT_PUBLIC_BLUEBUBBLES_PASSWORD',
     'NEXT_PUBLIC_BLUEBUBBLES_AUTH_KEY',
     'BLUEBUBBLES_PASSWORD',
