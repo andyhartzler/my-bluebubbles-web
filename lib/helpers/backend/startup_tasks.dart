@@ -18,6 +18,54 @@ import 'package:tuple/tuple.dart';
 import 'package:window_manager/window_manager.dart';
 
 class StartupTasks {
+  static const Map<String, String> _defineEnv = <String, String>{
+    'NEXT_PUBLIC_BLUEBUBBLES_HOST':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_HOST'),
+    'NEXT_PUBLIC_BLUEBUBBLES_URL':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_URL'),
+    'BLUEBUBBLES_HOST': const String.fromEnvironment('BLUEBUBBLES_HOST'),
+    'BLUEBUBBLES_URL': const String.fromEnvironment('BLUEBUBBLES_URL'),
+    'NEXT_PUBLIC_BLUEBUBBLES_PASSWORD':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD'),
+    'NEXT_PUBLIC_BLUEBUBBLES_AUTH_KEY':
+        const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_AUTH_KEY'),
+    'BLUEBUBBLES_PASSWORD':
+        const String.fromEnvironment('BLUEBUBBLES_PASSWORD'),
+    'BLUEBUBBLES_AUTH_KEY':
+        const String.fromEnvironment('BLUEBUBBLES_AUTH_KEY'),
+  };
+
+  static const List<String> _hostEnvKeys = <String>[
+    'NEXT_PUBLIC_BLUEBUBBLES_HOST',
+    'NEXT_PUBLIC_BLUEBUBBLES_URL',
+    'BLUEBUBBLES_HOST',
+    'BLUEBUBBLES_URL',
+  ];
+
+  static const List<String> _passwordEnvKeys = <String>[
+    'NEXT_PUBLIC_BLUEBUBBLES_PASSWORD',
+    'NEXT_PUBLIC_BLUEBUBBLES_AUTH_KEY',
+    'BLUEBUBBLES_PASSWORD',
+    'BLUEBUBBLES_AUTH_KEY',
+  ];
+
+  static String _resolveEnvValue(List<String> keys) {
+    for (final String key in keys) {
+      final String value = (_defineEnv[key] ?? '').trim();
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    for (final String key in keys) {
+      final String? value = dotenv.maybeGet(key)?.trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return '';
+  }
 
   static final Completer<void> uiReady = Completer<void>();
 
@@ -44,19 +92,13 @@ class StartupTasks {
 
     await _applyMYDAutoConfiguration();
 
-    final hostFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_HOST');
-    final passwordFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD');
-    final envHost = hostFromDefine.isNotEmpty
-        ? hostFromDefine
-        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_HOST') ?? '');
-    final envPassword = passwordFromDefine.isNotEmpty
-        ? passwordFromDefine
-        : (dotenv.maybeGet('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD') ?? '');
+    final String envHost = _resolveEnvValue(_hostEnvKeys);
+    final String envPassword = _resolveEnvValue(_passwordEnvKeys);
 
     if (envHost.isNotEmpty) {
       final additional = <String>[];
       if (envPassword.isNotEmpty) {
-        ss.settings.guidAuthKey.value = envPassword;
+        ss.settings.guidAuthKey.value = envPassword.trim();
         additional.add('guidAuthKey');
       }
       await saveNewServerUrl(
