@@ -42,6 +42,8 @@ class StartupTasks {
     // Setup the settings service
     await ss.init();
 
+    await _applyMYDAutoConfiguration();
+
     final hostFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_HOST');
     final passwordFromDefine = const String.fromEnvironment('NEXT_PUBLIC_BLUEBUBBLES_PASSWORD');
     final envHost = hostFromDefine.isNotEmpty
@@ -64,6 +66,12 @@ class StartupTasks {
         force: true,
         saveAdditionalSettings: additional,
       );
+
+      try {
+        socket.restartSocket();
+      } catch (e) {
+        Logger.error('Failed to restart socket after applying environment server URL', error: e);
+      }
     }
 
     // The next thing we need to do is initialize the database.
@@ -89,6 +97,60 @@ class StartupTasks {
 
     await notif.init();
     await intents.init();
+  }
+
+  static Future<void> _applyMYDAutoConfiguration() async {
+    bool updated = false;
+
+    if (!ss.settings.enablePrivateAPI.value) {
+      ss.settings.enablePrivateAPI.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateAPISend.value) {
+      ss.settings.privateAPISend.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateAPIAttachmentSend.value) {
+      ss.settings.privateAPIAttachmentSend.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateSendTypingIndicators.value) {
+      ss.settings.privateSendTypingIndicators.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateMarkChatAsRead.value) {
+      ss.settings.privateMarkChatAsRead.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateManualMarkAsRead.value) {
+      ss.settings.privateManualMarkAsRead.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.privateSubjectLine.value) {
+      ss.settings.privateSubjectLine.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.finishedSetup.value) {
+      ss.settings.finishedSetup.value = true;
+      updated = true;
+    }
+
+    if (!ss.settings.reachedConversationList.value) {
+      ss.settings.reachedConversationList.value = true;
+      updated = true;
+    }
+
+    if (updated) {
+      await ss.saveSettings();
+      await ss.prefs.setBool('private-api-enable-tip', true);
+    }
   }
 
   static Future<void> initIsolateServices() async {
