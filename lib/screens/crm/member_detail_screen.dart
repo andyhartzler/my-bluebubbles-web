@@ -32,6 +32,20 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
   bool get _crmReady => _supabaseService.isInitialized;
 
+  static const Map<String, List<Color>> _sectionPalette = {
+    'Contact Information': [Color(0xFF0052D4), Color(0xFF65C7F7)],
+    'Chapter Involvement': [Color(0xFF11998e), Color(0xFF38ef7d)],
+    'Social Profiles': [Color(0xFFee0979), Color(0xFFff6a00)],
+    'Political & Civic': [Color(0xFF4776E6), Color(0xFF8E54E9)],
+    'Education & Employment': [Color(0xFFf7971e), Color(0xFFffd200)],
+    'Personal Details': [Color(0xFF654ea3), Color(0xFFeaafc8)],
+    'Goals & Interests': [Color(0xFF36d1dc), Color(0xFF5b86e5)],
+    'Engagement & Interests': [Color(0xFF36d1dc), Color(0xFF5b86e5)],
+    'Notes & Engagement': [Color(0xFFb24592), Color(0xFFf15f79)],
+    'Metadata': [Color(0xFF232526), Color(0xFF414345)],
+    'CRM Metadata': [Color(0xFF232526), Color(0xFF414345)],
+  };
+
   @override
   void initState() {
     super.initState();
@@ -427,19 +441,53 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   Widget _buildSection(String title, List<Widget> children) {
     if (children.isEmpty) return const SizedBox.shrink();
 
+    final theme = Theme.of(context);
+    final palette = _sectionPalette[title];
+    final bool useLightText = palette != null;
+    final Color effectiveColor = useLightText
+        ? Colors.white
+        : theme.textTheme.bodyMedium?.color ?? theme.colorScheme.onSurface;
+
+    final BoxDecoration decoration = palette != null
+        ? BoxDecoration(
+            gradient: LinearGradient(colors: palette, begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: palette.last.withOpacity(0.25),
+                blurRadius: 24,
+                offset: const Offset(0, 18),
+              ),
+            ],
+          )
+        : BoxDecoration(
+            color: theme.colorScheme.surfaceVariant.withOpacity(0.65),
+            borderRadius: BorderRadius.circular(24),
+          );
+
+    final sectionTheme = theme.copyWith(
+      textTheme: theme.textTheme.apply(
+        bodyColor: effectiveColor,
+        displayColor: effectiveColor,
+      ),
+      iconTheme: theme.iconTheme.copyWith(color: effectiveColor),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
+        Container(
+          decoration: decoration,
+          padding: const EdgeInsets.all(20),
+          child: Theme(
+            data: sectionTheme,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: children,
@@ -453,18 +501,30 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
   Widget _buildInfoRow(String label, String value, {Widget? trailing, Uri? link}) {
     final theme = Theme.of(context);
+    final labelColor = theme.textTheme.bodyMedium?.color?.withOpacity(0.75) ??
+        theme.colorScheme.onSurface.withOpacity(0.65);
+    final labelStyle = theme.textTheme.labelMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: labelColor,
+        ) ??
+        TextStyle(
+          fontWeight: FontWeight.w600,
+          color: labelColor,
+        );
+
+    final baseValueStyle = theme.textTheme.bodyMedium ?? const TextStyle();
+    final baseValueColor = baseValueStyle.color ?? theme.colorScheme.onSurface;
+    final linkStyle = baseValueStyle.copyWith(
+      color: baseValueColor,
+      decoration: TextDecoration.underline,
+      decorationColor: baseValueColor.withOpacity(0.8),
+    );
     final valueWidget = link != null
         ? InkWell(
             onTap: () => _openLink(link),
-            child: Text(
-              value,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                decoration: TextDecoration.underline,
-              ),
-            ),
+            child: Text(value, style: linkStyle),
           )
-        : Text(value);
+        : Text(value, style: baseValueStyle);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -473,22 +533,22 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         children: [
           Expanded(
             flex: 2,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.grey,
-              ),
-            ),
+            child: Text(label, style: labelStyle),
           ),
           Expanded(
             flex: 3,
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(child: valueWidget),
                 if (trailing != null) ...[
-                  const SizedBox(width: 4),
-                  Flexible(child: trailing),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: trailing,
+                    ),
+                  ),
                 ],
               ],
             ),

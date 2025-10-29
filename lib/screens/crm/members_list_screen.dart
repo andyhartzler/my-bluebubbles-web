@@ -10,7 +10,9 @@ import 'member_detail_screen.dart';
 
 /// Screen showing all CRM members with search and filters
 class MembersListScreen extends StatefulWidget {
-  const MembersListScreen({Key? key}) : super(key: key);
+  final bool embed;
+
+  const MembersListScreen({Key? key, this.embed = false}) : super(key: key);
 
   @override
   State<MembersListScreen> createState() => _MembersListScreenState();
@@ -34,6 +36,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
   List<String> _counties = [];
   List<String> _districts = [];
   List<String> _committees = [];
+
+  static const List<List<Color>> _cardGradients = [
+    [Color(0xFF4e54c8), Color(0xFF8f94fb)],
+    [Color(0xFF11998e), Color(0xFF38ef7d)],
+    [Color(0xFFee0979), Color(0xFFff6a00)],
+    [Color(0xFFfc5c7d), Color(0xFF6a82fb)],
+    [Color(0xFF00b09b), Color(0xFF96c93d)],
+  ];
 
   @override
   void initState() {
@@ -129,6 +139,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final body = _buildContent(context);
+
+    if (widget.embed) {
+      return body;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('CRM Members'),
@@ -155,11 +171,11 @@ class _MembersListScreenState extends State<MembersListScreen> {
             ),
         ],
       ),
-      body: _buildBody(),
+      body: body,
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildContent(BuildContext context) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -176,150 +192,305 @@ class _MembersListScreenState extends State<MembersListScreen> {
       );
     }
 
+    final theme = Theme.of(context);
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Search by name or phone...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        setState(() => _searchQuery = '');
-                        _applyFilters();
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onChanged: (value) {
-              setState(() => _searchQuery = value);
-              _applyFilters();
-            },
-          ),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: _buildSearchField(),
         ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Row(
-            children: [
-              FilterChip(
-                label: Text(_selectedCounty ?? 'County'),
-                selected: _selectedCounty != null,
-                onSelected: (_) => _showCountyFilter(),
-              ),
-              const SizedBox(width: 8),
-              FilterChip(
-                label: Text(_selectedDistrict ?? 'District'),
-                selected: _selectedDistrict != null,
-                onSelected: (_) => _showDistrictFilter(),
-              ),
-              const SizedBox(width: 8),
-              FilterChip(
-                label: Text(
-                  _selectedCommittees == null || _selectedCommittees!.isEmpty
-                      ? 'Committee'
-                      : '${_selectedCommittees!.length} committees',
-                ),
-                selected: _selectedCommittees != null && _selectedCommittees!.isNotEmpty,
-                onSelected: (_) => _showCommitteeFilter(),
-              ),
-              const SizedBox(width: 8),
-              if (_selectedCounty != null ||
-                  _selectedDistrict != null ||
-                  (_selectedCommittees != null && _selectedCommittees!.isNotEmpty))
-                TextButton.icon(
-                  icon: const Icon(Icons.clear_all),
-                  label: const Text('Clear'),
-                  onPressed: _clearFilters,
-                ),
-            ],
-          ),
-        ),
-        const Divider(),
+        _buildFilterRow(),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Text(
             'Showing ${_filteredMembers.length} of ${_members.length} members',
-            style: Theme.of(context).textTheme.bodySmall,
+            style: theme.textTheme.labelMedium,
           ),
         ),
+        const SizedBox(height: 8),
         Expanded(
           child: _filteredMembers.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.people_outline, size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No members found',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ],
+              ? _buildEmptyState(theme)
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = constraints.maxWidth;
+                      final crossAxisCount = width > 1300
+                          ? 3
+                          : width > 900
+                              ? 2
+                              : 1;
+                      final aspectRatio = crossAxisCount == 1 ? 2.4 : 1.6;
+
+                      return GridView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 18,
+                          mainAxisSpacing: 18,
+                          childAspectRatio: aspectRatio,
+                        ),
+                        itemCount: _filteredMembers.length,
+                        itemBuilder: (context, index) => _buildMemberCard(_filteredMembers[index], index),
+                      );
+                    },
                   ),
-                )
-              : ListView.builder(
-                  itemCount: _filteredMembers.length,
-                  itemBuilder: (context, index) {
-                    final member = _filteredMembers[index];
-                    return _buildMemberTile(member);
-                  },
                 ),
         ),
       ],
     );
   }
 
-  Widget _buildMemberTile(Member member) {
+  Widget _buildSearchField() {
+    return TextField(
+      decoration: InputDecoration(
+        hintText: 'Search by name or phone...',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  setState(() => _searchQuery = '');
+                  _applyFilters();
+                },
+              )
+            : null,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      onChanged: (value) {
+        setState(() => _searchQuery = value);
+        _applyFilters();
+      },
+    );
+  }
+
+  Widget _buildFilterRow() {
+    final hasFilters = _selectedCounty != null ||
+        _selectedDistrict != null ||
+        (_selectedCommittees != null && _selectedCommittees!.isNotEmpty);
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          _buildFilterChip(
+            label: _selectedCounty ?? 'County',
+            selected: _selectedCounty != null,
+            onTap: _showCountyFilter,
+          ),
+          const SizedBox(width: 12),
+          _buildFilterChip(
+            label: _selectedDistrict != null
+                ? 'District ${_formatDistrict(_selectedDistrict) ?? _selectedDistrict!}'
+                : 'District',
+            selected: _selectedDistrict != null,
+            onTap: _showDistrictFilter,
+          ),
+          const SizedBox(width: 12),
+          _buildFilterChip(
+            label: _selectedCommittees == null || _selectedCommittees!.isEmpty
+                ? 'Committee'
+                : '${_selectedCommittees!.length} committees',
+            selected: _selectedCommittees != null && _selectedCommittees!.isNotEmpty,
+            onTap: _showCommitteeFilter,
+          ),
+          if (hasFilters) ...[
+            const SizedBox(width: 12),
+            TextButton.icon(
+              onPressed: _clearFilters,
+              icon: const Icon(Icons.clear_all),
+              label: const Text('Clear'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({required String label, required bool selected, required VoidCallback onTap}) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(48.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.people_outline, size: 76, color: theme.colorScheme.primary.withOpacity(0.25)),
+            const SizedBox(height: 16),
+            Text(
+              'No members match your filters',
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your filters or refreshing to see everyone in your database.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMemberCard(Member member, int index) {
+    final theme = Theme.of(context);
+    final gradient = _cardGradients[index % _cardGradients.length];
     final phoneDisplay = _hasText(member.phone)
         ? member.phone!.trim()
         : (_hasText(member.phoneE164) ? member.phoneE164!.trim() : null);
+    final districtLabel = _formatDistrict(member.congressionalDistrict);
 
-    final locationBits = <String>[
-      if (_hasText(member.county)) member.county!.trim(),
-      if (_formatDistrict(member.congressionalDistrict) != null)
-        _formatDistrict(member.congressionalDistrict)!,
-    ];
+    final highlights = <Widget>[];
+    if (phoneDisplay != null) {
+      highlights.add(_buildInfoChip(Icons.phone, phoneDisplay));
+    }
+    if (_hasText(member.county)) {
+      highlights.add(_buildInfoChip(Icons.map, member.county!.trim()));
+    }
+    if (districtLabel != null) {
+      highlights.add(_buildInfoChip(Icons.account_balance, 'District $districtLabel'));
+    }
+    if (_hasText(member.currentChapterMember)) {
+      highlights.add(_buildInfoChip(
+        Icons.flag,
+        'Chapter Status: ${member.currentChapterMember!.trim()}',
+      ));
+    }
+    if (_hasText(member.graduationYear)) {
+      highlights.add(_buildInfoChip(Icons.school, 'Grad ${member.graduationYear!.trim()}'));
+    }
+    if (member.committee != null && member.committee!.isNotEmpty) {
+      for (final committee in member.committee!.take(2)) {
+        if (_hasText(committee)) {
+          highlights.add(_buildInfoChip(Icons.groups, committee.trim()));
+        }
+      }
+    }
 
-    return ListTile(
-      leading: CircleAvatar(
-        child: Text(member.name[0].toUpperCase()),
-      ),
-      title: Text(member.name),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (phoneDisplay != null) Text(phoneDisplay),
-          if (locationBits.isNotEmpty)
-            Text(locationBits.join(' • '), style: const TextStyle(fontSize: 12)),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: gradient.last.withOpacity(0.22),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
         ],
       ),
-      trailing: Row(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => _openMember(member),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        member.name,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (member.optOut)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'Opted Out',
+                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (highlights.isNotEmpty)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: highlights,
+                  ),
+                const Spacer(),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: TextButton.icon(
+                    onPressed: () => _openMember(member),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                    ),
+                    icon: const Icon(Icons.open_in_new, size: 18),
+                    label: const Text('View Profile'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (member.optOut)
-            const Chip(
-              label: Text('Opted Out', style: TextStyle(fontSize: 10)),
-              backgroundColor: Colors.red,
-              labelStyle: TextStyle(color: Colors.white),
-            ),
-          const Icon(Icons.chevron_right),
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+          ),
         ],
       ),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MemberDetailScreen(member: member),
-          ),
-        );
-      },
+    );
+  }
+
+  void _openMember(Member member) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MemberDetailScreen(member: member),
+      ),
     );
   }
 

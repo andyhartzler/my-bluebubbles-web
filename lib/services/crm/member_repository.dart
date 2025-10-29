@@ -130,6 +130,66 @@ class MemberRepository {
     }
   }
 
+  Future<Map<String, int>> getCountyCounts() => _aggregateTextField('county');
+
+  Future<Map<String, int>> getDistrictCounts() => _aggregateTextField(
+        'congressional_district',
+        normalize: Member.normalizeDistrict,
+        postProcess: Member.formatDistrictLabel,
+      );
+
+  Future<Map<String, int>> getCommitteeCounts() async {
+    if (!_isReady) return {};
+
+    try {
+      final response = await _supabase.client.from('members').select('committee');
+      final counts = <String, int>{};
+
+      for (final item in response as List<dynamic>) {
+        final values = Member.normalizeTextList(item['committee']);
+        for (final committee in values) {
+          final value = committee.trim();
+          if (value.isEmpty) continue;
+          counts[value] = (counts[value] ?? 0) + 1;
+        }
+      }
+
+      return _sortCounts(counts);
+    } catch (e) {
+      print('❌ Error aggregating committee counts: $e');
+      return {};
+    }
+  }
+
+  Future<Map<String, int>> getChapterStatusCounts() => _aggregateTextField(
+        'current_chapter_member',
+        normalize: Member.normalizeText,
+      );
+
+  Future<Map<String, int>> getGraduationYearCounts() => _aggregateTextField(
+        'graduation_year',
+        normalize: Member.normalizeText,
+      );
+
+  Future<List<Member>> getRecentMembers({int limit = 5}) async {
+    if (!_isReady) return [];
+
+    try {
+      final response = await _supabase.client
+          .from('members')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      return (response as List<dynamic>)
+          .map((json) => Member.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('❌ Error fetching recent members: $e');
+      return [];
+    }
+  }
+
   /// Get all unique congressional districts (for filter UI)
   Future<List<String>> getUniqueCongressionalDistricts() async {
     if (!_isReady) return [];
@@ -268,6 +328,46 @@ class MemberRepository {
       print('❌ Error searching members: $e');
       return [];
     }
+  }
+
+  Future<Map<String, int>> _aggregateTextField(
+    String column, {
+    String? Function(dynamic value)? normalize,
+    String? Function(String value)? postProcess,
+  }) async {
+    if (!_isReady) return {};
+
+    try {
+      final response = await _supabase.client.from('members').select(column);
+      final counts = <String, int>{};
+
+      for (final item in response as List<dynamic>) {
+        final raw = item[column];
+        String? value = normalize != null ? normalize(raw) : Member.normalizeText(raw);
+        if (value == null || value.isEmpty) continue;
+        if (postProcess != null) {
+          value = postProcess(value) ?? value;
+        }
+        final cleaned = value.trim();
+        if (cleaned.isEmpty) continue;
+        counts[cleaned] = (counts[cleaned] ?? 0) + 1;
+      }
+
+      return _sortCounts(counts);
+    } catch (e) {
+      print('❌ Error aggregating $column counts: $e');
+      return {};
+    }
+  }
+
+  Map<String, int> _sortCounts(Map<String, int> counts) {
+    final entries = counts.entries.toList()
+      ..sort((a, b) {
+        final valueCompare = b.value.compareTo(a.value);
+        if (valueCompare != 0) return valueCompare;
+        return a.key.compareTo(b.key);
+      });
+    return {for (final entry in entries) entry.key: entry.value};
   }
 
   /// Get member statistics
