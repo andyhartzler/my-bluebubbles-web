@@ -136,6 +136,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                 address: address,
               ),
             ],
+            onMessageSent: (chat) async {
+              if (!mounted) return;
+              final navigator = Navigator.of(context, rootNavigator: true);
+              if (navigator.canPop()) {
+                navigator.pop();
+              }
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Message sent to ${_member.name}')),
+              );
+            },
           ),
         ),
       ));

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -29,6 +32,12 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   int _totalMessages = 0;
   bool _crmReady = false;
 
+  final TextEditingController _searchController = TextEditingController();
+  final List<Member> _selectedMembers = [];
+  List<Member> _searchResults = [];
+  bool _searching = false;
+  Timer? _searchDebounce;
+
   List<String> _counties = [];
   List<String> _districts = [];
   List<String> _committees = [];
@@ -40,6 +49,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   void initState() {
     super.initState();
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
+    _searchController.addListener(_onSearchChanged);
     if (_crmReady) {
       _loadFilterOptions();
       _updatePreview();
@@ -49,6 +59,9 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -81,10 +94,27 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
 
     try {
       final members = await _messageService.getFilteredMembers(_filter);
+      final Map<String, Member> combined = LinkedHashMap<String, Member>();
+
+      void addMember(Member member) {
+        final key = _memberKey(member);
+        if (key == null || !member.canContact) return;
+        combined[key] = member;
+      }
+
+      for (final member in members) {
+        addMember(member);
+      }
+
+      for (final member in _selectedMembers) {
+        addMember(member);
+      }
+
+      final combinedList = combined.values.toList();
       if (!mounted) return;
       setState(() {
-        _previewMembers = members.take(5).toList();
-        _totalMessages = members.length;
+        _previewMembers = combinedList.take(5).toList();
+        _totalMessages = combinedList.length;
         _loadingPreview = false;
       });
     } catch (e) {
@@ -92,6 +122,63 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       if (!mounted) return;
       setState(() => _loadingPreview = false);
     }
+  }
+
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    final query = _searchController.text.trim();
+
+    if (query.length < 2) {
+      setState(() {
+        _searchResults = [];
+        _searching = false;
+      });
+      return;
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () async {
+      setState(() => _searching = true);
+      final results = await _memberRepo.searchMembers(query);
+      if (!mounted) return;
+      setState(() {
+        _searchResults = results.where((member) => member.canContact).toList();
+        _searching = false;
+      });
+    });
+  }
+
+  void _toggleMemberSelection(Member member) {
+    final key = _memberKey(member);
+    if (key == null) return;
+
+    setState(() {
+      if (_isMemberSelected(member)) {
+        _selectedMembers.removeWhere((m) => _memberKey(m) == key);
+      } else {
+        _selectedMembers.add(member);
+      }
+    });
+
+    _updatePreview();
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.text = '';
+    setState(() {
+      _searchResults = [];
+      _searching = false;
+    });
+  }
+
+  bool _isMemberSelected(Member member) {
+    final key = _memberKey(member);
+    if (key == null) return false;
+    return _selectedMembers.any((m) => _memberKey(m) == key);
+  }
+
+  String? _memberKey(Member member) {
+    return member.id ?? member.phoneE164 ?? member.phone;
   }
 
   Future<void> _sendMessages() async {
@@ -148,6 +235,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             _totalMessages = total;
           });
         },
+        explicitMembers: List<Member>.from(_selectedMembers),
       );
 
       final successCount = results.values.where((v) => v).length;
@@ -223,6 +311,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             _totalMessages = total;
           });
         },
+        explicitMembers: List<Member>.from(_selectedMembers),
       );
 
       final successCount = results.values.where((v) => v).length;
@@ -276,6 +365,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                     children: [
                       _buildMessageCard(),
                       const SizedBox(height: 16),
+                      _buildRecipientsCard(),
+                      const SizedBox(height: 16),
                       _buildFiltersCard(),
                       const SizedBox(height: 16),
                       _buildPreviewCard(),
@@ -313,6 +404,121 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRecipientsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Recipients',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Combine filters with manual selections to tailor your outreach.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Search members by name or phone',
+                border: const OutlineInputBorder(),
+                suffixIcon: _searching
+                    ? const Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : (_searchController.text.isNotEmpty
+                        ? IconButton(
+                            onPressed: _clearSearch,
+                            icon: const Icon(Icons.clear),
+                          )
+                        : const Icon(Icons.search)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (_selectedMembers.isNotEmpty) ...[
+              Text(
+                'Selected members (${_selectedMembers.length})',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _selectedMembers.map((member) {
+                  return InputChip(
+                    label: Text(member.name),
+                    onDeleted: () => _toggleMemberSelection(member),
+                    avatar: const Icon(Icons.person, size: 18),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_searchController.text.trim().length >= 2)
+              _buildSearchResults()
+            else
+              const Text('Type at least 2 characters to search the member directory.'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_searching) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_searchResults.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8.0),
+        child: Text('No matching members found.'),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: _searchResults.length,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemBuilder: (context, index) {
+        final member = _searchResults[index];
+        final selected = _isMemberSelected(member);
+        final subtitleParts = <String>[
+          if (member.phoneE164 != null) member.phoneE164!
+          else if (member.phone != null) member.phone!,
+          if (member.county != null) member.county!,
+          if (member.congressionalDistrict != null) 'District ${member.congressionalDistrict!}',
+        ].where((value) => value.trim().isNotEmpty).toList();
+
+        return ListTile(
+          leading: Icon(selected ? Icons.check_circle : Icons.person_add_alt_1),
+          title: Text(member.name),
+          subtitle: subtitleParts.isEmpty ? null : Text(subtitleParts.join(' • ')),
+          trailing: IconButton(
+            icon: Icon(selected ? Icons.remove_circle_outline : Icons.add_circle_outline),
+            onPressed: () => _toggleMemberSelection(member),
+          ),
+          onTap: () => _toggleMemberSelection(member),
+        );
+      },
     );
   }
 
@@ -614,6 +820,13 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                 _filter.description,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              if (_selectedMembers.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Manually selected: ${_selectedMembers.length}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               if (_previewMembers.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 const Text('First 5 recipients:'),

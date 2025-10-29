@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -76,6 +77,7 @@ class CRMMessageService {
     Function(int current, int total)? onProgress,
     bool includeContactCard = false,
     bool markIntro = false,
+    List<Member>? explicitMembers,
   }) async {
     final results = <String, bool>{};
 
@@ -85,7 +87,10 @@ class CRMMessageService {
     }
 
     try {
-      final members = await getFilteredMembers(filter);
+      final members = await _resolveRecipients(
+        filter,
+        explicitMembers: explicitMembers,
+      );
       final total = members.length;
 
       if (total == 0) {
@@ -152,14 +157,18 @@ class CRMMessageService {
     return success;
   }
 
-  Future<Map<String, bool>> sendIntroToFilteredMembers(MessageFilter filter,
-      {Function(int current, int total)? onProgress}) async {
+  Future<Map<String, bool>> sendIntroToFilteredMembers(
+    MessageFilter filter, {
+    Function(int current, int total)? onProgress,
+    List<Member>? explicitMembers,
+  }) async {
     return await sendBulkMessages(
       filter: filter,
       messageText: _introMessage,
       includeContactCard: true,
       markIntro: true,
       onProgress: onProgress,
+      explicitMembers: explicitMembers,
     );
   }
 
@@ -203,22 +212,27 @@ class CRMMessageService {
 
     final cleaned = phoneNumber.contains('@') ? phoneNumber : cleansePhoneNumber(phoneNumber);
     Chat? chat = await _findExistingChat(cleaned);
-    bool sentViaCreateChat = false;
+    bool textQueued = false;
 
     try {
       if (chat == null) {
         final service = await _determineService(cleaned);
         final response = await http.createChat([cleaned], message, service);
-        var created = Chat.fromMap(response.data['data']);
-        created = created.save();
-        final saved = await cm.fetchChat(created.guid) ?? created;
-        chat = saved;
-        sentViaCreateChat = true;
-      }
-
-      if (chat == null) return false;
-
-      if (!sentViaCreateChat) {
+        final payload = response.data?['data'];
+        if (payload is Map<String, dynamic>) {
+          var created = Chat.fromMap(payload);
+          created = created.save();
+          final saved = await cm.fetchChat(created.guid) ?? created;
+          chat = saved;
+        } else {
+          chat = await _findExistingChat(cleaned);
+          if (chat == null) {
+            await Future.delayed(const Duration(milliseconds: 300));
+            chat = await _findExistingChat(cleaned);
+          }
+        }
+        textQueued = true;
+      } else {
         final msg = Message(
           text: message,
           dateCreated: DateTime.now(),
@@ -232,22 +246,42 @@ class CRMMessageService {
           chat: chat,
           message: msg,
         ));
+        textQueued = true;
       }
-
-      if (includeContactCard) {
-        await _sendContactCard(chat);
-      }
-
-      return true;
     } catch (e, stack) {
-      Logger.error('Failed to send CRM message', error: e, trace: stack);
+      Logger.error('Failed to queue CRM text message', error: e, trace: stack);
       return false;
     }
+
+    if (!textQueued) {
+      return false;
+    }
+
+    if (chat == null) {
+      Logger.warn('Queued CRM message but could not locate chat for $cleaned');
+      return true;
+    }
+
+    if (includeContactCard) {
+      try {
+        await _sendContactCard(chat);
+      } catch (e, stack) {
+        Logger.warn('Unable to send CRM contact card', error: e, trace: stack);
+      }
+    }
+
+    return true;
   }
 
   /// Preview: Get count of members that would receive message
-  Future<int> previewBulkMessage(MessageFilter filter) async {
-    final members = await getFilteredMembers(filter);
+  Future<int> previewBulkMessage(
+    MessageFilter filter, {
+    List<Member>? explicitMembers,
+  }) async {
+    final members = await _resolveRecipients(
+      filter,
+      explicitMembers: explicitMembers,
+    );
     return members.length;
   }
 
@@ -340,5 +374,32 @@ class CRMMessageService {
       ..writeln();
 
     return Uint8List.fromList(utf8.encode(buffer.toString()));
+  }
+
+  Future<List<Member>> _resolveRecipients(
+    MessageFilter filter, {
+    List<Member>? explicitMembers,
+  }) async {
+    final combined = LinkedHashMap<String, Member>();
+
+    void add(Member member) {
+      if (!member.canContact) return;
+      final key = member.id ?? member.phoneE164 ?? member.phone;
+      if (key == null) return;
+      combined[key] = member;
+    }
+
+    final filtered = await getFilteredMembers(filter);
+    for (final member in filtered) {
+      add(member);
+    }
+
+    if (explicitMembers != null) {
+      for (final member in explicitMembers) {
+        add(member);
+      }
+    }
+
+    return combined.values.toList();
   }
 }
