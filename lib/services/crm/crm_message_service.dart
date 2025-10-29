@@ -263,10 +263,9 @@ class CRMMessageService {
     }
 
     if (includeContactCard) {
-      try {
-        await _sendContactCard(chat);
-      } catch (e, stack) {
-        Logger.warn('Unable to send CRM contact card', error: e, trace: stack);
+      final sent = await _sendContactCardForAddress(cleaned, chat);
+      if (!sent) {
+        Logger.warn('Unable to send CRM contact card for $cleaned');
       }
     }
 
@@ -314,64 +313,86 @@ class CRMMessageService {
     }
   }
 
-  Future<void> _sendContactCard(Chat chat) async {
+  Future<bool> _sendContactCardForAddress(String cleaned, Chat? initialChat) async {
     try {
-      final bytes = await _buildContactCard();
-      final attachmentGuid = 'temp-${randomString(8)}';
-      final message = Message(
-        guid: attachmentGuid,
-        text: '',
-        dateCreated: DateTime.now(),
-        hasAttachments: true,
-        isFromMe: true,
-        handleId: 0,
-        attachments: [
-          Attachment(
-            guid: attachmentGuid,
-            mimeType: 'text/vcard',
-            uti: 'public.vcard',
-            isOutgoing: true,
-            transferName: 'MOYDA Contact.vcf',
-            totalBytes: bytes.length,
-            bytes: bytes,
-          ),
-        ],
-      );
+      var chat = initialChat;
+      if (chat == null) {
+        for (var attempt = 0; attempt < 5 && chat == null; attempt++) {
+          chat = await _findExistingChat(cleaned);
+          if (chat != null) break;
+          await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
+        }
+      }
 
-      message.chat.target = chat;
+      if (chat == null) {
+        Logger.warn('Unable to locate chat for $cleaned to send contact card');
+        return false;
+      }
 
+      final message = await _buildContactCardMessage(chat);
       await outq.queue(OutgoingItem(
         type: QueueType.sendAttachment,
         chat: chat,
         message: message,
       ));
-    } catch (e) {
-      Logger.warn('Unable to send contact card', error: e);
+      return true;
+    } catch (e, stack) {
+      Logger.warn('Unable to send contact card', error: e, trace: stack);
+      return false;
     }
   }
 
-  Future<Uint8List> _buildContactCard() async {
+  Future<Message> _buildContactCardMessage(Chat chat) async {
+    final bytes = await _buildContactCardBytes();
+    final messageGuid = 'temp-${randomString(8)}';
+    final attachmentGuid = 'temp-${randomString(8)}';
+    final message = Message(
+      guid: messageGuid,
+      text: '',
+      dateCreated: DateTime.now(),
+      hasAttachments: true,
+      isFromMe: true,
+      handleId: 0,
+      attachments: [
+        Attachment(
+          guid: attachmentGuid,
+          mimeType: 'text/x-vcard',
+          uti: 'public.vcard',
+          isOutgoing: true,
+          transferName: 'MOYDA Contact.vcf',
+          totalBytes: bytes.length,
+          bytes: bytes,
+        ),
+      ],
+    );
+
+    message.chat.target = chat;
+    return message;
+  }
+
+  Future<Uint8List> _buildContactCardBytes() async {
+    const newline = '\r\n';
     final buffer = StringBuffer()
-      ..writeln('BEGIN:VCARD')
-      ..writeln('VERSION:3.0')
-      ..writeln('FN:Missouri Young Democrats')
-      ..writeln('ORG:Missouri Young Democrats')
-      ..writeln('TEL;TYPE=WORK,VOICE:+18165300773')
-      ..writeln('EMAIL;TYPE=WORK:info@moyoungdemocrats.org')
-      ..writeln('ADR;TYPE=WORK:;;PO Box 270043;Kansas City;MO;64127;USA')
-      ..writeln('URL:https://moyoungdemocrats.org');
+      ..write('BEGIN:VCARD$newline')
+      ..write('VERSION:3.0$newline')
+      ..write('N:Young Democrats;Missouri;;;$newline')
+      ..write('FN:Missouri Young Democrats$newline')
+      ..write('ORG:Missouri Young Democrats$newline')
+      ..write('TEL;TYPE=WORK,VOICE:+18165300773$newline')
+      ..write('EMAIL;TYPE=WORK:info@moyoungdemocrats.org$newline')
+      ..write('ADR;TYPE=WORK:;;PO Box 270043;Kansas City;MO;64127;USA$newline')
+      ..write('URL:https://moyoungdemocrats.org$newline');
 
     try {
       final data = await rootBundle.load('assets/icon/contact-photo.png');
       final encoded = base64Encode(data.buffer.asUint8List());
-      buffer.writeln('PHOTO;ENCODING=b;TYPE=PNG:$encoded');
+      buffer.write('PHOTO;ENCODING=b;TYPE=PNG:$encoded$newline');
     } catch (_) {
       // Ignore missing asset
     }
 
     buffer
-      ..writeln('END:VCARD')
-      ..writeln();
+      ..write('END:VCARD$newline');
 
     return Uint8List.fromList(utf8.encode(buffer.toString()));
   }

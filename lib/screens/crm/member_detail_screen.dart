@@ -127,7 +127,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
 
     try {
-      await Navigator.of(context, rootNavigator: true).push(ThemeSwitcher.buildPageRoute(
+      final result = await Navigator.of(context, rootNavigator: true).push(ThemeSwitcher.buildPageRoute(
         builder: (context) => TitleBarWrapper(
           child: ChatCreator(
             initialSelected: [
@@ -136,20 +136,16 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                 address: address,
               ),
             ],
-            onMessageSent: (chat) async {
-              if (!mounted) return;
-              final navigator = Navigator.of(context, rootNavigator: true);
-              if (navigator.canPop()) {
-                navigator.pop();
-              }
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Message sent to ${_member.name}')),
-              );
-            },
+            popOnSend: true,
           ),
         ),
       ));
+
+      if (result == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Message sent to ${_member.name}')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
