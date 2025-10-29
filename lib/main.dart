@@ -14,10 +14,15 @@ import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_lis
 import 'package:bluebubbles/app/layouts/startup/failure_to_start.dart';
 import 'package:bluebubbles/app/layouts/setup/setup_view.dart';
 import 'package:bluebubbles/app/layouts/startup/splash_screen.dart';
+import 'package:bluebubbles/app/layouts/startup/myd_loading_screen.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/screens/crm/members_list_screen.dart';
+import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/foundation.dart';
@@ -70,6 +75,15 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
       WidgetsFlutterBinding.ensureInitialized();
 
       await dotenv.load(fileName: '.env', isOptional: true);
+
+      if (CRMConfig.crmEnabled) {
+        try {
+          await CRMSupabaseService().initialize();
+          Logger.info('CRM system initialized');
+        } catch (e, s) {
+          Logger.warn('CRM system failed to initialize: $e', trace: s);
+        }
+      }
 
       await StartupTasks.initStartupServices(isBubble: bubble);
 
@@ -127,7 +141,7 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
           /* ----- WINDOW INITIALIZATION ----- */
           await windowManager.ensureInitialized();
           await windowManager.setPreventClose(ss.settings.closeToTray.value);
-          await windowManager.setTitle('BlueBubbles');
+          await windowManager.setTitle('Missouri Young Democrats CRM');
           await Window.initialize();
           if (Platform.isWindows) {
             await Window.hideWindowControls();
@@ -161,7 +175,7 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
             await ss.prefs.setDouble("window-x", posX);
             await ss.prefs.setDouble("window-y", posY);
 
-            await windowManager.setTitle('BlueBubbles');
+            await windowManager.setTitle('Missouri Young Democrats CRM');
             if (arguments.firstOrNull != "minimized") {
               await windowManager.show();
             }
@@ -269,7 +283,7 @@ class Main extends StatelessWidget {
       initial: AdaptiveThemeMode.system,
       builder: (theme, darkTheme) => GetMaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'BlueBubbles',
+        title: 'Missouri Young Democrats CRM',
         theme: theme.copyWith(appBarTheme: theme.appBarTheme.copyWith(elevation: 0.0)),
         darkTheme: darkTheme.copyWith(appBarTheme: darkTheme.appBarTheme.copyWith(elevation: 0.0)),
         navigatorKey: ns.key,
@@ -339,7 +353,7 @@ class Main extends StatelessWidget {
                         isAuthing = true;
                         localAuth
                             .authenticate(
-                                localizedReason: 'Please authenticate to unlock BlueBubbles',
+                                localizedReason: 'Please authenticate to unlock the Missouri Young Democrats hub',
                                 options: const AuthenticationOptions(stickyAuth: true))
                             .then((result) {
                           isAuthing = false;
@@ -363,7 +377,7 @@ class Main extends StatelessWidget {
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                                 child: Text(
-                                  "BlueBubbles is currently locked. Please unlock to access your messages.",
+                                  "The Missouri Young Democrats hub is currently locked. Please unlock to access your messages.",
                                   style: context.theme.textTheme.titleLarge,
                                   textAlign: TextAlign.center,
                                 ),
@@ -380,7 +394,7 @@ class Main extends StatelessWidget {
                                     onTap: () async {
                                       final localAuth = LocalAuthentication();
                                       bool didAuthenticate = await localAuth.authenticate(
-                                          localizedReason: 'Please authenticate to unlock BlueBubbles',
+                                          localizedReason: 'Please authenticate to unlock the Missouri Young Democrats hub',
                                           options: const AuthenticationOptions(stickyAuth: true));
                                       if (didAuthenticate) {
                                         controller!.authSuccess(unlock: true);
@@ -420,9 +434,13 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
+enum _HomeSection { dashboard, members, conversations }
+
 class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayListener {
   bool serverCompatible = true;
   bool fullyLoaded = false;
+  _HomeSection _currentSection = _HomeSection.dashboard;
+  final PageStorageBucket _bucket = PageStorageBucket();
 
   @override
   void initState() {
@@ -514,7 +532,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         }
 
         /* ----- NOTIFICATIONS INITIALIZATION ----- */
-        await localNotifier.setup(appName: "BlueBubbles");
+        await localNotifier.setup(appName: "Missouri Young Democrats CRM");
       }
 
       if (!ss.settings.finishedSetup.value) {
@@ -616,33 +634,208 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           StartIncrementalSyncIntent: StartIncrementalSyncAction(),
           GoBackIntent: GoBackAction(context),
         },
-        child: Obx(() => Scaffold(
-              backgroundColor: context.theme.colorScheme.background.themeOpacity(context),
-              body: Builder(
-                builder: (BuildContext context) {
-                  if (ss.settings.finishedSetup.value) {
-                    if (!serverCompatible && kIsWeb) {
-                      return const FailureToStart(
-                        otherTitle: "Server version too low, please upgrade!",
-                        e: "Required Server Version: v0.2.0",
-                      );
-                    }
-                    return ConversationList(
-                      showArchivedChats: false,
-                      showUnknownSenders: false,
-                    );
-                  } else {
-                    return PopScope(
-                      canPop: false,
-                      child: TitleBarWrapper(
-                          child: kIsWeb || kIsDesktop ? SetupView() : SplashScreen(shouldNavigate: fullyLoaded)),
-                    );
-                  }
-                },
-              ),
-            )),
+        child: Obx(() {
+          if (!ss.settings.finishedSetup.value) {
+            return const MYDLoadingScreen();
+          }
+
+          return Scaffold(
+            backgroundColor: context.theme.colorScheme.background.themeOpacity(context),
+            body: Builder(
+              builder: (BuildContext context) {
+                if (!serverCompatible && kIsWeb) {
+                  return const FailureToStart(
+                    otherTitle: "Server version too low, please upgrade!",
+                    e: "Required Server Version: v0.2.0",
+                  );
+                }
+
+                return _buildShell(context);
+              },
+            ),
+          );
+        }),
       ),
     );
+  }
+
+  Widget _buildShell(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool crmReady = CRMConfig.crmEnabled && CRMSupabaseService().isInitialized;
+
+    return SafeArea(
+      top: false,
+      bottom: false,
+      child: Column(
+        children: [
+          _buildTopBar(context, crmReady),
+          Expanded(
+            child: Container(
+              color: theme.colorScheme.background,
+              child: PageStorage(
+                bucket: _bucket,
+                child: IndexedStack(
+                  index: _currentSection.index,
+                  children: [
+                    const DashboardScreen(key: PageStorageKey('dashboard-view')),
+                    const MembersListScreen(key: PageStorageKey('members-view'), embed: true),
+                    ConversationList(
+                      key: const PageStorageKey('conversations-view'),
+                      showArchivedChats: false,
+                      showUnknownSenders: false,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopBar(BuildContext context, bool crmReady) {
+    final theme = Theme.of(context);
+    final navButtons = [
+      _buildNavButton(context, _HomeSection.dashboard, 'Dashboard', Icons.dashboard_outlined),
+      _buildNavButton(context, _HomeSection.members, 'Members', Icons.groups_outlined, enabled: crmReady),
+      _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline),
+    ];
+
+    final newMessageButton = ElevatedButton.icon(
+      onPressed: () => _openNewMessage(context),
+      icon: const Icon(Icons.add_comment),
+      label: const Text('New Message'),
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
+    );
+
+    final settingsButton = Tooltip(
+      message: 'Settings',
+      child: IconButton(
+        onPressed: () => Actions.invoke(context, const OpenSettingsIntent()),
+        icon: const Icon(Icons.settings_outlined),
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withOpacity(0.08),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool compact = constraints.maxWidth < 900;
+          final navChildren = [
+            ...navButtons,
+            newMessageButton,
+            settingsButton,
+          ];
+
+          final navigation = Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: compact ? WrapAlignment.start : WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: navChildren,
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildBranding(theme),
+                const SizedBox(height: 12),
+                navigation,
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _buildBranding(theme),
+              const Spacer(),
+              navigation,
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBranding(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Missouri Young Democrats',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Communications Hub',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNavButton(
+    BuildContext context,
+    _HomeSection section,
+    String label,
+    IconData icon, {
+    bool enabled = true,
+  }) {
+    final theme = Theme.of(context);
+    final bool isSelected = _currentSection == section;
+
+    return TextButton.icon(
+      onPressed: enabled ? () => _setSection(section) : null,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: ButtonStyle(
+        backgroundColor: MaterialStateProperty.resolveWith((states) {
+          if (states.contains(MaterialState.disabled)) {
+            return theme.colorScheme.surfaceVariant.withOpacity(0.3);
+          }
+          return isSelected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.surfaceVariant.withOpacity(0.7);
+        }),
+        foregroundColor: MaterialStateProperty.resolveWith((states) {
+          if (states.contains(MaterialState.disabled)) {
+            return theme.disabledColor;
+          }
+          return isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
+        }),
+        padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 18, vertical: 12)),
+        shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
+      ),
+    );
+  }
+
+  void _setSection(_HomeSection section) {
+    if (_currentSection == section) return;
+    setState(() => _currentSection = section);
+  }
+
+  void _openNewMessage(BuildContext context) {
+    Actions.invoke(context, const OpenNewChatCreatorIntent());
   }
 }
 
@@ -650,7 +843,7 @@ Future<void> initSystemTray() async {
   if (Platform.isWindows) {
     await systemTray.initSystemTray(
       iconPath: 'assets/icon/icon.ico',
-      toolTip: "BlueBubbles",
+      toolTip: "Missouri Young Democrats CRM",
     );
   } else {
     String path;
