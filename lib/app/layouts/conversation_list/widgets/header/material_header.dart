@@ -5,6 +5,7 @@ import 'package:bluebubbles/app/layouts/conversation_list/pages/search/search_vi
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
@@ -91,6 +92,18 @@ class _MaterialHeaderState extends CustomState<MaterialHeader, void, Conversatio
                                               color: context.theme.colorScheme.properOnSurface,
                                             ),
                                           ),
+                                          if (CRMConfig.crmEnabled)
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 2),
+                                              child: IconButton(
+                                                onPressed: () => goToCRM(context),
+                                                icon: Icon(
+                                                  Icons.people_outline,
+                                                  color: context.theme.colorScheme.properOnSurface,
+                                                ),
+                                                tooltip: 'CRM Members',
+                                              ),
+                                            ),
                                           Padding(
                                             padding: const EdgeInsets.only(left: 2),
                                             child: IconButton(

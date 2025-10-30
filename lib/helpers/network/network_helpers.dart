@@ -14,11 +14,13 @@ String? sanitizeServerAddress({String? address}) {
 
   Uri? uri = Uri.tryParse(sanitized);
   if (uri?.scheme.isEmpty ?? false) {
-    if (sanitized.contains("ngrok.io") || sanitized.contains("trycloudflare.com") || sanitized.contains("zrok.io")) {
-      uri = Uri.tryParse("https://$sanitized");
-    } else {
-      uri = Uri.tryParse("http://$sanitized");
-    }
+    final String lower = sanitized.toLowerCase();
+    final bool preferHttps = lower.contains('ngrok.io') ||
+        lower.contains('trycloudflare.com') ||
+        lower.contains('zrok.io');
+
+    final String scheme = preferHttps ? 'https://' : 'http://';
+    uri = Uri.tryParse('$scheme$sanitized');
   }
 
   return uri.toString();
