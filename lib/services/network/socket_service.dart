@@ -26,7 +26,14 @@ class SocketService extends GetxService {
   SocketState _lastState = SocketState.disconnected;
   RxString lastError = "".obs;
   Timer? _reconnectTimer;
+  Timer? _healthCheckTimer;
   late Socket socket;
+  String? _socketOverride;
+  String? _lastBaseServer;
+  List<String> _socketCandidates = <String>[];
+  int _candidateIndex = 0;
+  bool _resolvingCandidate = false;
+  bool _serverInfoChecked = false;
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
@@ -55,16 +62,28 @@ class SocketService extends GetxService {
   }
 
   void startSocket() {
+    _ensureSocketCandidates();
+
     OptionBuilder options = OptionBuilder()
         .setQuery({"guid": password})
         .setTransports(['websocket', 'polling'])
         .setExtraHeaders(http.headers)
+        .setPath('/socket.io')
+        .setTimeout(20000)
+        .setReconnectionAttempts(999999)
+        .setReconnectionDelay(2000)
+        .setReconnectionDelayMax(10000)
+        .setRandomizationFactor(0.35)
         // Disable so that we can create the listeners first
         .disableAutoConnect()
         .enableReconnection();
-    socket = io(serverAddress, options.build());
-    // placed here so that [socket] is still initialized
-    if (isNullOrEmpty(serverAddress)) return;
+    final target = _currentSocketTarget();
+    if (isNullOrEmpty(target)) {
+      return;
+    }
+
+    Logger.info('Connecting to socket at $target');
+    socket = io(target, options.build());
 
     socket.onConnect((data) => handleStatusUpdate(SocketState.connected, data));
     socket.onReconnect((data) => handleStatusUpdate(SocketState.connected, data));
@@ -76,8 +95,10 @@ class SocketService extends GetxService {
     socket.onDisconnect((data) => handleStatusUpdate(SocketState.disconnected, data));
 
     socket.onConnectError((data) => handleStatusUpdate(SocketState.error, data));
+    socket.onReconnectError((data) => handleStatusUpdate(SocketState.error, data));
     socket.onConnectTimeout((data) => handleStatusUpdate(SocketState.error, data));
     socket.onError((data) => handleStatusUpdate(SocketState.error, data));
+    socket.onReconnectFailed((_) => _scheduleReconnect(fetchNewUrl: true));
 
     // custom events
     // only listen to these events from socket on web/desktop (FCM handles on Android)
@@ -97,12 +118,20 @@ class SocketService extends GetxService {
     socket.on("imessage-aliases-removed", (data) => ah.handleEvent("imessage-aliases-removed", data, 'DartSocket'));
 
     socket.connect();
+    _healthCheckTimer?.cancel();
+    _healthCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (state.value == SocketState.connected || _reconnectTimer != null) {
+        return;
+      }
+      _scheduleReconnect();
+    });
   }
 
   void disconnect() {
     if (isNullOrEmpty(serverAddress)) return;
     socket.disconnect();
     state.value = SocketState.disconnected;
+    _healthCheckTimer?.cancel();
   }
 
   void reconnect() {
@@ -115,6 +144,7 @@ class SocketService extends GetxService {
     if (isNullOrEmpty(serverAddress)) return;
     socket.dispose();
     state.value = SocketState.disconnected;
+    _healthCheckTimer?.cancel();
   }
 
   void restartSocket() {
@@ -124,6 +154,7 @@ class SocketService extends GetxService {
 
   void forgetConnection() {
     closeSocket();
+    clearOverride();
     ss.settings.guidAuthKey.value = "";
     clearServerUrl(saveAdditionalSettings: ["guidAuthKey"]);
   }
@@ -145,7 +176,9 @@ class SocketService extends GetxService {
   }
 
   void handleStatusUpdate(SocketState status, dynamic data) {
-    if (_lastState == status) return;
+    if (_lastState == status && status != SocketState.error && status != SocketState.disconnected) {
+      return;
+    }
     _lastState = status;
 
     switch (status) {
@@ -155,40 +188,63 @@ class SocketService extends GetxService {
         _reconnectTimer = null;
         NetworkTasks.onConnect();
         notif.clearSocketError();
+        if (_socketCandidates.isNotEmpty) {
+          final String activeTarget = _socketOverride ?? serverAddress;
+          final int index = _socketCandidates.indexOf(activeTarget);
+          _candidateIndex = index >= 0 ? index : 0;
+          _socketOverride = _socketCandidates[_candidateIndex] == serverAddress
+              ? null
+              : _socketCandidates[_candidateIndex];
+        } else {
+          _candidateIndex = 0;
+        }
         return;
       case SocketState.disconnected:
         Logger.info("Disconnected from socket...");
         state.value = SocketState.disconnected;
+        _scheduleReconnect();
         return;
       case SocketState.connecting:
         Logger.info("Connecting to socket...");
         state.value = SocketState.connecting;
         return;
       case SocketState.error:
-        Logger.info("Socket connect error, fetching new URL...");
+        Logger.info("Socket connect error, evaluating fallbacks...");
 
         if (data is SocketException) {
           handleSocketException(data);
         }
 
-        state.value = SocketState.error;
-        // After 5 seconds of an error, we should retry the connection
-        _reconnectTimer = Timer(const Duration(seconds: 5), () async {
-          if (state.value == SocketState.connected) return;
-
-          await fdb.fetchNewUrl();
-          restartSocket();
-
-          if (state.value == SocketState.connected) return;
-
-          if (!ss.settings.keepAppAlive.value) {
-            notif.createSocketError();
-          }
-        });
+        _handleSocketError();
         return;
       default:
         return;
     }
+  }
+
+  void _scheduleReconnect({bool fetchNewUrl = false}) {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 5), () async {
+      if (state.value == SocketState.connected) {
+        _reconnectTimer = null;
+        return;
+      }
+
+      if (fetchNewUrl) {
+        try {
+          await fdb.fetchNewUrl();
+        } catch (e, stack) {
+          Logger.warn('Failed to refresh server URL before reconnecting', error: e, trace: stack);
+        }
+      }
+
+      restartSocket();
+
+      if (state.value != SocketState.connected && !ss.settings.keepAppAlive.value) {
+        notif.createSocketError();
+      }
+      _reconnectTimer = null;
+    });
   }
 
   void handleSocketException(SocketException e) {
@@ -198,5 +254,231 @@ class SocketService extends GetxService {
     } else {
       lastError.value = msg;
     }
+  }
+
+  void clearOverride() {
+    _socketOverride = null;
+    _lastBaseServer = null;
+    _socketCandidates = <String>[];
+    _candidateIndex = 0;
+    _serverInfoChecked = false;
+  }
+
+  void _handleSocketError() {
+    Future<void>(() async {
+      final applied = await _applyNextCandidate();
+      if (applied) {
+        return;
+      }
+
+      state.value = SocketState.error;
+      _scheduleReconnect(fetchNewUrl: true);
+    });
+  }
+
+  String? _currentSocketTarget() {
+    if (_socketCandidates.isEmpty) {
+      return _socketOverride ?? serverAddress;
+    }
+
+    if (_candidateIndex < 0 || _candidateIndex >= _socketCandidates.length) {
+      _candidateIndex = 0;
+    }
+
+    final String candidate = _socketCandidates[_candidateIndex];
+    if (candidate == serverAddress) {
+      _socketOverride = null;
+      return candidate;
+    }
+
+    _socketOverride = candidate;
+    return candidate;
+  }
+
+  void _ensureSocketCandidates() {
+    final base = serverAddress;
+    if (base.isEmpty) {
+      _socketCandidates = <String>[];
+      _lastBaseServer = null;
+      return;
+    }
+
+    if (_lastBaseServer == base && _socketCandidates.isNotEmpty) {
+      return;
+    }
+
+    final Uri? baseUri = Uri.tryParse(base);
+    if (baseUri == null) {
+      _socketCandidates = <String>[];
+      _lastBaseServer = null;
+      return;
+    }
+
+    _lastBaseServer = base;
+    _candidateIndex = 0;
+    _serverInfoChecked = false;
+    final List<String> candidates = <String>[];
+
+    void addUri(Uri uri) {
+      final candidate = uri.toString();
+      if (candidate.isEmpty) {
+        return;
+      }
+      if (!candidates.contains(candidate)) {
+        candidates.add(candidate);
+      }
+    }
+
+    addUri(baseUri);
+
+    if (!baseUri.hasPort || baseUri.port == 0) {
+      addUri(baseUri.replace(port: 1234));
+    } else if (baseUri.port == 443 && baseUri.scheme == 'https') {
+      addUri(baseUri.replace(port: 1234));
+    } else if (baseUri.port == 80 && baseUri.scheme == 'http') {
+      addUri(baseUri.replace(port: 1234));
+    }
+
+    if (kIsWeb) {
+      if (baseUri.scheme == 'http') {
+        addUri(baseUri.replace(scheme: 'https'));
+        if (!baseUri.hasPort || baseUri.port == 80) {
+          addUri(baseUri.replace(scheme: 'https', port: 1234));
+        }
+      }
+    } else {
+      if (baseUri.scheme == 'https') {
+        addUri(baseUri.replace(scheme: 'http'));
+        if (!baseUri.hasPort || baseUri.port == 443) {
+          addUri(baseUri.replace(scheme: 'http', port: 1234));
+        }
+      } else if (baseUri.scheme == 'http') {
+        addUri(baseUri.replace(scheme: 'https'));
+        if (!baseUri.hasPort || baseUri.port == 80) {
+          addUri(baseUri.replace(scheme: 'https', port: 1234));
+        }
+      }
+    }
+
+    _socketCandidates = candidates;
+  }
+
+  Future<bool> _applyNextCandidate() async {
+    if (_resolvingCandidate) {
+      return false;
+    }
+
+    _resolvingCandidate = true;
+    try {
+      _ensureSocketCandidates();
+      if (_socketCandidates.isEmpty) {
+        return false;
+      }
+
+      final bool hasNext = _candidateIndex + 1 < _socketCandidates.length;
+      if (hasNext) {
+        _candidateIndex += 1;
+        final String next = _socketCandidates[_candidateIndex];
+        _socketOverride = next == serverAddress ? null : next;
+        Logger.warn('Socket connection failed, retrying with alternate target: $next');
+        restartSocket();
+        return true;
+      }
+
+      if (!_serverInfoChecked && await _appendServerInfoCandidate()) {
+        _candidateIndex = _socketCandidates.length - 1;
+        final String next = _socketCandidates[_candidateIndex];
+        _socketOverride = next == serverAddress ? null : next;
+        Logger.warn('Socket connection failed, retrying with server-provided target: $next');
+        restartSocket();
+        return true;
+      }
+
+      return false;
+    } finally {
+      _resolvingCandidate = false;
+    }
+  }
+
+  Future<bool> _appendServerInfoCandidate() async {
+    _serverInfoChecked = true;
+    try {
+      final response = await http.serverInfo();
+      final dynamic data = response.data;
+      if (data is! Map) {
+        return false;
+      }
+
+      final Map map = data;
+      final String? socketUrl = _stringFromMap(map, const [
+        'socket_url',
+        'socketUrl',
+        'socket_address',
+        'socketAddress',
+      ]);
+      if (socketUrl != null) {
+        final String? sanitized = sanitizeServerAddress(address: socketUrl);
+        if (sanitized != null && !_socketCandidates.contains(sanitized)) {
+          _socketCandidates.add(sanitized);
+          return true;
+        }
+      }
+
+      final int? port = _intFromMap(map, const ['socket_port', 'socketPort']);
+      if (port != null) {
+        final Uri? baseUri = Uri.tryParse(serverAddress);
+        if (baseUri != null) {
+          String scheme = baseUri.scheme;
+          final String? socketScheme = _stringFromMap(map, const ['socket_scheme', 'socketScheme']);
+          if (socketScheme != null && socketScheme.isNotEmpty) {
+            final String normalized = socketScheme.toLowerCase();
+            if (normalized == 'ws') {
+              scheme = 'http';
+            } else if (normalized == 'wss') {
+              scheme = 'https';
+            } else if (normalized == 'http' || normalized == 'https') {
+              scheme = normalized;
+            }
+          }
+
+          final Uri candidateUri = baseUri.replace(scheme: scheme, port: port);
+          final String candidate = candidateUri.toString();
+          if (!_socketCandidates.contains(candidate)) {
+            _socketCandidates.add(candidate);
+            return true;
+          }
+        }
+      }
+    } catch (e, stack) {
+      Logger.warn('Failed to fetch server socket metadata', error: e, trace: stack);
+    }
+
+    return false;
+  }
+
+  String? _stringFromMap(Map<dynamic, dynamic> map, List<String> keys) {
+    for (final String key in keys) {
+      final dynamic value = map[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
+  int? _intFromMap(Map<dynamic, dynamic> map, List<String> keys) {
+    for (final String key in keys) {
+      final dynamic value = map[key];
+      if (value is int) {
+        return value;
+      }
+      if (value is String) {
+        final int? parsed = int.tryParse(value);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+    }
+    return null;
   }
 }
