@@ -29,7 +29,11 @@ class SocketService extends GetxService {
   Timer? _healthCheckTimer;
   late Socket socket;
   String? _socketOverride;
-  bool _attemptedDowngrade = false;
+  String? _lastBaseServer;
+  List<String> _socketCandidates = <String>[];
+  int _candidateIndex = 0;
+  bool _resolvingCandidate = false;
+  bool _serverInfoChecked = false;
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
@@ -58,6 +62,8 @@ class SocketService extends GetxService {
   }
 
   void startSocket() {
+    _ensureSocketCandidates();
+
     OptionBuilder options = OptionBuilder()
         .setQuery({"guid": password})
         .setTransports(['websocket', 'polling'])
@@ -71,7 +77,7 @@ class SocketService extends GetxService {
         // Disable so that we can create the listeners first
         .disableAutoConnect()
         .enableReconnection();
-    final target = _socketOverride ?? serverAddress;
+    final target = _currentSocketTarget();
     if (isNullOrEmpty(target)) {
       return;
     }
@@ -182,7 +188,16 @@ class SocketService extends GetxService {
         _reconnectTimer = null;
         NetworkTasks.onConnect();
         notif.clearSocketError();
-        _attemptedDowngrade = false;
+        if (_socketCandidates.isNotEmpty) {
+          final String activeTarget = _socketOverride ?? serverAddress;
+          final int index = _socketCandidates.indexOf(activeTarget);
+          _candidateIndex = index >= 0 ? index : 0;
+          _socketOverride = _socketCandidates[_candidateIndex] == serverAddress
+              ? null
+              : _socketCandidates[_candidateIndex];
+        } else {
+          _candidateIndex = 0;
+        }
         return;
       case SocketState.disconnected:
         Logger.info("Disconnected from socket...");
@@ -194,49 +209,17 @@ class SocketService extends GetxService {
         state.value = SocketState.connecting;
         return;
       case SocketState.error:
-        Logger.info("Socket connect error, fetching new URL...");
+        Logger.info("Socket connect error, evaluating fallbacks...");
 
         if (data is SocketException) {
           handleSocketException(data);
         }
 
-        if (_maybeDowngradeSocketScheme()) {
-          return;
-        }
-
-        state.value = SocketState.error;
-        _scheduleReconnect(fetchNewUrl: true);
+        _handleSocketError();
         return;
       default:
         return;
     }
-  }
-
-  bool _maybeDowngradeSocketScheme() {
-    final origin = serverAddress;
-    if (origin.isEmpty || _socketOverride != null) {
-      return false;
-    }
-
-    if (_attemptedDowngrade) {
-      return false;
-    }
-
-    final uri = Uri.tryParse(origin);
-    if (uri == null || uri.scheme.toLowerCase() != 'https') {
-      return false;
-    }
-
-    final downgraded = uri.replace(scheme: 'http');
-    if (downgraded.toString() == origin) {
-      return false;
-    }
-
-    _attemptedDowngrade = true;
-    _socketOverride = downgraded.toString();
-    Logger.warn('HTTPS socket failed, retrying over HTTP/WebSocket fallback at $_socketOverride');
-    restartSocket();
-    return true;
   }
 
   void _scheduleReconnect({bool fetchNewUrl = false}) {
@@ -275,6 +258,227 @@ class SocketService extends GetxService {
 
   void clearOverride() {
     _socketOverride = null;
-    _attemptedDowngrade = false;
+    _lastBaseServer = null;
+    _socketCandidates = <String>[];
+    _candidateIndex = 0;
+    _serverInfoChecked = false;
+  }
+
+  void _handleSocketError() {
+    Future<void>(() async {
+      final applied = await _applyNextCandidate();
+      if (applied) {
+        return;
+      }
+
+      state.value = SocketState.error;
+      _scheduleReconnect(fetchNewUrl: true);
+    });
+  }
+
+  String? _currentSocketTarget() {
+    if (_socketCandidates.isEmpty) {
+      return _socketOverride ?? serverAddress;
+    }
+
+    if (_candidateIndex < 0 || _candidateIndex >= _socketCandidates.length) {
+      _candidateIndex = 0;
+    }
+
+    final String candidate = _socketCandidates[_candidateIndex];
+    if (candidate == serverAddress) {
+      _socketOverride = null;
+      return candidate;
+    }
+
+    _socketOverride = candidate;
+    return candidate;
+  }
+
+  void _ensureSocketCandidates() {
+    final base = serverAddress;
+    if (base.isEmpty) {
+      _socketCandidates = <String>[];
+      _lastBaseServer = null;
+      return;
+    }
+
+    if (_lastBaseServer == base && _socketCandidates.isNotEmpty) {
+      return;
+    }
+
+    final Uri? baseUri = Uri.tryParse(base);
+    if (baseUri == null) {
+      _socketCandidates = <String>[];
+      _lastBaseServer = null;
+      return;
+    }
+
+    _lastBaseServer = base;
+    _candidateIndex = 0;
+    _serverInfoChecked = false;
+    final List<String> candidates = <String>[];
+
+    void addUri(Uri uri) {
+      final candidate = uri.toString();
+      if (candidate.isEmpty) {
+        return;
+      }
+      if (!candidates.contains(candidate)) {
+        candidates.add(candidate);
+      }
+    }
+
+    addUri(baseUri);
+
+    if (!baseUri.hasPort || baseUri.port == 0) {
+      addUri(baseUri.replace(port: 1234));
+    } else if (baseUri.port == 443 && baseUri.scheme == 'https') {
+      addUri(baseUri.replace(port: 1234));
+    } else if (baseUri.port == 80 && baseUri.scheme == 'http') {
+      addUri(baseUri.replace(port: 1234));
+    }
+
+    if (kIsWeb) {
+      if (baseUri.scheme == 'http') {
+        addUri(baseUri.replace(scheme: 'https'));
+        if (!baseUri.hasPort || baseUri.port == 80) {
+          addUri(baseUri.replace(scheme: 'https', port: 1234));
+        }
+      }
+    } else {
+      if (baseUri.scheme == 'https') {
+        addUri(baseUri.replace(scheme: 'http'));
+        if (!baseUri.hasPort || baseUri.port == 443) {
+          addUri(baseUri.replace(scheme: 'http', port: 1234));
+        }
+      } else if (baseUri.scheme == 'http') {
+        addUri(baseUri.replace(scheme: 'https'));
+        if (!baseUri.hasPort || baseUri.port == 80) {
+          addUri(baseUri.replace(scheme: 'https', port: 1234));
+        }
+      }
+    }
+
+    _socketCandidates = candidates;
+  }
+
+  Future<bool> _applyNextCandidate() async {
+    if (_resolvingCandidate) {
+      return false;
+    }
+
+    _resolvingCandidate = true;
+    try {
+      _ensureSocketCandidates();
+      if (_socketCandidates.isEmpty) {
+        return false;
+      }
+
+      final bool hasNext = _candidateIndex + 1 < _socketCandidates.length;
+      if (hasNext) {
+        _candidateIndex += 1;
+        final String next = _socketCandidates[_candidateIndex];
+        _socketOverride = next == serverAddress ? null : next;
+        Logger.warn('Socket connection failed, retrying with alternate target: $next');
+        restartSocket();
+        return true;
+      }
+
+      if (!_serverInfoChecked && await _appendServerInfoCandidate()) {
+        _candidateIndex = _socketCandidates.length - 1;
+        final String next = _socketCandidates[_candidateIndex];
+        _socketOverride = next == serverAddress ? null : next;
+        Logger.warn('Socket connection failed, retrying with server-provided target: $next');
+        restartSocket();
+        return true;
+      }
+
+      return false;
+    } finally {
+      _resolvingCandidate = false;
+    }
+  }
+
+  Future<bool> _appendServerInfoCandidate() async {
+    _serverInfoChecked = true;
+    try {
+      final response = await http.serverInfo();
+      final dynamic data = response.data;
+      if (data is! Map) {
+        return false;
+      }
+
+      final Map map = data;
+      final String? socketUrl = _stringFromMap(map, const [
+        'socket_url',
+        'socketUrl',
+        'socket_address',
+        'socketAddress',
+      ]);
+      if (socketUrl != null) {
+        final String? sanitized = sanitizeServerAddress(address: socketUrl);
+        if (sanitized != null && !_socketCandidates.contains(sanitized)) {
+          _socketCandidates.add(sanitized);
+          return true;
+        }
+      }
+
+      final int? port = _intFromMap(map, const ['socket_port', 'socketPort']);
+      if (port != null) {
+        final Uri? baseUri = Uri.tryParse(serverAddress);
+        if (baseUri != null) {
+          String scheme = baseUri.scheme;
+          final String? socketScheme = _stringFromMap(map, const ['socket_scheme', 'socketScheme']);
+          if (socketScheme != null && socketScheme.isNotEmpty) {
+            final String normalized = socketScheme.toLowerCase();
+            if (normalized == 'ws') {
+              scheme = 'http';
+            } else if (normalized == 'wss') {
+              scheme = 'https';
+            } else if (normalized == 'http' || normalized == 'https') {
+              scheme = normalized;
+            }
+          }
+
+          final Uri candidateUri = baseUri.replace(scheme: scheme, port: port);
+          final String candidate = candidateUri.toString();
+          if (!_socketCandidates.contains(candidate)) {
+            _socketCandidates.add(candidate);
+            return true;
+          }
+        }
+      }
+    } catch (e, stack) {
+      Logger.warn('Failed to fetch server socket metadata', error: e, trace: stack);
+    }
+
+    return false;
+  }
+
+  String? _stringFromMap(Map<dynamic, dynamic> map, List<String> keys) {
+    for (final String key in keys) {
+      final dynamic value = map[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
+  int? _intFromMap(Map<dynamic, dynamic> map, List<String> keys) {
+    for (final String key in keys) {
+      final dynamic value = map[key];
+      if (value is int) {
+        return value;
+      }
+      if (value is String) {
+        final int? parsed = int.tryParse(value);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+    }
+    return null;
   }
 }
