@@ -286,6 +286,228 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     return existingChat;
   }
 
+  Future<bool> _sendToExistingChat(Chat? chat, String? effect) async {
+    if (chat == null) return false;
+
+    Future<void> sendInitialMessage() async {
+      if (fakeController.value == null) {
+        await cm.setActiveChat(chat, clearNotifications: false);
+        cm.activeChat!.controller = cvc(chat);
+        cm.activeChat!.controller!.pickedAttachments.value = [];
+        fakeController.value = cm.activeChat!.controller;
+      } else {
+        fakeController.value!.textController.text = textController.text;
+        fakeController.value!.pickedAttachments.value = widget.initialAttachments;
+        fakeController.value!.subjectTextController.text = subjectController.text;
+      }
+
+      await fakeController.value!.send(
+        widget.initialAttachments,
+        fakeController.value!.textController.text,
+        subjectController.text,
+        fakeController.value!.replyToMessage?.item1.threadOriginatorGuid ??
+            fakeController.value!.replyToMessage?.item1.guid,
+        fakeController.value!.replyToMessage?.item2,
+        effect,
+        false,
+      );
+
+      fakeController.value!.replyToMessage = null;
+      fakeController.value!.pickedAttachments.clear();
+      fakeController.value!.textController.clear();
+      fakeController.value!.subjectTextController.clear();
+      _clearComposer();
+    }
+
+    try {
+      if (widget.popOnSend) {
+        await sendInitialMessage();
+      } else {
+        ns.pushAndRemoveUntil(
+          Get.context!,
+          ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage),
+          (route) => route.isFirst,
+          closeActiveChat: false,
+          customRoute: PageRouteBuilder(
+            pageBuilder: (_, __, ___) =>
+                TitleBarWrapper(child: ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage)),
+            transitionDuration: Duration.zero,
+          ),
+        );
+
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      if (widget.onMessageSent != null) {
+        await widget.onMessageSent!(chat);
+      }
+
+      if (widget.popOnSend && mounted) {
+        final navigator = Navigator.of(context, rootNavigator: true);
+        if (navigator.canPop()) {
+          navigator.pop(true);
+        }
+      }
+
+      return true;
+    } catch (e, stack) {
+      Logger.warn('Failed to send message via existing chat', error: e, trace: stack);
+      return false;
+    }
+  }
+
+  Future<void> _createNewChat(Chat? previousChat, String? _effect) async {
+    if (!(createCompleter?.isCompleted ?? true)) return;
+
+    if (previousChat != null) {
+      chats.removeChat(previousChat);
+      Chat.deleteChat(previousChat);
+    }
+
+    if (selectedContacts.isEmpty) {
+      showSnackbar('Error', 'Please add at least one participant.');
+      return;
+    }
+
+    createCompleter = Completer();
+    final participants = selectedContacts
+        .map((e) => e.address.isEmail ? e.address : cleansePhoneNumber(e.address))
+        .toList();
+    final method = iMessage ? 'iMessage' : 'SMS';
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: context.theme.colorScheme.properSurface,
+            title: Text(
+              'Creating a new $method chat...',
+              style: context.theme.textTheme.titleLarge,
+            ),
+            content: SizedBox(
+              height: 70,
+              child: Center(
+                child: CircularProgressIndicator(
+                  backgroundColor: context.theme.colorScheme.properSurface,
+                  valueColor: AlwaysStoppedAnimation<Color>(context.theme.colorScheme.primary),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    try {
+      final response = await http.createChat(participants, textController.text, method);
+
+      if (mounted) {
+        await Navigator.of(context).maybePop();
+      }
+
+      Chat newChat = Chat.fromMap(response.data['data']);
+      newChat = newChat.save();
+
+      final saved = await cm.fetchChat(newChat.guid);
+      if (saved == null) {
+        showSnackbar('Error', 'Failed to save chat!');
+        if (!(createCompleter?.isCompleted ?? true)) {
+          createCompleter?.completeError('Failed to save chat');
+        }
+        return;
+      }
+
+      newChat = saved;
+      final updated = chats.updateChat(newChat);
+      if (!updated) {
+        await chats.addChat(newChat);
+      }
+
+      final messageRes = await http.chatMessages(newChat.guid, limit: 1);
+      final data = messageRes.data['data'];
+      if (data is List && data.isNotEmpty) {
+        final messages = data.map((e) => Message.fromMap(e as Map<String, dynamic>)).toList();
+        await Chat.bulkSyncMessages(newChat, messages);
+      }
+
+      ms(newChat.guid).close(force: true);
+      cvc(newChat).close();
+
+      createCompleter?.complete();
+
+      if (!widget.popOnSend) {
+        ns.pushAndRemoveUntil(
+          Get.context!,
+          ConversationView(chat: newChat),
+          (route) => route.isFirst,
+          customRoute: PageRouteBuilder(
+            pageBuilder: (_, __, ___) => TitleBarWrapper(
+              child: ConversationView(
+                chat: newChat,
+                fromChatCreator: true,
+              ),
+            ),
+            transitionDuration: Duration.zero,
+          ),
+        );
+      }
+
+      if (widget.onMessageSent != null) {
+        await widget.onMessageSent!(newChat);
+      }
+
+      if (widget.popOnSend && mounted) {
+        final navigator = Navigator.of(context, rootNavigator: true);
+        if (navigator.canPop()) {
+          navigator.pop(true);
+        }
+      }
+
+      _clearComposer();
+    } catch (error, stack) {
+      Logger.warn('Failed to create chat', error: error, trace: stack);
+      if (mounted) {
+        await Navigator.of(context).maybePop();
+        await showDialog(
+          barrierDismissible: false,
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              backgroundColor: context.theme.colorScheme.properSurface,
+              title: Text(
+                'Failed to create chat!',
+                style: context.theme.textTheme.titleLarge,
+              ),
+              content: Text(
+                error is Response
+                    ? 'Reason: (${error.data["error"]["type"]}) -> ${error.data["error"]["message"]}'
+                    : error.toString(),
+                style: context.theme.textTheme.bodyLarge,
+              ),
+              actions: [
+                TextButton(
+                  child: Text(
+                    'OK',
+                    style: context.theme.textTheme.bodyLarge!
+                        .copyWith(color: Get.context!.theme.colorScheme.primary),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
+
+      if (!(createCompleter?.isCompleted ?? true)) {
+        createCompleter?.completeError(error);
+      }
+    }
+  }
+
   void addressOnSubmitted() {
     final text = addressController.text;
     if (text.isEmail || text.isPhoneNumber) {
@@ -744,210 +966,12 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
                           addressOnSubmitted();
                           final chat =
                               fakeController.value?.chat ?? await findExistingChat(checkDeleted: true, update: false);
-                          var sentToExistingChat = false;
-                          if (chat != null) {
-                            Future<void> sendInitialMessage() async {
-                              if (fakeController.value == null) {
-                                await cm.setActiveChat(chat, clearNotifications: false);
-                                cm.activeChat!.controller = cvc(chat);
-                                cm.activeChat!.controller!.pickedAttachments.value = [];
-                                fakeController.value = cm.activeChat!.controller;
-                              } else {
-                                fakeController.value!.textController.text = textController.text;
-                                fakeController.value!.pickedAttachments.value = widget.initialAttachments;
-                                fakeController.value!.subjectTextController.text = subjectController.text;
-                              }
 
-                              await fakeController.value!.send(
-                                widget.initialAttachments,
-                                fakeController.value!.textController.text,
-                                subjectController.text,
-                                fakeController.value!.replyToMessage?.item1.threadOriginatorGuid ??
-                                    fakeController.value!.replyToMessage?.item1.guid,
-                                fakeController.value!.replyToMessage?.item2,
-                                effect,
-                                false,
-                              );
-
-                              fakeController.value!.replyToMessage = null;
-                              fakeController.value!.pickedAttachments.clear();
-                              fakeController.value!.textController.clear();
-                              fakeController.value!.subjectTextController.clear();
-                              _clearComposer();
-                            }
-
-                            try {
-                              if (widget.popOnSend) {
-                                await sendInitialMessage();
-                              } else {
-                                ns.pushAndRemoveUntil(
-                                  Get.context!,
-                                  ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage),
-                                  (route) => route.isFirst,
-                                  // don't force close the active chat in tablet mode
-                                  closeActiveChat: false,
-                                  // only used in non-tablet mode context
-                                  customRoute: PageRouteBuilder(
-                                    pageBuilder: (_, __, ___) =>
-                                        TitleBarWrapper(child: ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage)),
-                                    transitionDuration: Duration.zero,
-                                  ),
-                                );
-
-                                await Future.delayed(const Duration(milliseconds: 500));
-                              }
-
-                              if (widget.onMessageSent != null) {
-                                await widget.onMessageSent!(chat);
-                              }
-
-                              if (widget.popOnSend && mounted) {
-                                final navigator = Navigator.of(context, rootNavigator: true);
-                                if (navigator.canPop()) {
-                                  navigator.pop(true);
-                                }
-                              }
-
-                              sentToExistingChat = true;
-                            } catch (e, stack) {
-                              Logger.warn('Failed to send message via existing chat', error: e, trace: stack);
-                            }
+                          if (await _sendToExistingChat(chat, effect)) {
+                            return;
                           }
 
-                          if (!sentToExistingChat) {
-                            if (!(createCompleter?.isCompleted ?? true)) return;
-                            // hard delete a chat that exists on BB but not on the server to make way for the proper server data
-                            if (chat != null) {
-                              chats.removeChat(chat);
-                              Chat.deleteChat(chat);
-                            }
-                            createCompleter = Completer();
-                            final participants = selectedContacts
-                                .map((e) => e.address.isEmail ? e.address : cleansePhoneNumber(e.address))
-                                .toList();
-                            final method = iMessage ? "iMessage" : "SMS";
-                            showDialog(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return AlertDialog(
-                                    backgroundColor: context.theme.colorScheme.properSurface,
-                                    title: Text(
-                                      "Creating a new $method chat...",
-                                      style: context.theme.textTheme.titleLarge,
-                                    ),
-                                    content: Container(
-                                      height: 70,
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          backgroundColor: context.theme.colorScheme.properSurface,
-                                          valueColor: AlwaysStoppedAnimation<Color>(context.theme.colorScheme.primary),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                });
-                            http.createChat(participants, textController.text, method).then((response) async {
-                              // Load the chat data and save it to the DB
-                              Chat newChat = Chat.fromMap(response.data["data"]);
-                              newChat = newChat.save();
-
-                              // Fetch the newly saved chat data from the DB
-                              // Throw an error if it wasn't saved correctly.
-                              final saved = await cm.fetchChat(newChat.guid);
-                              if (saved == null) {
-                                return showSnackbar("Error", "Failed to save chat!");
-                              }
-
-                              // Update the chat in the chat list.
-                              // If it wasn't existing, add it.
-                              newChat = saved;
-                              bool updated = chats.updateChat(newChat);
-                              if (!updated) {
-                                await chats.addChat(newChat);
-                              }
-
-                              // Fetch the last message for the chat and save it.
-                              final messageRes = await http.chatMessages(newChat.guid, limit: 1);
-                              if (messageRes.data["data"].length > 0) {
-                                final messages =
-                                    (messageRes.data["data"] as List<dynamic>).map((e) => Message.fromMap(e)).toList();
-                                await Chat.bulkSyncMessages(newChat, messages);
-                              }
-
-                              // Force close the message service for the chat so it can be reloaded.
-                              // If this isn't done, new messages will not show.
-                              ms(newChat.guid).close(force: true);
-                              cvc(newChat).close();
-
-                              // Let awaiters know we completed
-                              createCompleter?.complete();
-
-                              // Navigate to the new chat
-                              Navigator.of(context).pop();
-                              if (!widget.popOnSend) {
-                                ns.pushAndRemoveUntil(
-                                  Get.context!,
-                                  ConversationView(chat: newChat),
-                                  (route) => route.isFirst,
-                                  customRoute: PageRouteBuilder(
-                                    pageBuilder: (_, __, ___) => TitleBarWrapper(
-                                      child: ConversationView(
-                                        chat: newChat,
-                                        fromChatCreator: true,
-                                      ),
-                                    ),
-                                    transitionDuration: Duration.zero,
-                                  ),
-                                );
-                              }
-
-                              if (widget.onMessageSent != null) {
-                                await widget.onMessageSent!(newChat);
-                              }
-
-                              if (widget.popOnSend && mounted) {
-                                final navigator = Navigator.of(context, rootNavigator: true);
-                                if (navigator.canPop()) {
-                                  navigator.pop(true);
-                                }
-                              }
-
-                              _clearComposer();
-                            }).catchError((error) {
-                              Navigator.of(context).pop();
-                              showDialog(
-                                  barrierDismissible: false,
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                      backgroundColor: context.theme.colorScheme.properSurface,
-                                      title: Text(
-                                        "Failed to create chat!",
-                                        style: context.theme.textTheme.titleLarge,
-                                      ),
-                                      content: Text(
-                                        error is Response
-                                            ? "Reason: (${error.data["error"]["type"]}) -> ${error.data["error"]["message"]}"
-                                            : error.toString(),
-                                        style: context.theme.textTheme.bodyLarge,
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          child: Text("OK",
-                                              style: context.theme.textTheme.bodyLarge!
-                                                  .copyWith(color: Get.context!.theme.colorScheme.primary)),
-                                          onPressed: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                        )
-                                      ],
-                                    );
-                                  });
-                              if (!createCompleter!.isCompleted) {
-                                createCompleter?.completeError(error);
-                              }
-                            });
-                          }
+                          await _createNewChat(chat, effect);
                         })),
                   ),
                 ),
