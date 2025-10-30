@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 
@@ -17,7 +19,8 @@ class MemberRepository {
     String? county,
     String? congressionalDistrict,
     List<String>? committees,
-    String? schoolName,
+    String? highSchool,
+    String? college,
     String? chapterName,
     String? chapterStatus,
     int? minAge,
@@ -41,8 +44,12 @@ class MemberRepository {
         query = query.overlaps('committee', committees);
       }
 
-      if (schoolName != null && schoolName.isNotEmpty) {
-        query = query.eq('school_name', schoolName);
+      if (highSchool != null && highSchool.isNotEmpty) {
+        query = query.eq('high_school', highSchool);
+      }
+
+      if (college != null && college.isNotEmpty) {
+        query = query.eq('college', college);
       }
 
       if (chapterName != null && chapterName.isNotEmpty) {
@@ -153,8 +160,18 @@ class MemberRepository {
         postProcess: Member.formatDistrictLabel,
       );
 
-  Future<Map<String, int>> getSchoolCounts() => _aggregateTextField(
-        'school_name',
+  Future<Map<String, int>> getHighSchoolCounts() => _aggregateTextField(
+        'high_school',
+        normalize: Member.normalizeText,
+      );
+
+  Future<Map<String, int>> getCollegeCounts() => _aggregateTextField(
+        'college',
+        normalize: Member.normalizeText,
+      );
+
+  Future<Map<String, int>> getSexualOrientationCounts() => _aggregateTextField(
+        'sexual_orientation',
         normalize: Member.normalizeText,
       );
 
@@ -227,6 +244,66 @@ class MemberRepository {
       );
 
   Future<Map<String, int>> getLanguageCounts() => _aggregateDelimitedField('languages');
+
+  Future<Map<String, int>> getAgeBucketCounts() async {
+    if (!_isReady) return {};
+
+    try {
+      final response = await _supabase.client.from('members').select('date_of_birth');
+      final now = DateTime.now();
+      final buckets = LinkedHashMap<String, int>.fromEntries([
+        MapEntry('14-17', 0),
+        MapEntry('18-21', 0),
+        MapEntry('22-25', 0),
+        MapEntry('26-29', 0),
+        MapEntry('30-33', 0),
+        MapEntry('34-36', 0),
+        MapEntry('37+', 0),
+        MapEntry('Unknown', 0),
+      ]);
+
+      for (final item in response as List<dynamic>) {
+        final raw = item['date_of_birth'];
+        int? age;
+        if (raw is String && raw.isNotEmpty) {
+          final parsed = DateTime.tryParse(raw);
+          if (parsed != null) {
+            age = now.year - parsed.year;
+            if (now.month < parsed.month ||
+                (now.month == parsed.month && now.day < parsed.day)) {
+              age--;
+            }
+          }
+        }
+
+        final bucket = _bucketForAge(age);
+        buckets[bucket] = (buckets[bucket] ?? 0) + 1;
+      }
+
+      final cleaned = LinkedHashMap<String, int>();
+      for (final entry in buckets.entries) {
+        if (entry.value > 0) {
+          cleaned[entry.key] = entry.value;
+        }
+      }
+
+      return cleaned.isEmpty ? {} : cleaned;
+    } catch (e) {
+      print('❌ Error computing age buckets: $e');
+      return {};
+    }
+  }
+
+  String _bucketForAge(int? age) {
+    if (age == null || age < 0) return 'Unknown';
+    if (age <= 17) return '14-17';
+    if (age <= 21) return '18-21';
+    if (age <= 25) return '22-25';
+    if (age <= 29) return '26-29';
+    if (age <= 33) return '30-33';
+    if (age <= 36) return '34-36';
+    return '37+';
+  }
 
   Future<Map<String, int>> getRegisteredVoterCounts() => _aggregateBooleanField(
         'registered_voter',
@@ -305,17 +382,17 @@ class MemberRepository {
     }
   }
 
-  Future<List<String>> getUniqueSchools() async {
+  Future<List<String>> getUniqueHighSchools() async {
     if (!_isReady) return [];
 
     try {
       final response = await _supabase.client
           .from('members')
-          .select('school_name')
-          .not('school_name', 'is', null);
+          .select('high_school')
+          .not('high_school', 'is', null);
 
       final schools = (response as List<dynamic>)
-          .map((item) => Member.normalizeText(item['school_name']))
+          .map((item) => Member.normalizeText(item['high_school']))
           .whereType<String>()
           .map((value) => value.trim())
           .where((value) => value.isNotEmpty)
@@ -325,7 +402,32 @@ class MemberRepository {
       schools.sort();
       return schools;
     } catch (e) {
-      print('❌ Error fetching schools: $e');
+      print('❌ Error fetching high schools: $e');
+      return [];
+    }
+  }
+
+  Future<List<String>> getUniqueColleges() async {
+    if (!_isReady) return [];
+
+    try {
+      final response = await _supabase.client
+          .from('members')
+          .select('college')
+          .not('college', 'is', null);
+
+      final colleges = (response as List<dynamic>)
+          .map((item) => Member.normalizeText(item['college']))
+          .whereType<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toSet()
+          .toList();
+
+      colleges.sort();
+      return colleges;
+    } catch (e) {
+      print('❌ Error fetching colleges: $e');
       return [];
     }
   }

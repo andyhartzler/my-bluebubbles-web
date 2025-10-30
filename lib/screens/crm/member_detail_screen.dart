@@ -270,6 +270,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               final chapterStatus = _cleanText(_member.currentChapterMember);
               final chapterName = _cleanText(_member.chapterName);
               final graduationYear = _cleanText(_member.graduationYear);
+              final college = _cleanText(_member.college);
+              final highSchool = _cleanText(_member.highSchool);
+              final legacySchool =
+                  (college == null && highSchool == null) ? _cleanText(_member.schoolName) : null;
 
               final sections = <Widget?>[
                 _buildOptionalSection('Contact Information', [
@@ -299,7 +303,9 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                 _buildOptionalSection('Education & Employment', [
                   _infoRowOrNull('Education Level', _member.educationLevel),
                   _infoRowOrNull('In School', _member.inSchool),
-                  _infoRowOrNull('School Name', _member.schoolName),
+                  _infoRowOrNull('College', college),
+                  _infoRowOrNull('High School', highSchool),
+                  _infoRowOrNull('School (Legacy)', legacySchool),
                   _infoRowOrNull('Employed', _member.employed),
                   _infoRowOrNull('Industry', _member.industry),
                   _infoRowOrNull('Leadership Experience', _member.leadershipExperience),

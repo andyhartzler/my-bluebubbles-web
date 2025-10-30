@@ -53,7 +53,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final counties = await _memberRepo.getCountyCounts();
       final districts = await _memberRepo.getDistrictCounts();
       final committees = await _memberRepo.getCommitteeCounts();
-      final schools = await _memberRepo.getSchoolCounts();
+      final highSchools = await _memberRepo.getHighSchoolCounts();
+      final colleges = await _memberRepo.getCollegeCounts();
       final chapters = await _memberRepo.getChapterCounts();
       final chapterStatuses = await _memberRepo.getChapterStatusCounts();
       final graduationYears = await _memberRepo.getGraduationYearCounts();
@@ -65,6 +66,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final industries = await _memberRepo.getIndustryCounts();
       final educationLevels = await _memberRepo.getEducationLevelCounts();
       final registeredVoters = await _memberRepo.getRegisteredVoterCounts();
+      final sexualOrientations = await _memberRepo.getSexualOrientationCounts();
+      final ageBuckets = await _memberRepo.getAgeBucketCounts();
       final recentMembers = await _memberRepo.getRecentMembers(limit: 6);
 
       final chatCount = await _fetchChatCount();
@@ -85,7 +88,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           counties: counties,
           districts: districts,
           committees: committees,
-          schools: schools,
+          highSchools: highSchools,
+          colleges: colleges,
           chapters: chapters,
           chapterStatuses: chapterStatuses,
           graduationYears: graduationYears,
@@ -97,6 +101,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           industries: industries,
           educationLevels: educationLevels,
           registeredVoters: registeredVoters,
+          sexualOrientations: sexualOrientations,
+          ageBuckets: ageBuckets,
           recentMembers: recentMembers,
         );
         _loading = false;
@@ -322,10 +328,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'counties': 'Top Counties',
       'districts': 'Top Districts',
       'committees': 'Committees',
-      'schools': 'Schools',
+      'highSchools': 'High Schools',
+      'colleges': 'Colleges',
       'chapters': 'Chapters',
       'chapterStatuses': 'Chapter Status',
       'graduationYears': 'Graduation Years',
+      'ageBuckets': 'Age Distribution',
+      'sexualOrientations': 'Sexual Orientation',
       'pronouns': 'Pronouns',
       'genders': 'Gender Identity',
       'races': 'Race & Ethnicity',
@@ -340,10 +349,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'counties': data.counties,
       'districts': data.districts,
       'committees': data.committees,
-      'schools': data.schools,
+      'highSchools': data.highSchools,
+      'colleges': data.colleges,
       'chapters': data.chapters,
       'chapterStatuses': data.chapterStatuses,
       'graduationYears': data.graduationYears,
+      'ageBuckets': data.ageBuckets,
+      'sexualOrientations': data.sexualOrientations,
       'pronouns': data.pronouns,
       'genders': data.genders,
       'races': data.races,
@@ -354,9 +366,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'registeredVoters': data.registeredVoters,
     };
 
+    final unsortedMetrics = {'ageBuckets'};
+
     final selectedData = metricValues[_selectedMetric] ?? const {};
-    final entries = selectedData.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    final entries = selectedData.entries
+        .where((element) => element.value > 0)
+        .toList();
+
+    if (!unsortedMetrics.contains(_selectedMetric)) {
+      entries.sort((a, b) => b.value.compareTo(a.value));
+    }
     final topEntries = entries.take(8).toList();
 
     if (topEntries.isEmpty) {
@@ -564,17 +583,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
             accentColor: theme.colorScheme.tertiary,
           ),
           _BreakdownCard(
-            title: 'Chapter Engagement',
-            metricLabel: 'responses',
-            data: data.chapterStatuses,
-            total: data.chapterStatuses.values.sum,
+            title: 'Age Distribution',
+            metricLabel: 'members',
+            data: data.ageBuckets,
+            total: data.ageBuckets.values.sum,
             accentColor: theme.colorScheme.primaryContainer,
           ),
           _BreakdownCard(
-            title: 'Graduation Year',
-            metricLabel: 'members',
-            data: data.graduationYears,
-            total: data.totalMembers,
+            title: 'Sexual Orientation',
+            metricLabel: 'responses',
+            data: data.sexualOrientations,
+            total: data.sexualOrientations.values.sum,
             accentColor: theme.colorScheme.secondaryContainer,
           ),
           _BreakdownCard(
@@ -730,7 +749,8 @@ class _DashboardData {
   final Map<String, int> counties;
   final Map<String, int> districts;
   final Map<String, int> committees;
-  final Map<String, int> schools;
+  final Map<String, int> highSchools;
+  final Map<String, int> colleges;
   final Map<String, int> chapters;
   final Map<String, int> chapterStatuses;
   final Map<String, int> graduationYears;
@@ -742,6 +762,8 @@ class _DashboardData {
   final Map<String, int> industries;
   final Map<String, int> educationLevels;
   final Map<String, int> registeredVoters;
+  final Map<String, int> sexualOrientations;
+  final Map<String, int> ageBuckets;
   final List<Member> recentMembers;
 
   const _DashboardData({
@@ -755,7 +777,8 @@ class _DashboardData {
     required this.counties,
     required this.districts,
     required this.committees,
-    required this.schools,
+    required this.highSchools,
+    required this.colleges,
     required this.chapters,
     required this.chapterStatuses,
     required this.graduationYears,
@@ -767,6 +790,8 @@ class _DashboardData {
     required this.industries,
     required this.educationLevels,
     required this.registeredVoters,
+    required this.sexualOrientations,
+    required this.ageBuckets,
     required this.recentMembers,
   });
 
@@ -781,7 +806,8 @@ class _DashboardData {
         counties = const {},
         districts = const {},
         committees = const {},
-        schools = const {},
+        highSchools = const {},
+        colleges = const {},
         chapters = const {},
         chapterStatuses = const {},
         graduationYears = const {},
@@ -793,6 +819,8 @@ class _DashboardData {
         industries = const {},
         educationLevels = const {},
         registeredVoters = const {},
+        sexualOrientations = const {},
+        ageBuckets = const {},
         recentMembers = const [];
 }
 

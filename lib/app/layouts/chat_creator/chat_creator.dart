@@ -286,6 +286,49 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     return existingChat;
   }
 
+  Future<void> _completeSend(Chat chat, {Future<void> Function()? onConversationInit}) async {
+    _clearComposer();
+
+    if (!widget.popOnSend) {
+      try {
+        ns.pushAndRemoveUntil(
+          Get.context!,
+          ConversationView(chat: chat, fromChatCreator: true, onInit: onConversationInit),
+          (route) => route.isFirst,
+          closeActiveChat: false,
+          customRoute: PageRouteBuilder(
+            pageBuilder: (_, __, ___) =>
+                TitleBarWrapper(child: ConversationView(chat: chat, fromChatCreator: true, onInit: onConversationInit)),
+            transitionDuration: Duration.zero,
+          ),
+        );
+
+        await Future.delayed(const Duration(milliseconds: 500));
+      } catch (e, stack) {
+        Logger.warn('Failed to navigate to conversation view after send', error: e, trace: stack);
+      }
+    }
+
+    if (widget.onMessageSent != null) {
+      try {
+        await widget.onMessageSent!(chat);
+      } catch (e, stack) {
+        Logger.warn('onMessageSent callback failed', error: e, trace: stack);
+      }
+    }
+
+    if (widget.popOnSend && mounted) {
+      try {
+        final navigator = Navigator.of(context, rootNavigator: true);
+        if (navigator.canPop()) {
+          navigator.pop(true);
+        }
+      } catch (e, stack) {
+        Logger.warn('Failed to close chat creator after send', error: e, trace: stack);
+      }
+    }
+  }
+
   Future<bool> _sendToExistingChat(Chat? chat, String? effect) async {
     if (chat == null) return false;
 
@@ -326,45 +369,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       return false;
     }
 
-    if (!widget.popOnSend) {
-      try {
-        ns.pushAndRemoveUntil(
-          Get.context!,
-          ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage),
-          (route) => route.isFirst,
-          closeActiveChat: false,
-          customRoute: PageRouteBuilder(
-            pageBuilder: (_, __, ___) =>
-                TitleBarWrapper(child: ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage)),
-            transitionDuration: Duration.zero,
-          ),
-        );
-
-        await Future.delayed(const Duration(milliseconds: 500));
-      } catch (e, stack) {
-        Logger.warn('Failed to navigate to conversation view after send', error: e, trace: stack);
-      }
-    }
-
-    if (widget.onMessageSent != null) {
-      try {
-        await widget.onMessageSent!(chat);
-      } catch (e, stack) {
-        Logger.warn('onMessageSent callback failed', error: e, trace: stack);
-      }
-    }
-
-    if (widget.popOnSend && mounted) {
-      try {
-        final navigator = Navigator.of(context, rootNavigator: true);
-        if (navigator.canPop()) {
-          navigator.pop(true);
-        }
-      } catch (e, stack) {
-        Logger.warn('Failed to close chat creator after send', error: e, trace: stack);
-      }
-    }
-
+    await _completeSend(chat, onConversationInit: sendInitialMessage);
     return true;
   }
 
@@ -448,39 +453,42 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
 
       createCompleter?.complete();
 
-      if (!widget.popOnSend) {
-        ns.pushAndRemoveUntil(
-          Get.context!,
-          ConversationView(chat: newChat),
-          (route) => route.isFirst,
-          customRoute: PageRouteBuilder(
-            pageBuilder: (_, __, ___) => TitleBarWrapper(
-              child: ConversationView(
-                chat: newChat,
-                fromChatCreator: true,
-              ),
-            ),
-            transitionDuration: Duration.zero,
-          ),
-        );
-      }
-
-      if (widget.onMessageSent != null) {
-        await widget.onMessageSent!(newChat);
-      }
-
-      if (widget.popOnSend && mounted) {
-        final navigator = Navigator.of(context, rootNavigator: true);
-        if (navigator.canPop()) {
-          navigator.pop(true);
-        }
-      }
-
-      _clearComposer();
+      await _completeSend(newChat);
     } catch (error, stack) {
       Logger.warn('Failed to create chat', error: error, trace: stack);
+
       if (mounted) {
         await Navigator.of(context).maybePop();
+      }
+
+      Chat? recovered = await _recoverChatAfterCreateFailure();
+      if (recovered == null) {
+        await Future.delayed(const Duration(milliseconds: 750));
+        recovered = await _recoverChatAfterCreateFailure();
+      }
+      if (recovered != null) {
+        createCompleter?.complete();
+        await _completeSend(recovered);
+        return;
+      }
+
+      if (widget.popOnSend && _isIgnorableCreateChatError(error)) {
+        createCompleter?.complete();
+        _clearComposer();
+        if (mounted) {
+          try {
+            final navigator = Navigator.of(context, rootNavigator: true);
+            if (navigator.canPop()) {
+              navigator.pop(true);
+            }
+          } catch (e, trace) {
+            Logger.warn('Failed to close composer after ignored chat create error', error: e, trace: trace);
+          }
+        }
+        return;
+      }
+
+      if (mounted) {
         await showDialog(
           barrierDismissible: false,
           context: context,
@@ -518,6 +526,109 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         createCompleter?.completeError(error);
       }
     }
+  }
+
+  Future<Chat?> _recoverChatAfterCreateFailure() async {
+    final normalizedHandles = selectedContacts
+        .map((c) => _normalizeAddressForMatching(c.address))
+        .whereType<String>()
+        .toSet();
+
+    if (normalizedHandles.isEmpty) {
+      return null;
+    }
+
+    try {
+      final existing = await findExistingChat(checkDeleted: true, update: false);
+      if (existing != null) {
+        return existing;
+      }
+    } catch (e, stack) {
+      Logger.warn('Failed to reuse existing chat after creation error', error: e, trace: stack);
+    }
+
+    try {
+      final response = await http.chats(withQuery: const ['participants'], limit: 100);
+      final body = response.data;
+      final data = body is Map<String, dynamic> ? body['data'] : body;
+
+      if (data is List) {
+        for (final entry in data) {
+          if (entry is! Map<String, dynamic>) continue;
+
+          final participantSet = _extractParticipantSet(entry['participants']);
+          if (participantSet == null) continue;
+
+          if (participantSet.length == normalizedHandles.length &&
+              participantSet.containsAll(normalizedHandles)) {
+            try {
+              var chat = Chat.fromMap(entry);
+              chat = chat.save();
+              try {
+                await chats.addChat(chat);
+              } catch (_) {}
+              return chat;
+            } catch (e, stack) {
+              Logger.warn('Failed to hydrate recovered chat', error: e, trace: stack);
+            }
+          }
+        }
+      }
+    } catch (e, stack) {
+      Logger.warn('Failed to query chats after creation error', error: e, trace: stack);
+    }
+
+    return null;
+  }
+
+  bool _isIgnorableCreateChatError(dynamic error) {
+    if (error is! Response) return false;
+
+    final data = error.data;
+    String? message;
+
+    if (data is Map<String, dynamic>) {
+      final inner = data['error'];
+      if (inner is Map<String, dynamic>) {
+        message = inner['message'] as String?;
+      } else if (inner is String) {
+        message = inner;
+      }
+    } else if (data is String) {
+      message = data;
+    }
+
+    message ??= error.statusMessage;
+    if (message == null) return false;
+
+    return message.contains('Null check operator used on a null value');
+  }
+
+  Set<String>? _extractParticipantSet(dynamic participants) {
+    if (participants is! List) return null;
+
+    final values = <String>{};
+    for (final participant in participants) {
+      if (participant is! Map<String, dynamic>) continue;
+      final address = participant['address'] as String?;
+      if (address == null) continue;
+      final normalized = _normalizeAddressForMatching(address);
+      if (normalized != null) {
+        values.add(normalized);
+      }
+    }
+
+    return values.isEmpty ? null : values;
+  }
+
+  String? _normalizeAddressForMatching(String address) {
+    final trimmed = address.trim();
+    if (trimmed.isEmpty) return null;
+
+    final formatted = trimmed.contains('@') ? trimmed.toLowerCase() : cleansePhoneNumber(trimmed);
+    if (formatted.isEmpty) return null;
+
+    return slugify(formatted, delimiter: '');
   }
 
   void addressOnSubmitted() {

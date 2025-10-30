@@ -4,7 +4,8 @@ class MessageFilter {
   final String? county;
   final String? congressionalDistrict;
   final List<String>? committees;
-  final String? schoolName;
+  final String? highSchool;
+  final String? college;
   final String? chapterName;
   final String? chapterStatus;
   final int? minAge;
@@ -17,7 +18,8 @@ class MessageFilter {
     this.county,
     this.congressionalDistrict,
     this.committees,
-    this.schoolName,
+    this.highSchool,
+    this.college,
     this.chapterName,
     this.chapterStatus,
     this.minAge,
@@ -32,7 +34,8 @@ class MessageFilter {
       county != null ||
       congressionalDistrict != null ||
       (committees != null && committees!.isNotEmpty) ||
-      schoolName != null ||
+      highSchool != null ||
+      college != null ||
       chapterName != null ||
       chapterStatus != null ||
       minAge != null ||
@@ -47,7 +50,8 @@ class MessageFilter {
     if (committees != null && committees!.isNotEmpty) {
       parts.add('Committees: ${committees!.join(", ")}');
     }
-    if (schoolName != null) parts.add('School: $schoolName');
+    if (highSchool != null) parts.add('High School: $highSchool');
+    if (college != null) parts.add('College: $college');
     if (chapterName != null) parts.add('Chapter: $chapterName');
     if (chapterStatus != null) parts.add('Chapter Status: $chapterStatus');
     if (minAge != null || maxAge != null) {
@@ -72,7 +76,8 @@ class MessageFilter {
     String? county,
     String? congressionalDistrict,
     List<String>? committees,
-    String? schoolName,
+    String? highSchool,
+    String? college,
     String? chapterName,
     String? chapterStatus,
     int? minAge,
@@ -85,7 +90,8 @@ class MessageFilter {
       county: county ?? this.county,
       congressionalDistrict: congressionalDistrict ?? this.congressionalDistrict,
       committees: committees ?? this.committees,
-      schoolName: schoolName ?? this.schoolName,
+      highSchool: highSchool ?? this.highSchool,
+      college: college ?? this.college,
       chapterName: chapterName ?? this.chapterName,
       chapterStatus: chapterStatus ?? this.chapterStatus,
       minAge: minAge ?? this.minAge,
@@ -103,8 +109,10 @@ class MessageFilter {
     bool clearCongressionalDistrict = false,
     List<String>? committees,
     bool clearCommittees = false,
-    String? schoolName,
-    bool clearSchoolName = false,
+    String? highSchool,
+    bool clearHighSchool = false,
+    String? college,
+    bool clearCollege = false,
     String? chapterName,
     bool clearChapterName = false,
     String? chapterStatus,
@@ -122,7 +130,8 @@ class MessageFilter {
       congressionalDistrict:
           clearCongressionalDistrict ? null : (congressionalDistrict ?? this.congressionalDistrict),
       committees: clearCommittees ? null : (committees ?? this.committees),
-      schoolName: clearSchoolName ? null : (schoolName ?? this.schoolName),
+      highSchool: clearHighSchool ? null : (highSchool ?? this.highSchool),
+      college: clearCollege ? null : (college ?? this.college),
       chapterName: clearChapterName ? null : (chapterName ?? this.chapterName),
       chapterStatus: clearChapterStatus ? null : (chapterStatus ?? this.chapterStatus),
       minAge: clearMinAge ? null : (minAge ?? this.minAge),

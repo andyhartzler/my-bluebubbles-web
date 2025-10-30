@@ -23,6 +23,8 @@ class Member {
   final bool? registeredVoter;
   final String? inSchool;
   final String? schoolName;
+  final String? highSchool;
+  final String? college;
   final String? employed;
   final String? industry;
   final bool? hispanicLatino;
@@ -79,6 +81,8 @@ class Member {
     this.registeredVoter,
     this.inSchool,
     this.schoolName,
+    this.highSchool,
+    this.college,
     this.employed,
     this.industry,
     this.hispanicLatino,
@@ -308,6 +312,8 @@ class Member {
       registeredVoter: json['registered_voter'] as bool?,
       inSchool: _normalizeText(json['in_school']),
       schoolName: _normalizeText(json['school_name']),
+      highSchool: _normalizeText(json['high_school']),
+      college: _normalizeText(json['college']),
       employed: _normalizeText(json['employed']),
       industry: _normalizeText(json['industry']),
       hispanicLatino: json['hispanic_latino'] as bool?,
@@ -378,6 +384,8 @@ class Member {
       'registered_voter': registeredVoter,
       'in_school': inSchool,
       'school_name': schoolName,
+      'high_school': highSchool,
+      'college': college,
       'employed': employed,
       'industry': industry,
       'hispanic_latino': hispanicLatino,
@@ -433,6 +441,9 @@ class Member {
   /// Helper: Format committees as string
   String get committeesString => committee?.join(', ') ?? 'None';
 
+  /// Preferred school/education label prioritizing dedicated columns.
+  String? get primarySchool => college ?? highSchool ?? schoolName;
+
   /// Copy with method for updates
   Member copyWith({
     String? id,
@@ -455,6 +466,8 @@ class Member {
     bool? registeredVoter,
     String? inSchool,
     String? schoolName,
+    String? highSchool,
+    String? college,
     String? employed,
     String? industry,
     bool? hispanicLatino,
@@ -511,6 +524,8 @@ class Member {
       registeredVoter: registeredVoter ?? this.registeredVoter,
       inSchool: inSchool ?? this.inSchool,
       schoolName: schoolName ?? this.schoolName,
+      highSchool: highSchool ?? this.highSchool,
+      college: college ?? this.college,
       employed: employed ?? this.employed,
       industry: industry ?? this.industry,
       hispanicLatino: hispanicLatino ?? this.hispanicLatino,

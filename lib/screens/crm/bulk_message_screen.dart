@@ -17,7 +17,8 @@ enum _RecipientMode {
   manual,
   county,
   district,
-  school,
+  highSchool,
+  college,
   committee,
   chapter,
   chapterStatus,
@@ -59,7 +60,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   List<String> _counties = [];
   List<String> _districts = [];
   List<String> _committees = [];
-  List<String> _schools = [];
+  List<String> _highSchools = [];
+  List<String> _colleges = [];
   List<String> _chapters = [];
   List<String> _chapterStatuses = [];
 
@@ -88,7 +90,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       _memberRepo.getUniqueCounties(),
       _memberRepo.getUniqueCongressionalDistricts(),
       _memberRepo.getUniqueCommittees(),
-      _memberRepo.getUniqueSchools(),
+      _memberRepo.getUniqueHighSchools(),
+      _memberRepo.getUniqueColleges(),
       _memberRepo.getUniqueChapterNames(),
       _memberRepo.getChapterStatusCounts(),
     ]);
@@ -99,9 +102,10 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       _counties = List<String>.from(results[0] as List);
       _districts = List<String>.from(results[1] as List);
       _committees = List<String>.from(results[2] as List);
-      _schools = List<String>.from(results[3] as List);
-      _chapters = List<String>.from(results[4] as List);
-      _chapterStatuses = (results[5] as Map<String, int>).keys.toList()..sort();
+      _highSchools = List<String>.from(results[3] as List);
+      _colleges = List<String>.from(results[4] as List);
+      _chapters = List<String>.from(results[5] as List);
+      _chapterStatuses = (results[6] as Map<String, int>).keys.toList()..sort();
     });
   }
 
@@ -233,7 +237,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
           _filter = _filter.copyWithOverrides(
             clearCounty: true,
             clearCongressionalDistrict: true,
-            clearSchoolName: true,
+            clearHighSchool: true,
+            clearCollege: true,
             clearChapterName: true,
             clearChapterStatus: true,
             clearCommittees: true,
@@ -242,7 +247,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
         case _RecipientMode.county:
           _filter = _filter.copyWithOverrides(
             clearCongressionalDistrict: true,
-            clearSchoolName: true,
+            clearHighSchool: true,
+            clearCollege: true,
             clearChapterName: true,
             clearChapterStatus: true,
             clearCommittees: true,
@@ -251,16 +257,28 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
         case _RecipientMode.district:
           _filter = _filter.copyWithOverrides(
             clearCounty: true,
-            clearSchoolName: true,
+            clearHighSchool: true,
+            clearCollege: true,
             clearChapterName: true,
             clearChapterStatus: true,
             clearCommittees: true,
           );
           break;
-        case _RecipientMode.school:
+        case _RecipientMode.highSchool:
           _filter = _filter.copyWithOverrides(
             clearCounty: true,
             clearCongressionalDistrict: true,
+            clearCollege: true,
+            clearChapterName: true,
+            clearChapterStatus: true,
+            clearCommittees: true,
+          );
+          break;
+        case _RecipientMode.college:
+          _filter = _filter.copyWithOverrides(
+            clearCounty: true,
+            clearCongressionalDistrict: true,
+            clearHighSchool: true,
             clearChapterName: true,
             clearChapterStatus: true,
             clearCommittees: true,
@@ -270,7 +288,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
           _filter = _filter.copyWithOverrides(
             clearCounty: true,
             clearCongressionalDistrict: true,
-            clearSchoolName: true,
+            clearHighSchool: true,
+            clearCollege: true,
             clearChapterName: true,
             clearChapterStatus: true,
           );
@@ -279,7 +298,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
           _filter = _filter.copyWithOverrides(
             clearCounty: true,
             clearCongressionalDistrict: true,
-            clearSchoolName: true,
+            clearHighSchool: true,
+            clearCollege: true,
             clearChapterStatus: true,
             clearCommittees: true,
           );
@@ -288,7 +308,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
           _filter = _filter.copyWithOverrides(
             clearCounty: true,
             clearCongressionalDistrict: true,
-            clearSchoolName: true,
+            clearHighSchool: true,
+            clearCollege: true,
             clearChapterName: true,
             clearCommittees: true,
           );
@@ -601,7 +622,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                 _buildModeChip(_RecipientMode.manual, 'Manual', Icons.person_add_alt_1),
                 _buildModeChip(_RecipientMode.county, 'County', Icons.map_outlined),
                 _buildModeChip(_RecipientMode.district, 'District', Icons.apartment_outlined),
-                _buildModeChip(_RecipientMode.school, 'School', Icons.school_outlined),
+                _buildModeChip(_RecipientMode.highSchool, 'High Schools', Icons.school_outlined),
+                _buildModeChip(_RecipientMode.college, 'Colleges', Icons.school),
                 _buildModeChip(_RecipientMode.committee, 'Committee', Icons.groups_2_outlined),
                 _buildModeChip(_RecipientMode.chapter, 'Chapter', Icons.flag_outlined),
                 _buildModeChip(_RecipientMode.chapterStatus, 'Chapter Status', Icons.badge_outlined),
@@ -636,8 +658,10 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
         return _buildCountyDropdown();
       case _RecipientMode.district:
         return _buildDistrictDropdown();
-      case _RecipientMode.school:
-        return _buildSchoolDropdown();
+      case _RecipientMode.highSchool:
+        return _buildHighSchoolDropdown();
+      case _RecipientMode.college:
+        return _buildCollegeDropdown();
       case _RecipientMode.committee:
         return _buildCommitteesSelector();
       case _RecipientMode.chapter:
@@ -915,27 +939,57 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
     );
   }
 
-  Widget _buildSchoolDropdown() {
+  Widget _buildHighSchoolDropdown() {
     final items = <DropdownMenuItem<String?>>[
-      const DropdownMenuItem<String?>(value: null, child: Text('All Schools')),
-      ..._schools.map(
+      const DropdownMenuItem<String?>(value: null, child: Text('All High Schools')),
+      ..._highSchools.map(
         (s) => DropdownMenuItem<String?>(value: s, child: Text(s)),
       ),
     ];
 
     return DropdownButtonFormField<String?>(
-      value: _filter.schoolName,
+      value: _filter.highSchool,
       decoration: const InputDecoration(
-        labelText: 'School',
+        labelText: 'High School',
         border: OutlineInputBorder(),
       ),
       items: items,
       onChanged: (value) {
         setState(() {
-          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.school, notify: false);
+          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.highSchool, notify: false);
           _filter = _filter.copyWithOverrides(
-            schoolName: value,
-            clearSchoolName: value == null,
+            highSchool: value,
+            clearHighSchool: value == null,
+            clearCollege: true,
+          );
+        });
+        _updatePreview();
+      },
+    );
+  }
+
+  Widget _buildCollegeDropdown() {
+    final items = <DropdownMenuItem<String?>>[
+      const DropdownMenuItem<String?>(value: null, child: Text('All Colleges')),
+      ..._colleges.map(
+        (s) => DropdownMenuItem<String?>(value: s, child: Text(s)),
+      ),
+    ];
+
+    return DropdownButtonFormField<String?>(
+      value: _filter.college,
+      decoration: const InputDecoration(
+        labelText: 'College',
+        border: OutlineInputBorder(),
+      ),
+      items: items,
+      onChanged: (value) {
+        setState(() {
+          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.college, notify: false);
+          _filter = _filter.copyWithOverrides(
+            college: value,
+            clearCollege: value == null,
+            clearHighSchool: true,
           );
         });
         _updatePreview();
