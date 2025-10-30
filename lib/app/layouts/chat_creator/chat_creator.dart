@@ -320,9 +320,14 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     }
 
     try {
-      if (widget.popOnSend) {
-        await sendInitialMessage();
-      } else {
+      await sendInitialMessage();
+    } catch (e, stack) {
+      Logger.warn('Failed to send message via existing chat', error: e, trace: stack);
+      return false;
+    }
+
+    if (!widget.popOnSend) {
+      try {
         ns.pushAndRemoveUntil(
           Get.context!,
           ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage),
@@ -336,24 +341,31 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         );
 
         await Future.delayed(const Duration(milliseconds: 500));
+      } catch (e, stack) {
+        Logger.warn('Failed to navigate to conversation view after send', error: e, trace: stack);
       }
+    }
 
-      if (widget.onMessageSent != null) {
+    if (widget.onMessageSent != null) {
+      try {
         await widget.onMessageSent!(chat);
+      } catch (e, stack) {
+        Logger.warn('onMessageSent callback failed', error: e, trace: stack);
       }
+    }
 
-      if (widget.popOnSend && mounted) {
+    if (widget.popOnSend && mounted) {
+      try {
         final navigator = Navigator.of(context, rootNavigator: true);
         if (navigator.canPop()) {
           navigator.pop(true);
         }
+      } catch (e, stack) {
+        Logger.warn('Failed to close chat creator after send', error: e, trace: stack);
       }
-
-      return true;
-    } catch (e, stack) {
-      Logger.warn('Failed to send message via existing chat', error: e, trace: stack);
-      return false;
     }
+
+    return true;
   }
 
   Future<void> _createNewChat(Chat? previousChat, String? _effect) async {
