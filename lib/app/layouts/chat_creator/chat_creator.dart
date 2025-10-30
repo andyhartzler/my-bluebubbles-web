@@ -12,6 +12,7 @@ import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
@@ -743,16 +744,9 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
                           addressOnSubmitted();
                           final chat =
                               fakeController.value?.chat ?? await findExistingChat(checkDeleted: true, update: false);
-                          bool existsOnServer = false;
+                          var sentToExistingChat = false;
                           if (chat != null) {
-                            // if we don't error, then the chat exists
-                            try {
-                              await http.singleChat(chat.guid);
-                              existsOnServer = true;
-                            } catch (_) {}
-                          }
-                          if (chat != null && existsOnServer) {
-                            sendInitialMessage() async {
+                            Future<void> sendInitialMessage() async {
                               if (fakeController.value == null) {
                                 await cm.setActiveChat(chat, clearNotifications: false);
                                 cm.activeChat!.controller = cvc(chat);
@@ -782,38 +776,45 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
                               _clearComposer();
                             }
 
-                            if (widget.popOnSend) {
-                              await sendInitialMessage();
-                            } else {
-                              ns.pushAndRemoveUntil(
-                                Get.context!,
-                                ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage),
-                                (route) => route.isFirst,
-                                // don't force close the active chat in tablet mode
-                                closeActiveChat: false,
-                                // only used in non-tablet mode context
-                                customRoute: PageRouteBuilder(
-                                  pageBuilder: (_, __, ___) =>
-                                      TitleBarWrapper(child: ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage)),
-                                  transitionDuration: Duration.zero,
-                                ),
-                              );
+                            try {
+                              if (widget.popOnSend) {
+                                await sendInitialMessage();
+                              } else {
+                                ns.pushAndRemoveUntil(
+                                  Get.context!,
+                                  ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage),
+                                  (route) => route.isFirst,
+                                  // don't force close the active chat in tablet mode
+                                  closeActiveChat: false,
+                                  // only used in non-tablet mode context
+                                  customRoute: PageRouteBuilder(
+                                    pageBuilder: (_, __, ___) =>
+                                        TitleBarWrapper(child: ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage)),
+                                    transitionDuration: Duration.zero,
+                                  ),
+                                );
 
-                              await Future.delayed(const Duration(milliseconds: 500));
-                            }
-
-                            if (widget.onMessageSent != null) {
-                              await widget.onMessageSent!(chat);
-                            }
-
-                            if (widget.popOnSend && mounted) {
-                              final navigator = Navigator.of(context, rootNavigator: true);
-                              if (navigator.canPop()) {
-                                navigator.pop(true);
+                                await Future.delayed(const Duration(milliseconds: 500));
                               }
-                            }
 
-                          } else {
+                              if (widget.onMessageSent != null) {
+                                await widget.onMessageSent!(chat);
+                              }
+
+                              if (widget.popOnSend && mounted) {
+                                final navigator = Navigator.of(context, rootNavigator: true);
+                                if (navigator.canPop()) {
+                                  navigator.pop(true);
+                                }
+                              }
+
+                              sentToExistingChat = true;
+                            } catch (e, stack) {
+                              Logger.warn('Failed to send message via existing chat', error: e, trace: stack);
+                            }
+                          }
+
+                          if (!sentToExistingChat) {
                             if (!(createCompleter?.isCompleted ?? true)) return;
                             // hard delete a chat that exists on BB but not on the server to make way for the proper server data
                             if (chat != null) {
