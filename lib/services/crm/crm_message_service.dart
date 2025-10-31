@@ -348,8 +348,10 @@ class CRMMessageService {
       _serviceCache[address] = service;
       return service;
     } catch (_) {
-      _serviceCache[address] = 'iMessage';
-      return 'iMessage';
+      // Default to SMS when availability cannot be determined for phone numbers
+      final fallback = address.contains('@') ? 'iMessage' : 'SMS';
+      _serviceCache[address] = fallback;
+      return fallback;
     }
   }
 

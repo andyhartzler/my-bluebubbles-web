@@ -176,7 +176,16 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     try {
       final response = await http.handleiMessageState(c.address);
       c.iMessage.value = response.data["data"]["available"];
-    } catch (_) {}
+    } catch (_) {
+      // If we cannot determine availability, prefer SMS for phone numbers
+      if (!c.address.contains('@')) {
+        c.iMessage.value ??= false;
+      }
+    } finally {
+      if (c.iMessage.value == null && !c.address.contains('@')) {
+        c.iMessage.value = false;
+      }
+    }
     addressController.text = "";
     findExistingChat();
   }
@@ -199,19 +208,27 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       fakeController.value = null;
       return null;
     }
-    if (selectedContacts.firstWhereOrNull((element) => element.iMessage.value == false) != null) {
-      setState(() {
+    final prefersSms = selectedContacts.firstWhereOrNull((element) {
+          final value = element.iMessage.value;
+          if (value == false) return true;
+          if (value == null && !element.address.contains('@')) {
+            return true;
+          }
+          return false;
+        }) !=
+        null;
+
+    setState(() {
+      if (prefersSms) {
         iMessage = false;
         sms = true;
         filteredChats = List<Chat>.from(existingChats.where((e) => !e.isIMessage));
-      });
-    } else {
-      setState(() {
+      } else {
         iMessage = true;
         sms = false;
         filteredChats = List<Chat>.from(existingChats.where((e) => e.isIMessage));
-      });
-    }
+      }
+    });
     Chat? existingChat;
     // try and find the chat simply by identifier
     if (selectedContacts.length == 1) {

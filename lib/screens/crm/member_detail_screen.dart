@@ -129,7 +129,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
     try {
       final normalized = address.contains('@') ? address : cleansePhoneNumber(address);
-      final isIMessage = await _lookupServiceAvailability(normalized);
+      final lookup = await _lookupServiceAvailability(normalized);
+      final isIMessage = lookup ?? normalized.contains('@');
       final result = await Navigator.of(context, rootNavigator: true).push(ThemeSwitcher.buildPageRoute(
         builder: (context) => TitleBarWrapper(
           child: ChatCreator(
