@@ -22,6 +22,7 @@ import 'package:chunked_stream/chunked_stream.dart';
 import 'package:collection/collection.dart';
 import 'package:emojis/emoji.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart' hide Emoji;
+import 'package:emoji_picker_flutter/src/emoji_set.dart';
 import 'package:file_picker/file_picker.dart' as pf;
 import 'package:file_picker/file_picker.dart' hide PlatformFile;
 import 'package:flutter/cupertino.dart';
