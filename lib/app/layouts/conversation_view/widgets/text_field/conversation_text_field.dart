@@ -21,8 +21,9 @@ import 'package:bluebubbles/utils/share.dart';
 import 'package:chunked_stream/chunked_stream.dart';
 import 'package:collection/collection.dart';
 import 'package:emojis/emoji.dart';
-import 'package:emoji_picker_flutter/emoji_picker_flutter.dart' hide Emoji;
-import 'package:emoji_picker_flutter/src/emoji_set.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart'
+    as emoji_picker
+    hide Emoji;
 import 'package:file_picker/file_picker.dart' as pf;
 import 'package:file_picker/file_picker.dart' hide PlatformFile;
 import 'package:flutter/cupertino.dart';
@@ -746,18 +747,18 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
 
     return Theme(
       data: theme.copyWith(canvasColor: Colors.transparent),
-      child: EmojiPicker(
+      child: emoji_picker.EmojiPicker(
         textEditingController: proxyController,
         scrollController: ScrollController(),
-        config: Config(
+        config: emoji_picker.Config(
           height: emojiPickerHeight,
           checkPlatformCompatibility: true,
-          viewOrderConfig: const ViewOrderConfig(
-            top: EmojiPickerItem.searchBar,
-            middle: EmojiPickerItem.emojiView,
-            bottom: EmojiPickerItem.categoryBar,
+          viewOrderConfig: const emoji_picker.ViewOrderConfig(
+            top: emoji_picker.EmojiPickerItem.searchBar,
+            middle: emoji_picker.EmojiPickerItem.emojiView,
+            bottom: emoji_picker.EmojiPickerItem.categoryBar,
           ),
-          emojiViewConfig: EmojiViewConfig(
+          emojiViewConfig: emoji_picker.EmojiViewConfig(
             emojiSizeMax: 28,
             backgroundColor: Colors.transparent,
             columns: emojiColumns,
@@ -766,13 +767,13 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
               style: theme.textTheme.headlineMedium?.copyWith(color: outlineColor),
             ),
           ),
-          skinToneConfig: const SkinToneConfig(enabled: false),
-          categoryViewConfig: const CategoryViewConfig(
+          skinToneConfig: const emoji_picker.SkinToneConfig(enabled: false),
+          categoryViewConfig: const emoji_picker.CategoryViewConfig(
             backgroundColor: Colors.transparent,
             dividerColor: Colors.transparent,
           ),
-          bottomActionBarConfig: BottomActionBarConfig(
-            customBottomActionBar: (Config config, EmojiViewState state, VoidCallback showSearchView) {
+          bottomActionBarConfig: emoji_picker.BottomActionBarConfig(
+            customBottomActionBar: (emoji_picker.Config config, emoji_picker.EmojiViewState state, VoidCallback showSearchView) {
               return Container(
                 margin: const EdgeInsets.only(top: 10),
                 child: Row(
