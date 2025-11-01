@@ -731,96 +731,102 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
               curve: Curves.easeIn,
               alignment: Alignment.bottomCenter,
               child: Obx(() {
-                return showEmojiPicker.value
-                    ? Theme(
-                        data: context.theme.copyWith(canvasColor: Colors.transparent),
-                        child: EmojiPicker(
-                          textEditingController: proxyController,
-                          scrollController: ScrollController(),
-                          config: Config(
-                            height: emojiPickerHeight,
-                            checkPlatformCompatibility: true,
-                            viewOrderConfig: const ViewOrderConfig(
-                              top: EmojiPickerItem.searchBar,
-                              middle: EmojiPickerItem.emojiView,
-                              bottom: EmojiPickerItem.categoryBar,
-                            ),
-                            emojiViewConfig: EmojiViewConfig(
-                              emojiSet: defaultEmojiSetApple,
-                              emojiSizeMax: 28,
-                              backgroundColor: Colors.transparent,
-                              columns: emojiColumns,
-                              emojiSet: EmojiSet.apple,
-                              noRecents: Text("No Recents", style: context.textTheme.headlineMedium!.copyWith(color: context.theme.colorScheme.outline))
-                            ),
-                            skinToneConfig: const SkinToneConfig(enabled: false),
-                            categoryViewConfig: const CategoryViewConfig(
-                              backgroundColor: Colors.transparent,
-                              dividerColor: Colors.transparent,
-                            ),
-                            bottomActionBarConfig: BottomActionBarConfig(
-                              customBottomActionBar: (Config config, EmojiViewState state, VoidCallback showSearchView) {
-                                return Container(
-                                  margin: const EdgeInsets.only(top: 10),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Material(
-                                          child: InkWell(
-                                            onTap: showSearchView,
-                                            child: Padding(
-                                              padding: const EdgeInsets.all(12),
-                                              child: Row(children: [
-                                                Icon(
-                                                  iOS ? CupertinoIcons.search : Icons.search,
-                                                  color: context.theme.colorScheme.outline,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    "Search...",
-                                                    style: context.theme.textTheme.bodyLarge!.copyWith(
-                                                      color: context.theme.colorScheme.outline,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ]),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.all(12),
-                                        child: IconButton(
-                                          icon: Icon(
-                                            iOS ? CupertinoIcons.xmark : Icons.close,
-                                            color: context.theme.colorScheme.outline,
-                                          ),
-                                          onPressed: () {
-                                            showEmojiPicker.value = false;
-                                            controller.lastFocusedNode.requestFocus();
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                            searchViewConfig: SearchViewConfig(
-                              backgroundColor: Colors.transparent,
-                              buttonIconColor: context.theme.colorScheme.outline,
-                            ),
-                          ),
-                        ),
-                      )
-                    : const SizedBox.shrink();
+                return showEmojiPicker.value ? _buildEmojiPicker(context) : const SizedBox.shrink();
               }),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmojiPicker(BuildContext context) {
+    final theme = context.theme;
+    final outlineColor = theme.colorScheme.outline;
+
+    return Theme(
+      data: theme.copyWith(canvasColor: Colors.transparent),
+      child: EmojiPicker(
+        textEditingController: proxyController,
+        scrollController: ScrollController(),
+        config: Config(
+          height: emojiPickerHeight,
+          checkPlatformCompatibility: true,
+          viewOrderConfig: const ViewOrderConfig(
+            top: EmojiPickerItem.searchBar,
+            middle: EmojiPickerItem.emojiView,
+            bottom: EmojiPickerItem.categoryBar,
+          ),
+          emojiViewConfig: EmojiViewConfig(
+            emojiSizeMax: 28,
+            backgroundColor: Colors.transparent,
+            columns: emojiColumns,
+            noRecents: Text(
+              "No Recents",
+              style: theme.textTheme.headlineMedium?.copyWith(color: outlineColor),
+            ),
+          ),
+          skinToneConfig: const SkinToneConfig(enabled: false),
+          categoryViewConfig: const CategoryViewConfig(
+            backgroundColor: Colors.transparent,
+            dividerColor: Colors.transparent,
+          ),
+          bottomActionBarConfig: BottomActionBarConfig(
+            customBottomActionBar: (Config config, EmojiViewState state, VoidCallback showSearchView) {
+              return Container(
+                margin: const EdgeInsets.only(top: 10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Material(
+                        child: InkWell(
+                          onTap: showSearchView,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  iOS ? CupertinoIcons.search : Icons.search,
+                                  color: outlineColor,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    "Search...",
+                                    style: theme.textTheme.bodyLarge?.copyWith(color: outlineColor),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: IconButton(
+                        icon: Icon(
+                          iOS ? CupertinoIcons.xmark : Icons.close,
+                          color: outlineColor,
+                        ),
+                        onPressed: () {
+                          showEmojiPicker.value = false;
+                          controller.lastFocusedNode.requestFocus();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+              );
+            },
+          ),
+          searchViewConfig: SearchViewConfig(
+            backgroundColor: Colors.transparent,
+            buttonIconColor: outlineColor,
+          ),
         ),
       ),
     );
