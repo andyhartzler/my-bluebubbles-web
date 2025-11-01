@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:bluebubbles/app/components/custom_text_editing_controllers.dart';
 import 'package:bluebubbles/app/layouts/chat_creator/widgets/chat_creator_tile.dart';
@@ -12,17 +13,21 @@ import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:dio/dio.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart' as emoji_picker;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_acrylic/window_effect.dart';
+import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:get/get.dart' hide Response;
 import 'package:slugify/slugify.dart';
 import 'package:tuple/tuple.dart';
+import 'package:universal_io/io.dart';
 
 class SelectedContact {
   final String displayName;
@@ -40,11 +45,17 @@ class ChatCreator extends StatefulWidget {
     this.initialText = "",
     this.initialAttachments = const [],
     this.initialSelected = const [],
+    this.onMessageSent,
+    this.popOnSend = false,
+    this.launchConversationOnSend = true,
   });
 
   final String? initialText;
   final List<PlatformFile> initialAttachments;
   final List<SelectedContact> initialSelected;
+  final Future<void> Function(Chat chat)? onMessageSent;
+  final bool popOnSend;
+  final bool launchConversationOnSend;
 
   @override
   ChatCreatorState createState() => ChatCreatorState();
@@ -71,11 +82,33 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   Timer? _debounce;
   Completer<void>? createCompleter;
 
+  late List<PlatformFile> _composerAttachments;
+  bool _showEmojiPicker = false;
+
   bool canCreateGroupChats = ss.canCreateGroupChatSync();
+
+  void _clearComposer() {
+    final empty = const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
+    textController.value = empty;
+    subjectController.clear();
+    if (fakeController.value != null) {
+      try {
+        fakeController.value!.textController.value = empty;
+        fakeController.value!.pickedAttachments.clear();
+        fakeController.value!.subjectTextController.clear();
+      } catch (_) {}
+    }
+    _composerAttachments.clear();
+    _showEmojiPicker = false;
+    if (!mounted) return;
+    setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
+
+    _composerAttachments = List<PlatformFile>.from(widget.initialAttachments);
 
     addressController.addListener(() {
       _debounce?.cancel();
@@ -126,7 +159,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     });
 
     updateObx(() {
-      if (widget.initialAttachments.isEmpty && !kIsWeb) {
+      if (_composerAttachments.isEmpty && !kIsWeb) {
         final query = (Database.contacts.query()..order(Contact_.displayName)).build();
         contacts = query.find().toSet().toList();
         filteredContacts = List<Contact>.from(contacts);
@@ -144,6 +177,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       }
       setState(() {});
       if (widget.initialSelected.isNotEmpty) {
+        _syncServicePreference(updateFilteredChats: false);
         findExistingChat();
       }
     });
@@ -151,24 +185,196 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     if (widget.initialSelected.isNotEmpty) messageNode.requestFocus();
   }
 
+  bool _selectedPrefersSms() {
+    if (selectedContacts.isEmpty) return false;
+
+    return selectedContacts.any((element) {
+      final value = element.iMessage.value;
+      if (value == false) return true;
+      if (value == null && !element.address.contains('@')) {
+        return true;
+      }
+      return false;
+    });
+  }
+
+  Future<void> _handleAttachmentPick() async {
+    try {
+      final result = await file_picker.FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        withData: kIsWeb,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final additions = <PlatformFile>[];
+
+      for (final entry in result.files) {
+        Uint8List? bytes = entry.bytes;
+        if (bytes == null && !kIsWeb && entry.path != null) {
+          try {
+            bytes = await File(entry.path!).readAsBytes();
+          } catch (_) {}
+        }
+
+        if (bytes == null && (entry.path == null || kIsWeb)) {
+          continue;
+        }
+
+        final size = bytes?.length ?? entry.size;
+        additions.add(PlatformFile(
+          name: entry.name,
+          size: size,
+          path: entry.path,
+          bytes: bytes,
+        ));
+      }
+
+      if (additions.isEmpty) {
+        showSnackbar('Attachment Error', 'Unable to read the selected files.');
+        return;
+      }
+
+      setState(() {
+        _composerAttachments.addAll(additions);
+      });
+    } catch (e) {
+      showSnackbar('Attachment Error', e.toString());
+    }
+  }
+
+  void _toggleEmojiPicker() {
+    setState(() {
+      _showEmojiPicker = !_showEmojiPicker;
+    });
+    messageNode.requestFocus();
+  }
+
+  void _insertEmoji(String emoji) {
+    final controller = fakeController.value?.textController ?? textController;
+    final selection = controller.selection;
+    final text = controller.text;
+    final start = selection.start >= 0 ? selection.start : text.length;
+    final end = selection.end >= 0 ? selection.end : start;
+    final updated = text.replaceRange(start, end, emoji);
+    controller.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+    );
+    messageNode.requestFocus();
+  }
+
+  Widget _buildEmojiPicker(BuildContext context) {
+    final theme = context.theme;
+    final outlineColor = theme.colorScheme.outline;
+    final columns = (ns.width(context) ~/ 56).clamp(4, 12);
+
+    return SizedBox(
+      height: 280,
+      child: emoji_picker.EmojiPicker(
+        onEmojiSelected: (_, emoji) => _insertEmoji(emoji.emoji),
+        onBackspacePressed: () {
+          final controller = fakeController.value?.textController ?? textController;
+          final value = controller.value;
+          final selection = value.selection;
+          if (selection.isCollapsed && selection.start == 0) return;
+          final start = selection.start >= 0 ? selection.start : value.text.length;
+          final end = selection.end >= 0 ? selection.end : start;
+          final replaceStart = start == end ? (start - 1).clamp(0, value.text.length) : start;
+          final updated = value.text.replaceRange(replaceStart, end, '');
+          controller.value = TextEditingValue(
+            text: updated,
+            selection: TextSelection.collapsed(offset: replaceStart),
+          );
+          messageNode.requestFocus();
+        },
+        config: emoji_picker.Config(
+          checkPlatformCompatibility: false,
+          emojiViewConfig: emoji_picker.EmojiViewConfig(
+            emojiSizeMax: 28,
+            backgroundColor: Colors.transparent,
+            columns: columns,
+            noRecents: Text(
+              'No Recents',
+              style: theme.textTheme.headlineMedium?.copyWith(color: outlineColor),
+            ),
+          ),
+          skinToneConfig: const emoji_picker.SkinToneConfig(enabled: false),
+          categoryViewConfig: const emoji_picker.CategoryViewConfig(
+            backgroundColor: Colors.transparent,
+            dividerColor: Colors.transparent,
+          ),
+          bottomActionBarConfig: emoji_picker.BottomActionBarConfig(
+            backgroundColor: Colors.transparent,
+            showBackspaceButton: false,
+            buttonIconColor: outlineColor,
+          ),
+          searchViewConfig: emoji_picker.SearchViewConfig(
+            backgroundColor: Colors.transparent,
+            buttonIconColor: outlineColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _syncServicePreference({bool updateFilteredChats = true}) {
+    if (!mounted) return;
+
+    if (selectedContacts.isEmpty) {
+      setState(() {
+        iMessage = true;
+        sms = false;
+        if (updateFilteredChats) {
+          filteredChats = List<Chat>.from(existingChats);
+        }
+      });
+      return;
+    }
+
+    final prefersSms = _selectedPrefersSms();
+    final prefersImessage = selectedContacts.isEmpty ? true : !prefersSms;
+
+    setState(() {
+      iMessage = prefersImessage;
+      sms = prefersSms && selectedContacts.isNotEmpty;
+      if (updateFilteredChats) {
+        filteredChats = List<Chat>.from(existingChats.where((chat) =>
+            sms ? !chat.isIMessage : chat.isIMessage));
+      }
+    });
+  }
+
   void addSelected(SelectedContact c) async {
     selectedContacts.add(c);
+    _syncServicePreference();
     try {
       final response = await http.handleiMessageState(c.address);
       c.iMessage.value = response.data["data"]["available"];
-    } catch (_) {}
+    } catch (_) {
+      // If we cannot determine availability, prefer SMS for phone numbers
+      if (!c.address.contains('@')) {
+        c.iMessage.value ??= false;
+      }
+    } finally {
+      if (c.iMessage.value == null && !c.address.contains('@')) {
+        c.iMessage.value = false;
+      }
+    }
+    _syncServicePreference();
     addressController.text = "";
     findExistingChat();
   }
 
   void addSelectedList(Iterable<SelectedContact> c) {
     selectedContacts.addAll(c);
+    _syncServicePreference();
     addressController.text = "";
     findExistingChat();
   }
 
   void removeSelected(SelectedContact c) {
     selectedContacts.remove(c);
+    _syncServicePreference();
     findExistingChat();
   }
 
@@ -177,20 +383,11 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     if (selectedContacts.isEmpty) {
       await cm.setAllInactive();
       fakeController.value = null;
+      _syncServicePreference();
       return null;
     }
-    if (selectedContacts.firstWhereOrNull((element) => element.iMessage.value == false) != null) {
-      setState(() {
-        iMessage = false;
-        sms = true;
-        filteredChats = List<Chat>.from(existingChats.where((e) => !e.isIMessage));
-      });
-    } else {
-      setState(() {
-        iMessage = true;
-        sms = false;
-        filteredChats = List<Chat>.from(existingChats.where((e) => e.isIMessage));
-      });
+    if (update) {
+      _syncServicePreference();
     }
     Chat? existingChat;
     // try and find the chat simply by identifier
@@ -238,8 +435,8 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         await cm.setActiveChat(existingChat, clearNotifications: false);
         cm.activeChat!.controller = cvc(existingChat);
 
-        if (widget.initialAttachments.isNotEmpty) {
-          cm.activeChat!.controller!.pickedAttachments.value = widget.initialAttachments;
+        if (_composerAttachments.isNotEmpty) {
+          cm.activeChat!.controller!.pickedAttachments.assignAll(_composerAttachments);
         } else if (fakeController.value != null && fakeController.value!.pickedAttachments.isNotEmpty) {
           cm.activeChat!.controller!.pickedAttachments.value = fakeController.value!.pickedAttachments;
         }
@@ -264,6 +461,383 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       await chats.addChat(existingChat);
     }
     return existingChat;
+  }
+
+  Future<void> _completeSend(Chat chat, {Future<void> Function()? onConversationInit}) async {
+    _clearComposer();
+
+    if (!widget.popOnSend && widget.launchConversationOnSend) {
+      try {
+        ns.pushAndRemoveUntil(
+          Get.context!,
+          ConversationView(chat: chat, fromChatCreator: true, onInit: onConversationInit),
+          (route) => route.isFirst,
+          closeActiveChat: false,
+          customRoute: PageRouteBuilder(
+            pageBuilder: (_, __, ___) =>
+                TitleBarWrapper(child: ConversationView(chat: chat, fromChatCreator: true, onInit: onConversationInit)),
+            transitionDuration: Duration.zero,
+          ),
+        );
+
+        await Future.delayed(const Duration(milliseconds: 500));
+      } catch (e, stack) {
+        Logger.warn('Failed to navigate to conversation view after send', error: e, trace: stack);
+      }
+    }
+
+    if (widget.onMessageSent != null) {
+      try {
+        await widget.onMessageSent!(chat);
+      } catch (e, stack) {
+        Logger.warn('onMessageSent callback failed', error: e, trace: stack);
+      }
+    }
+
+    if (widget.popOnSend && mounted) {
+      try {
+        final navigator = Navigator.of(context, rootNavigator: true);
+        if (navigator.canPop()) {
+          navigator.pop(true);
+        }
+      } catch (e, stack) {
+        Logger.warn('Failed to close chat creator after send', error: e, trace: stack);
+      }
+    }
+  }
+
+  Future<bool> _sendToExistingChat(Chat? chat, String? effect) async {
+    if (chat == null) return false;
+
+    Future<void> sendInitialMessage() async {
+      if (fakeController.value == null) {
+        await cm.setActiveChat(chat, clearNotifications: false);
+        cm.activeChat!.controller = cvc(chat);
+        cm.activeChat!.controller!.pickedAttachments.value = [];
+        fakeController.value = cm.activeChat!.controller;
+      } else {
+        fakeController.value!.textController.text = textController.text;
+        fakeController.value!.pickedAttachments.assignAll(_composerAttachments);
+        fakeController.value!.subjectTextController.text = subjectController.text;
+      }
+
+      await fakeController.value!.send(
+        _composerAttachments,
+        fakeController.value!.textController.text,
+        subjectController.text,
+        fakeController.value!.replyToMessage?.item1.threadOriginatorGuid ??
+            fakeController.value!.replyToMessage?.item1.guid,
+        fakeController.value!.replyToMessage?.item2,
+        effect,
+        false,
+      );
+
+      fakeController.value!.replyToMessage = null;
+      fakeController.value!.pickedAttachments.clear();
+      fakeController.value!.textController.clear();
+      fakeController.value!.subjectTextController.clear();
+      _clearComposer();
+    }
+
+    try {
+      await sendInitialMessage();
+    } catch (e, stack) {
+      Logger.warn('Failed to send message via existing chat', error: e, trace: stack);
+      return false;
+    }
+
+    await _completeSend(chat, onConversationInit: sendInitialMessage);
+    return true;
+  }
+
+  Future<void> _createNewChat(Chat? previousChat, String? _effect) async {
+    if (!(createCompleter?.isCompleted ?? true)) return;
+
+    if (previousChat != null) {
+      chats.removeChat(previousChat);
+      Chat.deleteChat(previousChat);
+    }
+
+    if (selectedContacts.isEmpty) {
+      showSnackbar('Error', 'Please add at least one participant.');
+      return;
+    }
+
+    createCompleter = Completer();
+    final participants = selectedContacts
+        .map((e) => e.address.isEmail ? e.address : cleansePhoneNumber(e.address))
+        .toList();
+    final method = iMessage ? 'iMessage' : 'SMS';
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: context.theme.colorScheme.properSurface,
+            title: Text(
+              'Creating a new $method chat...',
+              style: context.theme.textTheme.titleLarge,
+            ),
+            content: SizedBox(
+              height: 70,
+              child: Center(
+                child: CircularProgressIndicator(
+                  backgroundColor: context.theme.colorScheme.properSurface,
+                  valueColor: AlwaysStoppedAnimation<Color>(context.theme.colorScheme.primary),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    try {
+      final response = await http.createChat(participants, textController.text, method);
+
+      if (mounted) {
+        await Navigator.of(context).maybePop();
+      }
+
+      Chat newChat = Chat.fromMap(response.data['data']);
+      newChat = newChat.save();
+
+      final saved = await cm.fetchChat(newChat.guid);
+      if (saved == null) {
+        showSnackbar('Error', 'Failed to save chat!');
+        if (!(createCompleter?.isCompleted ?? true)) {
+          createCompleter?.completeError('Failed to save chat');
+        }
+        return;
+      }
+
+      newChat = saved;
+      final updated = chats.updateChat(newChat);
+      if (!updated) {
+        await chats.addChat(newChat);
+      }
+
+      final messageRes = await http.chatMessages(newChat.guid, limit: 1);
+      final data = messageRes.data['data'];
+      if (data is List && data.isNotEmpty) {
+        final messages = data.map((e) => Message.fromMap(e as Map<String, dynamic>)).toList();
+        await Chat.bulkSyncMessages(newChat, messages);
+      }
+
+      ms(newChat.guid).close(force: true);
+      cvc(newChat).close();
+
+      createCompleter?.complete();
+
+      if (_composerAttachments.isNotEmpty) {
+        await _dispatchAttachmentsToChat(newChat);
+      }
+
+      await _completeSend(newChat);
+    } catch (error, stack) {
+      Logger.warn('Failed to create chat', error: error, trace: stack);
+
+      if (mounted) {
+        await Navigator.of(context).maybePop();
+      }
+
+      Chat? recovered = await _recoverChatAfterCreateFailure();
+      if (recovered == null) {
+        await Future.delayed(const Duration(milliseconds: 750));
+        recovered = await _recoverChatAfterCreateFailure();
+      }
+      if (recovered != null) {
+        createCompleter?.complete();
+        await _completeSend(recovered);
+        return;
+      }
+
+      if (widget.popOnSend && _isIgnorableCreateChatError(error)) {
+        createCompleter?.complete();
+        _clearComposer();
+        if (mounted) {
+          try {
+            final navigator = Navigator.of(context, rootNavigator: true);
+            if (navigator.canPop()) {
+              navigator.pop(true);
+            }
+          } catch (e, trace) {
+            Logger.warn('Failed to close composer after ignored chat create error', error: e, trace: trace);
+          }
+        }
+        return;
+      }
+
+      if (mounted) {
+        await showDialog(
+          barrierDismissible: false,
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              backgroundColor: context.theme.colorScheme.properSurface,
+              title: Text(
+                'Failed to create chat!',
+                style: context.theme.textTheme.titleLarge,
+              ),
+              content: Text(
+                error is Response
+                    ? 'Reason: (${error.data["error"]["type"]}) -> ${error.data["error"]["message"]}'
+                    : error.toString(),
+                style: context.theme.textTheme.bodyLarge,
+              ),
+              actions: [
+                TextButton(
+                  child: Text(
+                    'OK',
+                    style: context.theme.textTheme.bodyLarge!
+                        .copyWith(color: Get.context!.theme.colorScheme.primary),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
+
+      if (!(createCompleter?.isCompleted ?? true)) {
+        createCompleter?.completeError(error);
+      }
+    }
+  }
+
+  Future<Chat?> _recoverChatAfterCreateFailure() async {
+    final normalizedHandles = selectedContacts
+        .map((c) => _normalizeAddressForMatching(c.address))
+        .whereType<String>()
+        .toSet();
+
+    if (normalizedHandles.isEmpty) {
+      return null;
+    }
+
+    try {
+      final existing = await findExistingChat(checkDeleted: true, update: false);
+      if (existing != null) {
+        return existing;
+      }
+    } catch (e, stack) {
+      Logger.warn('Failed to reuse existing chat after creation error', error: e, trace: stack);
+    }
+
+    try {
+      final response = await http.chats(withQuery: const ['participants'], limit: 100);
+      final body = response.data;
+      final data = body is Map<String, dynamic> ? body['data'] : body;
+
+      if (data is List) {
+        for (final entry in data) {
+          if (entry is! Map<String, dynamic>) continue;
+
+          final participantSet = _extractParticipantSet(entry['participants']);
+          if (participantSet == null) continue;
+
+          if (participantSet.length == normalizedHandles.length &&
+              participantSet.containsAll(normalizedHandles)) {
+            try {
+              var chat = Chat.fromMap(entry);
+              chat = chat.save();
+              try {
+                await chats.addChat(chat);
+              } catch (_) {}
+              return chat;
+            } catch (e, stack) {
+              Logger.warn('Failed to hydrate recovered chat', error: e, trace: stack);
+            }
+          }
+        }
+      }
+    } catch (e, stack) {
+      Logger.warn('Failed to query chats after creation error', error: e, trace: stack);
+    }
+
+    return null;
+  }
+
+  Future<void> _dispatchAttachmentsToChat(Chat chat) async {
+    if (_composerAttachments.isEmpty) return;
+
+    final previous = cm.activeChat?.chat;
+    try {
+      await cm.setActiveChat(chat, clearNotifications: false);
+      final controller = cvc(chat);
+      controller.pickedAttachments.assignAll(_composerAttachments);
+      await controller.send(
+        _composerAttachments,
+        '',
+        '',
+        null,
+        null,
+        null,
+        false,
+      );
+    } catch (e, stack) {
+      Logger.warn('Failed to queue attachments for new chat', error: e, trace: stack);
+    } finally {
+      if (previous != null) {
+        await cm.setActiveChat(previous, clearNotifications: false);
+      } else {
+        await cm.setAllInactive();
+      }
+    }
+  }
+
+  bool _isIgnorableCreateChatError(dynamic error) {
+    if (error is! Response) return false;
+
+    final data = error.data;
+    String? message;
+
+    if (data is Map<String, dynamic>) {
+      final inner = data['error'];
+      if (inner is Map<String, dynamic>) {
+        message = inner['message'] as String?;
+      } else if (inner is String) {
+        message = inner;
+      }
+    } else if (data is String) {
+      message = data;
+    }
+
+    message ??= error.statusMessage;
+    if (message == null) return false;
+
+    return message.contains('Null check operator used on a null value');
+  }
+
+  Set<String>? _extractParticipantSet(dynamic participants) {
+    if (participants is! List) return null;
+
+    final values = <String>{};
+    for (final participant in participants) {
+      if (participant is! Map<String, dynamic>) continue;
+      final address = participant['address'] as String?;
+      if (address == null) continue;
+      final normalized = _normalizeAddressForMatching(address);
+      if (normalized != null) {
+        values.add(normalized);
+      }
+    }
+
+    return values.isEmpty ? null : values;
+  }
+
+  String? _normalizeAddressForMatching(String address) {
+    final trimmed = address.trim();
+    if (trimmed.isEmpty) return null;
+
+    final formatted = trimmed.contains('@') ? trimmed.toLowerCase() : cleansePhoneNumber(trimmed);
+    if (formatted.isEmpty) return null;
+
+    return slugify(formatted, delimiter: '');
   }
 
   void addressOnSubmitted() {
@@ -688,217 +1262,87 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
               ),
               Padding(
                 padding: const EdgeInsets.only(left: 5.0, top: 10.0, bottom: 5.0),
-                child: Theme(
-                  data: context.theme.copyWith(
-                    // in case some components still use legacy theming
-                    primaryColor: context.theme.colorScheme.bubble(context, iMessage),
-                    colorScheme: context.theme.colorScheme.copyWith(
-                      primary: context.theme.colorScheme.bubble(context, iMessage),
-                      onPrimary: context.theme.colorScheme.onBubble(context, iMessage),
-                      surface: ss.settings.monetTheming.value == Monet.full
-                          ? null
-                          : (context.theme.extensions[BubbleColors] as BubbleColors?)?.receivedBubbleColor,
-                      onSurface: ss.settings.monetTheming.value == Monet.full
-                          ? null
-                          : (context.theme.extensions[BubbleColors] as BubbleColors?)?.onReceivedBubbleColor,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Add attachments',
+                          icon: const Icon(Icons.attach_file),
+                          onPressed: _handleAttachmentPick,
+                        ),
+                        IconButton(
+                          tooltip: _showEmojiPicker ? 'Hide emoji keyboard' : 'Show emoji keyboard',
+                          icon: Icon(
+                            _showEmojiPicker
+                                ? (iOS ? CupertinoIcons.keyboard_chevron_compact_down : Icons.keyboard_hide)
+                                : (iOS ? CupertinoIcons.smiley_fill : Icons.emoji_emotions),
+                          ),
+                          onPressed: _toggleEmojiPicker,
+                        ),
+                        const Spacer(),
+                        if (_composerAttachments.isNotEmpty)
+                          Text(
+                            '${_composerAttachments.length} attachment${_composerAttachments.length == 1 ? '' : 's'} selected',
+                            style: context.theme.textTheme.bodySmall,
+                          ),
+                      ],
                     ),
-                  ),
-                  child: Focus(
-                    onKeyEvent: (node, event) {
-                      if (event is KeyDownEvent &&
-                          HardwareKeyboard.instance.isShiftPressed &&
-                          event.logicalKey == LogicalKeyboardKey.tab) {
-                        addressNode.requestFocus();
-                        return KeyEventResult.handled;
-                      }
-                      return KeyEventResult.ignored;
-                    },
-                    child: Obx(() => TextFieldComponent(
-                        focusNode: messageNode,
-                        subjectTextController: subjectController,
-                        textController: textController,
-                        controller: fakeController.value,
-                        recorderController: null,
-                        initialAttachments: widget.initialAttachments,
-                        sendMessage: ({String? effect}) async {
-                          addressOnSubmitted();
-                          final chat =
-                              fakeController.value?.chat ?? await findExistingChat(checkDeleted: true, update: false);
-                          bool existsOnServer = false;
-                          if (chat != null) {
-                            // if we don't error, then the chat exists
-                            try {
-                              await http.singleChat(chat.guid);
-                              existsOnServer = true;
-                            } catch (_) {}
+                    const SizedBox(height: 6),
+                    Theme(
+                      data: context.theme.copyWith(
+                        // in case some components still use legacy theming
+                        primaryColor: context.theme.colorScheme.bubble(context, iMessage),
+                        colorScheme: context.theme.colorScheme.copyWith(
+                          primary: context.theme.colorScheme.bubble(context, iMessage),
+                          onPrimary: context.theme.colorScheme.onBubble(context, iMessage),
+                          surface: ss.settings.monetTheming.value == Monet.full
+                              ? null
+                              : (context.theme.extensions[BubbleColors] as BubbleColors?)?.receivedBubbleColor,
+                          onSurface: ss.settings.monetTheming.value == Monet.full
+                              ? null
+                              : (context.theme.extensions[BubbleColors] as BubbleColors?)?.onReceivedBubbleColor,
+                        ),
+                      ),
+                      child: Focus(
+                        onKeyEvent: (node, event) {
+                          if (event is KeyDownEvent &&
+                              HardwareKeyboard.instance.isShiftPressed &&
+                              event.logicalKey == LogicalKeyboardKey.tab) {
+                            addressNode.requestFocus();
+                            return KeyEventResult.handled;
                           }
-                          if (chat != null && existsOnServer) {
-                            sendInitialMessage() async {
-                              if (fakeController.value == null) {
-                                await cm.setActiveChat(chat, clearNotifications: false);
-                                cm.activeChat!.controller = cvc(chat);
-                                cm.activeChat!.controller!.pickedAttachments.value = [];
-                                fakeController.value = cm.activeChat!.controller;
-                              } else {
-                                fakeController.value!.textController.text = textController.text;
-                                fakeController.value!.pickedAttachments.value = widget.initialAttachments;
-                                fakeController.value!.subjectTextController.text = subjectController.text;
+                          return KeyEventResult.ignored;
+                        },
+                        child: Obx(() => TextFieldComponent(
+                            focusNode: messageNode,
+                            subjectTextController: subjectController,
+                            textController: textController,
+                            controller: fakeController.value,
+                            recorderController: null,
+                            initialAttachments: _composerAttachments,
+                            onAttachmentsChanged: () => setState(() {}),
+                            sendMessage: ({String? effect}) async {
+                              addressOnSubmitted();
+                              final chat =
+                                  fakeController.value?.chat ?? await findExistingChat(checkDeleted: true, update: false);
+
+                              if (await _sendToExistingChat(chat, effect)) {
+                                return;
                               }
 
-                              await fakeController.value!.send(
-                                widget.initialAttachments,
-                                fakeController.value!.textController.text,
-                                subjectController.text,
-                                fakeController.value!.replyToMessage?.item1.threadOriginatorGuid ??
-                                    fakeController.value!.replyToMessage?.item1.guid,
-                                fakeController.value!.replyToMessage?.item2,
-                                effect,
-                                false,
-                              );
-
-                              fakeController.value!.replyToMessage = null;
-                              fakeController.value!.pickedAttachments.clear();
-                              fakeController.value!.textController.clear();
-                              fakeController.value!.subjectTextController.clear();
-                            }
-
-                            ns.pushAndRemoveUntil(
-                              Get.context!,
-                              ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage),
-                              (route) => route.isFirst,
-                              // don't force close the active chat in tablet mode
-                              closeActiveChat: false,
-                              // only used in non-tablet mode context
-                              customRoute: PageRouteBuilder(
-                                pageBuilder: (_, __, ___) =>
-                                    TitleBarWrapper(child: ConversationView(chat: chat, fromChatCreator: true, onInit: sendInitialMessage)),
-                                transitionDuration: Duration.zero,
-                              ),
-                            );
-
-                            await Future.delayed(const Duration(milliseconds: 500));
-                            
-                          } else {
-                            if (!(createCompleter?.isCompleted ?? true)) return;
-                            // hard delete a chat that exists on BB but not on the server to make way for the proper server data
-                            if (chat != null) {
-                              chats.removeChat(chat);
-                              Chat.deleteChat(chat);
-                            }
-                            createCompleter = Completer();
-                            final participants = selectedContacts
-                                .map((e) => e.address.isEmail ? e.address : cleansePhoneNumber(e.address))
-                                .toList();
-                            final method = iMessage ? "iMessage" : "SMS";
-                            showDialog(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return AlertDialog(
-                                    backgroundColor: context.theme.colorScheme.properSurface,
-                                    title: Text(
-                                      "Creating a new $method chat...",
-                                      style: context.theme.textTheme.titleLarge,
-                                    ),
-                                    content: Container(
-                                      height: 70,
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          backgroundColor: context.theme.colorScheme.properSurface,
-                                          valueColor: AlwaysStoppedAnimation<Color>(context.theme.colorScheme.primary),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                });
-                            http.createChat(participants, textController.text, method).then((response) async {
-                              // Load the chat data and save it to the DB
-                              Chat newChat = Chat.fromMap(response.data["data"]);
-                              newChat = newChat.save();
-
-                              // Fetch the newly saved chat data from the DB
-                              // Throw an error if it wasn't saved correctly.
-                              final saved = await cm.fetchChat(newChat.guid);
-                              if (saved == null) {
-                                return showSnackbar("Error", "Failed to save chat!");
-                              }
-
-                              // Update the chat in the chat list.
-                              // If it wasn't existing, add it.
-                              newChat = saved;
-                              bool updated = chats.updateChat(newChat);
-                              if (!updated) {
-                                await chats.addChat(newChat);
-                              }
-
-                              // Fetch the last message for the chat and save it.
-                              final messageRes = await http.chatMessages(newChat.guid, limit: 1);
-                              if (messageRes.data["data"].length > 0) {
-                                final messages =
-                                    (messageRes.data["data"] as List<dynamic>).map((e) => Message.fromMap(e)).toList();
-                                await Chat.bulkSyncMessages(newChat, messages);
-                              }
-
-                              // Force close the message service for the chat so it can be reloaded.
-                              // If this isn't done, new messages will not show.
-                              ms(newChat.guid).close(force: true);
-                              cvc(newChat).close();
-
-                              // Let awaiters know we completed
-                              createCompleter?.complete();
-
-                              // Navigate to the new chat
-                              Navigator.of(context).pop();
-                              ns.pushAndRemoveUntil(
-                                Get.context!,
-                                ConversationView(chat: newChat),
-                                (route) => route.isFirst,
-                                customRoute: PageRouteBuilder(
-                                  pageBuilder: (_, __, ___) => TitleBarWrapper(
-                                    child: ConversationView(
-                                      chat: newChat,
-                                      fromChatCreator: true,
-                                    ),
-                                  ),
-                                  transitionDuration: Duration.zero,
-                                ),
-                              );
-                            }).catchError((error) {
-                              Navigator.of(context).pop();
-                              showDialog(
-                                  barrierDismissible: false,
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                      backgroundColor: context.theme.colorScheme.properSurface,
-                                      title: Text(
-                                        "Failed to create chat!",
-                                        style: context.theme.textTheme.titleLarge,
-                                      ),
-                                      content: Text(
-                                        error is Response
-                                            ? "Reason: (${error.data["error"]["type"]}) -> ${error.data["error"]["message"]}"
-                                            : error.toString(),
-                                        style: context.theme.textTheme.bodyLarge,
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          child: Text("OK",
-                                              style: context.theme.textTheme.bodyLarge!
-                                                  .copyWith(color: Get.context!.theme.colorScheme.primary)),
-                                          onPressed: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                        )
-                                      ],
-                                    );
-                                  });
-                              if (!createCompleter!.isCompleted) {
-                                createCompleter?.completeError(error);
-                              }
-                            });
-                          }
-                        })),
-                  ),
+                              await _createNewChat(chat, effect);
+                            })),
+                      ),
+                    ),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      alignment: Alignment.bottomCenter,
+                      child: _showEmojiPicker ? _buildEmojiPicker(context) : const SizedBox.shrink(),
+                    ),
+                  ],
                 ),
               ),
             ],
