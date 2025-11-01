@@ -17,6 +17,7 @@ import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:dio/dio.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart' as emoji_picker;
+import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_acrylic/window_effect.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:get/get.dart' hide Response;
+import 'package:mime_type/mime_type.dart';
 import 'package:slugify/slugify.dart';
 import 'package:tuple/tuple.dart';
 import 'package:universal_io/io.dart';
@@ -506,47 +508,117 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     }
   }
 
+  Future<void> _primeConversationController(Chat chat) async {
+    if (fakeController.value == null) {
+      await cm.setActiveChat(chat, clearNotifications: false);
+      cm.activeChat!.controller = cvc(chat);
+      fakeController.value = cm.activeChat!.controller;
+    }
+
+    final controller = fakeController.value;
+    if (controller == null) return;
+
+    controller.pickedAttachments.assignAll(_composerAttachments);
+    controller.textController.text = textController.text;
+    controller.subjectTextController.text = subjectController.text;
+  }
+
+  Future<void> _queueComposerContent(Chat chat, {String? effect}) async {
+    final controller = fakeController.value;
+    final replyTuple = controller?.replyToMessage;
+    final replyGuid = replyTuple?.item1.threadOriginatorGuid ?? replyTuple?.item1.guid;
+    final replyPart = replyTuple?.item2;
+
+    final attachments = List<PlatformFile>.from(_composerAttachments);
+
+    for (final file in attachments) {
+      final message = Message(
+        text: '',
+        dateCreated: DateTime.now(),
+        hasAttachments: true,
+        isFromMe: true,
+        handleId: 0,
+        attachments: [
+          Attachment(
+            isOutgoing: true,
+            mimeType: mime(file.path ?? file.name) ?? 'application/octet-stream',
+            uti: 'public.data',
+            bytes: file.bytes,
+            transferName: file.name,
+            totalBytes: file.size,
+          ),
+        ],
+      );
+
+      message.chat.target = chat;
+      message.generateTempGuid();
+      final attachment = message.attachments.first;
+      if (attachment != null) {
+        attachment.guid = message.guid;
+        attachment.bytes = file.bytes;
+        attachment.totalBytes = file.size;
+      }
+
+      await outq.queue(OutgoingItem(
+        type: QueueType.sendAttachment,
+        chat: chat,
+        message: message,
+        customArgs: const {'audio': false},
+      ));
+    }
+
+    final text = textController.text.trimRight();
+    final subject = subjectController.text.trimRight();
+
+    if (text.isNotEmpty || subject.isNotEmpty) {
+      final message = Message(
+        text: text.isEmpty && subject.isNotEmpty ? subject : text,
+        subject: text.isEmpty && subject.isNotEmpty ? null : subject,
+        threadOriginatorGuid: attachments.isEmpty ? replyGuid : null,
+        threadOriginatorPart: attachments.isEmpty && replyPart != null ? '$replyPart:0:0' : null,
+        expressiveSendStyleId: effect,
+        dateCreated: DateTime.now(),
+        hasAttachments: false,
+        isFromMe: true,
+        handleId: 0,
+      );
+
+      message.chat.target = chat;
+      message.generateTempGuid();
+
+      await outq.queue(OutgoingItem(
+        type: QueueType.sendMessage,
+        chat: chat,
+        message: message,
+      ));
+    }
+
+    if (controller != null) {
+      controller.replyToMessage = null;
+      controller.pickedAttachments.clear();
+      controller.textController.clear();
+      controller.subjectTextController.clear();
+    }
+  }
+
   Future<bool> _sendToExistingChat(Chat? chat, String? effect) async {
     if (chat == null) return false;
 
-    Future<void> sendInitialMessage() async {
-      if (fakeController.value == null) {
-        await cm.setActiveChat(chat, clearNotifications: false);
-        cm.activeChat!.controller = cvc(chat);
-        cm.activeChat!.controller!.pickedAttachments.value = [];
-        fakeController.value = cm.activeChat!.controller;
-      } else {
-        fakeController.value!.textController.text = textController.text;
-        fakeController.value!.pickedAttachments.assignAll(_composerAttachments);
-        fakeController.value!.subjectTextController.text = subjectController.text;
-      }
-
-      await fakeController.value!.send(
-        _composerAttachments,
-        fakeController.value!.textController.text,
-        subjectController.text,
-        fakeController.value!.replyToMessage?.item1.threadOriginatorGuid ??
-            fakeController.value!.replyToMessage?.item1.guid,
-        fakeController.value!.replyToMessage?.item2,
-        effect,
-        false,
-      );
-
-      fakeController.value!.replyToMessage = null;
-      fakeController.value!.pickedAttachments.clear();
-      fakeController.value!.textController.clear();
-      fakeController.value!.subjectTextController.clear();
-      _clearComposer();
-    }
-
     try {
-      await sendInitialMessage();
+      await _primeConversationController(chat);
+      if (_composerAttachments.isEmpty &&
+          textController.text.trim().isEmpty &&
+          subjectController.text.trim().isEmpty) {
+        showSnackbar('Error', 'Add a message or attachment to send.');
+        return true;
+      }
+      await _queueComposerContent(chat, effect: effect);
     } catch (e, stack) {
       Logger.warn('Failed to send message via existing chat', error: e, trace: stack);
       return false;
     }
 
-    await _completeSend(chat, onConversationInit: sendInitialMessage);
+    await _completeSend(chat);
     return true;
   }
 
