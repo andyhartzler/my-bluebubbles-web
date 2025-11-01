@@ -23,8 +23,9 @@ Future<bool> saveNewServerUrl(
     if (tryRestartForegroundService) {
       restartForegroundService();
     }
-    
+
     try {
+      socket.clearOverride();
       if (restartSocket) {
         socket.restartSocket();
       }
