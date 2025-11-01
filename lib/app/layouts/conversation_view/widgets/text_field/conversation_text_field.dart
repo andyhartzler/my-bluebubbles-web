@@ -824,7 +824,7 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
               );
             },
           ),
-          searchViewConfig: SearchViewConfig(
+          searchViewConfig: emoji_picker.SearchViewConfig(
             backgroundColor: Colors.transparent,
             buttonIconColor: outlineColor,
           ),
