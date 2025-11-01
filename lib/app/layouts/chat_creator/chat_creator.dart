@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:bluebubbles/app/components/custom_text_editing_controllers.dart';
 import 'package:bluebubbles/app/layouts/chat_creator/widgets/chat_creator_tile.dart';
@@ -15,15 +16,18 @@ import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:dio/dio.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart' as emoji_picker;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_acrylic/window_effect.dart';
+import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:get/get.dart' hide Response;
 import 'package:slugify/slugify.dart';
 import 'package:tuple/tuple.dart';
+import 'package:universal_io/io.dart';
 
 class SelectedContact {
   final String displayName;
@@ -78,6 +82,9 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   Timer? _debounce;
   Completer<void>? createCompleter;
 
+  late List<PlatformFile> _composerAttachments;
+  bool _showEmojiPicker = false;
+
   bool canCreateGroupChats = ss.canCreateGroupChatSync();
 
   void _clearComposer() {
@@ -91,6 +98,8 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         fakeController.value!.subjectTextController.clear();
       } catch (_) {}
     }
+    _composerAttachments.clear();
+    _showEmojiPicker = false;
     if (!mounted) return;
     setState(() {});
   }
@@ -98,6 +107,8 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   @override
   void initState() {
     super.initState();
+
+    _composerAttachments = List<PlatformFile>.from(widget.initialAttachments);
 
     addressController.addListener(() {
       _debounce?.cancel();
@@ -148,7 +159,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     });
 
     updateObx(() {
-      if (widget.initialAttachments.isEmpty && !kIsWeb) {
+      if (_composerAttachments.isEmpty && !kIsWeb) {
         final query = (Database.contacts.query()..order(Contact_.displayName)).build();
         contacts = query.find().toSet().toList();
         filteredContacts = List<Contact>.from(contacts);
@@ -185,6 +196,125 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       }
       return false;
     });
+  }
+
+  Future<void> _handleAttachmentPick() async {
+    try {
+      final result = await file_picker.FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        withData: kIsWeb,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final additions = <PlatformFile>[];
+
+      for (final entry in result.files) {
+        Uint8List? bytes = entry.bytes;
+        if (bytes == null && !kIsWeb && entry.path != null) {
+          try {
+            bytes = await File(entry.path!).readAsBytes();
+          } catch (_) {}
+        }
+
+        if (bytes == null && (entry.path == null || kIsWeb)) {
+          continue;
+        }
+
+        final size = bytes?.length ?? entry.size;
+        additions.add(PlatformFile(
+          name: entry.name,
+          size: size,
+          path: entry.path,
+          bytes: bytes,
+        ));
+      }
+
+      if (additions.isEmpty) {
+        showSnackbar('Attachment Error', 'Unable to read the selected files.');
+        return;
+      }
+
+      setState(() {
+        _composerAttachments.addAll(additions);
+      });
+    } catch (e) {
+      showSnackbar('Attachment Error', e.toString());
+    }
+  }
+
+  void _toggleEmojiPicker() {
+    setState(() {
+      _showEmojiPicker = !_showEmojiPicker;
+    });
+    messageNode.requestFocus();
+  }
+
+  void _insertEmoji(String emoji) {
+    final controller = fakeController.value?.textController ?? textController;
+    final selection = controller.selection;
+    final text = controller.text;
+    final start = selection.start >= 0 ? selection.start : text.length;
+    final end = selection.end >= 0 ? selection.end : start;
+    final updated = text.replaceRange(start, end, emoji);
+    controller.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+    );
+    messageNode.requestFocus();
+  }
+
+  Widget _buildEmojiPicker(BuildContext context) {
+    final theme = context.theme;
+    final outlineColor = theme.colorScheme.outline;
+    final columns = (ns.width(context) ~/ 56).clamp(4, 12);
+
+    return SizedBox(
+      height: 280,
+      child: emoji_picker.EmojiPicker(
+        onEmojiSelected: (_, emoji) => _insertEmoji(emoji.emoji),
+        onBackspacePressed: () {
+          final controller = fakeController.value?.textController ?? textController;
+          final value = controller.value;
+          final selection = value.selection;
+          if (selection.isCollapsed && selection.start == 0) return;
+          final start = selection.start >= 0 ? selection.start : value.text.length;
+          final end = selection.end >= 0 ? selection.end : start;
+          final replaceStart = start == end ? (start - 1).clamp(0, value.text.length) : start;
+          final updated = value.text.replaceRange(replaceStart, end, '');
+          controller.value = TextEditingValue(
+            text: updated,
+            selection: TextSelection.collapsed(offset: replaceStart),
+          );
+          messageNode.requestFocus();
+        },
+        config: emoji_picker.Config(
+          checkPlatformCompatibility: false,
+          emojiViewConfig: emoji_picker.EmojiViewConfig(
+            emojiSizeMax: 28,
+            backgroundColor: Colors.transparent,
+            columns: columns,
+            noRecents: Text(
+              'No Recents',
+              style: theme.textTheme.headlineMedium?.copyWith(color: outlineColor),
+            ),
+          ),
+          skinToneConfig: const emoji_picker.SkinToneConfig(enabled: false),
+          categoryViewConfig: const emoji_picker.CategoryViewConfig(
+            backgroundColor: Colors.transparent,
+            dividerColor: Colors.transparent,
+          ),
+          bottomActionBarConfig: emoji_picker.BottomActionBarConfig(
+            backgroundColor: Colors.transparent,
+            showBackspaceButton: false,
+            buttonIconColor: outlineColor,
+          ),
+          searchViewConfig: emoji_picker.SearchViewConfig(
+            backgroundColor: Colors.transparent,
+            buttonIconColor: outlineColor,
+          ),
+        ),
+      ),
+    );
   }
 
   void _syncServicePreference({bool updateFilteredChats = true}) {
@@ -305,8 +435,8 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         await cm.setActiveChat(existingChat, clearNotifications: false);
         cm.activeChat!.controller = cvc(existingChat);
 
-        if (widget.initialAttachments.isNotEmpty) {
-          cm.activeChat!.controller!.pickedAttachments.value = widget.initialAttachments;
+        if (_composerAttachments.isNotEmpty) {
+          cm.activeChat!.controller!.pickedAttachments.assignAll(_composerAttachments);
         } else if (fakeController.value != null && fakeController.value!.pickedAttachments.isNotEmpty) {
           cm.activeChat!.controller!.pickedAttachments.value = fakeController.value!.pickedAttachments;
         }
@@ -387,12 +517,12 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         fakeController.value = cm.activeChat!.controller;
       } else {
         fakeController.value!.textController.text = textController.text;
-        fakeController.value!.pickedAttachments.value = widget.initialAttachments;
+        fakeController.value!.pickedAttachments.assignAll(_composerAttachments);
         fakeController.value!.subjectTextController.text = subjectController.text;
       }
 
       await fakeController.value!.send(
-        widget.initialAttachments,
+        _composerAttachments,
         fakeController.value!.textController.text,
         subjectController.text,
         fakeController.value!.replyToMessage?.item1.threadOriginatorGuid ??
@@ -499,6 +629,10 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       cvc(newChat).close();
 
       createCompleter?.complete();
+
+      if (_composerAttachments.isNotEmpty) {
+        await _dispatchAttachmentsToChat(newChat);
+      }
 
       await _completeSend(newChat);
     } catch (error, stack) {
@@ -626,6 +760,34 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     }
 
     return null;
+  }
+
+  Future<void> _dispatchAttachmentsToChat(Chat chat) async {
+    if (_composerAttachments.isEmpty) return;
+
+    final previous = cm.activeChat?.chat;
+    try {
+      await cm.setActiveChat(chat, clearNotifications: false);
+      final controller = cvc(chat);
+      controller.pickedAttachments.assignAll(_composerAttachments);
+      await controller.send(
+        _composerAttachments,
+        '',
+        '',
+        null,
+        null,
+        null,
+        false,
+      );
+    } catch (e, stack) {
+      Logger.warn('Failed to queue attachments for new chat', error: e, trace: stack);
+    } finally {
+      if (previous != null) {
+        await cm.setActiveChat(previous, clearNotifications: false);
+      } else {
+        await cm.setAllInactive();
+      }
+    }
   }
 
   bool _isIgnorableCreateChatError(dynamic error) {
@@ -1100,50 +1262,87 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
               ),
               Padding(
                 padding: const EdgeInsets.only(left: 5.0, top: 10.0, bottom: 5.0),
-                child: Theme(
-                  data: context.theme.copyWith(
-                    // in case some components still use legacy theming
-                    primaryColor: context.theme.colorScheme.bubble(context, iMessage),
-                    colorScheme: context.theme.colorScheme.copyWith(
-                      primary: context.theme.colorScheme.bubble(context, iMessage),
-                      onPrimary: context.theme.colorScheme.onBubble(context, iMessage),
-                      surface: ss.settings.monetTheming.value == Monet.full
-                          ? null
-                          : (context.theme.extensions[BubbleColors] as BubbleColors?)?.receivedBubbleColor,
-                      onSurface: ss.settings.monetTheming.value == Monet.full
-                          ? null
-                          : (context.theme.extensions[BubbleColors] as BubbleColors?)?.onReceivedBubbleColor,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Add attachments',
+                          icon: const Icon(Icons.attach_file),
+                          onPressed: _handleAttachmentPick,
+                        ),
+                        IconButton(
+                          tooltip: _showEmojiPicker ? 'Hide emoji keyboard' : 'Show emoji keyboard',
+                          icon: Icon(
+                            _showEmojiPicker
+                                ? (iOS ? CupertinoIcons.keyboard_chevron_compact_down : Icons.keyboard_hide)
+                                : (iOS ? CupertinoIcons.smiley_fill : Icons.emoji_emotions),
+                          ),
+                          onPressed: _toggleEmojiPicker,
+                        ),
+                        const Spacer(),
+                        if (_composerAttachments.isNotEmpty)
+                          Text(
+                            '${_composerAttachments.length} attachment${_composerAttachments.length == 1 ? '' : 's'} selected',
+                            style: context.theme.textTheme.bodySmall,
+                          ),
+                      ],
                     ),
-                  ),
-                  child: Focus(
-                    onKeyEvent: (node, event) {
-                      if (event is KeyDownEvent &&
-                          HardwareKeyboard.instance.isShiftPressed &&
-                          event.logicalKey == LogicalKeyboardKey.tab) {
-                        addressNode.requestFocus();
-                        return KeyEventResult.handled;
-                      }
-                      return KeyEventResult.ignored;
-                    },
-                    child: Obx(() => TextFieldComponent(
-                        focusNode: messageNode,
-                        subjectTextController: subjectController,
-                        textController: textController,
-                        controller: fakeController.value,
-                        recorderController: null,
-                        initialAttachments: widget.initialAttachments,
-                        sendMessage: ({String? effect}) async {
-                          addressOnSubmitted();
-                          final chat =
-                              fakeController.value?.chat ?? await findExistingChat(checkDeleted: true, update: false);
-
-                          if (await _sendToExistingChat(chat, effect)) {
-                            return;
+                    const SizedBox(height: 6),
+                    Theme(
+                      data: context.theme.copyWith(
+                        // in case some components still use legacy theming
+                        primaryColor: context.theme.colorScheme.bubble(context, iMessage),
+                        colorScheme: context.theme.colorScheme.copyWith(
+                          primary: context.theme.colorScheme.bubble(context, iMessage),
+                          onPrimary: context.theme.colorScheme.onBubble(context, iMessage),
+                          surface: ss.settings.monetTheming.value == Monet.full
+                              ? null
+                              : (context.theme.extensions[BubbleColors] as BubbleColors?)?.receivedBubbleColor,
+                          onSurface: ss.settings.monetTheming.value == Monet.full
+                              ? null
+                              : (context.theme.extensions[BubbleColors] as BubbleColors?)?.onReceivedBubbleColor,
+                        ),
+                      ),
+                      child: Focus(
+                        onKeyEvent: (node, event) {
+                          if (event is KeyDownEvent &&
+                              HardwareKeyboard.instance.isShiftPressed &&
+                              event.logicalKey == LogicalKeyboardKey.tab) {
+                            addressNode.requestFocus();
+                            return KeyEventResult.handled;
                           }
+                          return KeyEventResult.ignored;
+                        },
+                        child: Obx(() => TextFieldComponent(
+                            focusNode: messageNode,
+                            subjectTextController: subjectController,
+                            textController: textController,
+                            controller: fakeController.value,
+                            recorderController: null,
+                            initialAttachments: _composerAttachments,
+                            onAttachmentsChanged: () => setState(() {}),
+                            sendMessage: ({String? effect}) async {
+                              addressOnSubmitted();
+                              final chat =
+                                  fakeController.value?.chat ?? await findExistingChat(checkDeleted: true, update: false);
 
-                          await _createNewChat(chat, effect);
-                        })),
-                  ),
+                              if (await _sendToExistingChat(chat, effect)) {
+                                return;
+                              }
+
+                              await _createNewChat(chat, effect);
+                            })),
+                      ),
+                    ),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      alignment: Alignment.bottomCenter,
+                      child: _showEmojiPicker ? _buildEmojiPicker(context) : const SizedBox.shrink(),
+                    ),
+                  ],
                 ),
               ),
             ],

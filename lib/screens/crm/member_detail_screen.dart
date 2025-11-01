@@ -8,7 +8,6 @@ import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
-import 'package:file_picker/file_picker.dart' as fp;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -133,7 +132,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       final normalized = address.contains('@') ? address : cleansePhoneNumber(address);
       final lookup = await _lookupServiceAvailability(normalized);
       final isIMessage = lookup ?? normalized.contains('@');
-      final result = await Navigator.of(context, rootNavigator: true).push(ThemeSwitcher.buildPageRoute(
+      await Navigator.of(context, rootNavigator: true).push(ThemeSwitcher.buildPageRoute(
         builder: (context) => TitleBarWrapper(
           child: ChatCreator(
             initialSelected: [
@@ -145,7 +144,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             ],
             initialAttachments: attachments,
             launchConversationOnSend: false,
-            popOnSend: true,
+            popOnSend: false,
             onMessageSent: (chat) async {
               await _memberRepo.updateLastContacted(_member.id);
               if (!mounted) return;
@@ -153,53 +152,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               setState(() {
                 _member = _member.copyWith(lastContacted: now);
               });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Message sent to ${_member.name}')),
+              );
             },
           ),
         ),
       ));
-
-      if (result == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Message sent to ${_member.name}')),
-        );
-      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Unable to open chat composer: $e')),
-      );
-    }
-  }
-
-  Future<void> _startChatWithAttachments() async {
-    try {
-      final picked = await fp.FilePicker.platform.pickFiles(allowMultiple: true, withData: true);
-      if (picked == null || picked.files.isEmpty) {
-        return;
-      }
-
-      final attachments = picked.files
-          .where((file) => file.bytes != null || file.path != null)
-          .map((file) => PlatformFile(
-                name: file.name,
-                size: file.size,
-                path: file.path,
-                bytes: file.bytes,
-              ))
-          .toList();
-
-      if (attachments.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to attach selected files.')),
-        );
-        return;
-      }
-
-      await _startChat(attachments: attachments);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Attachment error: $e')),
       );
     }
   }
@@ -282,11 +245,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             icon: const Icon(Icons.message),
             onPressed: _member.canContact ? _startChat : null,
             tooltip: 'Start Chat',
-          ),
-          IconButton(
-            icon: const Icon(Icons.attachment),
-            onPressed: _member.canContact ? _startChatWithAttachments : null,
-            tooltip: 'Message with Attachment',
           ),
           IconButton(
             icon: const Icon(Icons.auto_awesome),

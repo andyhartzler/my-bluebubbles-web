@@ -844,6 +844,7 @@ class TextFieldComponent extends StatefulWidget {
     required this.sendMessage,
     this.focusNode,
     this.initialAttachments = const [],
+    this.onAttachmentsChanged,
   });
 
   final SpellCheckTextEditingController subjectTextController;
@@ -854,6 +855,7 @@ class TextFieldComponent extends StatefulWidget {
   final FocusNode? focusNode;
 
   final List<PlatformFile> initialAttachments;
+  final VoidCallback? onAttachmentsChanged;
 
   @override
   State<StatefulWidget> createState() => TextFieldComponentState();
@@ -868,6 +870,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
   late final MentionTextEditingController textController;
   late final SpellCheckTextEditingController subjectTextController;
   late final Future<void> Function({String? effect}) sendMessage;
+  late final VoidCallback? onAttachmentsChanged;
 
   late final ValueNotifier<bool> isRecordingNotifier;
   TextFieldComponentState() : isRecordingNotifier = ValueNotifier<bool>(false);
@@ -882,6 +885,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     textController = widget.textController;
     subjectTextController = widget.subjectTextController;
     sendMessage = widget.sendMessage;
+    onAttachmentsChanged = widget.onAttachmentsChanged;
 
     // add a listener to recorderController to update isRecordingNotifier
     recorderController?.addListener(() {
@@ -943,6 +947,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
                     textController: txtController,
                     subjectTextController: subjController,
                     initialAttachments: initialAttachments,
+                    onChanged: onAttachmentsChanged,
                   ),
                 if (!isChatCreator)
                   Obx(() {
