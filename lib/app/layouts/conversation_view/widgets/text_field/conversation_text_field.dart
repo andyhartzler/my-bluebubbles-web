@@ -742,6 +742,7 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
                             checkPlatformCompatibility: true,
                             emojiSet: EmojiSet.apple,
                             emojiViewConfig: EmojiViewConfig(
+                              emojiSet: defaultEmojiSetApple,
                               emojiSizeMax: 28,
                               backgroundColor: Colors.transparent,
                               columns: emojiColumns,
