@@ -22,6 +22,7 @@ import 'package:chunked_stream/chunked_stream.dart';
 import 'package:collection/collection.dart';
 import 'package:emojis/emoji.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart' hide Emoji;
+import 'package:emoji_picker_flutter/src/emoji_set.dart';
 import 'package:file_picker/file_picker.dart' as pf;
 import 'package:file_picker/file_picker.dart' hide PlatformFile;
 import 'package:flutter/cupertino.dart';
@@ -739,10 +740,13 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
                           config: Config(
                             height: emojiPickerHeight,
                             checkPlatformCompatibility: true,
+                            emojiSet: EmojiSet.apple,
                             emojiViewConfig: EmojiViewConfig(
+                              emojiSet: defaultEmojiSetApple,
                               emojiSizeMax: 28,
                               backgroundColor: Colors.transparent,
                               columns: emojiColumns,
+                              emojiSet: EmojiSet.apple,
                               noRecents: Text("No Recents", style: context.textTheme.headlineMedium!.copyWith(color: context.theme.colorScheme.outline))
                             ),
                             swapCategoryAndBottomBar: true,
