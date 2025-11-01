@@ -43,6 +43,7 @@ class ChatCreator extends StatefulWidget {
     this.initialSelected = const [],
     this.onMessageSent,
     this.popOnSend = false,
+    this.launchConversationOnSend = true,
   });
 
   final String? initialText;
@@ -50,6 +51,7 @@ class ChatCreator extends StatefulWidget {
   final List<SelectedContact> initialSelected;
   final Future<void> Function(Chat chat)? onMessageSent;
   final bool popOnSend;
+  final bool launchConversationOnSend;
 
   @override
   ChatCreatorState createState() => ChatCreatorState();
@@ -164,6 +166,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       }
       setState(() {});
       if (widget.initialSelected.isNotEmpty) {
+        _syncServicePreference(updateFilteredChats: false);
         findExistingChat();
       }
     });
@@ -171,8 +174,49 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     if (widget.initialSelected.isNotEmpty) messageNode.requestFocus();
   }
 
+  bool _selectedPrefersSms() {
+    if (selectedContacts.isEmpty) return false;
+
+    return selectedContacts.any((element) {
+      final value = element.iMessage.value;
+      if (value == false) return true;
+      if (value == null && !element.address.contains('@')) {
+        return true;
+      }
+      return false;
+    });
+  }
+
+  void _syncServicePreference({bool updateFilteredChats = true}) {
+    if (!mounted) return;
+
+    if (selectedContacts.isEmpty) {
+      setState(() {
+        iMessage = true;
+        sms = false;
+        if (updateFilteredChats) {
+          filteredChats = List<Chat>.from(existingChats);
+        }
+      });
+      return;
+    }
+
+    final prefersSms = _selectedPrefersSms();
+    final prefersImessage = selectedContacts.isEmpty ? true : !prefersSms;
+
+    setState(() {
+      iMessage = prefersImessage;
+      sms = prefersSms && selectedContacts.isNotEmpty;
+      if (updateFilteredChats) {
+        filteredChats = List<Chat>.from(existingChats.where((chat) =>
+            sms ? !chat.isIMessage : chat.isIMessage));
+      }
+    });
+  }
+
   void addSelected(SelectedContact c) async {
     selectedContacts.add(c);
+    _syncServicePreference();
     try {
       final response = await http.handleiMessageState(c.address);
       c.iMessage.value = response.data["data"]["available"];
@@ -186,18 +230,21 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         c.iMessage.value = false;
       }
     }
+    _syncServicePreference();
     addressController.text = "";
     findExistingChat();
   }
 
   void addSelectedList(Iterable<SelectedContact> c) {
     selectedContacts.addAll(c);
+    _syncServicePreference();
     addressController.text = "";
     findExistingChat();
   }
 
   void removeSelected(SelectedContact c) {
     selectedContacts.remove(c);
+    _syncServicePreference();
     findExistingChat();
   }
 
@@ -206,29 +253,12 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     if (selectedContacts.isEmpty) {
       await cm.setAllInactive();
       fakeController.value = null;
+      _syncServicePreference();
       return null;
     }
-    final prefersSms = selectedContacts.firstWhereOrNull((element) {
-          final value = element.iMessage.value;
-          if (value == false) return true;
-          if (value == null && !element.address.contains('@')) {
-            return true;
-          }
-          return false;
-        }) !=
-        null;
-
-    setState(() {
-      if (prefersSms) {
-        iMessage = false;
-        sms = true;
-        filteredChats = List<Chat>.from(existingChats.where((e) => !e.isIMessage));
-      } else {
-        iMessage = true;
-        sms = false;
-        filteredChats = List<Chat>.from(existingChats.where((e) => e.isIMessage));
-      }
-    });
+    if (update) {
+      _syncServicePreference();
+    }
     Chat? existingChat;
     // try and find the chat simply by identifier
     if (selectedContacts.length == 1) {
@@ -306,7 +336,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   Future<void> _completeSend(Chat chat, {Future<void> Function()? onConversationInit}) async {
     _clearComposer();
 
-    if (!widget.popOnSend) {
+    if (!widget.popOnSend && widget.launchConversationOnSend) {
       try {
         ns.pushAndRemoveUntil(
           Get.context!,
