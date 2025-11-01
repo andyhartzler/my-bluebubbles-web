@@ -624,14 +624,13 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
                         }
                       }
                     }),
-              if (kIsDesktop || kIsWeb)
-                IconButton(
-                  icon: Icon(iOS ? CupertinoIcons.smiley_fill : Icons.emoji_emotions, color: context.theme.colorScheme.outline, size: 28),
-                  onPressed: () {
-                    showEmojiPicker.value = !showEmojiPicker.value;
-                    (controller.editing.lastOrNull?.item3.focusNode ?? controller.lastFocusedNode).requestFocus();
-                  },
-                ),
+              IconButton(
+                icon: Icon(iOS ? CupertinoIcons.smiley_fill : Icons.emoji_emotions, color: context.theme.colorScheme.outline, size: 28),
+                onPressed: () {
+                  showEmojiPicker.value = !showEmojiPicker.value;
+                  (controller.editing.lastOrNull?.item3.focusNode ?? controller.lastFocusedNode).requestFocus();
+                },
+              ),
               if (kIsDesktop && !Platform.isLinux)
                 IconButton(
                   icon: Icon(iOS ? CupertinoIcons.location_solid : Icons.location_on_outlined, color: context.theme.colorScheme.outline, size: 28),
