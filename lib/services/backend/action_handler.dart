@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart' hide Response;
 import 'package:tuple/tuple.dart';
 import 'package:universal_io/io.dart';
+import 'package:bluebubbles/services/crm/crm_message_service.dart';
 
 ActionHandler ah = Get.isRegistered<ActionHandler>() ? Get.find<ActionHandler>() : Get.put(ActionHandler());
 
@@ -147,17 +148,21 @@ class ActionHandler extends GetxService {
   Future<void> sendMessage(Chat c, Message m, Message? selected, String? r) async {
     final completer = Completer<void>();
     if (r == null) {
+      final bool privateApiEnabled =
+          ss.settings.enablePrivateAPI.value && ss.settings.privateAPISend.value;
+      final bool requiresPrivateApi =
+          (m.subject?.isNotEmpty ?? false) ||
+          m.threadOriginatorGuid != null ||
+          m.expressiveSendStyleId != null;
+      final bool shouldUsePrivateApi = c.isIMessage &&
+          (privateApiEnabled || requiresPrivateApi);
+
       http.sendMessage(
         c.guid,
         m.guid!,
         m.text!,
         subject: m.subject,
-        method: (ss.settings.enablePrivateAPI.value
-            && ss.settings.privateAPISend.value)
-            || (m.subject?.isNotEmpty ?? false)
-            || m.threadOriginatorGuid != null
-            || m.expressiveSendStyleId != null
-            ? "private-api" : "apple-script",
+        method: shouldUsePrivateApi ? "private-api" : "apple-script",
         selectedMessageGuid: m.threadOriginatorGuid,
         effectId: m.expressiveSendStyleId,
         partIndex: int.tryParse(m.threadOriginatorPart?.split(":").firstOrNull ?? ""),
@@ -358,6 +363,7 @@ class ActionHandler extends GetxService {
       await MessageHelper.handleNotification(m, c);
     }
     await c.addMessage(m);
+    unawaited(CRMMessageService().handleIncomingAutomation(c, m));
   }
 
   Future<void> handleUpdatedMessage(Chat c, Message m, String? tempGuid, {bool checkExisting = true}) async {

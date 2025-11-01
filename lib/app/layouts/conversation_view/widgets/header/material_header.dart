@@ -10,6 +10,8 @@ import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide BackButton;
 import 'package:flutter/services.dart';
@@ -17,6 +19,8 @@ import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:get/get.dart';
 import 'package:universal_io/io.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../crm_member_panel.dart';
 
 class MaterialHeader extends StatelessWidget implements PreferredSizeWidget {
   const MaterialHeader({Key? key, required this.controller});
@@ -110,6 +114,27 @@ class MaterialHeader extends StatelessWidget implements PreferredSizeWidget {
             icon: Icon(Icons.mail_outlined, color: context.theme.colorScheme.onBackground),
             onPressed: () {
               launchUrl(Uri(scheme: "mailto", path: controller.chat.participants.first.address));
+            },
+          ),
+        if (CRMConfig.crmEnabled &&
+            CRMSupabaseService().isInitialized &&
+            !controller.chat.isGroup &&
+            controller.chat.participants.isNotEmpty &&
+            controller.chat.participants.first.address.isPhoneNumber)
+          IconButton(
+            icon: Icon(Icons.info_outline, color: context.theme.colorScheme.onBackground),
+            tooltip: 'Member Info',
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                builder: (context) => SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.75,
+                  child: CRMMemberPanel(
+                    phoneNumber: controller.chat.participants.first.address,
+                  ),
+                ),
+              );
             },
           ),
         Padding(
