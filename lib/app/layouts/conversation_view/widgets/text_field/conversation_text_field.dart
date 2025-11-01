@@ -740,7 +740,11 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
                           config: Config(
                             height: emojiPickerHeight,
                             checkPlatformCompatibility: true,
-                            emojiSet: EmojiSet.apple,
+                            viewOrderConfig: const ViewOrderConfig(
+                              top: EmojiPickerItem.searchBar,
+                              middle: EmojiPickerItem.emojiView,
+                              bottom: EmojiPickerItem.categoryBar,
+                            ),
                             emojiViewConfig: EmojiViewConfig(
                               emojiSet: defaultEmojiSetApple,
                               emojiSizeMax: 28,
@@ -749,7 +753,6 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
                               emojiSet: EmojiSet.apple,
                               noRecents: Text("No Recents", style: context.textTheme.headlineMedium!.copyWith(color: context.theme.colorScheme.outline))
                             ),
-                            swapCategoryAndBottomBar: true,
                             skinToneConfig: const SkinToneConfig(enabled: false),
                             categoryViewConfig: const CategoryViewConfig(
                               backgroundColor: Colors.transparent,
