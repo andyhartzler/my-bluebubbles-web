@@ -547,12 +547,26 @@ class SocketService extends GetxService {
     if (candidate == null) {
       return null;
     }
-    if (candidate.startsWith('ws://')) {
-      return 'http://${candidate.substring(5)}';
+
+    if (candidate.startsWith('ws://') || candidate.startsWith('wss://')) {
+      final Uri? uri = Uri.tryParse(candidate);
+      if (uri == null) {
+        return candidate.startsWith('wss://')
+            ? 'https://${candidate.substring(6)}'
+            : 'http://${candidate.substring(5)}';
+      }
+
+      final bool secure = candidate.startsWith('wss://');
+      final String targetScheme;
+      if (kIsWeb && !_isLocalHost(uri.host)) {
+        targetScheme = 'https';
+      } else {
+        targetScheme = secure ? 'https' : 'http';
+      }
+
+      return uri.replace(scheme: targetScheme).toString();
     }
-    if (candidate.startsWith('wss://')) {
-      return 'https://${candidate.substring(6)}';
-    }
+
     return candidate;
   }
 
@@ -571,7 +585,7 @@ class SocketService extends GetxService {
 
     final OptionBuilder builder = OptionBuilder()
         .setQuery(query)
-        .setTransports(<String>['polling', 'websocket'])
+        .setTransports(<String>['websocket', 'polling'])
         .setPath('/socket.io/')
         .setTimeout(20000)
         .setReconnectionAttempts(999999)
