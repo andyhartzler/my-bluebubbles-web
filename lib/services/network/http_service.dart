@@ -821,9 +821,10 @@ class HttpService extends GetxService {
 
   /// Get a single handle's focus state by [address]
   Future<Response> handleFocusState(String address, {CancelToken? cancelToken}) async {
+    final encodedAddress = Uri.encodeComponent(address);
     return runApiGuarded(() async {
       final response = await dio.get(
-          "$apiRoot/handle/$address/focus",
+          "$apiRoot/handle/$encodedAddress/focus",
           queryParameters: buildQueryParams(),
           cancelToken: cancelToken
       );

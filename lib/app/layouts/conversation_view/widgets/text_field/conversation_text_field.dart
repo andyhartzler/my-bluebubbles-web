@@ -21,7 +21,9 @@ import 'package:bluebubbles/utils/share.dart';
 import 'package:chunked_stream/chunked_stream.dart';
 import 'package:collection/collection.dart';
 import 'package:emojis/emoji.dart';
-import 'package:emoji_picker_flutter/emoji_picker_flutter.dart' hide Emoji;
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart'
+    as emoji_picker
+    hide Emoji;
 import 'package:file_picker/file_picker.dart' as pf;
 import 'package:file_picker/file_picker.dart' hide PlatformFile;
 import 'package:flutter/cupertino.dart';
@@ -624,14 +626,13 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
                         }
                       }
                     }),
-              if (kIsDesktop || kIsWeb)
-                IconButton(
-                  icon: Icon(iOS ? CupertinoIcons.smiley_fill : Icons.emoji_emotions, color: context.theme.colorScheme.outline, size: 28),
-                  onPressed: () {
-                    showEmojiPicker.value = !showEmojiPicker.value;
-                    (controller.editing.lastOrNull?.item3.focusNode ?? controller.lastFocusedNode).requestFocus();
-                  },
-                ),
+              IconButton(
+                icon: Icon(iOS ? CupertinoIcons.smiley_fill : Icons.emoji_emotions, color: context.theme.colorScheme.outline, size: 28),
+                onPressed: () {
+                  showEmojiPicker.value = !showEmojiPicker.value;
+                  (controller.editing.lastOrNull?.item3.focusNode ?? controller.lastFocusedNode).requestFocus();
+                },
+              ),
               if (kIsDesktop && !Platform.isLinux)
                 IconButton(
                   icon: Icon(iOS ? CupertinoIcons.location_solid : Icons.location_on_outlined, color: context.theme.colorScheme.outline, size: 28),
@@ -731,90 +732,102 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
               curve: Curves.easeIn,
               alignment: Alignment.bottomCenter,
               child: Obx(() {
-                return showEmojiPicker.value
-                    ? Theme(
-                        data: context.theme.copyWith(canvasColor: Colors.transparent),
-                        child: EmojiPicker(
-                          textEditingController: proxyController,
-                          scrollController: ScrollController(),
-                          config: Config(
-                            height: emojiPickerHeight,
-                            checkPlatformCompatibility: true,
-                            emojiViewConfig: EmojiViewConfig(
-                              emojiSizeMax: 28,
-                              backgroundColor: Colors.transparent,
-                              columns: emojiColumns,
-                              noRecents: Text("No Recents", style: context.textTheme.headlineMedium!.copyWith(color: context.theme.colorScheme.outline))
-                            ),
-                            swapCategoryAndBottomBar: true,
-                            skinToneConfig: const SkinToneConfig(enabled: false),
-                            categoryViewConfig: const CategoryViewConfig(
-                              backgroundColor: Colors.transparent,
-                              dividerColor: Colors.transparent,
-                            ),
-                            bottomActionBarConfig: BottomActionBarConfig(
-                              customBottomActionBar: (Config config, EmojiViewState state, VoidCallback showSearchView) {
-                                return Container(
-                                  margin: const EdgeInsets.only(top: 10),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Material(
-                                          child: InkWell(
-                                            onTap: showSearchView,
-                                            child: Padding(
-                                              padding: const EdgeInsets.all(12),
-                                              child: Row(children: [
-                                                Icon(
-                                                  iOS ? CupertinoIcons.search : Icons.search,
-                                                  color: context.theme.colorScheme.outline,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    "Search...",
-                                                    style: context.theme.textTheme.bodyLarge!.copyWith(
-                                                      color: context.theme.colorScheme.outline,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ]),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.all(12),
-                                        child: IconButton(
-                                          icon: Icon(
-                                            iOS ? CupertinoIcons.xmark : Icons.close,
-                                            color: context.theme.colorScheme.outline,
-                                          ),
-                                          onPressed: () {
-                                            showEmojiPicker.value = false;
-                                            controller.lastFocusedNode.requestFocus();
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                            searchViewConfig: SearchViewConfig(
-                              backgroundColor: Colors.transparent,
-                              buttonIconColor: context.theme.colorScheme.outline,
-                            ),
-                          ),
-                        ),
-                      )
-                    : const SizedBox.shrink();
+                return showEmojiPicker.value ? _buildEmojiPicker(context) : const SizedBox.shrink();
               }),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmojiPicker(BuildContext context) {
+    final theme = context.theme;
+    final outlineColor = theme.colorScheme.outline;
+
+    return Theme(
+      data: theme.copyWith(canvasColor: Colors.transparent),
+      child: emoji_picker.EmojiPicker(
+        textEditingController: proxyController,
+        scrollController: ScrollController(),
+        config: emoji_picker.Config(
+          height: emojiPickerHeight,
+          checkPlatformCompatibility: true,
+          viewOrderConfig: const emoji_picker.ViewOrderConfig(
+            top: emoji_picker.EmojiPickerItem.searchBar,
+            middle: emoji_picker.EmojiPickerItem.emojiView,
+            bottom: emoji_picker.EmojiPickerItem.categoryBar,
+          ),
+          emojiViewConfig: emoji_picker.EmojiViewConfig(
+            emojiSizeMax: 28,
+            backgroundColor: Colors.transparent,
+            columns: emojiColumns,
+            noRecents: Text(
+              "No Recents",
+              style: theme.textTheme.headlineMedium?.copyWith(color: outlineColor),
+            ),
+          ),
+          skinToneConfig: const emoji_picker.SkinToneConfig(enabled: false),
+          categoryViewConfig: const emoji_picker.CategoryViewConfig(
+            backgroundColor: Colors.transparent,
+            dividerColor: Colors.transparent,
+          ),
+          bottomActionBarConfig: emoji_picker.BottomActionBarConfig(
+            customBottomActionBar: (emoji_picker.Config config, emoji_picker.EmojiViewState state, VoidCallback showSearchView) {
+              return Container(
+                margin: const EdgeInsets.only(top: 10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Material(
+                        child: InkWell(
+                          onTap: showSearchView,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  iOS ? CupertinoIcons.search : Icons.search,
+                                  color: outlineColor,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    "Search...",
+                                    style: theme.textTheme.bodyLarge?.copyWith(color: outlineColor),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: IconButton(
+                        icon: Icon(
+                          iOS ? CupertinoIcons.xmark : Icons.close,
+                          color: outlineColor,
+                        ),
+                        onPressed: () {
+                          showEmojiPicker.value = false;
+                          controller.lastFocusedNode.requestFocus();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+              );
+            },
+          ),
+          searchViewConfig: emoji_picker.SearchViewConfig(
+            backgroundColor: Colors.transparent,
+            buttonIconColor: outlineColor,
+          ),
         ),
       ),
     );
@@ -831,6 +844,7 @@ class TextFieldComponent extends StatefulWidget {
     required this.sendMessage,
     this.focusNode,
     this.initialAttachments = const [],
+    this.onAttachmentsChanged,
   });
 
   final SpellCheckTextEditingController subjectTextController;
@@ -841,6 +855,7 @@ class TextFieldComponent extends StatefulWidget {
   final FocusNode? focusNode;
 
   final List<PlatformFile> initialAttachments;
+  final VoidCallback? onAttachmentsChanged;
 
   @override
   State<StatefulWidget> createState() => TextFieldComponentState();
@@ -855,6 +870,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
   late final MentionTextEditingController textController;
   late final SpellCheckTextEditingController subjectTextController;
   late final Future<void> Function({String? effect}) sendMessage;
+  late final VoidCallback? onAttachmentsChanged;
 
   late final ValueNotifier<bool> isRecordingNotifier;
   TextFieldComponentState() : isRecordingNotifier = ValueNotifier<bool>(false);
@@ -869,6 +885,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     textController = widget.textController;
     subjectTextController = widget.subjectTextController;
     sendMessage = widget.sendMessage;
+    onAttachmentsChanged = widget.onAttachmentsChanged;
 
     // add a listener to recorderController to update isRecordingNotifier
     recorderController?.addListener(() {
@@ -930,6 +947,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
                     textController: txtController,
                     subjectTextController: subjController,
                     initialAttachments: initialAttachments,
+                    onChanged: onAttachmentsChanged,
                   ),
                 if (!isChatCreator)
                   Obx(() {
