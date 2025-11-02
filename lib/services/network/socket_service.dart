@@ -460,6 +460,11 @@ class SocketService extends GetxService {
       serverCandidate = await _appendServerInfoCandidate();
     }
     _prioritizeCandidates(serverCandidate: serverCandidate);
+    if (_socketCandidates.isNotEmpty) {
+      Logger.debug('Socket candidates: ${_socketCandidates.join(', ')}');
+    } else {
+      Logger.debug('Socket candidates: <none>');
+    }
   }
 
   void _prioritizeCandidates({String? serverCandidate}) {
@@ -561,8 +566,8 @@ class SocketService extends GetxService {
 
     final builder = OptionBuilder()
         .setQuery({"guid": password})
-        .setTransports(['polling', 'websocket'])
-        .setPath('/socket.io/')
+        .setTransports(['websocket', 'polling'])
+        .setPath('/socket.io')
         .setTimeout(20000)
         .setReconnectionAttempts(999999)
         .setReconnectionDelay(2000)
@@ -572,7 +577,7 @@ class SocketService extends GetxService {
         .disableAutoConnect()
         .enableReconnection();
 
-    if (!kIsWeb && http.headers.isNotEmpty) {
+    if (http.headers.isNotEmpty) {
       builder.setExtraHeaders(http.headers);
     }
 
