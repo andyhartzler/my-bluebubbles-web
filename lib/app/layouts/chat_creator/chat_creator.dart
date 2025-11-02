@@ -24,6 +24,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_acrylic/window_effect.dart';
+import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:get/get.dart' hide Response;
 import 'package:mime_type/mime_type.dart';
 import 'package:slugify/slugify.dart';
