@@ -19,12 +19,14 @@ class PickedAttachmentsHolder extends StatefulWidget {
     required this.textController,
     required this.controller,
     this.initialAttachments = const [],
+    this.onChanged,
   });
 
   final ConversationViewController? controller;
   final TextEditingController subjectTextController;
   final TextEditingController textController;
   final List<PlatformFile> initialAttachments;
+  final VoidCallback? onChanged;
 
   @override
   OptimizedState createState() => _PickedAttachmentsHolderState();
@@ -77,19 +79,20 @@ class _PickedAttachmentsHolderState extends OptimizedState<PickedAttachmentsHold
                     SliverList(
                       delegate: SliverChildBuilderDelegate(
                             (context, index) {
-                          return PickedAttachment(
-                            key: ValueKey(pickedAttachments[index].name),
-                            data: pickedAttachments[index],
-                            controller: widget.controller,
-                            onRemove: (file) {
-                              if (widget.controller == null) {
-                                pickedAttachments.removeWhere((e) => e.path == file.path);
-                                setState(() {});
-                              }
-                            },
-                          );
-                        },
-                        childCount: pickedAttachments.length,
+          return PickedAttachment(
+            key: ValueKey(pickedAttachments[index].name),
+            data: pickedAttachments[index],
+            controller: widget.controller,
+            onRemove: (file) {
+              if (widget.controller == null) {
+                pickedAttachments.removeWhere((e) => e.path == file.path);
+                setState(() {});
+                widget.onChanged?.call();
+              }
+            },
+          );
+        },
+        childCount: pickedAttachments.length,
                       ),
                     )
                   ],
