@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'package:universal_html/html.dart' as html;
 import 'package:universal_io/io.dart';
 
 import 'package:bluebubbles/helpers/backend/settings_helpers.dart';
@@ -37,6 +38,7 @@ class SocketService extends GetxService {
   int _candidateIndex = 0;
   bool _resolvingCandidate = false;
   bool _serverInfoChecked = false;
+  bool? _secureContext;
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
@@ -286,7 +288,7 @@ class SocketService extends GetxService {
         return;
       }
 
-      if (kIsWeb && !_isLocalHost(uri.host) && uri.scheme == 'http') {
+      if (_shouldBlockInsecureCandidate(uri)) {
         return;
       }
 
@@ -517,7 +519,7 @@ class SocketService extends GetxService {
       scheme = 'https';
     }
 
-    if (kIsWeb && !_isLocalHost(baseUri.host) && scheme == 'http') {
+    if (_shouldBlockInsecureCandidate(baseUri) && scheme == 'http') {
       scheme = 'https';
     }
 
@@ -559,7 +561,11 @@ class SocketService extends GetxService {
       final bool secure = candidate.startsWith('wss://');
       final String targetScheme;
       if (kIsWeb && !_isLocalHost(uri.host)) {
-        targetScheme = 'https';
+        if (_isSecureContext()) {
+          targetScheme = 'https';
+        } else {
+          targetScheme = secure ? 'https' : 'http';
+        }
       } else {
         targetScheme = secure ? 'https' : 'http';
       }
@@ -568,6 +574,40 @@ class SocketService extends GetxService {
     }
 
     return candidate;
+  }
+
+  bool _shouldBlockInsecureCandidate(Uri uri) {
+    if (!kIsWeb) {
+      return false;
+    }
+
+    if (uri.scheme != 'http') {
+      return false;
+    }
+
+    if (_isLocalHost(uri.host)) {
+      return false;
+    }
+
+    return _isSecureContext();
+  }
+
+  bool _isSecureContext() {
+    if (!kIsWeb) {
+      return false;
+    }
+
+    if (_secureContext != null) {
+      return _secureContext!;
+    }
+
+    bool secure = true;
+    try {
+      secure = html.window.location.protocol == 'https:' || html.window.location.protocol == 'wss:';
+    } catch (_) {}
+
+    _secureContext = secure;
+    return secure;
   }
 
   void _initializeSocket() {
