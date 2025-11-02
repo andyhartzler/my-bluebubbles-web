@@ -285,6 +285,11 @@ class SocketService extends GetxService {
       if (candidate.isEmpty) {
         return;
       }
+
+      if (kIsWeb && !_isLocalHost(uri.host) && uri.scheme == 'http') {
+        return;
+      }
+
       candidates.add(candidate);
     }
 
@@ -554,11 +559,10 @@ class SocketService extends GetxService {
       return;
     }
 
-    OptionBuilder options = OptionBuilder()
+    final builder = OptionBuilder()
         .setQuery({"guid": password})
-        .setTransports(['websocket', 'polling'])
-        .setExtraHeaders(http.headers)
-        .setPath('/socket.io')
+        .setTransports(['polling', 'websocket'])
+        .setPath('/socket.io/')
         .setTimeout(20000)
         .setReconnectionAttempts(999999)
         .setReconnectionDelay(2000)
@@ -568,8 +572,14 @@ class SocketService extends GetxService {
         .disableAutoConnect()
         .enableReconnection();
 
+    if (!kIsWeb && http.headers.isNotEmpty) {
+      builder.setExtraHeaders(http.headers);
+    }
+
+    final options = builder.build();
+
     Logger.info('Connecting to socket at $target');
-    socket = io(target, options.build());
+    socket = io(target, options);
     _socketInitialized = true;
 
     socket.onConnect((data) => handleStatusUpdate(SocketState.connected, data));
