@@ -564,10 +564,15 @@ class SocketService extends GetxService {
       return;
     }
 
-    final builder = OptionBuilder()
-        .setQuery({"guid": password})
-        .setTransports(['websocket', 'polling'])
-        .setPath('/socket.io')
+    final Map<String, dynamic> query = <String, dynamic>{};
+    if (password.isNotEmpty) {
+      query['guid'] = password;
+    }
+
+    final OptionBuilder builder = OptionBuilder()
+        .setQuery(query)
+        .setTransports(<String>['polling', 'websocket'])
+        .setPath('/socket.io/')
         .setTimeout(20000)
         .setReconnectionAttempts(999999)
         .setReconnectionDelay(2000)
@@ -577,7 +582,7 @@ class SocketService extends GetxService {
         .disableAutoConnect()
         .enableReconnection();
 
-    if (http.headers.isNotEmpty) {
+    if (!kIsWeb && http.headers.isNotEmpty) {
       builder.setExtraHeaders(http.headers);
     }
 
