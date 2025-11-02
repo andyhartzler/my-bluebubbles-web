@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'package:universal_io/io.dart';
 
@@ -28,6 +29,8 @@ class SocketService extends GetxService {
   Timer? _reconnectTimer;
   Timer? _healthCheckTimer;
   late Socket socket;
+  bool _socketInitialized = false;
+  bool _initializingSocket = false;
   String? _socketOverride;
   String? _lastBaseServer;
   List<String> _socketCandidates = <String>[];
@@ -62,87 +65,41 @@ class SocketService extends GetxService {
   }
 
   void startSocket() {
-    _ensureSocketCandidates();
-
-    OptionBuilder options = OptionBuilder()
-        .setQuery({"guid": password})
-        .setTransports(['websocket', 'polling'])
-        .setExtraHeaders(http.headers)
-        .setPath('/socket.io')
-        .setTimeout(20000)
-        .setReconnectionAttempts(999999)
-        .setReconnectionDelay(2000)
-        .setReconnectionDelayMax(10000)
-        .setRandomizationFactor(0.35)
-        // Disable so that we can create the listeners first
-        .disableAutoConnect()
-        .enableReconnection();
-    final target = _currentSocketTarget();
-    if (isNullOrEmpty(target)) {
+    if (_initializingSocket) {
+      Logger.debug('Socket initialization already in progress');
       return;
     }
 
-    Logger.info('Connecting to socket at $target');
-    socket = io(target, options.build());
-
-    socket.onConnect((data) => handleStatusUpdate(SocketState.connected, data));
-    socket.onReconnect((data) => handleStatusUpdate(SocketState.connected, data));
-
-    socket.onReconnectAttempt((data) => handleStatusUpdate(SocketState.connecting, data));
-    socket.onReconnecting((data) => handleStatusUpdate(SocketState.connecting, data));
-    socket.onConnecting((data) => handleStatusUpdate(SocketState.connecting, data));
-
-    socket.onDisconnect((data) => handleStatusUpdate(SocketState.disconnected, data));
-
-    socket.onConnectError((data) => handleStatusUpdate(SocketState.error, data));
-    socket.onReconnectError((data) => handleStatusUpdate(SocketState.error, data));
-    socket.onConnectTimeout((data) => handleStatusUpdate(SocketState.error, data));
-    socket.onError((data) => handleStatusUpdate(SocketState.error, data));
-    socket.onReconnectFailed((_) => _scheduleReconnect(fetchNewUrl: true));
-
-    // custom events
-    // only listen to these events from socket on web/desktop (FCM handles on Android)
-    if (kIsWeb || kIsDesktop) {
-      socket.on("group-name-change", (data) => ah.handleEvent("group-name-change", data, 'DartSocket'));
-      socket.on("participant-removed", (data) => ah.handleEvent("participant-removed", data, 'DartSocket'));
-      socket.on("participant-added", (data) => ah.handleEvent("participant-added", data, 'DartSocket'));
-      socket.on("participant-left", (data) => ah.handleEvent("participant-left", data, 'DartSocket'));
-      socket.on("incoming-facetime", (data) => ah.handleEvent("incoming-facetime", jsonDecode(data), 'DartSocket'));
-    }
-
-    socket.on("ft-call-status-changed", (data) => ah.handleEvent("ft-call-status-changed", data, 'DartSocket'));
-    socket.on("new-message", (data) => ah.handleEvent("new-message", data, 'DartSocket'));
-    socket.on("updated-message", (data) => ah.handleEvent("updated-message", data, 'DartSocket'));
-    socket.on("typing-indicator", (data) => ah.handleEvent("typing-indicator", data, 'DartSocket'));
-    socket.on("chat-read-status-changed", (data) => ah.handleEvent("chat-read-status-changed", data, 'DartSocket'));
-    socket.on("imessage-aliases-removed", (data) => ah.handleEvent("imessage-aliases-removed", data, 'DartSocket'));
-
-    socket.connect();
-    _healthCheckTimer?.cancel();
-    _healthCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (state.value == SocketState.connected || _reconnectTimer != null) {
-        return;
+    _initializingSocket = true;
+    Future<void>(() async {
+      try {
+        await _prepareSocketCandidates();
+        _initializeSocket();
+      } catch (e, stack) {
+        Logger.error('Failed to start socket', error: e, trace: stack);
+      } finally {
+        _initializingSocket = false;
       }
-      _scheduleReconnect();
     });
   }
 
   void disconnect() {
-    if (isNullOrEmpty(serverAddress)) return;
+    if (!_socketInitialized || isNullOrEmpty(serverAddress)) return;
     socket.disconnect();
     state.value = SocketState.disconnected;
     _healthCheckTimer?.cancel();
   }
 
   void reconnect() {
-    if (state.value == SocketState.connected || isNullOrEmpty(serverAddress)) return;
+    if (!_socketInitialized || state.value == SocketState.connected || isNullOrEmpty(serverAddress)) return;
     state.value = SocketState.connecting;
     socket.connect();
   }
 
   void closeSocket() {
-    if (isNullOrEmpty(serverAddress)) return;
+    if (!_socketInitialized || isNullOrEmpty(serverAddress)) return;
     socket.dispose();
+    _socketInitialized = false;
     state.value = SocketState.disconnected;
     _healthCheckTimer?.cancel();
   }
@@ -160,6 +117,10 @@ class SocketService extends GetxService {
   }
 
   Future<Map<String, dynamic>> sendMessage(String event, Map<String, dynamic> message) {
+    if (!_socketInitialized) {
+      return Future.error('Socket not initialized');
+    }
+
     Completer<Map<String, dynamic>> completer = Completer();
 
     socket.emitWithAck(event, message, ack: (response) {
@@ -317,16 +278,14 @@ class SocketService extends GetxService {
     _lastBaseServer = base;
     _candidateIndex = 0;
     _serverInfoChecked = false;
-    final List<String> candidates = <String>[];
+    final LinkedHashSet<String> candidates = LinkedHashSet<String>();
 
     void addUri(Uri uri) {
       final candidate = uri.toString();
       if (candidate.isEmpty) {
         return;
       }
-      if (!candidates.contains(candidate)) {
-        candidates.add(candidate);
-      }
+      candidates.add(candidate);
     }
 
     addUri(baseUri);
@@ -360,7 +319,7 @@ class SocketService extends GetxService {
       }
     }
 
-    _socketCandidates = candidates;
+    _socketCandidates = candidates.toList();
   }
 
   Future<bool> _applyNextCandidate() async {
@@ -370,7 +329,6 @@ class SocketService extends GetxService {
 
     _resolvingCandidate = true;
     try {
-      _ensureSocketCandidates();
       if (_socketCandidates.isEmpty) {
         return false;
       }
@@ -381,17 +339,25 @@ class SocketService extends GetxService {
         final String next = _socketCandidates[_candidateIndex];
         _socketOverride = next == serverAddress ? null : next;
         Logger.warn('Socket connection failed, retrying with alternate target: $next');
-        restartSocket();
+        closeSocket();
+        _initializeSocket();
         return true;
       }
 
-      if (!_serverInfoChecked && await _appendServerInfoCandidate()) {
-        _candidateIndex = _socketCandidates.length - 1;
-        final String next = _socketCandidates[_candidateIndex];
-        _socketOverride = next == serverAddress ? null : next;
-        Logger.warn('Socket connection failed, retrying with server-provided target: $next');
-        restartSocket();
-        return true;
+      if (!_serverInfoChecked) {
+        final String? appended = await _appendServerInfoCandidate();
+        if (appended != null) {
+          _prioritizeCandidates(serverCandidate: appended);
+          if (_socketCandidates.isNotEmpty) {
+            final String next = _socketCandidates.first;
+            _candidateIndex = 0;
+            _socketOverride = next == serverAddress ? null : next;
+            Logger.warn('Socket connection failed, retrying with server-provided target: $next');
+            closeSocket();
+            _initializeSocket();
+            return true;
+          }
+        }
       }
 
       return false;
@@ -400,13 +366,13 @@ class SocketService extends GetxService {
     }
   }
 
-  Future<bool> _appendServerInfoCandidate() async {
+  Future<String?> _appendServerInfoCandidate() async {
     _serverInfoChecked = true;
     try {
       final response = await http.serverInfo();
       final dynamic data = response.data;
       if (data is! Map) {
-        return false;
+        return null;
       }
 
       final Map map = data;
@@ -417,10 +383,11 @@ class SocketService extends GetxService {
         'socketAddress',
       ]);
       if (socketUrl != null) {
-        final String? sanitized = sanitizeServerAddress(address: socketUrl);
-        if (sanitized != null && !_socketCandidates.contains(sanitized)) {
-          _socketCandidates.add(sanitized);
-          return true;
+        final String? sanitized = _normalizeCandidate(sanitizeServerAddress(address: socketUrl));
+        if (sanitized != null) {
+          _socketCandidates.remove(sanitized);
+          _socketCandidates.insert(0, sanitized);
+          return sanitized;
         }
       }
 
@@ -443,17 +410,16 @@ class SocketService extends GetxService {
 
           final Uri candidateUri = baseUri.replace(scheme: scheme, port: port);
           final String candidate = candidateUri.toString();
-          if (!_socketCandidates.contains(candidate)) {
-            _socketCandidates.add(candidate);
-            return true;
-          }
+          _socketCandidates.remove(candidate);
+          _socketCandidates.insert(0, candidate);
+          return candidate;
         }
       }
     } catch (e, stack) {
       Logger.warn('Failed to fetch server socket metadata', error: e, trace: stack);
     }
 
-    return false;
+    return null;
   }
 
   String? _stringFromMap(Map<dynamic, dynamic> map, List<String> keys) {
@@ -480,5 +446,173 @@ class SocketService extends GetxService {
       }
     }
     return null;
+  }
+
+  Future<void> _prepareSocketCandidates() async {
+    _ensureSocketCandidates();
+    String? serverCandidate;
+    if (!_serverInfoChecked) {
+      serverCandidate = await _appendServerInfoCandidate();
+    }
+    _prioritizeCandidates(serverCandidate: serverCandidate);
+  }
+
+  void _prioritizeCandidates({String? serverCandidate}) {
+    if (_socketCandidates.isEmpty) {
+      if (serverAddress.isNotEmpty) {
+        _socketCandidates = <String>[serverAddress];
+      }
+      return;
+    }
+
+    final LinkedHashSet<String> ordered = LinkedHashSet<String>();
+
+    void push(String? value) {
+      if (value == null || value.isEmpty) return;
+      ordered.add(value);
+    }
+
+    push(serverCandidate);
+
+    final Uri? baseUri = Uri.tryParse(serverAddress);
+    if (baseUri != null && ss.settings.enablePrivateAPI.value) {
+      push(_buildPrivateApiCandidate(baseUri));
+    }
+
+    for (final String candidate in _socketCandidates) {
+      push(candidate);
+    }
+
+    _socketCandidates = ordered.toList();
+    _candidateIndex = 0;
+    if (_socketCandidates.isNotEmpty) {
+      final String first = _socketCandidates.first;
+      _socketOverride = first == serverAddress ? null : first;
+    } else {
+      _socketOverride = null;
+    }
+  }
+
+  String? _buildPrivateApiCandidate(Uri baseUri) {
+    if (baseUri.host.isEmpty) {
+      return null;
+    }
+
+    String scheme = baseUri.scheme;
+    if (scheme.isEmpty) {
+      scheme = 'http';
+    } else if (scheme == 'ws') {
+      scheme = 'http';
+    } else if (scheme == 'wss') {
+      scheme = 'https';
+    }
+
+    if (kIsWeb && !_isLocalHost(baseUri.host) && scheme == 'http') {
+      scheme = 'https';
+    }
+
+    final Uri candidate = baseUri.replace(scheme: scheme, port: 1234);
+    final String candidateString = candidate.toString();
+    if (candidateString == serverAddress) {
+      return null;
+    }
+
+    return candidateString;
+  }
+
+  bool _isLocalHost(String host) {
+    if (host == 'localhost') {
+      return true;
+    }
+
+    final InternetAddress? parsed = InternetAddress.tryParse(host);
+    if (parsed != null) {
+      return parsed.isLoopback || parsed.type == InternetAddressType.unix;
+    }
+
+    return host.endsWith('.local');
+  }
+
+  String? _normalizeCandidate(String? candidate) {
+    if (candidate == null) {
+      return null;
+    }
+    if (candidate.startsWith('ws://')) {
+      return 'http://${candidate.substring(5)}';
+    }
+    if (candidate.startsWith('wss://')) {
+      return 'https://${candidate.substring(6)}';
+    }
+    return candidate;
+  }
+
+  void _initializeSocket() {
+    final String? target = _currentSocketTarget();
+    if (isNullOrEmpty(target)) {
+      Logger.warn('No socket target available');
+      _initializingSocket = false;
+      return;
+    }
+
+    OptionBuilder options = OptionBuilder()
+        .setQuery({"guid": password})
+        .setTransports(['websocket', 'polling'])
+        .setExtraHeaders(http.headers)
+        .setPath('/socket.io')
+        .setTimeout(20000)
+        .setReconnectionAttempts(999999)
+        .setReconnectionDelay(2000)
+        .setReconnectionDelayMax(10000)
+        .setRandomizationFactor(0.35)
+        // Disable so that we can create the listeners first
+        .disableAutoConnect()
+        .enableReconnection();
+
+    Logger.info('Connecting to socket at $target');
+    socket = io(target, options.build());
+    _socketInitialized = true;
+
+    socket.onConnect((data) => handleStatusUpdate(SocketState.connected, data));
+    socket.onReconnect((data) => handleStatusUpdate(SocketState.connected, data));
+
+    socket.onReconnectAttempt((data) => handleStatusUpdate(SocketState.connecting, data));
+    socket.onReconnecting((data) => handleStatusUpdate(SocketState.connecting, data));
+    socket.onConnecting((data) => handleStatusUpdate(SocketState.connecting, data));
+
+    socket.onDisconnect((data) => handleStatusUpdate(SocketState.disconnected, data));
+
+    socket.onConnectError((data) => handleStatusUpdate(SocketState.error, data));
+    socket.onReconnectError((data) => handleStatusUpdate(SocketState.error, data));
+    socket.onConnectTimeout((data) => handleStatusUpdate(SocketState.error, data));
+    socket.onError((data) => handleStatusUpdate(SocketState.error, data));
+    socket.onReconnectFailed((_) => _scheduleReconnect(fetchNewUrl: true));
+
+    // custom events
+    // only listen to these events from socket on web/desktop (FCM handles on Android)
+    if (kIsWeb || kIsDesktop) {
+      socket.on("group-name-change", (data) => ah.handleEvent("group-name-change", data, 'DartSocket'));
+      socket.on("participant-removed", (data) => ah.handleEvent("participant-removed", data, 'DartSocket'));
+      socket.on("participant-added", (data) => ah.handleEvent("participant-added", data, 'DartSocket'));
+      socket.on("participant-left", (data) => ah.handleEvent("participant-left", data, 'DartSocket'));
+      socket.on("incoming-facetime", (data) => ah.handleEvent("incoming-facetime", jsonDecode(data), 'DartSocket'));
+    }
+
+    socket.on("ft-call-status-changed", (data) => ah.handleEvent("ft-call-status-changed", data, 'DartSocket'));
+    socket.on("new-message", (data) => ah.handleEvent("new-message", data, 'DartSocket'));
+    socket.on("updated-message", (data) => ah.handleEvent("updated-message", data, 'DartSocket'));
+    socket.on("typing-indicator", (data) => ah.handleEvent("typing-indicator", data, 'DartSocket'));
+    socket.on("chat-read-status-changed", (data) => ah.handleEvent("chat-read-status-changed", data, 'DartSocket'));
+    socket.on("imessage-aliases-removed", (data) => ah.handleEvent("imessage-aliases-removed", data, 'DartSocket'));
+
+    state.value = SocketState.connecting;
+    socket.connect();
+    _healthCheckTimer?.cancel();
+    _healthCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (state.value == SocketState.connected || _reconnectTimer != null) {
+        return;
+      }
+      _scheduleReconnect();
+    });
+    _initializingSocket = false;
   }
 }
