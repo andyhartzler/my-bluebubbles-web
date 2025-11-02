@@ -39,6 +39,7 @@ class SocketService extends GetxService {
   bool _resolvingCandidate = false;
   bool _serverInfoChecked = false;
   bool? _secureContext;
+  bool _forcePollingTransport = false;
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
@@ -178,7 +179,7 @@ class SocketService extends GetxService {
           handleSocketException(data);
         }
 
-        _handleSocketError();
+        _handleSocketError(data);
         return;
       default:
         return;
@@ -225,10 +226,15 @@ class SocketService extends GetxService {
     _socketCandidates = <String>[];
     _candidateIndex = 0;
     _serverInfoChecked = false;
+    _forcePollingTransport = false;
   }
 
-  void _handleSocketError() {
+  void _handleSocketError([dynamic error]) {
     Future<void>(() async {
+      if (_attemptPollingFallback(error)) {
+        return;
+      }
+
       final applied = await _applyNextCandidate();
       if (applied) {
         return;
@@ -263,6 +269,7 @@ class SocketService extends GetxService {
     if (base.isEmpty) {
       _socketCandidates = <String>[];
       _lastBaseServer = null;
+      _forcePollingTransport = false;
       return;
     }
 
@@ -274,9 +281,13 @@ class SocketService extends GetxService {
     if (baseUri == null) {
       _socketCandidates = <String>[];
       _lastBaseServer = null;
+      _forcePollingTransport = false;
       return;
     }
 
+    if (_lastBaseServer != base) {
+      _forcePollingTransport = false;
+    }
     _lastBaseServer = base;
     _candidateIndex = 0;
     _serverInfoChecked = false;
@@ -345,6 +356,7 @@ class SocketService extends GetxService {
         _candidateIndex += 1;
         final String next = _socketCandidates[_candidateIndex];
         _socketOverride = next == serverAddress ? null : next;
+        _forcePollingTransport = false;
         Logger.warn('Socket connection failed, retrying with alternate target: $next');
         closeSocket();
         _initializeSocket();
@@ -359,6 +371,7 @@ class SocketService extends GetxService {
             final String next = _socketCandidates.first;
             _candidateIndex = 0;
             _socketOverride = next == serverAddress ? null : next;
+            _forcePollingTransport = false;
             Logger.warn('Socket connection failed, retrying with server-provided target: $next');
             closeSocket();
             _initializeSocket();
@@ -625,7 +638,7 @@ class SocketService extends GetxService {
 
     final OptionBuilder builder = OptionBuilder()
         .setQuery(query)
-        .setTransports(<String>['websocket', 'polling'])
+        .setTransports(_socketTransports())
         .setPath('/socket.io/')
         .setTimeout(20000)
         .setReconnectionAttempts(999999)
@@ -688,5 +701,88 @@ class SocketService extends GetxService {
       _scheduleReconnect();
     });
     _initializingSocket = false;
+  }
+
+  List<String> _socketTransports() {
+    if (!kIsWeb) {
+      return const <String>['websocket', 'polling'];
+    }
+
+    if (_forcePollingTransport) {
+      return const <String>['polling'];
+    }
+
+    return const <String>['polling', 'websocket'];
+  }
+
+  bool _attemptPollingFallback(dynamic error) {
+    if (!kIsWeb || _forcePollingTransport) {
+      return false;
+    }
+
+    if (!_shouldForcePollingTransport(error)) {
+      return false;
+    }
+
+    _forcePollingTransport = true;
+    Logger.warn('Switching socket transport to long polling due to WebSocket connection failure');
+    closeSocket();
+    _initializeSocket();
+    return true;
+  }
+
+  bool _shouldForcePollingTransport(dynamic error) {
+    final String? message = _socketErrorMessage(error);
+    if (message == null) {
+      return false;
+    }
+
+    final String lower = message.toLowerCase();
+    if (lower.contains('websocket is closed before the connection is established') ||
+        lower.contains('websocket connection') ||
+        lower.contains('websocket error') ||
+        lower.contains('network connection was lost') ||
+        lower.contains('transport error') ||
+        lower.contains('transport close')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  String? _socketErrorMessage(dynamic error) {
+    if (error == null) {
+      return null;
+    }
+
+    if (error is SocketException) {
+      return error.message;
+    }
+
+    if (error is WebSocketException) {
+      return error.message;
+    }
+
+    if (error is Error) {
+      return error.toString();
+    }
+
+    if (error is Map) {
+      for (final String key in const <String>['message', 'description', 'data', 'error']) {
+        final dynamic value = error[key];
+        if (value is String && value.isNotEmpty) {
+          return value;
+        }
+        if (value != null) {
+          return value.toString();
+        }
+      }
+    }
+
+    if (error is Iterable) {
+      return error.map((dynamic item) => item == null ? '' : item.toString()).join(' ');
+    }
+
+    return error.toString();
   }
 }
