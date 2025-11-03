@@ -62,14 +62,10 @@ class SocketService extends GetxService {
     OptionBuilder options = OptionBuilder()
         .setQuery({"guid": password})
         .setTransports(['websocket', 'polling'])
-        .setPath('/socket.io/')
+        .setExtraHeaders(http.headers)
         // Disable so that we can create the listeners first
         .disableAutoConnect()
         .enableReconnection();
-
-    if (!kIsWeb && http.headers.isNotEmpty) {
-      options = options.setExtraHeaders(http.headers);
-    }
 
     socket = io(serverAddress, options.build());
     // placed here so that [socket] is still initialized
@@ -85,10 +81,8 @@ class SocketService extends GetxService {
     socket.onDisconnect((data) => handleStatusUpdate(SocketState.disconnected, data));
 
     socket.onConnectError((data) => handleStatusUpdate(SocketState.error, data));
-    socket.onReconnectError((data) => handleStatusUpdate(SocketState.error, data));
     socket.onConnectTimeout((data) => handleStatusUpdate(SocketState.error, data));
     socket.onError((data) => handleStatusUpdate(SocketState.error, data));
-    socket.onReconnectFailed((_) => _scheduleReconnect(fetchNewUrl: true));
 
     // custom events
     // only listen to these events from socket on web/desktop (FCM handles on Android)
@@ -203,25 +197,6 @@ class SocketService extends GetxService {
     }
   }
 
-  void _scheduleReconnect({bool fetchNewUrl = false}) {
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 5), () async {
-      if (state.value == SocketState.connected) return;
-
-      if (fetchNewUrl) {
-        await fdb.fetchNewUrl();
-      }
-
-          if (state.value == SocketState.connected) return;
-
-      if (state.value == SocketState.connected) return;
-
-      if (!ss.settings.keepAppAlive.value) {
-        notif.createSocketError();
-      }
-    });
-  }
-
   void handleSocketException(SocketException e) {
     String msg = e.message;
     if (msg.contains("Failed host lookup")) {
@@ -232,6 +207,7 @@ class SocketService extends GetxService {
   }
 
   void clearOverride() {
+    http.originOverride = null;
     _resetErrorTracking();
   }
 
@@ -239,15 +215,6 @@ class SocketService extends GetxService {
     lastError.value = "";
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
-  }
-
-  void _resetErrorTracking() {
-    lastError.value = "";
-    _reconnectTimer?.cancel();
-    _reconnectTimer = null;
-    _healthCheckTimer?.cancel();
-    _healthCheckTimer = null;
-    _lastState = SocketState.disconnected;
   }
 }
 
