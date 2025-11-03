@@ -278,7 +278,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               final notesValue = _cleanText(_member.notes);
               final chapterStatus = _cleanText(_member.currentChapterMember);
               final chapterName = _cleanText(_member.chapterName);
+              final chapterPosition = _cleanText(_member.chapterPosition);
               final graduationYear = _cleanText(_member.graduationYear);
+              final schoolEmail = _cleanText(_member.schoolEmail);
+              final dateElected = _member.dateElected;
+              final termExpiration = _member.termExpiration;
               final college = _cleanText(_member.college);
               final highSchool = _cleanText(_member.highSchool);
               final legacySchool =
@@ -288,11 +292,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                 _buildOptionalSection('Contact Information', [
                   _copyRow('Phone', primaryPhone, copyValue: phoneCopyValue),
                   _copyRow('Email', email),
+                  _copyRow('School Email', schoolEmail),
                   _infoRowOrNull('Address', address),
                 ]),
                 _buildOptionalSection('Chapter Involvement', [
                   _infoRowOrNull('Current Chapter Member', chapterStatus),
                   _infoRowOrNull('Chapter Name', chapterName),
+                  _infoRowOrNull('Chapter Position', chapterPosition),
+                  if (dateElected != null)
+                    _buildInfoRow('Date Elected', _formatDateOnly(dateElected)),
+                  if (termExpiration != null)
+                    _buildInfoRow('Term Expiration', _formatDateOnly(termExpiration)),
                   _infoRowOrNull('Graduation Year', graduationYear),
                 ]),
                 _buildOptionalSection('Social Profiles', [
@@ -665,30 +675,20 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 2,
-            child: Text(label, style: labelStyle),
-          ),
-          Expanded(
-            flex: 3,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: valueWidget),
-                if (trailing != null) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Align(
-                      alignment: Alignment.topRight,
-                      child: trailing,
-                    ),
-                  ),
-                ],
+          Text(label, style: labelStyle),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: valueWidget),
+              if (trailing != null) ...[
+                const SizedBox(width: 8),
+                Flexible(child: trailing),
               ],
-            ),
+            ],
           ),
         ],
       ),
