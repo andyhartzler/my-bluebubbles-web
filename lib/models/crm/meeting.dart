@@ -42,15 +42,6 @@ int? _parseInt(dynamic value) {
   return null;
 }
 
-Map<String, dynamic>? _coerceJsonMap(dynamic value) {
-  if (value == null) return null;
-  if (value is Map<String, dynamic>) return value;
-  if (value is Map) {
-    return value.map((key, dynamic v) => MapEntry(key.toString(), v));
-  }
-  return null;
-}
-
 class Meeting {
   final String id;
   final DateTime meetingDate;
@@ -152,8 +143,8 @@ class Meeting {
 
   factory Meeting.fromJson(Map<String, dynamic> json, {bool includeAttendance = true}) {
     Member? host;
-    final hostData = _coerceJsonMap(json['host']);
-    if (hostData != null) {
+    final hostData = json['host'];
+    if (hostData is Map<String, dynamic>) {
       host = Member.fromJson(hostData);
     }
 
@@ -188,14 +179,10 @@ class Meeting {
 
     final attendanceData = json['attendance'];
     if (attendanceData is List) {
-      final attendance = <MeetingAttendance>[];
-      for (final item in attendanceData) {
-        final map = _coerceJsonMap(item);
-        if (map == null) {
-          continue;
-        }
-        attendance.add(MeetingAttendance.fromJson(map, meeting: meeting));
-      }
+      final attendance = attendanceData
+          .whereType<Map<String, dynamic>>()
+          .map((item) => MeetingAttendance.fromJson(item, meeting: meeting))
+          .toList();
       return meeting.copyWith(attendance: attendance);
     }
 
@@ -291,14 +278,14 @@ class MeetingAttendance {
 
   factory MeetingAttendance.fromJson(Map<String, dynamic> json, {Meeting? meeting}) {
     Member? member;
-    final memberData = _coerceJsonMap(json['member'] ?? json['members']);
-    if (memberData != null) {
+    final memberData = json['member'] ?? json['members'];
+    if (memberData is Map<String, dynamic>) {
       member = Member.fromJson(memberData);
     }
 
     Meeting? meetingRef = meeting;
-    final meetingData = _coerceJsonMap(json['meeting']);
-    if (meetingData != null) {
+    final meetingData = json['meeting'];
+    if (meetingData is Map<String, dynamic>) {
       meetingRef = Meeting.fromJson(meetingData, includeAttendance: false);
     }
 
