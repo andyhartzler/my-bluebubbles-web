@@ -233,6 +233,11 @@ class MemberRepository {
         normalize: Member.normalizeText,
       );
 
+  Future<Map<String, int>> getChapterPositionCounts() => _aggregateTextField(
+        'chapter_position',
+        normalize: Member.normalizeText,
+      );
+
   Future<Map<String, int>> getIndustryCounts() => _aggregateTextField(
         'industry',
         normalize: Member.normalizeText,

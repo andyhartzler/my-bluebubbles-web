@@ -25,6 +25,7 @@ class Member {
   final String? schoolName;
   final String? highSchool;
   final String? college;
+  final String? schoolEmail;
   final String? employed;
   final String? industry;
   final bool? hispanicLatino;
@@ -59,6 +60,9 @@ class Member {
   final String? currentChapterMember;
   final String? chapterName;
   final String? graduationYear;
+  final String? chapterPosition;
+  final DateTime? dateElected;
+  final DateTime? termExpiration;
 
   Member({
     required this.id,
@@ -83,6 +87,7 @@ class Member {
     this.schoolName,
     this.highSchool,
     this.college,
+    this.schoolEmail,
     this.employed,
     this.industry,
     this.hispanicLatino,
@@ -117,6 +122,9 @@ class Member {
     this.currentChapterMember,
     this.chapterName,
     this.graduationYear,
+    this.chapterPosition,
+    this.dateElected,
+    this.termExpiration,
   });
 
   /// Helper used to normalize free-form Supabase fields that may be stored as
@@ -168,8 +176,6 @@ class Member {
 
       final fallback = _extractCommonValue(trimmed);
       return fallback ?? trimmed;
-
-      return trimmed;
     }
 
     if (value is Map) {
@@ -358,6 +364,14 @@ class Member {
       currentChapterMember: _normalizeText(json['current_chapter_member']),
       chapterName: _normalizeText(json['chapter_name']),
       graduationYear: _normalizeText(json['graduation_year']),
+      schoolEmail: _normalizeText(json['school_email']),
+      chapterPosition: _normalizeText(json['chapter_position']),
+      dateElected: json['date_elected'] != null
+          ? DateTime.tryParse(json['date_elected'] as String)
+          : null,
+      termExpiration: json['term_expiration'] != null
+          ? DateTime.tryParse(json['term_expiration'] as String)
+          : null,
     );
   }
 
@@ -386,6 +400,7 @@ class Member {
       'school_name': schoolName,
       'high_school': highSchool,
       'college': college,
+      'school_email': schoolEmail,
       'employed': employed,
       'industry': industry,
       'hispanic_latino': hispanicLatino,
@@ -420,6 +435,9 @@ class Member {
       'current_chapter_member': currentChapterMember,
       'chapter_name': chapterName,
       'graduation_year': graduationYear,
+      'chapter_position': chapterPosition,
+      'date_elected': dateElected?.toIso8601String().split('T').first,
+      'term_expiration': termExpiration?.toIso8601String().split('T').first,
     };
   }
 
@@ -502,6 +520,10 @@ class Member {
     String? currentChapterMember,
     String? chapterName,
     String? graduationYear,
+    String? schoolEmail,
+    String? chapterPosition,
+    DateTime? dateElected,
+    DateTime? termExpiration,
   }) {
     return Member(
       id: id ?? this.id,
@@ -526,6 +548,7 @@ class Member {
       schoolName: schoolName ?? this.schoolName,
       highSchool: highSchool ?? this.highSchool,
       college: college ?? this.college,
+      schoolEmail: schoolEmail ?? this.schoolEmail,
       employed: employed ?? this.employed,
       industry: industry ?? this.industry,
       hispanicLatino: hispanicLatino ?? this.hispanicLatino,
@@ -560,6 +583,25 @@ class Member {
       currentChapterMember: currentChapterMember ?? this.currentChapterMember,
       chapterName: chapterName ?? this.chapterName,
       graduationYear: graduationYear ?? this.graduationYear,
+      chapterPosition: chapterPosition ?? this.chapterPosition,
+      dateElected: dateElected ?? this.dateElected,
+      termExpiration: termExpiration ?? this.termExpiration,
     );
+  }
+
+  /// Convenience accessor to prefer personal email while falling back to school email.
+  String? get preferredEmail => email ?? schoolEmail;
+
+  /// Best effort phone display choosing formatted phone first then E.164 value.
+  String? get primaryPhone {
+    if (phone != null && phone!.trim().isNotEmpty) {
+      return phone;
+    }
+
+    if (phoneE164 != null && phoneE164!.trim().isNotEmpty) {
+      return phoneE164;
+    }
+
+    return null;
   }
 }
