@@ -389,6 +389,11 @@ class SocketService extends GetxService {
         if (!baseUri.hasPort || baseUri.port == 80) {
           addUri(baseUri.replace(scheme: 'https', port: 1234));
         }
+      } else if (baseUri.scheme == 'https') {
+        addUri(baseUri.replace(scheme: 'http'));
+        if (!baseUri.hasPort || baseUri.port == 443) {
+          addUri(baseUri.replace(scheme: 'http', port: 1234));
+        }
       }
     } else {
       if (baseUri.scheme == 'https') {
@@ -489,7 +494,7 @@ class SocketService extends GetxService {
       if (port != null) {
         final Uri? baseUri = Uri.tryParse(serverAddress);
         if (baseUri != null) {
-          String scheme = baseUri.scheme;
+          String scheme = baseUri.scheme.isEmpty ? 'http' : baseUri.scheme;
           final String? socketScheme = _stringFromMap(map, const ['socket_scheme', 'socketScheme']);
           if (socketScheme != null && socketScheme.isNotEmpty) {
             final String normalized = socketScheme.toLowerCase();
@@ -499,6 +504,23 @@ class SocketService extends GetxService {
               scheme = 'https';
             } else if (normalized == 'http' || normalized == 'https') {
               scheme = normalized;
+            }
+          } else {
+            final bool? socketSecure = _boolFromMap(map, const [
+              'socket_secure',
+              'socketSecure',
+              'socket_use_ssl',
+              'socketUseSSL',
+              'socketUseSsl',
+            ]);
+            if (socketSecure != null) {
+              scheme = socketSecure ? 'https' : 'http';
+            } else if (port == 1234 && scheme != 'http') {
+              scheme = 'http';
+            } else if (port == 80) {
+              scheme = 'http';
+            } else if (port == 443) {
+              scheme = 'https';
             }
           }
 
@@ -540,6 +562,33 @@ class SocketService extends GetxService {
         final int? parsed = int.tryParse(value);
         if (parsed != null) {
           return parsed;
+        }
+      }
+    }
+    return null;
+  }
+
+  bool? _boolFromMap(Map<dynamic, dynamic> map, List<String> keys) {
+    for (final String key in keys) {
+      final dynamic value = map[key];
+      if (value is bool) {
+        return value;
+      }
+      if (value is num) {
+        if (value == 1) {
+          return true;
+        }
+        if (value == 0) {
+          return false;
+        }
+      }
+      if (value is String) {
+        final String normalized = value.trim().toLowerCase();
+        if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+          return true;
+        }
+        if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+          return false;
         }
       }
     }
