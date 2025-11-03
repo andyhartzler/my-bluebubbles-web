@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'package:universal_html/html.dart' as html;
 import 'package:universal_io/io.dart';
 
 import 'package:bluebubbles/helpers/backend/settings_helpers.dart';
@@ -28,6 +29,7 @@ class SocketService extends GetxService {
   RxString lastError = "".obs;
   Timer? _reconnectTimer;
   Timer? _healthCheckTimer;
+  Timer? _errorRecoveryTimer;
   late Socket socket;
   bool _socketInitialized = false;
   bool _initializingSocket = false;
@@ -37,6 +39,10 @@ class SocketService extends GetxService {
   int _candidateIndex = 0;
   bool _resolvingCandidate = false;
   bool _serverInfoChecked = false;
+  bool? _secureContext;
+  bool _forcePollingTransport = false;
+  String? _lastErrorCandidate;
+  int _consecutiveErrors = 0;
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
@@ -102,6 +108,8 @@ class SocketService extends GetxService {
     _socketInitialized = false;
     state.value = SocketState.disconnected;
     _healthCheckTimer?.cancel();
+    _errorRecoveryTimer?.cancel();
+    _errorRecoveryTimer = null;
   }
 
   void restartSocket() {
@@ -147,6 +155,7 @@ class SocketService extends GetxService {
         state.value = SocketState.connected;
         _reconnectTimer?.cancel();
         _reconnectTimer = null;
+        _resetErrorTracking();
         NetworkTasks.onConnect();
         notif.clearSocketError();
         if (_socketCandidates.isNotEmpty) {
@@ -176,7 +185,7 @@ class SocketService extends GetxService {
           handleSocketException(data);
         }
 
-        _handleSocketError();
+        _handleSocketError(data);
         return;
       default:
         return;
@@ -223,17 +232,68 @@ class SocketService extends GetxService {
     _socketCandidates = <String>[];
     _candidateIndex = 0;
     _serverInfoChecked = false;
+    _forcePollingTransport = false;
+    _resetErrorTracking();
   }
 
-  void _handleSocketError() {
-    Future<void>(() async {
-      final applied = await _applyNextCandidate();
-      if (applied) {
+  void _handleSocketError([dynamic error]) {
+    if (state.value == SocketState.connected) {
+      return;
+    }
+
+    if (_recoverFromPollingCorsError(error)) {
+      _resetErrorTracking();
+      return;
+    }
+
+    final String? activeCandidate = _activeCandidate();
+    if (_lastErrorCandidate != activeCandidate) {
+      _consecutiveErrors = 0;
+      _lastErrorCandidate = activeCandidate;
+    }
+
+    _consecutiveErrors += 1;
+
+    if (_consecutiveErrors <= 2) {
+      Logger.warn('Socket error on $activeCandidate (attempt $_consecutiveErrors). Allowing client reconnection.');
+      if (_socketInitialized && !socket.connected) {
+        try {
+          socket.connect();
+        } catch (e, stack) {
+          Logger.warn('Failed to trigger socket reconnect', error: e, trace: stack);
+        }
+      }
+      return;
+    }
+
+    _errorRecoveryTimer?.cancel();
+    _errorRecoveryTimer = Timer(const Duration(seconds: 2), () {
+      if (state.value == SocketState.connected) {
+        _resetErrorTracking();
         return;
       }
 
-      state.value = SocketState.error;
-      _scheduleReconnect(fetchNewUrl: true);
+      Future<void>(() async {
+        if (_recoverFromPollingCorsError(error)) {
+          _resetErrorTracking();
+          return;
+        }
+
+        if (_attemptPollingFallback(error)) {
+          _resetErrorTracking();
+          return;
+        }
+
+        final applied = await _applyNextCandidate();
+        if (applied) {
+          _resetErrorTracking();
+          return;
+        }
+
+        _resetErrorTracking();
+        state.value = SocketState.error;
+        _scheduleReconnect(fetchNewUrl: true);
+      });
     });
   }
 
@@ -256,11 +316,25 @@ class SocketService extends GetxService {
     return candidate;
   }
 
+  String? _activeCandidate() {
+    if (_socketCandidates.isEmpty) {
+      return _socketOverride ?? serverAddress;
+    }
+
+    if (_candidateIndex < 0 || _candidateIndex >= _socketCandidates.length) {
+      return _socketOverride ?? serverAddress;
+    }
+
+    return _socketCandidates[_candidateIndex];
+  }
+
   void _ensureSocketCandidates() {
     final base = serverAddress;
     if (base.isEmpty) {
       _socketCandidates = <String>[];
       _lastBaseServer = null;
+      _forcePollingTransport = false;
+      _resetErrorTracking();
       return;
     }
 
@@ -272,9 +346,15 @@ class SocketService extends GetxService {
     if (baseUri == null) {
       _socketCandidates = <String>[];
       _lastBaseServer = null;
+      _forcePollingTransport = false;
+      _resetErrorTracking();
       return;
     }
 
+    if (_lastBaseServer != base) {
+      _forcePollingTransport = false;
+      _resetErrorTracking();
+    }
     _lastBaseServer = base;
     _candidateIndex = 0;
     _serverInfoChecked = false;
@@ -286,7 +366,7 @@ class SocketService extends GetxService {
         return;
       }
 
-      if (kIsWeb && !_isLocalHost(uri.host) && uri.scheme == 'http') {
+      if (_shouldBlockInsecureCandidate(uri)) {
         return;
       }
 
@@ -343,6 +423,8 @@ class SocketService extends GetxService {
         _candidateIndex += 1;
         final String next = _socketCandidates[_candidateIndex];
         _socketOverride = next == serverAddress ? null : next;
+        _forcePollingTransport = false;
+        _resetErrorTracking();
         Logger.warn('Socket connection failed, retrying with alternate target: $next');
         closeSocket();
         _initializeSocket();
@@ -357,6 +439,8 @@ class SocketService extends GetxService {
             final String next = _socketCandidates.first;
             _candidateIndex = 0;
             _socketOverride = next == serverAddress ? null : next;
+            _forcePollingTransport = false;
+            _resetErrorTracking();
             Logger.warn('Socket connection failed, retrying with server-provided target: $next');
             closeSocket();
             _initializeSocket();
@@ -517,7 +601,7 @@ class SocketService extends GetxService {
       scheme = 'https';
     }
 
-    if (kIsWeb && !_isLocalHost(baseUri.host) && scheme == 'http') {
+    if (_shouldBlockInsecureCandidate(baseUri) && scheme == 'http') {
       scheme = 'https';
     }
 
@@ -559,7 +643,11 @@ class SocketService extends GetxService {
       final bool secure = candidate.startsWith('wss://');
       final String targetScheme;
       if (kIsWeb && !_isLocalHost(uri.host)) {
-        targetScheme = 'https';
+        if (_isSecureContext()) {
+          targetScheme = 'https';
+        } else {
+          targetScheme = secure ? 'https' : 'http';
+        }
       } else {
         targetScheme = secure ? 'https' : 'http';
       }
@@ -570,6 +658,40 @@ class SocketService extends GetxService {
     return candidate;
   }
 
+  bool _shouldBlockInsecureCandidate(Uri uri) {
+    if (!kIsWeb) {
+      return false;
+    }
+
+    if (uri.scheme != 'http') {
+      return false;
+    }
+
+    if (_isLocalHost(uri.host)) {
+      return false;
+    }
+
+    return _isSecureContext();
+  }
+
+  bool _isSecureContext() {
+    if (!kIsWeb) {
+      return false;
+    }
+
+    if (_secureContext != null) {
+      return _secureContext!;
+    }
+
+    bool secure = true;
+    try {
+      secure = html.window.location.protocol == 'https:' || html.window.location.protocol == 'wss:';
+    } catch (_) {}
+
+    _secureContext = secure;
+    return secure;
+  }
+
   void _initializeSocket() {
     final String? target = _currentSocketTarget();
     if (isNullOrEmpty(target)) {
@@ -578,6 +700,8 @@ class SocketService extends GetxService {
       return;
     }
 
+    _resetErrorTracking();
+
     final Map<String, dynamic> query = <String, dynamic>{};
     if (password.isNotEmpty) {
       query['guid'] = password;
@@ -585,7 +709,7 @@ class SocketService extends GetxService {
 
     final OptionBuilder builder = OptionBuilder()
         .setQuery(query)
-        .setTransports(<String>['websocket', 'polling'])
+        .setTransports(_socketTransports())
         .setPath('/socket.io/')
         .setTimeout(20000)
         .setReconnectionAttempts(999999)
@@ -648,5 +772,130 @@ class SocketService extends GetxService {
       _scheduleReconnect();
     });
     _initializingSocket = false;
+  }
+
+  List<String> _socketTransports() {
+    if (!kIsWeb) {
+      return const <String>['websocket', 'polling'];
+    }
+
+    if (_forcePollingTransport) {
+      return const <String>['polling'];
+    }
+
+    return const <String>['websocket', 'polling'];
+  }
+
+  bool _attemptPollingFallback(dynamic error) {
+    if (!kIsWeb || _forcePollingTransport) {
+      return false;
+    }
+
+    if (!_shouldForcePollingTransport(error)) {
+      return false;
+    }
+
+    _forcePollingTransport = true;
+    _resetErrorTracking();
+    Logger.warn('Switching socket transport to long polling due to WebSocket connection failure');
+    closeSocket();
+    _initializeSocket();
+    return true;
+  }
+
+  bool _shouldForcePollingTransport(dynamic error) {
+    final String? message = _socketErrorMessage(error);
+    if (message == null) {
+      return false;
+    }
+
+    final String lower = message.toLowerCase();
+    if (_containsCorsRejection(lower)) {
+      return false;
+    }
+
+    if (lower.contains('websocket is closed before the connection is established') ||
+        lower.contains('websocket connection') ||
+        lower.contains('websocket error') ||
+        lower.contains('network connection was lost') ||
+        lower.contains('transport error') ||
+        lower.contains('transport close')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  bool _recoverFromPollingCorsError(dynamic error) {
+    if (!kIsWeb || !_forcePollingTransport) {
+      return false;
+    }
+
+    final String? message = _socketErrorMessage(error);
+    if (message == null) {
+      return false;
+    }
+
+    final String lower = message.toLowerCase();
+    if (!_containsCorsRejection(lower)) {
+      return false;
+    }
+
+    _forcePollingTransport = false;
+    _resetErrorTracking();
+    Logger.warn('Long polling rejected by CORS, restoring WebSocket transport preference');
+    closeSocket();
+    _initializeSocket();
+    return true;
+  }
+
+  bool _containsCorsRejection(String message) {
+    return message.contains('access-control-allow-origin') ||
+        message.contains('cors policy') ||
+        message.contains('cors error') ||
+        message.contains('origin is not allowed');
+  }
+
+  String? _socketErrorMessage(dynamic error) {
+    if (error == null) {
+      return null;
+    }
+
+    if (error is SocketException) {
+      return error.message;
+    }
+
+    if (error is WebSocketException) {
+      return error.message;
+    }
+
+    if (error is Error) {
+      return error.toString();
+    }
+
+    if (error is Map) {
+      for (final String key in const <String>['message', 'description', 'data', 'error']) {
+        final dynamic value = error[key];
+        if (value is String && value.isNotEmpty) {
+          return value;
+        }
+        if (value != null) {
+          return value.toString();
+        }
+      }
+    }
+
+    if (error is Iterable) {
+      return error.map((dynamic item) => item == null ? '' : item.toString()).join(' ');
+    }
+
+    return error.toString();
+  }
+
+  void _resetErrorTracking() {
+    _errorRecoveryTimer?.cancel();
+    _errorRecoveryTimer = null;
+    _lastErrorCandidate = null;
+    _consecutiveErrors = 0;
   }
 }
