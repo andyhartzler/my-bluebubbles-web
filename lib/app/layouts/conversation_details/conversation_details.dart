@@ -10,8 +10,15 @@ import 'package:bluebubbles/app/layouts/conversation_details/widgets/media_galle
 import 'package:bluebubbles/app/layouts/conversation_details/widgets/contact_tile.dart';
 import 'package:bluebubbles/app/layouts/settings/widgets/settings_widgets.dart';
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/database/models.dart';
+import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/services/crm/member_lookup_service.dart';
+import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/cupertino.dart';
@@ -41,6 +48,11 @@ class _ConversationDetailsState extends OptimizedState<ConversationDetails> with
   late Chat chat = widget.chat;
   late StreamSubscription sub;
   final RxList<String> selected = <String>[].obs;
+  final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
+  Member? _linkedMember;
+  bool _loadingMember = false;
+
+  bool get _crmReady => CRMConfig.crmEnabled && CRMSupabaseService().isInitialized;
 
   bool get shouldShowMore => chat.participants.length > 5;
   List<Handle> get clippedParticipants => showMoreParticipants
@@ -64,6 +76,7 @@ class _ConversationDetailsState extends OptimizedState<ConversationDetails> with
           chat = _chat.merge(chat);
           if (update) {
             setState(() {});
+            _maybeLoadLinkedMember();
           }
         }
       });
@@ -73,6 +86,7 @@ class _ConversationDetailsState extends OptimizedState<ConversationDetails> with
         chat = _chat.merge(chat);
         if (update) {
           setState(() {});
+          _maybeLoadLinkedMember();
         }
       });
     }
@@ -83,6 +97,8 @@ class _ConversationDetailsState extends OptimizedState<ConversationDetails> with
         fetchLinks();
       });
     }
+
+    _maybeLoadLinkedMember();
   }
 
   @override
@@ -132,6 +148,116 @@ class _ConversationDetailsState extends OptimizedState<ConversationDetails> with
     query.limit = 20;
     links = query.find();
     query.close();
+  }
+
+  void _maybeLoadLinkedMember() {
+    if (!_crmReady) {
+      if (_linkedMember != null) {
+        setState(() {
+          _linkedMember = null;
+          _loadingMember = false;
+        });
+      }
+      return;
+    }
+
+    if (chat.isGroup || chat.participants.isEmpty) {
+      if (_linkedMember != null || _loadingMember) {
+        setState(() {
+          _linkedMember = null;
+          _loadingMember = false;
+        });
+      }
+      return;
+    }
+
+    final handle = chat.participants.first;
+    final address = handle.address;
+    if (!address.isPhoneNumber) return;
+
+    if (_linkedMember != null && _linkedMember!.phoneE164 == address) return;
+    if (_memberLookup.hasCachedPhone(address)) {
+      final cached = _memberLookup.getCachedByPhone(address);
+      setState(() {
+        _linkedMember = cached;
+        _loadingMember = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _loadingMember = true;
+    });
+
+    _memberLookup.fetchByPhone(address).then((member) {
+      if (!mounted || chat.participants.isEmpty || chat.participants.first.address != address) {
+        return;
+      }
+      setState(() {
+        _linkedMember = member;
+        _loadingMember = false;
+      });
+    }).catchError((_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingMember = false;
+      });
+    });
+  }
+
+  Widget? _buildCRMMemberTile() {
+    if (!_crmReady || chat.isGroup || chat.participants.isEmpty) {
+      return null;
+    }
+
+    final address = chat.participants.first.address;
+    if (!address.isPhoneNumber) return null;
+
+    if (_loadingMember) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: Card(
+          child: ListTile(
+            leading: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+            title: Text('Loading member profile...'),
+          ),
+        ),
+      );
+    }
+
+    final member = _linkedMember;
+    if (member == null) return null;
+
+    final phone = member.phoneE164 ?? member.phone ?? '';
+    final initials = member.name.isNotEmpty ? member.name.substring(0, 1).toUpperCase() : '?';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Card(
+        child: ListTile(
+          leading: CircleAvatar(child: Text(initials)),
+          title: Text(member.name),
+          subtitle: phone.isNotEmpty ? Text(phone) : null,
+          trailing: TextButton.icon(
+            icon: const Icon(Icons.person),
+            label: const Text('View Profile'),
+            onPressed: () => _openMemberProfile(member),
+          ),
+          onTap: () => _openMemberProfile(member),
+        ),
+      ),
+    );
+  }
+
+  void _openMemberProfile(Member member) {
+    _memberLookup.cacheMember(member);
+    Navigator.of(context, rootNavigator: true).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(
+          child: MemberDetailScreen(member: member),
+        ),
+      ),
+    );
   }
 
   @override
@@ -201,6 +327,9 @@ class _ConversationDetailsState extends OptimizedState<ConversationDetails> with
             SliverToBoxAdapter(
               child: ChatInfo(chat: chat),
             ),
+            ...[
+              _buildCRMMemberTile(),
+            ].whereType<Widget>().map((widget) => SliverToBoxAdapter(child: widget)),
             if (chat.isGroup)
               SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
