@@ -11,7 +11,9 @@ import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide BackButton;
 import 'package:flutter/services.dart';
@@ -289,6 +291,9 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
   late final StreamSubscription sub;
   String? cachedDisplayName = "";
   List<Handle> cachedParticipants = [];
+  Member? _crmMember;
+  String? _lookupPhone;
+  final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
 
   @override
   void initState() {
@@ -321,6 +326,7 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
           }
           cachedDisplayName = chat.displayName;
           cachedParticipants = chat.handles;
+          _maybeLoadCRMMember();
         });
       });
     } else {
@@ -338,9 +344,11 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
           }
           cachedDisplayName = chat.displayName;
           cachedParticipants = chat.participants;
+          _maybeLoadCRMMember();
         }
       });
     }
+    _maybeLoadCRMMember();
   }
 
   @override
@@ -357,8 +365,8 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
       children: [
         Padding(
           padding: const EdgeInsets.only(right: 12.5),
-          child: IgnorePointer(
-            ignoring: true,
+          child: GestureDetector(
+            onTap: _openConversationDetails,
             child: ContactAvatarGroupWidget(
               chat: controller.chat,
               size: !controller.chat.isGroup ? 35 : 40,
@@ -425,6 +433,69 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
           ),
         ),
       ],
+    );
+  }
+
+  void _maybeLoadCRMMember() {
+    if (!_memberLookup.isReady) return;
+    if (controller.chat.isGroup || controller.chat.participants.isEmpty) return;
+    final handle = controller.chat.participants.first;
+    final address = handle.address;
+    if (!address.isPhoneNumber) return;
+
+    if (_lookupPhone == address && _crmMember != null) {
+      _applyCRMTitle(_crmMember);
+      return;
+    }
+
+    _lookupPhone = address;
+
+    if (_memberLookup.hasCachedPhone(address)) {
+      _applyCRMTitle(_memberLookup.getCachedByPhone(address));
+      return;
+    }
+
+    _memberLookup.fetchByPhone(address).then((member) {
+      if (!mounted || _lookupPhone != address) return;
+      _applyCRMTitle(member);
+    }).catchError((_) {});
+  }
+
+  void _applyCRMTitle(Member? member) {
+    _crmMember = member;
+    if (!_shouldUseCRMName(member)) return;
+
+    final newTitle = member!.name.trim();
+    if (newTitle.isEmpty || newTitle == title) return;
+
+    setState(() {
+      title = newTitle;
+    });
+  }
+
+  bool _shouldUseCRMName(Member? member) {
+    if (member == null) return false;
+    if (controller.chat.isGroup || controller.chat.participants.isEmpty) return false;
+    final handle = controller.chat.participants.first;
+    if (handle.contact == null) return true;
+
+    final trimmedTitle = title.trim();
+    if (trimmedTitle.isEmpty) return true;
+    if (trimmedTitle == handle.address.trim()) return true;
+    final identifier = controller.chat.chatIdentifier?.trim();
+    if (identifier != null && identifier.isNotEmpty && identifier == trimmedTitle) {
+      return true;
+    }
+    return false;
+  }
+
+  void _openConversationDetails() {
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => ConversationDetails(
+          chat: controller.chat,
+        ),
+      ),
     );
   }
 }
