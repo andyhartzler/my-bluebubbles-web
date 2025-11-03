@@ -12,6 +12,8 @@ import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
+import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 
@@ -92,6 +94,91 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _editMeeting(Meeting meeting) async {
+    if (!_crmReady) return;
+
+    final updated = await showModalBottomSheet<Meeting?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.9,
+        child: MeetingEditSheet(meeting: meeting),
+      ),
+    );
+
+    if (!mounted || updated == null) return;
+    _applyUpdatedMeeting(updated);
+  }
+
+  Future<void> _editAttendance(MeetingAttendance attendance) async {
+    if (!_crmReady) return;
+
+    final updated = await showModalBottomSheet<MeetingAttendance?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.85,
+        child: MeetingAttendanceEditSheet(attendance: attendance),
+      ),
+    );
+
+    if (!mounted || updated == null) return;
+    _applyUpdatedAttendance(updated);
+  }
+
+  void _applyUpdatedMeeting(Meeting meeting) {
+    final meetings = List<Meeting>.from(_meetings);
+    final index = meetings.indexWhere((element) => element.id == meeting.id);
+    if (index != -1) {
+      meetings[index] = meeting;
+    } else {
+      meetings.add(meeting);
+    }
+    meetings.sort((a, b) => b.meetingDate.compareTo(a.meetingDate));
+    for (final attendance in meeting.attendance) {
+      final member = attendance.member;
+      if (member != null) {
+        _memberLookup.cacheMember(member);
+      }
+    }
+    if (meeting.host != null) {
+      _memberLookup.cacheMember(meeting.host!);
+    }
+    setState(() {
+      _meetings = meetings;
+      _selectedMeeting = meeting;
+    });
+  }
+
+  void _applyUpdatedAttendance(MeetingAttendance attendance) {
+    final meetingId = attendance.meetingId ?? attendance.meeting?.id;
+    if (meetingId == null) return;
+
+    final meetings = List<Meeting>.from(_meetings);
+    final meetingIndex = meetings.indexWhere((element) => element.id == meetingId);
+    if (meetingIndex == -1) return;
+
+    final meeting = meetings[meetingIndex];
+    final updatedAttendance = meeting.attendance.toList();
+    final attendanceIndex = updatedAttendance.indexWhere((element) => element.id == attendance.id);
+    if (attendanceIndex == -1) return;
+
+    updatedAttendance[attendanceIndex] = attendance;
+    final updatedMeeting = meeting.copyWith(attendance: updatedAttendance);
+    meetings[meetingIndex] = updatedMeeting;
+
+    if (attendance.member != null) {
+      _memberLookup.cacheMember(attendance.member!);
+    }
+
+    setState(() {
+      _meetings = meetings;
+      if (_selectedMeeting?.id == updatedMeeting.id) {
+        _selectedMeeting = updatedMeeting;
+      }
+    });
   }
 
   @override
@@ -181,33 +268,74 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
           final meeting = _meetings[index];
           final bool selected = meeting.id == _selectedMeeting?.id;
           final theme = Theme.of(context);
-          final MaterialColor chipBase = meeting.processingStatus == 'completed'
-              ? Colors.green
-              : meeting.processingStatus == 'processing'
-                  ? Colors.orange
-                  : Colors.grey;
-          final Color chipBackground = chipBase.shade100;
-          final Color chipTextColor = chipBase.shade700;
+          final status = meeting.processingStatus ?? 'unknown';
+          final Color statusColor;
+          switch (status) {
+            case 'completed':
+              statusColor = Colors.green.shade100;
+              break;
+            case 'processing':
+              statusColor = Colors.orange.shade100;
+              break;
+            default:
+              statusColor = Colors.grey.shade200;
+          }
 
           return Card(
             color: selected
                 ? theme.colorScheme.primary.withOpacity(0.12)
                 : theme.colorScheme.surface,
-            child: ListTile(
-              title: Text(meeting.meetingTitle),
-              subtitle: Text('${meeting.formattedDate} • ${meeting.formattedTime}'),
-              leading: CircleAvatar(
-                child: Text('${index + 1}'),
+            elevation: selected ? 3 : 1,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => setState(() => _selectedMeeting = meeting),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            meeting.meetingTitle,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: Text(status.toUpperCase(),
+                              style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text('${meeting.formattedDate} • ${meeting.formattedTime}',
+                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        if (meeting.host?.name != null)
+                          _buildInfoChip(Icons.person_outline, 'Host: ${meeting.host!.name}'),
+                        if (meeting.attendance.isNotEmpty)
+                          _buildInfoChip(Icons.groups_outlined, '${meeting.attendance.length} participants'),
+                        if ((meeting.durationMinutes ?? 0) > 0)
+                          _buildInfoChip(Icons.timer_outlined, '${meeting.durationMinutes} min'),
+                        if (meeting.recordingUrl != null && meeting.recordingUrl!.isNotEmpty)
+                          _buildInfoChip(Icons.videocam_outlined, 'Recording available'),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              trailing: Chip(
-                label: Text((meeting.processingStatus ?? 'unknown').toUpperCase()),
-                backgroundColor: chipBackground,
-                labelStyle: TextStyle(color: chipTextColor, fontWeight: FontWeight.w600),
-              ),
-              selected: selected,
-              onTap: () {
-                setState(() => _selectedMeeting = meeting);
-              },
             ),
           );
         },
@@ -222,13 +350,26 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
         child: ListTile(
           title: Text(meeting.meetingTitle, style: theme.textTheme.titleLarge),
           subtitle: Text('${meeting.formattedDate} • ${meeting.formattedTime}'),
-          trailing: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment: MainAxisAlignment.center,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(meeting.processingStatus?.toUpperCase() ?? 'STATUS', style: theme.textTheme.labelSmall),
-              if (meeting.attendanceCount != null)
-                Text('${meeting.attendanceCount} attendees expected', style: theme.textTheme.bodySmall),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(meeting.processingStatus?.toUpperCase() ?? 'STATUS',
+                      style: theme.textTheme.labelSmall),
+                  if (meeting.attendanceCount != null)
+                    Text('${meeting.attendanceCount} attendees expected',
+                        style: theme.textTheme.bodySmall),
+                ],
+              ),
+              if (_crmReady)
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Edit meeting',
+                  onPressed: () => _editMeeting(meeting),
+                ),
             ],
           ),
         ),
@@ -364,13 +505,24 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
                 ),
                 title: Text(attendance.participantName),
                 subtitle: subtitle != null ? Text(subtitle) : null,
-                trailing: attendance.member != null
-                    ? IconButton(
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (attendance.member != null)
+                      IconButton(
                         icon: const Icon(Icons.open_in_new),
                         tooltip: 'View member profile',
                         onPressed: () => _openMemberProfile(attendance.member!),
-                      )
-                    : null,
+                      ),
+                    if (_crmReady)
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: 'Edit attendance',
+                        onPressed: () => _editAttendance(attendance),
+                      ),
+                  ],
+                ),
+                onTap: attendance.member != null ? () => _openMemberProfile(attendance.member!) : null,
               );
             }).toList(),
           ],
@@ -380,12 +532,12 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   }
 
   Widget _buildVideoEmbed(Meeting meeting) {
-    final embedUrl = meeting.recordingEmbedUrl ?? meeting.recordingUrl;
-    if (embedUrl == null || embedUrl.isEmpty) {
+    final resolvedUrl = _resolveEmbedUrl(meeting.recordingEmbedUrl, meeting.recordingUrl);
+    if (resolvedUrl == null) {
       return const SizedBox.shrink();
     }
 
-    final uri = Uri.tryParse(embedUrl);
+    final uri = Uri.tryParse(resolvedUrl);
     if (uri == null) {
       return const SizedBox.shrink();
     }
@@ -415,7 +567,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       // ignore: undefined_prefixed_name
       ui.platformViewRegistry.registerViewFactory(viewType, (int viewId) {
         final element = html.IFrameElement()
-          ..src = uri.toString()
+          ..src = resolvedUrl
           ..style.border = '0'
           ..allowFullscreen = true
           ..allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
@@ -451,4 +603,47 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       ),
     );
   }
+}
+
+String? _resolveEmbedUrl(String? embedUrl, String? fallbackUrl) {
+  final primary = embedUrl?.trim();
+  final fallback = fallbackUrl?.trim();
+  final candidate = (primary != null && primary.isNotEmpty) ? primary : fallback;
+  if (candidate == null || candidate.isEmpty) {
+    return null;
+  }
+
+  final uri = Uri.tryParse(candidate);
+  if (uri == null) {
+    return null;
+  }
+
+  if (uri.host.contains('drive.google.com')) {
+    final id = _extractDriveId(uri);
+    if (id != null) {
+      return 'https://drive.google.com/file/d/$id/preview';
+    }
+  }
+
+  return uri.toString();
+}
+
+String? _extractDriveId(Uri uri) {
+  final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
+  if (segments.length >= 3 && segments.first == 'file') {
+    final dIndex = segments.indexOf('d');
+    if (dIndex != -1 && segments.length > dIndex + 1) {
+      final id = segments[dIndex + 1];
+      if (id.isNotEmpty) {
+        return id;
+      }
+    }
+  }
+
+  final queryId = uri.queryParameters['id'] ?? uri.queryParameters['fileId'];
+  if (queryId != null && queryId.isNotEmpty) {
+    return queryId;
+  }
+
+  return null;
 }

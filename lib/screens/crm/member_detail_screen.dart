@@ -5,6 +5,7 @@ import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
+import 'package:bluebubbles/screens/crm/editors/member_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
@@ -168,6 +169,23 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         _loadingAttendance = false;
       });
     }
+  }
+
+  Future<void> _editMember() async {
+    if (!_crmReady) return;
+
+    final updated = await showModalBottomSheet<Member?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.9,
+        child: MemberEditSheet(member: _member),
+      ),
+    );
+
+    if (!mounted || updated == null) return;
+    setState(() => _member = updated);
+    _memberLookup.cacheMember(updated);
   }
 
   Future<void> _startChat({List<PlatformFile> attachments = const []}) async {
@@ -538,6 +556,22 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         label: Text('OPTED OUT'),
                         backgroundColor: Colors.red,
                         labelStyle: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  if (_crmReady)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Edit Member'),
+                            onPressed: _editMember,
+                          ),
+                        ],
                       ),
                     ),
                   const SizedBox(height: 24),
