@@ -298,6 +298,23 @@ List<Map<String, dynamic>> _coerceJsonList(dynamic value) {
   throw FormatException('Unexpected Supabase payload type: ${value.runtimeType}');
 }
 
+List<Map<String, dynamic>> _coerceJsonList(dynamic value) {
+  if (value == null) return const [];
+  if (value is PostgrestResponse) {
+    return _coerceJsonList(value.data);
+  }
+  if (value is List) {
+    return value
+        .map(_coerceJsonMap)
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
+  }
+  if (value is Map && value.containsKey('data')) {
+    return _coerceJsonList(value['data']);
+  }
+  throw FormatException('Unexpected Supabase payload type: ${value.runtimeType}');
+}
+
 Map<String, dynamic>? _coerceJsonMap(dynamic value) {
   if (value == null) return null;
   if (value is PostgrestResponse) {
