@@ -365,22 +365,30 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
       children: [
         Padding(
           padding: const EdgeInsets.only(right: 12.5),
-          child: GestureDetector(
-            onTap: _openConversationDetails,
-            child: ContactAvatarGroupWidget(
-              chat: controller.chat,
-              size: !controller.chat.isGroup ? 35 : 40,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: _openConversationDetails,
+              child: ContactAvatarGroupWidget(
+                chat: controller.chat,
+                size: !controller.chat.isGroup ? 35 : 40,
+              ),
             ),
           ),
         ),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Obx(() {
-                String _title = title;
-                if (controller.inSelectMode.value) {
-                  _title = "${controller.selected.length} selected";
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _openConversationDetails,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Obx(() {
+                    String _title = title;
+                    if (controller.inSelectMode.value) {
+                      _title = "${controller.selected.length} selected";
                 } else if (hideInfo) {
                   if (controller.chat.participants.length > 1) {
                     _title = "Group Chat";
@@ -429,7 +437,9 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
                     );
                   },
                 ),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ],

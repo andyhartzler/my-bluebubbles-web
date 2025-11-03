@@ -9,6 +9,7 @@ import 'package:bluebubbles/services/crm/chapter_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
+import 'editors/chapter_edit_sheet.dart';
 import 'member_detail_screen.dart';
 
 class ChapterDetailScreen extends StatefulWidget {
@@ -28,12 +29,14 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   bool _loading = true;
   List<Member> _members = [];
   List<ChapterDocument> _documents = [];
+  late Chapter _chapter;
 
   bool get _crmReady => _supabaseService.isInitialized && CRMConfig.crmEnabled;
 
   @override
   void initState() {
     super.initState();
+    _chapter = widget.chapter;
     _loadChapter();
   }
 
@@ -47,8 +50,8 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
 
     try {
       final results = await Future.wait([
-        _memberRepository.getAllMembers(chapterName: widget.chapter.chapterName),
-        _chapterRepository.getDocumentsForChapter(widget.chapter.chapterName),
+        _memberRepository.getAllMembers(chapterName: _chapter.chapterName),
+        _chapterRepository.getDocumentsForChapter(_chapter.chapterName),
       ]);
 
       if (!mounted) return;
@@ -71,12 +74,39 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
     }
   }
 
+  Future<void> _editChapter() async {
+    if (!_crmReady) return;
+
+    final updated = await showModalBottomSheet<Chapter?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.85,
+        child: ChapterEditSheet(chapter: _chapter),
+      ),
+    );
+
+    if (!mounted || updated == null) return;
+    setState(() => _chapter = updated);
+    await _loadChapter();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final title = '${widget.chapter.chapterName} Chapter';
+    final title = '${_chapter.chapterName} Chapter';
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          if (_crmReady)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit Chapter',
+              onPressed: _editChapter,
+            ),
+        ],
+      ),
       body: !_crmReady
           ? const Center(
               child: Padding(
@@ -109,41 +139,41 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
     final theme = Theme.of(context);
     final chips = <Widget>[];
 
-    chips.add(_buildPill(Icons.category, widget.chapter.chapterType.toUpperCase()));
+    chips.add(_buildPill(Icons.category, _chapter.chapterType.toUpperCase()));
 
-    if (widget.chapter.status != null && widget.chapter.status!.trim().isNotEmpty) {
-      chips.add(_buildPill(Icons.flag, widget.chapter.status!.trim()));
+    if (_chapter.status != null && _chapter.status!.trim().isNotEmpty) {
+      chips.add(_buildPill(Icons.flag, _chapter.status!.trim()));
     }
 
     chips.add(_buildPill(
-      widget.chapter.isChartered ? Icons.verified : Icons.pending,
-      widget.chapter.isChartered ? 'Chartered' : 'Not Chartered',
+      _chapter.isChartered ? Icons.verified : Icons.pending,
+      _chapter.isChartered ? 'Chartered' : 'Not Chartered',
     ));
 
-    if (widget.chapter.charterDate != null) {
+    if (_chapter.charterDate != null) {
       chips.add(_buildPill(
         Icons.calendar_month,
-        'Chartered ${_formatDate(widget.chapter.charterDate!)}',
+        'Chartered ${_formatDate(_chapter.charterDate!)}',
       ));
     }
 
     final detailRows = <Widget>[];
-    if (widget.chapter.schoolName.isNotEmpty) {
-      detailRows.add(_buildHeaderRow('School', widget.chapter.schoolName));
+    if (_chapter.schoolName.isNotEmpty) {
+      detailRows.add(_buildHeaderRow('School', _chapter.schoolName));
     }
-    if (widget.chapter.contactEmail != null && widget.chapter.contactEmail!.isNotEmpty) {
+    if (_chapter.contactEmail != null && _chapter.contactEmail!.isNotEmpty) {
       detailRows.add(_buildHeaderRow(
         'Contact',
-        widget.chapter.contactEmail!,
+        _chapter.contactEmail!,
         trailing: IconButton(
           tooltip: 'Email chapter',
           icon: const Icon(Icons.email_outlined),
-          onPressed: () => _launchUrl(Uri(scheme: 'mailto', path: widget.chapter.contactEmail!)),
+          onPressed: () => _launchUrl(Uri(scheme: 'mailto', path: _chapter.contactEmail!)),
         ),
       ));
     }
-    if (widget.chapter.website != null && widget.chapter.website!.isNotEmpty) {
-      final uri = _parseUrl(widget.chapter.website!);
+    if (_chapter.website != null && _chapter.website!.isNotEmpty) {
+      final uri = _parseUrl(_chapter.website!);
       if (uri != null) {
         detailRows.add(_buildHeaderRow(
           'Website',
@@ -157,7 +187,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
       }
     }
 
-    final socialMedia = widget.chapter.socialMedia;
+    final socialMedia = _chapter.socialMedia;
     if (socialMedia != null && socialMedia.isNotEmpty) {
       final entries = socialMedia.entries
           .where((entry) => entry.value is String && (entry.value as String).trim().isNotEmpty)
@@ -198,12 +228,12 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.chapter.displayTitle,
+              _chapter.displayTitle,
               style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
-            if (widget.chapter.displaySubtitle.isNotEmpty) ...[
+            if (_chapter.displaySubtitle.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(widget.chapter.displaySubtitle, style: theme.textTheme.titleMedium),
+              Text(_chapter.displaySubtitle, style: theme.textTheme.titleMedium),
             ],
             const SizedBox(height: 16),
             Wrap(
