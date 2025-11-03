@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:universal_html/html.dart' as html;
 import 'package:universal_io/io.dart';
 
 import 'package:bluebubbles/helpers/backend/settings_helpers.dart';
@@ -153,6 +154,7 @@ class SocketService extends GetxService {
         state.value = SocketState.connected;
         _reconnectTimer?.cancel();
         _reconnectTimer = null;
+        _resetErrorTracking();
         NetworkTasks.onConnect();
         notif.clearSocketError();
         return;
