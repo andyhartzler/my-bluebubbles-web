@@ -29,6 +29,7 @@ class SocketService extends GetxService {
   RxString lastError = "".obs;
   Timer? _reconnectTimer;
   Timer? _healthCheckTimer;
+  Timer? _errorRecoveryTimer;
   late Socket socket;
   bool _socketInitialized = false;
   bool _initializingSocket = false;
@@ -40,6 +41,8 @@ class SocketService extends GetxService {
   bool _serverInfoChecked = false;
   bool? _secureContext;
   bool _forcePollingTransport = false;
+  String? _lastErrorCandidate;
+  int _consecutiveErrors = 0;
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
@@ -105,6 +108,8 @@ class SocketService extends GetxService {
     _socketInitialized = false;
     state.value = SocketState.disconnected;
     _healthCheckTimer?.cancel();
+    _errorRecoveryTimer?.cancel();
+    _errorRecoveryTimer = null;
   }
 
   void restartSocket() {
@@ -150,6 +155,7 @@ class SocketService extends GetxService {
         state.value = SocketState.connected;
         _reconnectTimer?.cancel();
         _reconnectTimer = null;
+        _resetErrorTracking();
         NetworkTasks.onConnect();
         notif.clearSocketError();
         if (_socketCandidates.isNotEmpty) {
@@ -227,25 +233,67 @@ class SocketService extends GetxService {
     _candidateIndex = 0;
     _serverInfoChecked = false;
     _forcePollingTransport = false;
+    _resetErrorTracking();
   }
 
   void _handleSocketError([dynamic error]) {
-    Future<void>(() async {
-      if (_recoverFromPollingCorsError(error)) {
+    if (state.value == SocketState.connected) {
+      return;
+    }
+
+    if (_recoverFromPollingCorsError(error)) {
+      _resetErrorTracking();
+      return;
+    }
+
+    final String? activeCandidate = _activeCandidate();
+    if (_lastErrorCandidate != activeCandidate) {
+      _consecutiveErrors = 0;
+      _lastErrorCandidate = activeCandidate;
+    }
+
+    _consecutiveErrors += 1;
+
+    if (_consecutiveErrors <= 2) {
+      Logger.warn('Socket error on $activeCandidate (attempt $_consecutiveErrors). Allowing client reconnection.');
+      if (_socketInitialized && !socket.connected) {
+        try {
+          socket.connect();
+        } catch (e, stack) {
+          Logger.warn('Failed to trigger socket reconnect', error: e, trace: stack);
+        }
+      }
+      return;
+    }
+
+    _errorRecoveryTimer?.cancel();
+    _errorRecoveryTimer = Timer(const Duration(seconds: 2), () {
+      if (state.value == SocketState.connected) {
+        _resetErrorTracking();
         return;
       }
 
-      if (_attemptPollingFallback(error)) {
-        return;
-      }
+      Future<void>(() async {
+        if (_recoverFromPollingCorsError(error)) {
+          _resetErrorTracking();
+          return;
+        }
 
-      final applied = await _applyNextCandidate();
-      if (applied) {
-        return;
-      }
+        if (_attemptPollingFallback(error)) {
+          _resetErrorTracking();
+          return;
+        }
 
-      state.value = SocketState.error;
-      _scheduleReconnect(fetchNewUrl: true);
+        final applied = await _applyNextCandidate();
+        if (applied) {
+          _resetErrorTracking();
+          return;
+        }
+
+        _resetErrorTracking();
+        state.value = SocketState.error;
+        _scheduleReconnect(fetchNewUrl: true);
+      });
     });
   }
 
@@ -268,12 +316,25 @@ class SocketService extends GetxService {
     return candidate;
   }
 
+  String? _activeCandidate() {
+    if (_socketCandidates.isEmpty) {
+      return _socketOverride ?? serverAddress;
+    }
+
+    if (_candidateIndex < 0 || _candidateIndex >= _socketCandidates.length) {
+      return _socketOverride ?? serverAddress;
+    }
+
+    return _socketCandidates[_candidateIndex];
+  }
+
   void _ensureSocketCandidates() {
     final base = serverAddress;
     if (base.isEmpty) {
       _socketCandidates = <String>[];
       _lastBaseServer = null;
       _forcePollingTransport = false;
+      _resetErrorTracking();
       return;
     }
 
@@ -286,11 +347,13 @@ class SocketService extends GetxService {
       _socketCandidates = <String>[];
       _lastBaseServer = null;
       _forcePollingTransport = false;
+      _resetErrorTracking();
       return;
     }
 
     if (_lastBaseServer != base) {
       _forcePollingTransport = false;
+      _resetErrorTracking();
     }
     _lastBaseServer = base;
     _candidateIndex = 0;
@@ -361,6 +424,7 @@ class SocketService extends GetxService {
         final String next = _socketCandidates[_candidateIndex];
         _socketOverride = next == serverAddress ? null : next;
         _forcePollingTransport = false;
+        _resetErrorTracking();
         Logger.warn('Socket connection failed, retrying with alternate target: $next');
         closeSocket();
         _initializeSocket();
@@ -376,6 +440,7 @@ class SocketService extends GetxService {
             _candidateIndex = 0;
             _socketOverride = next == serverAddress ? null : next;
             _forcePollingTransport = false;
+            _resetErrorTracking();
             Logger.warn('Socket connection failed, retrying with server-provided target: $next');
             closeSocket();
             _initializeSocket();
@@ -635,6 +700,8 @@ class SocketService extends GetxService {
       return;
     }
 
+    _resetErrorTracking();
+
     final Map<String, dynamic> query = <String, dynamic>{};
     if (password.isNotEmpty) {
       query['guid'] = password;
@@ -729,6 +796,7 @@ class SocketService extends GetxService {
     }
 
     _forcePollingTransport = true;
+    _resetErrorTracking();
     Logger.warn('Switching socket transport to long polling due to WebSocket connection failure');
     closeSocket();
     _initializeSocket();
@@ -774,6 +842,7 @@ class SocketService extends GetxService {
     }
 
     _forcePollingTransport = false;
+    _resetErrorTracking();
     Logger.warn('Long polling rejected by CORS, restoring WebSocket transport preference');
     closeSocket();
     _initializeSocket();
@@ -821,5 +890,12 @@ class SocketService extends GetxService {
     }
 
     return error.toString();
+  }
+
+  void _resetErrorTracking() {
+    _errorRecoveryTimer?.cancel();
+    _errorRecoveryTimer = null;
+    _lastErrorCandidate = null;
+    _consecutiveErrors = 0;
   }
 }
