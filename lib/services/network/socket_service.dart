@@ -201,4 +201,16 @@ class SocketService extends GetxService {
       lastError.value = msg;
     }
   }
+
+  void clearOverride() {
+    http.originOverride = null;
+    _resetErrorTracking();
+  }
+
+  void _resetErrorTracking() {
+    lastError.value = "";
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _lastState = SocketState.disconnected;
+  }
 }
