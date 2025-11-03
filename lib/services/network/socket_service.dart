@@ -231,6 +231,10 @@ class SocketService extends GetxService {
 
   void _handleSocketError([dynamic error]) {
     Future<void>(() async {
+      if (_recoverFromPollingCorsError(error)) {
+        return;
+      }
+
       if (_attemptPollingFallback(error)) {
         return;
       }
@@ -712,7 +716,7 @@ class SocketService extends GetxService {
       return const <String>['polling'];
     }
 
-    return const <String>['polling', 'websocket'];
+    return const <String>['websocket', 'polling'];
   }
 
   bool _attemptPollingFallback(dynamic error) {
@@ -738,6 +742,10 @@ class SocketService extends GetxService {
     }
 
     final String lower = message.toLowerCase();
+    if (_containsCorsRejection(lower)) {
+      return false;
+    }
+
     if (lower.contains('websocket is closed before the connection is established') ||
         lower.contains('websocket connection') ||
         lower.contains('websocket error') ||
@@ -748,6 +756,35 @@ class SocketService extends GetxService {
     }
 
     return false;
+  }
+
+  bool _recoverFromPollingCorsError(dynamic error) {
+    if (!kIsWeb || !_forcePollingTransport) {
+      return false;
+    }
+
+    final String? message = _socketErrorMessage(error);
+    if (message == null) {
+      return false;
+    }
+
+    final String lower = message.toLowerCase();
+    if (!_containsCorsRejection(lower)) {
+      return false;
+    }
+
+    _forcePollingTransport = false;
+    Logger.warn('Long polling rejected by CORS, restoring WebSocket transport preference');
+    closeSocket();
+    _initializeSocket();
+    return true;
+  }
+
+  bool _containsCorsRejection(String message) {
+    return message.contains('access-control-allow-origin') ||
+        message.contains('cors policy') ||
+        message.contains('cors error') ||
+        message.contains('origin is not allowed');
   }
 
   String? _socketErrorMessage(dynamic error) {
