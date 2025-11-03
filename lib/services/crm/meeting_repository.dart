@@ -1,7 +1,8 @@
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
-import 'package:postgrest/postgrest.dart' show PostgrestResponse;
+import 'package:postgrest/postgrest.dart'
+    show PostgrestFilterBuilder, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MeetingRepository {
@@ -60,12 +61,15 @@ class MeetingRepository {
       final SupabaseClient client =
           _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
 
-      var query = client.from('meetings').select('*').order('meeting_date', ascending: false);
+      PostgrestFilterBuilder<List<Map<String, dynamic>>> query = client
+          .from('meetings')
+          .select<List<Map<String, dynamic>>>('*');
+
       if (meetingId != null) {
         query = query.eq('id', meetingId);
       }
 
-      final response = await query;
+      final response = await query.order('meeting_date', ascending: false);
       final baseRows = _coerceJsonList(response);
 
       if (baseRows.isEmpty) {
@@ -279,23 +283,6 @@ class MeetingRepository {
       rethrow;
     }
   }
-}
-
-List<Map<String, dynamic>> _coerceJsonList(dynamic value) {
-  if (value == null) return const [];
-  if (value is PostgrestResponse) {
-    return _coerceJsonList(value.data);
-  }
-  if (value is List) {
-    return value
-        .map(_coerceJsonMap)
-        .whereType<Map<String, dynamic>>()
-        .toList(growable: false);
-  }
-  if (value is Map && value.containsKey('data')) {
-    return _coerceJsonList(value['data']);
-  }
-  throw FormatException('Unexpected Supabase payload type: ${value.runtimeType}');
 }
 
 List<Map<String, dynamic>> _coerceJsonList(dynamic value) {
