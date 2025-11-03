@@ -361,12 +361,12 @@ class SocketService extends GetxService {
     final LinkedHashSet<String> candidates = LinkedHashSet<String>();
 
     void addUri(Uri uri) {
-      final candidate = uri.toString();
-      if (candidate.isEmpty) {
+      if (_shouldExcludeCandidate(uri)) {
         return;
       }
 
-      if (_shouldBlockInsecureCandidate(uri)) {
+      final candidate = uri.toString();
+      if (candidate.isEmpty) {
         return;
       }
 
@@ -474,6 +474,11 @@ class SocketService extends GetxService {
       if (socketUrl != null) {
         final String? sanitized = _normalizeCandidate(sanitizeServerAddress(address: socketUrl));
         if (sanitized != null) {
+          final Uri? sanitizedUri = Uri.tryParse(sanitized);
+          if (sanitizedUri != null && _shouldExcludeCandidate(sanitizedUri)) {
+            Logger.warn('Skipping unreachable socket candidate from server metadata: $sanitized');
+            return null;
+          }
           _socketCandidates.remove(sanitized);
           _socketCandidates.insert(0, sanitized);
           return sanitized;
@@ -498,6 +503,10 @@ class SocketService extends GetxService {
           }
 
           final Uri candidateUri = baseUri.replace(scheme: scheme, port: port);
+          if (_shouldExcludeCandidate(candidateUri)) {
+            Logger.warn('Skipping unreachable socket candidate from server metadata: ${candidateUri.toString()}');
+            return null;
+          }
           final String candidate = candidateUri.toString();
           _socketCandidates.remove(candidate);
           _socketCandidates.insert(0, candidate);
@@ -658,6 +667,18 @@ class SocketService extends GetxService {
     return candidate;
   }
 
+  bool _shouldExcludeCandidate(Uri uri) {
+    if (_shouldBlockInsecureCandidate(uri)) {
+      return true;
+    }
+
+    if (_shouldAvoidNonStandardSecurePort(uri)) {
+      return true;
+    }
+
+    return false;
+  }
+
   bool _shouldBlockInsecureCandidate(Uri uri) {
     if (!kIsWeb) {
       return false;
@@ -672,6 +693,26 @@ class SocketService extends GetxService {
     }
 
     return _isSecureContext();
+  }
+
+  bool _shouldAvoidNonStandardSecurePort(Uri uri) {
+    if (!kIsWeb) {
+      return false;
+    }
+
+    if (!_isSecureContext()) {
+      return false;
+    }
+
+    if (_isLocalHost(uri.host)) {
+      return false;
+    }
+
+    if ((uri.scheme == 'https' || uri.scheme == 'wss') && uri.hasPort && uri.port != 443) {
+      return true;
+    }
+
+    return false;
   }
 
   bool _isSecureContext() {
