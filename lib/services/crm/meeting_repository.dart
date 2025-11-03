@@ -1,6 +1,5 @@
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MeetingRepository {
   MeetingRepository._();
@@ -79,17 +78,27 @@ class MeetingRepository {
     if (!_isReady) return [];
 
     try {
-      final PostgrestTransformBuilder<dynamic> query = _supabase.client
+      final response = await _supabase.client
           .from('meeting_attendance')
           .select('*, member:members(*), meeting:meetings(id, meeting_date, meeting_title, recording_url, recording_embed_url, duration_minutes, meeting_host)')
-          .eq('member_id', memberId)
-          .order('meeting_date', ascending: false, foreignTable: 'meeting');
+          .eq('member_id', memberId);
 
-      final response = await query;
-      return (response as List<dynamic>)
+      final attendance = (response as List<dynamic>)
           .whereType<Map<String, dynamic>>()
           .map((json) => MeetingAttendance.fromJson(json))
           .toList();
+
+      attendance.sort((a, b) {
+        final aDate = a.meetingDate ?? a.meeting?.meetingDate;
+        final bDate = b.meetingDate ?? b.meeting?.meetingDate;
+
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return bDate.compareTo(aDate);
+      });
+
+      return attendance;
     } catch (e) {
       print('❌ Error fetching member meeting attendance: $e');
       return [];
