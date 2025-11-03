@@ -10,6 +10,7 @@ class CRMSupabaseService {
   CRMSupabaseService._internal();
 
   SupabaseClient? _client;
+  SupabaseClient? _serviceClient;
   bool _initialized = false;
 
   /// Initialize Supabase connection.
@@ -30,6 +31,19 @@ class CRMSupabaseService {
       );
 
       _client = Supabase.instance.client;
+
+      final serviceRoleKey = CRMConfig.supabaseServiceRoleKey;
+      if (serviceRoleKey.isNotEmpty) {
+        try {
+          _serviceClient = SupabaseClient(
+            CRMConfig.supabaseUrl,
+            serviceRoleKey,
+          );
+          print('✅ CRM Supabase service role client configured');
+        } catch (e) {
+          print('⚠️ Failed to create service role client: $e');
+        }
+      }
       _initialized = true;
       print('✅ CRM Supabase initialized successfully');
     } catch (e) {
@@ -47,4 +61,8 @@ class CRMSupabaseService {
   }
 
   bool get isInitialized => _initialized;
+
+  bool get hasServiceRole => _serviceClient != null;
+
+  SupabaseClient get privilegedClient => _serviceClient ?? client;
 }

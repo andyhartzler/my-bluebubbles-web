@@ -141,6 +141,34 @@ class Meeting {
     );
   }
 
+  Map<String, dynamic> toJson({bool includeAttendance = true}) {
+    return {
+      'id': id,
+      'meeting_date': meetingDate.toUtc().toIso8601String(),
+      'meeting_title': meetingTitle,
+      'zoom_meeting_id': zoomMeetingId,
+      'duration_minutes': durationMinutes,
+      'recording_url': recordingUrl,
+      'recording_embed_url': recordingEmbedUrl,
+      'transcript_file_path': transcriptFilePath,
+      'action_items': actionItems,
+      'executive_recap': executiveRecap,
+      'agenda_reviewed': agendaReviewed,
+      'discussion_highlights': discussionHighlights,
+      'decisions_rationales': decisionsRationales,
+      'risks_open_questions': risksOpenQuestions,
+      'attendance_count': attendanceCount,
+      'processing_status': processingStatus,
+      'processing_error': processingError,
+      'created_at': createdAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
+      'meeting_host': meetingHostId,
+      if (host != null) 'host': host!.toJson(),
+      if (includeAttendance)
+        'attendance': attendance.map((record) => record.toJson(includeMeeting: false)).toList(),
+    };
+  }
+
   factory Meeting.fromJson(Map<String, dynamic> json, {bool includeAttendance = true}) {
     Member? host;
     final hostData = json['host'];
@@ -274,6 +302,29 @@ class MeetingAttendance {
       meetingRecordingUrl: meetingRecordingUrl ?? this.meetingRecordingUrl,
       meetingRecordingEmbedUrl: meetingRecordingEmbedUrl ?? this.meetingRecordingEmbedUrl,
     );
+  }
+
+  Map<String, dynamic> toJson({bool includeMeeting = true, bool includeMember = true}) {
+    return {
+      'id': id,
+      'meeting_id': meetingId,
+      'member_id': memberId,
+      'total_duration_minutes': totalDurationMinutes,
+      'first_join_time': firstJoinTime?.toIso8601String(),
+      'last_leave_time': lastLeaveTime?.toIso8601String(),
+      'number_of_joins': numberOfJoins,
+      'zoom_display_name': zoomDisplayName,
+      'zoom_email': zoomEmail,
+      'matched_by': matchedBy,
+      'created_at': createdAt?.toIso8601String(),
+      'is_host': isHost,
+      if (includeMember && member != null) 'member': member!.toJson(),
+      if (includeMeeting && meeting != null) 'meeting': meeting!.toJson(includeAttendance: false),
+      'meeting_title': meetingTitle,
+      'meeting_date': meetingDate?.toIso8601String(),
+      'recording_url': meetingRecordingUrl,
+      'recording_embed_url': meetingRecordingEmbedUrl,
+    };
   }
 
   factory MeetingAttendance.fromJson(Map<String, dynamic> json, {Meeting? meeting}) {
