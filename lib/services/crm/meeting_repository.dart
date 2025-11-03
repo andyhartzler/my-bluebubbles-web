@@ -25,8 +25,13 @@ class MeetingRepository {
 
       final response = await query;
       final meetings = (response as List<dynamic>)
-          .whereType<Map<String, dynamic>>()
-          .map((json) => Meeting.fromJson(json, includeAttendance: includeAttendance))
+          .map((raw) {
+            final json = _coerceJsonMap(raw);
+            if (json == null) {
+              throw FormatException('Unexpected meeting payload: ${raw.runtimeType}');
+            }
+            return Meeting.fromJson(json, includeAttendance: includeAttendance);
+          })
           .toList();
       meetings.sort((a, b) => b.meetingDate.compareTo(a.meetingDate));
       return meetings;
@@ -49,7 +54,11 @@ class MeetingRepository {
           .maybeSingle();
 
       if (response == null) return null;
-      return Meeting.fromJson(response as Map<String, dynamic>, includeAttendance: includeAttendance);
+      final json = _coerceJsonMap(response);
+      if (json == null) {
+        throw const FormatException('Supabase returned an unexpected meeting payload');
+      }
+      return Meeting.fromJson(json, includeAttendance: includeAttendance);
     } catch (e) {
       print('❌ Error fetching meeting by id: $e');
       rethrow;
@@ -67,8 +76,13 @@ class MeetingRepository {
           .order('first_join_time');
 
       return (response as List<dynamic>)
-          .whereType<Map<String, dynamic>>()
-          .map((json) => MeetingAttendance.fromJson(json))
+          .map((raw) {
+            final json = _coerceJsonMap(raw);
+            if (json == null) {
+              throw FormatException('Unexpected meeting attendance payload: ${raw.runtimeType}');
+            }
+            return MeetingAttendance.fromJson(json);
+          })
           .toList();
     } catch (e) {
       print('❌ Error fetching meeting attendance: $e');
@@ -86,8 +100,13 @@ class MeetingRepository {
           .eq('member_id', memberId);
 
       final attendance = (response as List<dynamic>)
-          .whereType<Map<String, dynamic>>()
-          .map((json) => MeetingAttendance.fromJson(json))
+          .map((raw) {
+            final json = _coerceJsonMap(raw);
+            if (json == null) {
+              throw FormatException('Unexpected meeting attendance payload: ${raw.runtimeType}');
+            }
+            return MeetingAttendance.fromJson(json);
+          })
           .toList();
 
       attendance.sort((a, b) {
@@ -106,4 +125,13 @@ class MeetingRepository {
       rethrow;
     }
   }
+}
+
+Map<String, dynamic>? _coerceJsonMap(dynamic value) {
+  if (value == null) return null;
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) {
+    return value.map((key, dynamic v) => MapEntry(key.toString(), v));
+  }
+  return null;
 }
