@@ -371,6 +371,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
                         onPressed: () => _openMemberProfile(attendance.member!),
                       )
                     : null,
+                onTap: attendance.member != null ? () => _openMemberProfile(attendance.member!) : null,
               );
             }).toList(),
           ],
@@ -380,12 +381,12 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   }
 
   Widget _buildVideoEmbed(Meeting meeting) {
-    final embedUrl = meeting.recordingEmbedUrl ?? meeting.recordingUrl;
-    if (embedUrl == null || embedUrl.isEmpty) {
+    final resolvedUrl = _resolveEmbedUrl(meeting.recordingEmbedUrl, meeting.recordingUrl);
+    if (resolvedUrl == null) {
       return const SizedBox.shrink();
     }
 
-    final uri = Uri.tryParse(embedUrl);
+    final uri = Uri.tryParse(resolvedUrl);
     if (uri == null) {
       return const SizedBox.shrink();
     }
@@ -415,7 +416,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       // ignore: undefined_prefixed_name
       ui.platformViewRegistry.registerViewFactory(viewType, (int viewId) {
         final element = html.IFrameElement()
-          ..src = uri.toString()
+          ..src = resolvedUrl
           ..style.border = '0'
           ..allowFullscreen = true
           ..allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
@@ -451,4 +452,47 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       ),
     );
   }
+}
+
+String? _resolveEmbedUrl(String? embedUrl, String? fallbackUrl) {
+  final primary = embedUrl?.trim();
+  final fallback = fallbackUrl?.trim();
+  final candidate = (primary != null && primary.isNotEmpty) ? primary : fallback;
+  if (candidate == null || candidate.isEmpty) {
+    return null;
+  }
+
+  final uri = Uri.tryParse(candidate);
+  if (uri == null) {
+    return null;
+  }
+
+  if (uri.host.contains('drive.google.com')) {
+    final id = _extractDriveId(uri);
+    if (id != null) {
+      return 'https://drive.google.com/file/d/$id/preview';
+    }
+  }
+
+  return uri.toString();
+}
+
+String? _extractDriveId(Uri uri) {
+  final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
+  if (segments.length >= 3 && segments.first == 'file') {
+    final dIndex = segments.indexOf('d');
+    if (dIndex != -1 && segments.length > dIndex + 1) {
+      final id = segments[dIndex + 1];
+      if (id.isNotEmpty) {
+        return id;
+      }
+    }
+  }
+
+  final queryId = uri.queryParameters['id'] ?? uri.queryParameters['fileId'];
+  if (queryId != null && queryId.isNotEmpty) {
+    return queryId;
+  }
+
+  return null;
 }

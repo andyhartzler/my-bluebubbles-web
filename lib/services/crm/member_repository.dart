@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 
 import 'supabase_service.dart';
 
@@ -108,18 +109,39 @@ class MemberRepository {
 
   /// Get member by phone number (E.164 format)
   /// This is the KEY lookup for linking to BlueBubbles Handles
-  Future<Member?> getMemberByPhone(String phoneE164) async {
+  Future<Member?> getMemberByPhone(String phone) async {
     if (!_isReady) return null;
 
-    try {
-      final response = await _supabase.client
-          .from('members')
-          .select()
-          .eq('phone_e164', phoneE164)
-          .maybeSingle();
+    final candidates = buildPhoneLookupCandidates(phone);
+    if (candidates.isEmpty) return null;
 
+    try {
+      final filters = <String>[];
+      for (final candidate in candidates) {
+        final escaped = candidate.replaceAll(',', '\\,');
+        filters.add('phone_e164.eq.$escaped');
+        filters.add('phone.eq.$escaped');
+      }
+
+      var query = _supabase.client.from('members').select();
+      if (filters.isNotEmpty) {
+        query = query.or(filters.join(','));
+      } else {
+        query = query.eq('phone_e164', phone);
+      }
+
+      final response = await query.limit(1).maybeSingle();
       if (response == null) return null;
-      return Member.fromJson(response as Map<String, dynamic>);
+
+      if (response is Map<String, dynamic>) {
+        return Member.fromJson(response);
+      }
+
+      if (response is Map) {
+        return Member.fromJson(response.map((key, dynamic value) => MapEntry(key.toString(), value)));
+      }
+
+      throw FormatException('Unexpected response type: ${response.runtimeType}');
     } catch (e) {
       print('❌ Error fetching member by phone: $e');
       return null;
