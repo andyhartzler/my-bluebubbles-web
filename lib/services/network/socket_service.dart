@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
 
 import 'package:universal_io/io.dart';
@@ -29,16 +28,7 @@ class SocketService extends GetxService {
   SocketState _lastState = SocketState.disconnected;
   RxString lastError = "".obs;
   Timer? _reconnectTimer;
-  Timer? _healthCheckTimer;
   late Socket socket;
-  bool _socketInitialized = false;
-  bool _initializingSocket = false;
-  String? _socketOverride;
-  String? _lastBaseServer;
-  List<String> _socketCandidates = <String>[];
-  int _candidateIndex = 0;
-  bool _resolvingCandidate = false;
-  bool _serverInfoChecked = false;
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
@@ -69,9 +59,38 @@ class SocketService extends GetxService {
   }
 
   void startSocket() {
-    if (_initializingSocket) {
-      Logger.debug('Socket initialization already in progress');
-      return;
+    OptionBuilder options = OptionBuilder()
+        .setQuery({"guid": password})
+        .setTransports(['websocket', 'polling'])
+        .setExtraHeaders(http.headers)
+        // Disable so that we can create the listeners first
+        .disableAutoConnect()
+        .enableReconnection();
+    socket = io(serverAddress, options.build());
+    // placed here so that [socket] is still initialized
+    if (isNullOrEmpty(serverAddress)) return;
+
+    socket.onConnect((data) => handleStatusUpdate(SocketState.connected, data));
+    socket.onReconnect((data) => handleStatusUpdate(SocketState.connected, data));
+
+    socket.onReconnectAttempt((data) => handleStatusUpdate(SocketState.connecting, data));
+    socket.onReconnecting((data) => handleStatusUpdate(SocketState.connecting, data));
+    socket.onConnecting((data) => handleStatusUpdate(SocketState.connecting, data));
+
+    socket.onDisconnect((data) => handleStatusUpdate(SocketState.disconnected, data));
+
+    socket.onConnectError((data) => handleStatusUpdate(SocketState.error, data));
+    socket.onConnectTimeout((data) => handleStatusUpdate(SocketState.error, data));
+    socket.onError((data) => handleStatusUpdate(SocketState.error, data));
+
+    // custom events
+    // only listen to these events from socket on web/desktop (FCM handles on Android)
+    if (kIsWeb || kIsDesktop) {
+      socket.on("group-name-change", (data) => ah.handleEvent("group-name-change", data, 'DartSocket'));
+      socket.on("participant-removed", (data) => ah.handleEvent("participant-removed", data, 'DartSocket'));
+      socket.on("participant-added", (data) => ah.handleEvent("participant-added", data, 'DartSocket'));
+      socket.on("participant-left", (data) => ah.handleEvent("participant-left", data, 'DartSocket'));
+      socket.on("incoming-facetime", (data) => ah.handleEvent("incoming-facetime", jsonDecode(data), 'DartSocket'));
     }
 
     if (isNullOrEmpty(serverAddress)) {
@@ -93,10 +112,9 @@ class SocketService extends GetxService {
   }
 
   void disconnect() {
-    if (!_socketInitialized || isNullOrEmpty(serverAddress)) return;
+    if (isNullOrEmpty(serverAddress)) return;
     socket.disconnect();
     state.value = SocketState.disconnected;
-    _healthCheckTimer?.cancel();
   }
 
   void reconnect() {
@@ -113,9 +131,7 @@ class SocketService extends GetxService {
       return;
     }
     socket.dispose();
-    _socketInitialized = false;
     state.value = SocketState.disconnected;
-    _healthCheckTimer?.cancel();
   }
 
   void restartSocket() {
@@ -125,16 +141,11 @@ class SocketService extends GetxService {
 
   void forgetConnection() {
     closeSocket();
-    clearOverride();
     ss.settings.guidAuthKey.value = "";
     clearServerUrl(saveAdditionalSettings: ["guidAuthKey"]);
   }
 
   Future<Map<String, dynamic>> sendMessage(String event, Map<String, dynamic> message) {
-    if (!_socketInitialized) {
-      return Future.error('Socket not initialized');
-    }
-
     Completer<Map<String, dynamic>> completer = Completer();
 
     socket.emitWithAck(event, message, ack: (response) {
@@ -151,9 +162,7 @@ class SocketService extends GetxService {
   }
 
   void handleStatusUpdate(SocketState status, dynamic data) {
-    if (_lastState == status && status != SocketState.error && status != SocketState.disconnected) {
-      return;
-    }
+    if (_lastState == status) return;
     _lastState = status;
 
     switch (status) {
@@ -161,65 +170,43 @@ class SocketService extends GetxService {
         state.value = SocketState.connected;
         _reconnectTimer?.cancel();
         _reconnectTimer = null;
+        _resetErrorTracking();
         NetworkTasks.onConnect();
         notif.clearSocketError();
-        if (_socketCandidates.isNotEmpty) {
-          final String activeTarget = _socketOverride ?? serverAddress;
-          final int index = _socketCandidates.indexOf(activeTarget);
-          _candidateIndex = index >= 0 ? index : 0;
-          _socketOverride = _socketCandidates[_candidateIndex] == serverAddress
-              ? null
-              : _socketCandidates[_candidateIndex];
-        } else {
-          _candidateIndex = 0;
-        }
         return;
       case SocketState.disconnected:
         Logger.info("Disconnected from socket...");
         state.value = SocketState.disconnected;
-        _scheduleReconnect();
         return;
       case SocketState.connecting:
         Logger.info("Connecting to socket...");
         state.value = SocketState.connecting;
         return;
       case SocketState.error:
-        Logger.info("Socket connect error, evaluating fallbacks...");
+        Logger.info("Socket connect error, fetching new URL...");
 
         if (data is SocketException) {
           handleSocketException(data);
         }
 
-        _handleSocketError();
+        state.value = SocketState.error;
+        // After 5 seconds of an error, we should retry the connection
+        _reconnectTimer = Timer(const Duration(seconds: 5), () async {
+          if (state.value == SocketState.connected) return;
+
+          await fdb.fetchNewUrl();
+          restartSocket();
+
+          if (state.value == SocketState.connected) return;
+
+          if (!ss.settings.keepAppAlive.value) {
+            notif.createSocketError();
+          }
+        });
         return;
       default:
         return;
     }
-  }
-
-  void _scheduleReconnect({bool fetchNewUrl = false}) {
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 5), () async {
-      if (state.value == SocketState.connected) {
-        _reconnectTimer = null;
-        return;
-      }
-
-      if (fetchNewUrl) {
-        try {
-          await fdb.fetchNewUrl();
-        } catch (e, stack) {
-          Logger.warn('Failed to refresh server URL before reconnecting', error: e, trace: stack);
-        }
-      }
-
-      restartSocket();
-
-      if (state.value != SocketState.connected && !ss.settings.keepAppAlive.value) {
-        notif.createSocketError();
-      }
-      _reconnectTimer = null;
-    });
   }
 
   void handleSocketException(SocketException e) {
