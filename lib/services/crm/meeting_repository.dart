@@ -24,13 +24,15 @@ class MeetingRepository {
           .order('meeting_date', ascending: false);
 
       final response = await query;
-      return (response as List<dynamic>)
+      final meetings = (response as List<dynamic>)
           .whereType<Map<String, dynamic>>()
           .map((json) => Meeting.fromJson(json, includeAttendance: includeAttendance))
           .toList();
+      meetings.sort((a, b) => b.meetingDate.compareTo(a.meetingDate));
+      return meetings;
     } catch (e) {
       print('❌ Error fetching meetings: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -50,7 +52,7 @@ class MeetingRepository {
       return Meeting.fromJson(response as Map<String, dynamic>, includeAttendance: includeAttendance);
     } catch (e) {
       print('❌ Error fetching meeting by id: $e');
-      return null;
+      rethrow;
     }
   }
 
@@ -70,7 +72,7 @@ class MeetingRepository {
           .toList();
     } catch (e) {
       print('❌ Error fetching meeting attendance: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -101,7 +103,7 @@ class MeetingRepository {
       return attendance;
     } catch (e) {
       print('❌ Error fetching member meeting attendance: $e');
-      return [];
+      rethrow;
     }
   }
 }

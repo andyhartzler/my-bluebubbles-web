@@ -1,5 +1,47 @@
 import 'package:bluebubbles/models/crm/member.dart';
 
+DateTime? _parseDateTime(dynamic value, {bool isRequired = false, String? fieldName}) {
+  if (value == null) {
+    if (isRequired) {
+      throw FormatException('Missing required ${fieldName ?? 'DateTime'} value');
+    }
+    return null;
+  }
+
+  if (value is DateTime) {
+    return value.toLocal();
+  }
+
+  if (value is String) {
+    if (value.isEmpty) {
+      if (isRequired) {
+        throw FormatException('Empty string provided for ${fieldName ?? 'DateTime'}');
+      }
+      return null;
+    }
+
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) {
+      return parsed.toLocal();
+    }
+  }
+
+  if (isRequired) {
+    throw FormatException('Could not parse ${fieldName ?? 'DateTime'} value: $value');
+  }
+  return null;
+}
+
+int? _parseInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    return int.tryParse(value);
+  }
+  return null;
+}
+
 class Meeting {
   final String id;
   final DateTime meetingDate;
@@ -108,10 +150,10 @@ class Meeting {
 
     final meeting = Meeting(
       id: json['id'] as String,
-      meetingDate: DateTime.parse(json['meeting_date'] as String),
+      meetingDate: _parseDateTime(json['meeting_date'], isRequired: true, fieldName: 'meeting_date')!,
       meetingTitle: json['meeting_title'] as String,
       zoomMeetingId: json['zoom_meeting_id'] as String?,
-      durationMinutes: (json['duration_minutes'] as num?)?.toInt(),
+      durationMinutes: _parseInt(json['duration_minutes']),
       recordingUrl: json['recording_url'] as String?,
       recordingEmbedUrl: json['recording_embed_url'] as String?,
       transcriptFilePath: json['transcript_file_path'] as String?,
@@ -121,11 +163,11 @@ class Meeting {
       discussionHighlights: json['discussion_highlights'] as String?,
       decisionsRationales: json['decisions_rationales'] as String?,
       risksOpenQuestions: json['risks_open_questions'] as String?,
-      attendanceCount: (json['attendance_count'] as num?)?.toInt(),
+      attendanceCount: _parseInt(json['attendance_count']),
       processingStatus: json['processing_status'] as String?,
       processingError: json['processing_error'] as String?,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
+      createdAt: _parseDateTime(json['created_at']),
+      updatedAt: _parseDateTime(json['updated_at']),
       meetingHostId: json['meeting_host'] as String?,
       host: host,
       attendance: const [],
@@ -248,29 +290,20 @@ class MeetingAttendance {
     }
 
     final meetingTitle = json['meeting_title'] as String? ?? meetingRef?.meetingTitle;
-    final meetingDateString = json['meeting_date'] as String?;
-    final meetingDate = meetingDateString != null
-        ? DateTime.tryParse(meetingDateString)
-        : meetingRef?.meetingDate;
+    final meetingDate = _parseDateTime(json['meeting_date']) ?? meetingRef?.meetingDate;
 
     return MeetingAttendance(
       id: json['id'] as String,
       meetingId: json['meeting_id'] as String? ?? meetingRef?.id,
       memberId: json['member_id'] as String?,
-      totalDurationMinutes: (json['total_duration_minutes'] as num?)?.toInt(),
-      firstJoinTime: json['first_join_time'] != null
-          ? DateTime.tryParse(json['first_join_time'] as String)
-          : null,
-      lastLeaveTime: json['last_leave_time'] != null
-          ? DateTime.tryParse(json['last_leave_time'] as String)
-          : null,
-      numberOfJoins: (json['number_of_joins'] as num?)?.toInt(),
+      totalDurationMinutes: _parseInt(json['total_duration_minutes']),
+      firstJoinTime: _parseDateTime(json['first_join_time']),
+      lastLeaveTime: _parseDateTime(json['last_leave_time']),
+      numberOfJoins: _parseInt(json['number_of_joins']),
       zoomDisplayName: json['zoom_display_name'] as String?,
       zoomEmail: json['zoom_email'] as String?,
       matchedBy: json['matched_by'] as String?,
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'] as String)
-          : null,
+      createdAt: _parseDateTime(json['created_at']),
       isHost: json['is_host'] as bool?,
       member: member,
       meeting: meetingRef,

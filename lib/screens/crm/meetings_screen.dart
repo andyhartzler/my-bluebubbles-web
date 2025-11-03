@@ -84,8 +84,11 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       });
     } catch (e) {
       if (!mounted) return;
+      final friendly = e is FormatException
+          ? 'The meeting data from Supabase could not be parsed: ${e.message}. Please verify the stored timestamps and IDs.'
+          : 'Failed to load meetings: $e';
       setState(() {
-        _error = 'Failed to load meetings: $e';
+        _error = friendly;
         _loading = false;
       });
     }
