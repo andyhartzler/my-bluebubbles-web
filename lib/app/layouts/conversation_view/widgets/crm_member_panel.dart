@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
@@ -146,6 +149,12 @@ class _CRMMemberPanelState extends State<CRMMemberPanel> {
               ),
             ],
           ),
+        const SizedBox(height: 24),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.person),
+          label: const Text('Open Full Member Profile'),
+          onPressed: () => _openMemberProfile(_member!),
+        ),
       ],
     );
   }
@@ -167,5 +176,15 @@ class _CRMMemberPanelState extends State<CRMMemberPanel> {
     if (difference.inDays == 1) return 'Yesterday';
     if (difference.inDays < 7) return '${difference.inDays} days ago';
     return '${date.month}/${date.day}/${date.year}';
+  }
+
+  void _openMemberProfile(Member member) {
+    Navigator.of(context, rootNavigator: true).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(
+          child: MemberDetailScreen(member: member),
+        ),
+      ),
+    );
   }
 }
