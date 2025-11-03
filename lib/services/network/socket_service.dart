@@ -33,6 +33,8 @@ class SocketService extends GetxService {
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
 
+  bool get _isSecureWebContext => kIsWeb && Uri.base.scheme == 'https';
+
   @override
   void onInit() {
     super.onInit();
@@ -156,6 +158,7 @@ class SocketService extends GetxService {
         state.value = SocketState.connected;
         _reconnectTimer?.cancel();
         _reconnectTimer = null;
+        _resetErrorTracking();
         NetworkTasks.onConnect();
         notif.clearSocketError();
         return;
@@ -214,3 +217,4 @@ class SocketService extends GetxService {
     _reconnectTimer = null;
   }
 }
+
