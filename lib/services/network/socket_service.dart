@@ -1,19 +1,21 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+
 import 'package:universal_io/io.dart';
 
 import 'package:bluebubbles/helpers/backend/settings_helpers.dart';
-import 'package:bluebubbles/utils/crypto_utils.dart';
-import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/utils/crypto_utils.dart';
+import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:socket_io_client/socket_io_client.dart';
 
-SocketService socket = Get.isRegistered<SocketService>() ? Get.find<SocketService>() : Get.put(SocketService());
+SocketService socket =
+    Get.isRegistered<SocketService>() ? Get.find<SocketService>() : Get.put(SocketService());
 
 enum SocketState {
   connected,
@@ -40,6 +42,8 @@ class SocketService extends GetxService {
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
+
+  bool get _isSecureWebContext => kIsWeb && Uri.base.scheme == 'https';
 
   @override
   void onInit() {
@@ -70,6 +74,11 @@ class SocketService extends GetxService {
       return;
     }
 
+    if (isNullOrEmpty(serverAddress)) {
+      Logger.debug('Socket start skipped, no server address configured');
+      return;
+    }
+
     _initializingSocket = true;
     Future<void>(() async {
       try {
@@ -91,13 +100,18 @@ class SocketService extends GetxService {
   }
 
   void reconnect() {
-    if (!_socketInitialized || state.value == SocketState.connected || isNullOrEmpty(serverAddress)) return;
+    if (!_socketInitialized || state.value == SocketState.connected || isNullOrEmpty(serverAddress)) {
+      return;
+    }
     state.value = SocketState.connecting;
     socket.connect();
   }
 
   void closeSocket() {
-    if (!_socketInitialized || isNullOrEmpty(serverAddress)) return;
+    if (!_socketInitialized || isNullOrEmpty(serverAddress)) {
+      _socketInitialized = false;
+      return;
+    }
     socket.dispose();
     _socketInitialized = false;
     state.value = SocketState.disconnected;
@@ -223,11 +237,12 @@ class SocketService extends GetxService {
     _socketCandidates = <String>[];
     _candidateIndex = 0;
     _serverInfoChecked = false;
+    _resetErrorTracking();
   }
 
   void _handleSocketError() {
     Future<void>(() async {
-      final applied = await _applyNextCandidate();
+      final bool applied = await _applyNextCandidate();
       if (applied) {
         return;
       }
@@ -256,8 +271,28 @@ class SocketService extends GetxService {
     return candidate;
   }
 
+  Iterable<String> _candidateVariantsForUri(Uri uri, {bool fromMetadata = false}) sync* {
+    final candidate = uri.toString();
+    if (candidate.isEmpty) {
+      return;
+    }
+
+    final bool isHttp = uri.scheme == 'http';
+    final bool nonLocal = !_isLocalHost(uri.host);
+    if (_isSecureWebContext && nonLocal && isHttp && !fromMetadata) {
+      yield uri.replace(scheme: 'https').toString();
+      return;
+    }
+
+    yield candidate;
+
+    if (_isSecureWebContext && nonLocal && isHttp) {
+      yield uri.replace(scheme: 'https').toString();
+    }
+  }
+
   void _ensureSocketCandidates() {
-    final base = serverAddress;
+    final String base = serverAddress;
     if (base.isEmpty) {
       _socketCandidates = <String>[];
       _lastBaseServer = null;
@@ -280,17 +315,10 @@ class SocketService extends GetxService {
     _serverInfoChecked = false;
     final LinkedHashSet<String> candidates = LinkedHashSet<String>();
 
-    void addUri(Uri uri) {
-      final candidate = uri.toString();
-      if (candidate.isEmpty) {
-        return;
+    void addUri(Uri uri, {bool fromMetadata = false}) {
+      for (final variant in _candidateVariantsForUri(uri, fromMetadata: fromMetadata)) {
+        candidates.add(variant);
       }
-
-      if (kIsWeb && !_isLocalHost(uri.host) && uri.scheme == 'http') {
-        return;
-      }
-
-      candidates.add(candidate);
     }
 
     addUri(baseUri);
@@ -388,11 +416,25 @@ class SocketService extends GetxService {
         'socketAddress',
       ]);
       if (socketUrl != null) {
-        final String? sanitized = _normalizeCandidate(sanitizeServerAddress(address: socketUrl));
-        if (sanitized != null) {
-          _socketCandidates.remove(sanitized);
-          _socketCandidates.insert(0, sanitized);
-          return sanitized;
+        final String? normalized = _normalizeCandidate(sanitizeServerAddress(address: socketUrl));
+        if (normalized != null) {
+          final Uri? uri = Uri.tryParse(normalized);
+          if (uri != null) {
+            final List<String> variants = _candidateVariantsForUri(uri, fromMetadata: true).toList();
+            String? first;
+            for (final variant in variants) {
+              _socketCandidates.remove(variant);
+              _socketCandidates.insert(0, variant);
+              first = variant;
+            }
+            if (first != null) {
+              return first;
+            }
+          } else {
+            _socketCandidates.remove(normalized);
+            _socketCandidates.insert(0, normalized);
+            return normalized;
+          }
         }
       }
 
@@ -414,10 +456,17 @@ class SocketService extends GetxService {
           }
 
           final Uri candidateUri = baseUri.replace(scheme: scheme, port: port);
-          final String candidate = candidateUri.toString();
-          _socketCandidates.remove(candidate);
-          _socketCandidates.insert(0, candidate);
-          return candidate;
+          final List<String> variants =
+              _candidateVariantsForUri(candidateUri, fromMetadata: true).toList();
+          String? first;
+          for (final variant in variants) {
+            _socketCandidates.remove(variant);
+            _socketCandidates.insert(0, variant);
+            first = variant;
+          }
+          if (first != null) {
+            return first;
+          }
         }
       }
     } catch (e, stack) {
@@ -517,17 +566,22 @@ class SocketService extends GetxService {
       scheme = 'https';
     }
 
-    if (kIsWeb && !_isLocalHost(baseUri.host) && scheme == 'http') {
+    if (_isSecureWebContext && !_isLocalHost(baseUri.host) && scheme == 'http') {
       scheme = 'https';
     }
 
-    final Uri candidate = baseUri.replace(scheme: scheme, port: 1234);
-    final String candidateString = candidate.toString();
-    if (candidateString == serverAddress) {
-      return null;
+    final bool isLocal = _isLocalHost(baseUri.host);
+    int port = baseUri.port;
+    if (port == 0) {
+      port = scheme == 'https' ? 443 : 80;
     }
 
-    return candidateString;
+    if (isLocal && ss.settings.localhostPort.value != null) {
+      port = int.tryParse(ss.settings.localhostPort.value!) ?? port;
+    }
+
+    final Uri candidateUri = baseUri.replace(scheme: scheme, port: port);
+    return candidateUri.toString();
   }
 
   bool _isLocalHost(String host) {
@@ -557,9 +611,10 @@ class SocketService extends GetxService {
       }
 
       final bool secure = candidate.startsWith('wss://');
+      final bool nonLocal = !_isLocalHost(uri.host);
       final String targetScheme;
-      if (kIsWeb && !_isLocalHost(uri.host)) {
-        targetScheme = 'https';
+      if (_isSecureWebContext && nonLocal) {
+        targetScheme = secure ? 'https' : 'https';
       } else {
         targetScheme = secure ? 'https' : 'http';
       }
@@ -649,4 +704,14 @@ class SocketService extends GetxService {
     });
     _initializingSocket = false;
   }
+
+  void _resetErrorTracking() {
+    lastError.value = "";
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _healthCheckTimer?.cancel();
+    _healthCheckTimer = null;
+    _lastState = SocketState.disconnected;
+  }
 }
+
