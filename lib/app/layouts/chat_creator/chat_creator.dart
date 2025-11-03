@@ -171,10 +171,15 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         filteredChats = List<Chat>.from(existingChats.where((e) => e.isIMessage));
       } else {
         chats.loadedAllChats.future.then((_) {
+          if (!mounted) return;
           existingChats = chats.chats;
           setState(() {
             filteredChats = List<Chat>.from(existingChats.where((e) => e.isIMessage));
           });
+          if (widget.initialSelected.isNotEmpty) {
+            _syncServicePreference(updateFilteredChats: false);
+            findExistingChat();
+          }
         });
       }
       setState(() {});
@@ -381,6 +386,15 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   }
 
   Future<Chat?> findExistingChat({bool checkDeleted = false, bool update = true}) async {
+    if (!chats.loadedAllChats.isCompleted) {
+      try {
+        await chats.loadedAllChats.future;
+      } catch (_) {}
+      existingChats = chats.chats;
+      if (update && mounted) {
+        setState(() {});
+      }
+    }
     // no selected items, remove message view
     if (selectedContacts.isEmpty) {
       await cm.setAllInactive();
