@@ -24,6 +24,7 @@ import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
+import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:collection/collection.dart';
@@ -437,7 +438,7 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
-enum _HomeSection { dashboard, members, conversations }
+enum _HomeSection { dashboard, members, meetings, conversations }
 
 class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayListener {
   bool serverCompatible = true;
@@ -682,6 +683,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   children: [
                     const DashboardScreen(key: PageStorageKey('dashboard-view')),
                     const MembersListScreen(key: PageStorageKey('members-view'), embed: true),
+                    const MeetingsScreen(key: PageStorageKey('meetings-view')),
                     ConversationList(
                       key: const PageStorageKey('conversations-view'),
                       showArchivedChats: false,
@@ -702,6 +704,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     final navButtons = [
       _buildNavButton(context, _HomeSection.dashboard, 'Dashboard', Icons.dashboard_outlined),
       _buildNavButton(context, _HomeSection.members, 'Members', Icons.groups_outlined, enabled: crmReady),
+      _buildNavButton(context, _HomeSection.meetings, 'Meetings', Icons.video_camera_front_outlined, enabled: crmReady),
       _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline),
     ];
 

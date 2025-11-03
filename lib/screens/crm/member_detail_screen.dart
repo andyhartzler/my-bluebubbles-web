@@ -2,12 +2,17 @@ import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
+import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
+import 'package:bluebubbles/services/crm/meeting_repository.dart';
+import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -31,10 +36,16 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final MemberRepository _memberRepo = MemberRepository();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
   final CRMMessageService _messageService = CRMMessageService();
+  final MeetingRepository _meetingRepository = MeetingRepository();
+  final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
   late Member _member;
   final TextEditingController _notesController = TextEditingController();
   bool _editingNotes = false;
   bool _sendingIntro = false;
+  bool _loadingAttendance = false;
+  bool _hasLoadedAttendance = false;
+  String? _attendanceError;
+  List<MeetingAttendance> _meetingAttendance = [];
 
   bool get _crmReady => _supabaseService.isInitialized;
 
@@ -57,6 +68,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     super.initState();
     _member = widget.member;
     _notesController.text = _member.notes ?? '';
+    _memberLookup.cacheMember(_member);
+    if (_crmReady) {
+      _hasLoadedAttendance = true;
+      _loadMeetingAttendance();
+    }
   }
 
   @override
@@ -71,10 +87,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     try {
       await _memberRepo.updateNotes(_member.id, _notesController.text);
       if (!mounted) return;
+      final updated = _member.copyWith(notes: _notesController.text);
       setState(() {
-        _member = _member.copyWith(notes: _notesController.text);
+        _member = updated;
         _editingNotes = false;
       });
+      _memberLookup.cacheMember(updated);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Notes saved')),
       );
@@ -98,13 +116,15 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       );
 
       if (!mounted) return;
+      final updated = _member.copyWith(
+        optOut: newOptOutStatus,
+        optOutDate: newOptOutStatus ? DateTime.now() : _member.optOutDate,
+        optInDate: !newOptOutStatus ? DateTime.now() : _member.optInDate,
+      );
       setState(() {
-        _member = _member.copyWith(
-          optOut: newOptOutStatus,
-          optOutDate: newOptOutStatus ? DateTime.now() : _member.optOutDate,
-          optInDate: !newOptOutStatus ? DateTime.now() : _member.optInDate,
-        );
+        _member = updated;
       });
+      _memberLookup.cacheMember(updated);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -116,6 +136,37 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating opt-out status: $e')),
       );
+    }
+  }
+
+  Future<void> _loadMeetingAttendance() async {
+    if (!_crmReady) return;
+
+    _hasLoadedAttendance = true;
+    setState(() {
+      _loadingAttendance = true;
+      _attendanceError = null;
+    });
+
+    try {
+      final attendance = await _meetingRepository.getAttendanceForMember(_member.id);
+      if (!mounted) return;
+      for (final record in attendance) {
+        final member = record.member;
+        if (member != null) {
+          _memberLookup.cacheMember(member);
+        }
+      }
+      setState(() {
+        _meetingAttendance = attendance;
+        _loadingAttendance = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _attendanceError = 'Failed to load meeting attendance: $e';
+        _loadingAttendance = false;
+      });
     }
   }
 
@@ -149,9 +200,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               await _memberRepo.updateLastContacted(_member.id);
               if (!mounted) return;
               final now = DateTime.now();
+              final updated = _member.copyWith(lastContacted: now);
               setState(() {
-                _member = _member.copyWith(lastContacted: now);
+                _member = updated;
               });
+              _memberLookup.cacheMember(updated);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Message sent to ${_member.name}')),
               );
@@ -222,9 +275,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
     if (success) {
       final now = DateTime.now();
+      final updated = _member.copyWith(introSentAt: now, lastContacted: now);
       setState(() {
-        _member = _member.copyWith(introSentAt: now, lastContacted: now);
+        _member = updated;
       });
+      _memberLookup.cacheMember(updated);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Intro message sent')),
       );
@@ -237,6 +292,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_crmReady && !_hasLoadedAttendance) {
+      _hasLoadedAttendance = true;
+      _loadMeetingAttendance();
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text(_member.name),
@@ -482,6 +541,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                       ),
                     ),
                   const SizedBox(height: 24),
+                  ..._buildMeetingAttendanceSection(),
+                  if (_crmReady) const SizedBox(height: 24),
                   ...sections,
                   if (notesSection != null) notesSection,
                   if (metadataSection != null) metadataSection,
@@ -789,4 +850,153 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   }
 
   String _formatDateOnly(DateTime date) => '${date.month}/${date.day}/${date.year}';
+
+  MeetingAttendance? get _latestMeeting {
+    if (_meetingAttendance.isEmpty) return null;
+    final sorted = [..._meetingAttendance]
+      ..sort((a, b) {
+        final aDate = a.meetingDate ?? a.meeting?.meetingDate;
+        final bDate = b.meetingDate ?? b.meeting?.meetingDate;
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return bDate.compareTo(aDate);
+      });
+    return sorted.firstOrNull;
+  }
+
+  List<Widget> _buildMeetingAttendanceSection() {
+    if (!_crmReady) return const [];
+
+    final widgets = <Widget>[];
+    if (_loadingAttendance) {
+      widgets.add(
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12.0),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    } else if (_attendanceError != null) {
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: Card(
+            child: ListTile(
+              leading: const Icon(Icons.error_outline),
+              title: const Text('Unable to load meeting attendance'),
+              subtitle: Text(_attendanceError!),
+              trailing: IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadMeetingAttendance,
+              ),
+            ),
+          ),
+        ),
+      );
+    } else if (_meetingAttendance.isEmpty) {
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: Card(
+            child: ListTile(
+              leading: const Icon(Icons.event_busy),
+              title: const Text('No meetings recorded yet'),
+              subtitle: const Text('This member has not attended any tracked meetings.'),
+            ),
+          ),
+        ),
+      );
+    } else {
+      final latest = _latestMeeting;
+      if (latest != null) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: _buildMeetingSummaryCard(latest),
+          ),
+        );
+      }
+    }
+
+    widgets.add(
+      Align(
+        alignment: Alignment.center,
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.event_note),
+          label: const Text('Meeting Attendance'),
+          onPressed: _meetingAttendance.isEmpty ? null : _showMeetingAttendanceSheet,
+        ),
+      ),
+    );
+
+    return widgets;
+  }
+
+  Card _buildMeetingSummaryCard(MeetingAttendance attendance) {
+    final dateLabel = attendance.formattedMeetingDate ?? 'Date unavailable';
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.event_available),
+        title: Text(attendance.meetingLabel),
+        subtitle: Text('Last attended $dateLabel'),
+        trailing: const Icon(Icons.open_in_new),
+        onTap: () => _navigateToMeeting(attendance),
+      ),
+    );
+  }
+
+  void _showMeetingAttendanceSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => FractionallySizedBox(
+        heightFactor: 0.7,
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              Text('Meeting Attendance', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Expanded(
+                child: _meetingAttendance.isEmpty
+                    ? const Center(child: Text('No meetings recorded yet.'))
+                    : ListView.separated(
+                        itemCount: _meetingAttendance.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final attendance = _meetingAttendance[index];
+                          final dateLabel = attendance.formattedMeetingDate ?? 'Date unavailable';
+                          return ListTile(
+                            title: Text(attendance.meetingLabel),
+                            subtitle: Text(dateLabel),
+                            trailing: const Icon(Icons.open_in_new),
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              _navigateToMeeting(attendance);
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToMeeting(MeetingAttendance attendance) {
+    final meetingId = attendance.meetingId;
+    if (meetingId == null) return;
+    Navigator.of(context, rootNavigator: true).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(
+          child: MeetingsScreen(
+            initialMeetingId: meetingId,
+            highlightMemberId: _member.id,
+          ),
+        ),
+      ),
+    );
+  }
 }
