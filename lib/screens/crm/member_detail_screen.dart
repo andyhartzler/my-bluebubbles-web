@@ -957,7 +957,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         alignment: Alignment.center,
         child: OutlinedButton.icon(
           icon: const Icon(Icons.event_note),
-          label: const Text('Meeting Attendance'),
+          label: Text('Meeting Attendance (${_meetingAttendance.length})'),
           onPressed: _meetingAttendance.isEmpty ? null : _showMeetingAttendanceSheet,
         ),
       ),
@@ -968,11 +968,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
   Card _buildMeetingSummaryCard(MeetingAttendance attendance) {
     final dateLabel = attendance.formattedMeetingDate ?? 'Date unavailable';
+    final durationLabel = attendance.durationSummary;
     return Card(
       child: ListTile(
         leading: const Icon(Icons.event_available),
         title: Text(attendance.meetingLabel),
-        subtitle: Text('Last attended $dateLabel'),
+        subtitle: Text('Last attended $dateLabel • $durationLabel'),
         trailing: const Icon(Icons.open_in_new),
         onTap: () => _navigateToMeeting(attendance),
       ),
@@ -1000,9 +1001,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         itemBuilder: (context, index) {
                           final attendance = _meetingAttendance[index];
                           final dateLabel = attendance.formattedMeetingDate ?? 'Date unavailable';
+                          final details = <String>[
+                            dateLabel,
+                            attendance.durationSummary,
+                            if (attendance.joinWindow != null) attendance.joinWindow!,
+                          ].join(' • ');
                           return ListTile(
                             title: Text(attendance.meetingLabel),
-                            subtitle: Text(dateLabel),
+                            subtitle: Text(details),
                             trailing: const Icon(Icons.open_in_new),
                             onTap: () {
                               Navigator.of(sheetContext).pop();

@@ -87,6 +87,7 @@ class MeetingRepository {
 
       if (includeAttendance) {
         await _hydrateAttendance(client, meetingMap);
+        await _hydrateNonMemberAttendees(client, meetingMap);
       }
 
       final ordered = meetings
@@ -190,6 +191,46 @@ class MeetingRepository {
     }
   }
 
+  Future<void> _hydrateNonMemberAttendees(
+    SupabaseClient client,
+    Map<String, Meeting> meetingMap,
+  ) async {
+    if (meetingMap.isEmpty) {
+      return;
+    }
+
+    try {
+      final response = await client
+          .from('non_member_attendees')
+          .select('*, meeting:meetings(id, meeting_title, meeting_date, duration_minutes, recording_url, recording_embed_url, recording_thumbnail_url)')
+          .inFilter('meeting_id', meetingMap.keys.toList())
+          .order('display_name');
+
+      final rows = _coerceJsonList(response);
+      final attendeesByMeeting = <String, List<NonMemberAttendee>>{};
+
+      for (final row in rows) {
+        final meetingId = row['meeting_id'] as String?;
+        if (meetingId == null) continue;
+        final parent = meetingMap[meetingId];
+        final attendee = NonMemberAttendee.fromJson(
+          row,
+          meeting: parent,
+        );
+        attendeesByMeeting.putIfAbsent(meetingId, () => <NonMemberAttendee>[]).add(attendee);
+      }
+
+      for (final key in meetingMap.keys.toList()) {
+        final meeting = meetingMap[key];
+        if (meeting == null) continue;
+        final guests = attendeesByMeeting[key] ?? const <NonMemberAttendee>[];
+        meetingMap[key] = meeting.copyWith(nonMemberAttendees: guests);
+      }
+    } catch (e) {
+      print('⚠️ Failed to hydrate non-member attendees: $e');
+    }
+  }
+
   Future<List<MeetingAttendance>> getAttendanceForMember(String memberId) async {
     if (!_isReady) return [];
 
@@ -237,8 +278,8 @@ class MeetingRepository {
           .update(payload)
           .eq('id', meetingId)
           .select(includeAttendance
-              ? '*, host:members!meetings_meeting_host_fkey(*), attendance:meeting_attendance(*, member:members(*))'
-              : '*, host:members!meetings_meeting_host_fkey(*)')
+              ? '*, host:members!meetings_meeting_host_fkey(*), attendance:meeting_attendance(*, member:members(*)), non_member_attendees:non_member_attendees(*)'
+              : '*, host:members!meetings_meeting_host_fkey(*), non_member_attendees:non_member_attendees(*)')
           .maybeSingle();
 
       if (response == null) return null;
@@ -277,6 +318,127 @@ class MeetingRepository {
       return MeetingAttendance.fromJson(json);
     } catch (e) {
       print('❌ Error updating meeting attendance: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<NonMemberAttendee>> getNonMemberAttendeesForMeeting(String meetingId) async {
+    if (!_isReady) return [];
+
+    try {
+      final client = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final response = await client
+          .from('non_member_attendees')
+          .select('*, meeting:meetings(id, meeting_title, meeting_date, duration_minutes, recording_url, recording_embed_url, recording_thumbnail_url)')
+          .eq('meeting_id', meetingId)
+          .order('display_name');
+
+      return _coerceJsonList(response)
+          .map((row) => NonMemberAttendee.fromJson(row))
+          .toList();
+    } catch (e) {
+      print('❌ Error fetching non-member attendees: $e');
+      rethrow;
+    }
+  }
+
+  Future<NonMemberAttendee?> updateNonMemberAttendee(
+    String attendeeId,
+    Map<String, dynamic> updates,
+  ) async {
+    if (!_isReady || updates.isEmpty) return null;
+
+    final payload = Map<String, dynamic>.from(updates);
+
+    try {
+      final response = await _supabase.privilegedClient
+          .from('non_member_attendees')
+          .update(payload)
+          .eq('id', attendeeId)
+          .select('*, meeting:meetings(id, meeting_title, meeting_date, duration_minutes, recording_url, recording_embed_url, recording_thumbnail_url)')
+          .maybeSingle();
+
+      if (response == null) return null;
+      final json = _coerceJsonMap(response);
+      if (json == null) {
+        throw const FormatException('Supabase returned an unexpected non-member payload');
+      }
+      return NonMemberAttendee.fromJson(json);
+    } catch (e) {
+      print('❌ Error updating non-member attendee: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteNonMemberAttendee(String attendeeId) async {
+    if (!_isReady) return;
+
+    try {
+      await _supabase.privilegedClient
+          .from('non_member_attendees')
+          .delete()
+          .eq('id', attendeeId);
+    } catch (e) {
+      print('❌ Error deleting non-member attendee: $e');
+      rethrow;
+    }
+  }
+
+  Future<MeetingAttendance?> convertNonMemberToAttendance({
+    required String attendeeId,
+    required String meetingId,
+    required String memberId,
+    bool removeAttendee = true,
+  }) async {
+    if (!_isReady) return null;
+
+    try {
+      final client = _supabase.privilegedClient;
+      final attendeeResponse = await client
+          .from('non_member_attendees')
+          .select()
+          .eq('id', attendeeId)
+          .maybeSingle();
+
+      final attendeeJson = _coerceJsonMap(attendeeResponse);
+      if (attendeeJson == null) {
+        throw const FormatException('Unable to locate non-member attendee');
+      }
+
+      final payload = <String, dynamic>{
+        'meeting_id': meetingId,
+        'member_id': memberId,
+        'total_duration_minutes': attendeeJson['total_duration_minutes'],
+        'first_join_time': attendeeJson['first_join_time'],
+        'last_leave_time': attendeeJson['last_leave_time'],
+        'number_of_joins': attendeeJson['number_of_joins'],
+        'zoom_display_name': attendeeJson['display_name'],
+        'zoom_email': attendeeJson['email'],
+        'matched_by': 'linked-by-app',
+        'is_host': false,
+      };
+
+      final attendanceResponse = await client
+          .from('meeting_attendance')
+          .upsert(payload, onConflict: 'meeting_id,member_id')
+          .select('*, member:members(*), meeting:meetings(id, meeting_date, meeting_title, recording_url, recording_embed_url, duration_minutes, meeting_host)')
+          .maybeSingle();
+
+      if (attendanceResponse == null) {
+        throw const FormatException('Failed to create attendance record');
+      }
+
+      if (removeAttendee) {
+        await client.from('non_member_attendees').delete().eq('id', attendeeId);
+      }
+
+      final json = _coerceJsonMap(attendanceResponse);
+      if (json == null) {
+        throw const FormatException('Supabase returned an unexpected meeting attendance payload');
+      }
+      return MeetingAttendance.fromJson(json);
+    } catch (e) {
+      print('❌ Error linking non-member attendee: $e');
       rethrow;
     }
   }

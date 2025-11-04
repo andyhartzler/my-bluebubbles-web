@@ -50,6 +50,7 @@ class Meeting {
   final int? durationMinutes;
   final String? recordingUrl;
   final String? recordingEmbedUrl;
+  final String? recordingThumbnailUrl;
   final String? transcriptFilePath;
   final String? actionItems;
   final String? executiveRecap;
@@ -65,6 +66,7 @@ class Meeting {
   final String? meetingHostId;
   final Member? host;
   final List<MeetingAttendance> attendance;
+  final List<NonMemberAttendee> nonMemberAttendees;
 
   const Meeting({
     required this.id,
@@ -74,6 +76,7 @@ class Meeting {
     this.durationMinutes,
     this.recordingUrl,
     this.recordingEmbedUrl,
+    this.recordingThumbnailUrl,
     this.transcriptFilePath,
     this.actionItems,
     this.executiveRecap,
@@ -89,6 +92,7 @@ class Meeting {
     this.meetingHostId,
     this.host,
     this.attendance = const [],
+    this.nonMemberAttendees = const [],
   });
 
   Meeting copyWith({
@@ -99,6 +103,7 @@ class Meeting {
     int? durationMinutes,
     String? recordingUrl,
     String? recordingEmbedUrl,
+    String? recordingThumbnailUrl,
     String? transcriptFilePath,
     String? actionItems,
     String? executiveRecap,
@@ -114,6 +119,7 @@ class Meeting {
     String? meetingHostId,
     Member? host,
     List<MeetingAttendance>? attendance,
+    List<NonMemberAttendee>? nonMemberAttendees,
   }) {
     return Meeting(
       id: id ?? this.id,
@@ -123,6 +129,7 @@ class Meeting {
       durationMinutes: durationMinutes ?? this.durationMinutes,
       recordingUrl: recordingUrl ?? this.recordingUrl,
       recordingEmbedUrl: recordingEmbedUrl ?? this.recordingEmbedUrl,
+      recordingThumbnailUrl: recordingThumbnailUrl ?? this.recordingThumbnailUrl,
       transcriptFilePath: transcriptFilePath ?? this.transcriptFilePath,
       actionItems: actionItems ?? this.actionItems,
       executiveRecap: executiveRecap ?? this.executiveRecap,
@@ -138,6 +145,7 @@ class Meeting {
       meetingHostId: meetingHostId ?? this.meetingHostId,
       host: host ?? this.host,
       attendance: attendance ?? this.attendance,
+      nonMemberAttendees: nonMemberAttendees ?? this.nonMemberAttendees,
     );
   }
 
@@ -150,6 +158,7 @@ class Meeting {
       'duration_minutes': durationMinutes,
       'recording_url': recordingUrl,
       'recording_embed_url': recordingEmbedUrl,
+      'recording_thumbnail_url': recordingThumbnailUrl,
       'transcript_file_path': transcriptFilePath,
       'action_items': actionItems,
       'executive_recap': executiveRecap,
@@ -166,6 +175,9 @@ class Meeting {
       if (host != null) 'host': host!.toJson(),
       if (includeAttendance)
         'attendance': attendance.map((record) => record.toJson(includeMeeting: false)).toList(),
+      if (includeAttendance)
+        'non_member_attendees':
+            nonMemberAttendees.map((attendee) => attendee.toJson(includeMeeting: false)).toList(),
     };
   }
 
@@ -176,7 +188,7 @@ class Meeting {
       host = Member.fromJson(hostData);
     }
 
-    final meeting = Meeting(
+    var meeting = Meeting(
       id: json['id'] as String,
       meetingDate: _parseDateTime(json['meeting_date'], isRequired: true, fieldName: 'meeting_date')!,
       meetingTitle: json['meeting_title'] as String,
@@ -184,6 +196,7 @@ class Meeting {
       durationMinutes: _parseInt(json['duration_minutes']),
       recordingUrl: json['recording_url'] as String?,
       recordingEmbedUrl: json['recording_embed_url'] as String?,
+      recordingThumbnailUrl: json['recording_thumbnail_url'] as String?,
       transcriptFilePath: json['transcript_file_path'] as String?,
       actionItems: json['action_items'] as String?,
       executiveRecap: json['executive_recap'] as String?,
@@ -199,6 +212,7 @@ class Meeting {
       meetingHostId: json['meeting_host'] as String?,
       host: host,
       attendance: const [],
+      nonMemberAttendees: const [],
     );
 
     if (!includeAttendance) {
@@ -211,7 +225,16 @@ class Meeting {
           .whereType<Map<String, dynamic>>()
           .map((item) => MeetingAttendance.fromJson(item, meeting: meeting))
           .toList();
-      return meeting.copyWith(attendance: attendance);
+      meeting = meeting.copyWith(attendance: attendance);
+    }
+
+    final nonMemberData = json['non_member_attendees'];
+    if (nonMemberData is List) {
+      final guests = nonMemberData
+          .whereType<Map<String, dynamic>>()
+          .map((item) => NonMemberAttendee.fromJson(item, meeting: meeting))
+          .toList();
+      meeting = meeting.copyWith(nonMemberAttendees: guests);
     }
 
     return meeting;
@@ -219,6 +242,179 @@ class Meeting {
 
   String get formattedDate => '${meetingDate.month}/${meetingDate.day}/${meetingDate.year}';
   String get formattedTime => '${meetingDate.hour.toString().padLeft(2, '0')}:${meetingDate.minute.toString().padLeft(2, '0')}';
+
+  String? get resolvedRecordingEmbedUrl {
+    final candidate = (recordingEmbedUrl ?? recordingUrl)?.trim();
+    if (candidate == null || candidate.isEmpty) return null;
+    final uri = Uri.tryParse(candidate);
+    if (uri == null) return null;
+    final host = uri.host.toLowerCase();
+    if (host.contains('drive.google.com')) {
+      final id = _extractDriveIdFromUri(uri);
+      if (id != null) {
+        return 'https://drive.google.com/file/d/$id/preview';
+      }
+    }
+    return uri.toString();
+  }
+
+  String? get resolvedRecordingThumbnailUrl {
+    final provided = recordingThumbnailUrl?.trim();
+    if (provided != null && provided.isNotEmpty) {
+      return provided;
+    }
+    final candidate = (recordingEmbedUrl ?? recordingUrl)?.trim();
+    if (candidate == null || candidate.isEmpty) return null;
+    final uri = Uri.tryParse(candidate);
+    if (uri == null) return null;
+    final id = _extractDriveIdFromUri(uri);
+    if (id == null) return null;
+    return 'https://lh3.googleusercontent.com/d/$id=w1200-h675-n-k-no';
+  }
+}
+
+class NonMemberAttendee {
+  final String id;
+  final String meetingId;
+  final String displayName;
+  final String? email;
+  final String? phoneNumber;
+  final String? pronouns;
+  final int? totalDurationMinutes;
+  final DateTime? firstJoinTime;
+  final DateTime? lastLeaveTime;
+  final int? numberOfJoins;
+  final DateTime? createdAt;
+  final Meeting? meeting;
+
+  const NonMemberAttendee({
+    required this.id,
+    required this.meetingId,
+    required this.displayName,
+    this.email,
+    this.phoneNumber,
+    this.pronouns,
+    this.totalDurationMinutes,
+    this.firstJoinTime,
+    this.lastLeaveTime,
+    this.numberOfJoins,
+    this.createdAt,
+    this.meeting,
+  });
+
+  NonMemberAttendee copyWith({
+    String? id,
+    String? meetingId,
+    String? displayName,
+    String? email,
+    String? phoneNumber,
+    String? pronouns,
+    int? totalDurationMinutes,
+    DateTime? firstJoinTime,
+    DateTime? lastLeaveTime,
+    int? numberOfJoins,
+    DateTime? createdAt,
+    Meeting? meeting,
+  }) {
+    return NonMemberAttendee(
+      id: id ?? this.id,
+      meetingId: meetingId ?? this.meetingId,
+      displayName: displayName ?? this.displayName,
+      email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      pronouns: pronouns ?? this.pronouns,
+      totalDurationMinutes: totalDurationMinutes ?? this.totalDurationMinutes,
+      firstJoinTime: firstJoinTime ?? this.firstJoinTime,
+      lastLeaveTime: lastLeaveTime ?? this.lastLeaveTime,
+      numberOfJoins: numberOfJoins ?? this.numberOfJoins,
+      createdAt: createdAt ?? this.createdAt,
+      meeting: meeting ?? this.meeting,
+    );
+  }
+
+  Map<String, dynamic> toJson({bool includeMeeting = true}) {
+    return {
+      'id': id,
+      'meeting_id': meetingId,
+      'display_name': displayName,
+      'email': email,
+      'phone_number': phoneNumber,
+      'pronouns': pronouns,
+      'total_duration_minutes': totalDurationMinutes,
+      'first_join_time': firstJoinTime?.toIso8601String(),
+      'last_leave_time': lastLeaveTime?.toIso8601String(),
+      'number_of_joins': numberOfJoins,
+      'created_at': createdAt?.toIso8601String(),
+      if (includeMeeting && meeting != null)
+        'meeting': meeting!.toJson(includeAttendance: false),
+    };
+  }
+
+  factory NonMemberAttendee.fromJson(Map<String, dynamic> json, {Meeting? meeting}) {
+    Meeting? meetingRef = meeting;
+    final meetingData = json['meeting'];
+    if (meetingData is Map<String, dynamic>) {
+      meetingRef = Meeting.fromJson(meetingData, includeAttendance: false);
+    }
+
+    return NonMemberAttendee(
+      id: json['id'] as String,
+      meetingId: json['meeting_id'] as String,
+      displayName: json['display_name'] as String? ?? 'Guest',
+      email: json['email'] as String?,
+      phoneNumber: json['phone_number'] as String?,
+      pronouns: json['pronouns'] as String?,
+      totalDurationMinutes: _parseInt(json['total_duration_minutes']),
+      firstJoinTime: _parseDateTime(json['first_join_time']),
+      lastLeaveTime: _parseDateTime(json['last_leave_time']),
+      numberOfJoins: _parseInt(json['number_of_joins']),
+      createdAt: _parseDateTime(json['created_at']),
+      meeting: meetingRef,
+    );
+  }
+
+  String get initials {
+    final trimmed = displayName.trim();
+    if (trimmed.isEmpty) return '?';
+    final parts = trimmed.split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts[0][0] + parts.last[0]).toUpperCase();
+  }
+
+  String? get formattedJoinWindow {
+    final start = firstJoinTime;
+    final end = lastLeaveTime;
+    if (start == null && end == null) return null;
+    final buffer = StringBuffer();
+    if (start != null) {
+      buffer.write('${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}');
+    }
+    if (end != null) {
+      if (buffer.isNotEmpty) buffer.write(' – ');
+      buffer.write('${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}');
+    }
+    return buffer.toString();
+  }
+}
+
+String? _extractDriveIdFromUri(Uri uri) {
+  final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
+  if (segments.length >= 3 && segments.first == 'file') {
+    final dIndex = segments.indexOf('d');
+    if (dIndex != -1 && segments.length > dIndex + 1) {
+      final id = segments[dIndex + 1];
+      if (id.isNotEmpty) {
+        return id;
+      }
+    }
+  }
+
+  final queryId = uri.queryParameters['id'] ?? uri.queryParameters['fileId'];
+  if (queryId != null && queryId.isNotEmpty) {
+    return queryId;
+  }
+
+  return null;
 }
 
 class MeetingAttendance {
@@ -373,5 +569,34 @@ class MeetingAttendance {
     final date = meetingDate ?? meeting?.meetingDate;
     if (date == null) return null;
     return '${date.month}/${date.day}/${date.year}';
+  }
+
+  int? get meetingDurationMinutes => meeting?.durationMinutes;
+
+  String get durationSummary {
+    final attendeeMinutes = totalDurationMinutes;
+    final meetingMinutes = meetingDurationMinutes;
+    if (attendeeMinutes == null && meetingMinutes == null) {
+      return 'Attendance duration unavailable';
+    }
+    if (meetingMinutes == null) {
+      return '${attendeeMinutes ?? 0} min logged';
+    }
+    if (attendeeMinutes == null) {
+      return '0 of $meetingMinutes min logged';
+    }
+    return '$attendeeMinutes of $meetingMinutes min';
+  }
+
+  String? get joinWindow {
+    final start = firstJoinTime;
+    final end = lastLeaveTime;
+    if (start == null && end == null) return null;
+    String format(DateTime value) =>
+        '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+    if (start != null && end != null) {
+      return '${format(start)} – ${format(end)}';
+    }
+    return start != null ? 'Joined at ${format(start)}' : 'Left at ${format(end!)}';
   }
 }
