@@ -16,6 +16,8 @@ import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.da
 import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/non_member_attendee_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
+import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 
@@ -981,7 +983,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       // ignore: undefined_prefixed_name
       ui.platformViewRegistry.registerViewFactory(viewType, (int viewId) {
         final element = html.IFrameElement()
-          ..src = uri.toString()
+          ..src = resolvedUrl
           ..style.border = '0'
           ..allowFullscreen = true
           ..allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
@@ -1152,4 +1154,47 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   void _launchUrl(Uri uri) {
     launchUrl(uri, mode: LaunchMode.externalApplication);
   }
+}
+
+String? _resolveEmbedUrl(String? embedUrl, String? fallbackUrl) {
+  final primary = embedUrl?.trim();
+  final fallback = fallbackUrl?.trim();
+  final candidate = (primary != null && primary.isNotEmpty) ? primary : fallback;
+  if (candidate == null || candidate.isEmpty) {
+    return null;
+  }
+
+  final uri = Uri.tryParse(candidate);
+  if (uri == null) {
+    return null;
+  }
+
+  if (uri.host.contains('drive.google.com')) {
+    final id = _extractDriveId(uri);
+    if (id != null) {
+      return 'https://drive.google.com/file/d/$id/preview';
+    }
+  }
+
+  return uri.toString();
+}
+
+String? _extractDriveId(Uri uri) {
+  final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
+  if (segments.length >= 3 && segments.first == 'file') {
+    final dIndex = segments.indexOf('d');
+    if (dIndex != -1 && segments.length > dIndex + 1) {
+      final id = segments[dIndex + 1];
+      if (id.isNotEmpty) {
+        return id;
+      }
+    }
+  }
+
+  final queryId = uri.queryParameters['id'] ?? uri.queryParameters['fileId'];
+  if (queryId != null && queryId.isNotEmpty) {
+    return queryId;
+  }
+
+  return null;
 }
