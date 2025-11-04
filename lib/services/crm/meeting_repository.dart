@@ -1,8 +1,7 @@
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
-import 'package:postgrest/postgrest.dart'
-    show PostgrestFilterBuilder, PostgrestResponse;
+import 'package:postgrest/postgrest.dart' show PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MeetingRepository {
@@ -61,9 +60,7 @@ class MeetingRepository {
       final SupabaseClient client =
           _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
 
-      PostgrestFilterBuilder<List<Map<String, dynamic>>> query = client
-          .from('meetings')
-          .select<List<Map<String, dynamic>>>('*');
+      var query = client.from('meetings').select('*');
 
       if (meetingId != null) {
         query = query.eq('id', meetingId);
@@ -118,7 +115,7 @@ class MeetingRepository {
       final response = await client
           .from('members')
           .select('*')
-          .in_('id', hostIds.toList());
+          .inFilter('id', hostIds.toList());
 
       final hostRows = _coerceJsonList(response);
       final hosts = <String, Member>{};
@@ -154,7 +151,7 @@ class MeetingRepository {
       final response = await client
           .from('meeting_attendance')
           .select('*, member:members!meeting_attendance_member_id_fkey(*)')
-          .in_('meeting_id', meetingMap.keys.toList())
+          .inFilter('meeting_id', meetingMap.keys.toList())
           .order('first_join_time');
 
       final rows = _coerceJsonList(response);
