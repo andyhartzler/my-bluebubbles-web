@@ -21,6 +21,7 @@ import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.da
 import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
+import 'package:bluebubbles/services/crm/storage_uri_resolver.dart';
 
 class MeetingsScreen extends StatefulWidget {
   final String? initialMeetingId;
@@ -674,7 +675,9 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
                 icon: Icons.description_outlined,
                 label: 'Transcript',
                 value: meeting.transcriptFilePath!,
-                onTap: () => _launchUrl(Uri.parse(meeting.transcriptFilePath!)),
+                onTap: () {
+                  _handleTranscriptTap(meeting.transcriptFilePath!);
+                },
               ),
               const SizedBox(height: 20),
             ],
@@ -1258,8 +1261,51 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
     );
   }
 
-  void _launchUrl(Uri uri) {
-    launchUrl(uri, mode: LaunchMode.externalApplication);
+  Future<void> _handleTranscriptTap(String rawPath) async {
+    final resolved = await _resolveStorageUri(rawPath);
+    if (!mounted) return;
+
+    if (resolved == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open transcript link.')),
+      );
+      return;
+    }
+
+    await _launchUrl(resolved);
+  }
+
+  Future<Uri?> _resolveStorageUri(String path) {
+    return CRMStorageUriResolver.resolve(path);
+  }
+
+  Future<void> _launchUrl(Uri? uri) async {
+    if (!mounted) return;
+
+    if (uri == null || uri.scheme.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid link.')),
+      );
+      return;
+    }
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.platformDefault,
+        webOnlyWindowName: kIsWeb ? '_blank' : null,
+      );
+
+      if (!launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open ${uri.toString()}')),
+        );
+      }
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to launch link: $error')),
+      );
+    }
   }
 }
 
