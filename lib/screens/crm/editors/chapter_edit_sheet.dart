@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/services/crm/chapter_repository.dart';
 
-enum _ChapterFieldType { text, multiline, date, bool, json }
+enum _ChapterFieldType { text, multiline, date, bool, socialMedia }
 
 class ChapterEditSheet extends StatefulWidget {
   final Chapter chapter;
@@ -33,8 +33,17 @@ class _ChapterEditSheetState extends State<ChapterEditSheet> {
     'status': _ChapterFieldType.text,
     'website': _ChapterFieldType.text,
     'contact_email': _ChapterFieldType.text,
-    'social_media': _ChapterFieldType.json,
+    'social_media': _ChapterFieldType.socialMedia,
     'is_chartered': _ChapterFieldType.bool,
+  };
+
+  static const _socialMediaPlatforms = <String, String>{
+    'twitter': 'Twitter/X',
+    'bluesky': 'Bluesky',
+    'facebook': 'Facebook',
+    'instagram': 'Instagram',
+    'threads': 'Threads',
+    'tiktok': 'TikTok',
   };
 
   @override
@@ -52,10 +61,25 @@ class _ChapterEditSheetState extends State<ChapterEditSheet> {
     _controllers['status'] = TextEditingController(text: widget.chapter.status ?? '');
     _controllers['website'] = TextEditingController(text: widget.chapter.website ?? '');
     _controllers['contact_email'] = TextEditingController(text: widget.chapter.contactEmail ?? '');
-    _controllers['social_media'] = TextEditingController(
-      text: widget.chapter.socialMedia == null || widget.chapter.socialMedia!.isEmpty
-          ? ''
-          : const JsonEncoder.withIndent('  ').convert(widget.chapter.socialMedia),
+
+    // Initialize social media controllers from individual fields (preferred) or fallback to socialMedia map
+    _controllers['social_twitter'] = TextEditingController(
+      text: widget.chapter.twitter ?? widget.chapter.socialMedia?['twitter']?.toString() ?? '',
+    );
+    _controllers['social_bluesky'] = TextEditingController(
+      text: widget.chapter.bluesky ?? widget.chapter.socialMedia?['bluesky']?.toString() ?? '',
+    );
+    _controllers['social_facebook'] = TextEditingController(
+      text: widget.chapter.facebook ?? widget.chapter.socialMedia?['facebook']?.toString() ?? '',
+    );
+    _controllers['social_instagram'] = TextEditingController(
+      text: widget.chapter.instagram ?? widget.chapter.socialMedia?['instagram']?.toString() ?? '',
+    );
+    _controllers['social_threads'] = TextEditingController(
+      text: widget.chapter.threads ?? widget.chapter.socialMedia?['threads']?.toString() ?? '',
+    );
+    _controllers['social_tiktok'] = TextEditingController(
+      text: widget.chapter.tiktok ?? widget.chapter.socialMedia?['tiktok']?.toString() ?? '',
     );
   }
 
@@ -168,29 +192,53 @@ class _ChapterEditSheetState extends State<ChapterEditSheet> {
             return null;
           },
         );
-      case _ChapterFieldType.json:
-        return TextFormField(
-          controller: _controllers[key],
-          minLines: 3,
-          maxLines: 6,
-          decoration: const InputDecoration(
-            labelText: 'Social Media (JSON)',
-            helperText: 'Provide a JSON object of social links',
-            border: OutlineInputBorder(),
+      case _ChapterFieldType.socialMedia:
+        return Card(
+          elevation: 0,
+          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.link, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Social Media Links',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Add handles or URLs for each platform',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ..._socialMediaPlatforms.entries.map((entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: TextFormField(
+                    controller: _controllers['social_${entry.key}'],
+                    decoration: InputDecoration(
+                      labelText: entry.value,
+                      hintText: '@username or URL',
+                      prefixIcon: _getSocialIcon(entry.key),
+                      border: const OutlineInputBorder(),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surface,
+                    ),
+                  ),
+                )).toList(),
+              ],
+            ),
           ),
-          validator: (value) {
-            final text = value?.trim() ?? '';
-            if (text.isEmpty) return null;
-            try {
-              final decoded = jsonDecode(text);
-              if (decoded is Map<String, dynamic>) {
-                return null;
-              }
-              return 'JSON must be an object';
-            } catch (e) {
-              return 'Invalid JSON: $e';
-            }
-          },
         );
       case _ChapterFieldType.multiline:
         return TextFormField(
@@ -245,20 +293,11 @@ class _ChapterEditSheetState extends State<ChapterEditSheet> {
         case _ChapterFieldType.date:
           compare(entry.key, _controllers[entry.key]!.text.trim());
           break;
-        case _ChapterFieldType.json:
-          final text = _controllers[entry.key]!.text.trim();
-          if (text.isEmpty) {
-            compare(entry.key, null);
-          } else {
-            try {
-              final decoded = jsonDecode(text);
-              compare(entry.key, decoded);
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Invalid JSON for social media: $e')),
-              );
-              return;
-            }
+        case _ChapterFieldType.socialMedia:
+          // Add individual social media fields to updates
+          for (final platform in _socialMediaPlatforms.keys) {
+            final value = _controllers['social_$platform']!.text.trim();
+            compare(platform, value.isEmpty ? null : value);
           }
           break;
         default:
@@ -286,6 +325,33 @@ class _ChapterEditSheetState extends State<ChapterEditSheet> {
         SnackBar(content: Text('Failed to update chapter: $e')),
       );
     }
+  }
+
+  Widget _getSocialIcon(String platform) {
+    IconData iconData;
+    switch (platform) {
+      case 'twitter':
+        iconData = Icons.tag; // Twitter/X
+        break;
+      case 'facebook':
+        iconData = Icons.facebook;
+        break;
+      case 'instagram':
+        iconData = Icons.camera_alt;
+        break;
+      case 'tiktok':
+        iconData = Icons.music_note;
+        break;
+      case 'bluesky':
+        iconData = Icons.cloud;
+        break;
+      case 'threads':
+        iconData = Icons.interests;
+        break;
+      default:
+        iconData = Icons.link;
+    }
+    return Icon(iconData, size: 20);
   }
 
   String _labelFor(String key) {

@@ -88,10 +88,14 @@ class CRMStorageUriResolver {
             '⚠️ Failed to create signed URL for $bucket/$objectPath: $error',
           );
           debugPrint('$stackTrace');
+          // If signing fails, the bucket might be public, try public URL
+          final publicPath = 'storage/v1/object/public/$bucket/$objectPath';
+          return baseUri.resolve(publicPath);
         }
       }
 
-      final fallbackPath = 'storage/v1/object/$bucket/$objectPath';
+      // Default to public bucket URL as fallback
+      final fallbackPath = 'storage/v1/object/public/$bucket/$objectPath';
       return baseUri.resolve(fallbackPath);
     }
 

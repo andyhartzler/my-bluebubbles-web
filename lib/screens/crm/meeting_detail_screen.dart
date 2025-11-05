@@ -484,9 +484,8 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
     }
 
     final hasEmbed = meeting.resolvedRecordingEmbedUrl != null || meeting.recordingUrl != null;
-    final embedWidget = hasEmbed ? _buildVideoEmbed(meeting) : null;
 
-    if (actions.isEmpty && embedWidget == null) {
+    if (actions.isEmpty && !hasEmbed) {
       return null;
     }
 
@@ -510,12 +509,37 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
                 children: actions,
               ),
             ],
-            if (embedWidget != null) ...[
+            if (hasEmbed) ...[
               const SizedBox(height: 16),
-              embedWidget,
+              _buildCollapsibleVideoEmbed(meeting),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCollapsibleVideoEmbed(Meeting meeting) {
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        title: Row(
+          children: [
+            const Icon(Icons.videocam, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Recording Preview',
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        initiallyExpanded: false,
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        children: [
+          _buildVideoEmbed(meeting),
+        ],
       ),
     );
   }

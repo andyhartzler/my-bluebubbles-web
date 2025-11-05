@@ -241,7 +241,13 @@ class Meeting {
   }
 
   String get formattedDate => '${meetingDate.month}/${meetingDate.day}/${meetingDate.year}';
-  String get formattedTime => '${meetingDate.hour.toString().padLeft(2, '0')}:${meetingDate.minute.toString().padLeft(2, '0')}';
+  String get formattedTime {
+    final hour = meetingDate.hour;
+    final minute = meetingDate.minute;
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    return '${displayHour}:${minute.toString().padLeft(2, '0')} $period';
+  }
 
   String? get resolvedRecordingEmbedUrl {
     final candidate = (recordingEmbedUrl ?? recordingUrl)?.trim();

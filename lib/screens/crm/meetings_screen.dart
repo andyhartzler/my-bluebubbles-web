@@ -339,23 +339,16 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       );
     }
 
-    final crossAxisCount = constraints.maxWidth < 600 ? 1 : (constraints.maxWidth < 1200 ? 2 : 3);
-
-    return GridView.builder(
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        childAspectRatio: 1.5,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
+    return ListView.separated(
       itemCount: meetings.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        return _buildMeetingCard(meetings[index]);
+        return _buildMeetingPill(meetings[index]);
       },
     );
   }
 
-  Widget _buildMeetingCard(Meeting meeting) {
+  Widget _buildMeetingPill(Meeting meeting) {
     final theme = Theme.of(context);
     final attendeeCount = meeting.attendance.length + meeting.nonMemberAttendees.length;
     final hostName = meeting.host?.name ?? 'Host TBD';
@@ -363,48 +356,54 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      color: _unityBlue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         onTap: () => _openMeetingDetail(meeting),
         child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
                       meeting.meetingTitle,
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge?.copyWith(
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: _unityBlue,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                  const Icon(Icons.arrow_forward_ios, size: 16, color: _momentumBlue),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${meeting.formattedDate} • ${meeting.formattedTime} CST',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                    const SizedBox(height: 6),
+                    Text(
+                      '${meeting.formattedDate} • ${meeting.formattedTime} CST',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withOpacity(0.85),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const Spacer(),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _buildInfoChip(Icons.schedule, durationLabel, theme),
-                  _buildInfoChip(Icons.person_outline, hostName, theme),
-                  _buildInfoChip(Icons.groups_outlined, '$attendeeCount attendees', theme),
-                ],
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _buildInfoChip(Icons.schedule, durationLabel),
+                    _buildInfoChip(Icons.person_outline, hostName),
+                    _buildInfoChip(Icons.groups_outlined, '$attendeeCount'),
+                  ],
+                ),
               ),
+              const SizedBox(width: 12),
+              const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.white),
             ],
           ),
         ),
@@ -412,22 +411,22 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String label, ThemeData theme) {
+  Widget _buildInfoChip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: _momentumBlue.withOpacity(0.12),
+        color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: _unityBlue),
+          Icon(icon, size: 14, color: Colors.white),
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(
-              color: _unityBlue,
+            style: const TextStyle(
+              color: Colors.white,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
