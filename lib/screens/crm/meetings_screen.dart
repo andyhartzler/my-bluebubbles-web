@@ -931,35 +931,13 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(32),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-          children: [
-            _buildHeroCard(meeting),
-            const SizedBox(height: 20),
-            _buildMeetingStats(meeting),
-            const SizedBox(height: 20),
-            if (meeting.resolvedRecordingEmbedUrl != null || meeting.recordingUrl != null) ...[
-              _buildVideoEmbed(meeting),
-              const SizedBox(height: 20),
-            ],
-            if (meeting.transcriptFilePath != null && meeting.transcriptFilePath!.isNotEmpty) ...[
-              _buildLinkTile(
-                icon: Icons.description_outlined,
-                label: 'Transcript',
-                value: meeting.transcriptFilePath!,
-                onTap: () {
-                  _handleTranscriptTap(meeting.transcriptFilePath!);
-                },
-              ),
-              const SizedBox(height: 20),
-            ],
-            ..._intersperseSections(narrativeSections),
-            if (narrativeSections.isNotEmpty) const SizedBox(height: 20),
-            _buildParticipantsPreview(meeting),
-            if (meeting.nonMemberAttendees.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              _buildNonMemberPreview(meeting),
-            ],
-          ],
+          padding: EdgeInsets.fromLTRB(
+            isMobile ? 16 : 24,
+            24,
+            isMobile ? 16 : 24,
+            32,
+          ),
+          children: children,
         ),
       ),
     );
