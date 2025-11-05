@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/models/crm/meeting.dart';
+import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/editors/member_search_sheet.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 
 enum _MeetingFieldType { text, multiline, integer, dateTime }
 
@@ -25,8 +28,10 @@ class MeetingEditSheet extends StatefulWidget {
 
 class _MeetingEditSheetState extends State<MeetingEditSheet> {
   final MeetingRepository _meetingRepository = MeetingRepository();
+  final MemberRepository _memberRepository = MemberRepository();
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
+  final Map<String, Member?> _selectedMembers = {};
   late final Map<String, dynamic> _originalData;
   bool _saving = false;
 
@@ -67,6 +72,12 @@ class _MeetingEditSheetState extends State<MeetingEditSheet> {
         }
       }
       _controllers[field.key] = TextEditingController(text: initial);
+    }
+
+    final hostId = _controllers['meeting_host']?.text.trim();
+    if (hostId != null && hostId.isNotEmpty) {
+      _selectedMembers['meeting_host'] = null;
+      _prefetchHostMember(hostId);
     }
   }
 
@@ -147,6 +158,10 @@ class _MeetingEditSheetState extends State<MeetingEditSheet> {
   }
 
   Widget _buildField(_MeetingFieldDefinition field) {
+    if (field.key == 'meeting_host') {
+      return _buildMeetingHostSelector(field);
+    }
+
     final controller = _controllers[field.key]!;
     switch (field.type) {
       case _MeetingFieldType.multiline:
@@ -208,6 +223,151 @@ class _MeetingEditSheetState extends State<MeetingEditSheet> {
     }
   }
 
+  Widget _buildMeetingHostSelector(_MeetingFieldDefinition field) {
+    final controller = _controllers[field.key]!;
+    final Member? selectedMember = _selectedMembers[field.key];
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final subtleColor = colorScheme.onSurface.withOpacity(0.6);
+    final idText = controller.text.trim();
+
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: field.label,
+        helperText: field.helper ?? 'Select a member to host this meeting.',
+        border: const OutlineInputBorder(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (selectedMember != null) ...[
+            Text(
+              selectedMember.name,
+              style: theme.textTheme.titleMedium,
+            ),
+            if ((selectedMember.phoneE164 ?? selectedMember.phone)?.isNotEmpty ?? false)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  selectedMember.phoneE164 ?? selectedMember.phone!,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'ID: ${selectedMember.id}',
+                style: theme.textTheme.bodySmall?.copyWith(color: subtleColor),
+              ),
+            ),
+          ] else if (idText.isNotEmpty) ...[
+            Text(
+              'Current ID: $idText',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Select a member to see their details.',
+              style: theme.textTheme.bodySmall?.copyWith(color: subtleColor),
+            ),
+          ] else
+            Text(
+              'No host selected',
+              style: theme.textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
+            ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                icon: const Icon(Icons.person_search),
+                label: const Text('Choose Member'),
+                onPressed: _saving
+                    ? null
+                    : () async {
+                        final member = await showMemberSearchSheet(context);
+                        if (member == null) return;
+                        setState(() {
+                          _selectedMembers[field.key] = member;
+                          controller.text = member.id;
+                        });
+                      },
+              ),
+              TextButton(
+                onPressed: _saving
+                    ? null
+                    : () async {
+                        final manualId = await _promptForManualHostId(controller.text.trim());
+                        if (manualId == null) return;
+                        setState(() {
+                          _selectedMembers[field.key] = null;
+                          controller.text = manualId;
+                        });
+                      },
+                child: const Text('Enter ID Manually'),
+              ),
+              if (selectedMember != null || idText.isNotEmpty)
+                TextButton(
+                  onPressed: _saving
+                      ? null
+                      : () {
+                          setState(() {
+                            _selectedMembers[field.key] = null;
+                            controller.text = '';
+                          });
+                        },
+                  child: const Text('Clear'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _prefetchHostMember(String id) async {
+    final member = await _memberRepository.getMemberById(id);
+    if (!mounted || member == null) return;
+    setState(() {
+      _selectedMembers['meeting_host'] = member;
+    });
+  }
+
+  Future<String?> _promptForManualHostId(String initialValue) async {
+    final textController = TextEditingController(text: initialValue);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter Host Member ID'),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Member ID',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(textController.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    textController.dispose();
+    final trimmed = result?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -219,6 +379,23 @@ class _MeetingEditSheetState extends State<MeetingEditSheet> {
       final controller = _controllers[field.key]!;
       final text = controller.text.trim();
       final original = _originalData[field.key];
+
+      if (field.key == 'meeting_host') {
+        final selectedMember = _selectedMembers[field.key];
+        final newValue = selectedMember?.id ?? text;
+        final originalValue = original?.toString();
+
+        if ((newValue.isEmpty) && (originalValue == null || originalValue.isEmpty)) {
+          continue;
+        }
+
+        if (newValue.isEmpty && originalValue != null && originalValue.isNotEmpty) {
+          updates[field.key] = null;
+        } else if (newValue != originalValue) {
+          updates[field.key] = newValue;
+        }
+        continue;
+      }
 
       switch (field.type) {
         case _MeetingFieldType.integer:
