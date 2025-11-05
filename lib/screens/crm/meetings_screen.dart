@@ -16,6 +16,8 @@ import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.da
 import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/non_member_attendee_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
+import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 
