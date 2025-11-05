@@ -27,10 +27,13 @@ import 'supabase_service.dart';
 class CRMMessageService {
   final MemberRepository _memberRepo = MemberRepository();
   final Map<String, String> _serviceCache = {};
+  final LinkedHashMap<String, DateTime> _automationGuardCache = LinkedHashMap();
 
   // Rate limiting
   static const int messagesPerMinute = CRMConfig.messagesPerMinute;
   static const Duration delayBetweenMessages = CRMConfig.messageDelay;
+  static const int _automationGuardCacheLimit = 200;
+  static const Duration _automationGuardCacheTtl = Duration(minutes: 10);
 
   static const String _introMessage =
       'Hi! Thanks for connecting with MO Young Democrats.\n\nTap the contact card below to save our info.\n\nReply STOP to opt out of future messages.';
@@ -198,19 +201,78 @@ class CRMMessageService {
     final address = message.handle?.address;
     if (address == null || address.isEmpty) return;
 
+    final cacheKey = _buildAutomationCacheKey(chat, message, normalized);
+    if (cacheKey != null && _shouldSkipAutomation(cacheKey)) {
+      return;
+    }
+
     final member = await _memberRepo.getMemberByPhone(address);
     if (member == null) return;
 
     if (normalized == 'STOP') {
       if (member.optOut) return;
       await _memberRepo.updateOptOutStatus(member.id, true, reason: 'STOP keyword');
-      unawaited(_sendSingleMessage(phoneNumber: address, message: _stopResponse));
+      await _sendSingleMessage(phoneNumber: address, message: _stopResponse);
     } else if (normalized == 'START') {
       if (!member.optOut) return;
       await _memberRepo.updateOptOutStatus(member.id, false);
       const response =
-          'Welcome back! You are opted in to Missouri Young Democrats messages again.';
-      unawaited(_sendSingleMessage(phoneNumber: address, message: response));
+          'Welcome back! You are now opted in to Missouri Young Democrats messages.';
+      await _sendSingleMessage(phoneNumber: address, message: response);
+    }
+  }
+
+  String? _buildAutomationCacheKey(Chat chat, Message message, String normalized) {
+    final guid = message.guid;
+    if (guid != null && guid.isNotEmpty) {
+      return guid;
+    }
+
+    final chatGuid = chat.guid;
+    if (chatGuid != null && chatGuid.isNotEmpty) {
+      return '$chatGuid|$normalized';
+    }
+
+    final handleAddress = message.handle?.address;
+    if (handleAddress != null && handleAddress.isNotEmpty) {
+      return '$handleAddress|$normalized';
+    }
+
+    return null;
+  }
+
+  bool _shouldSkipAutomation(String key) {
+    final now = DateTime.now();
+
+    _pruneAutomationCache(now);
+
+    final existing = _automationGuardCache[key];
+    if (existing != null && now.difference(existing) < _automationGuardCacheTtl) {
+      return true;
+    }
+
+    _automationGuardCache[key] = now;
+    _enforceAutomationCacheLimit();
+    return false;
+  }
+
+  void _pruneAutomationCache(DateTime now) {
+    final expiredKeys = <String>[];
+    _automationGuardCache.forEach((key, timestamp) {
+      if (now.difference(timestamp) >= _automationGuardCacheTtl) {
+        expiredKeys.add(key);
+      }
+    });
+
+    for (final key in expiredKeys) {
+      _automationGuardCache.remove(key);
+    }
+  }
+
+  void _enforceAutomationCacheLimit() {
+    while (_automationGuardCache.length > _automationGuardCacheLimit) {
+      final oldestKey = _automationGuardCache.keys.first;
+      _automationGuardCache.remove(oldestKey);
     }
   }
 
