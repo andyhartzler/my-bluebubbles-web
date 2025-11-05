@@ -988,10 +988,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
           ),
           const SizedBox(
             height: 360,
-            child: MeetingRecordingEmbed(
-              uri: uri,
-              viewKey: ValueKey('recording-${meeting.id}-${uri.toString()}'),
-            ),
+            child: MeetingRecordingEmbed(uri: uri),
           ),
         ],
       ),
@@ -1145,12 +1142,10 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
 
 class MeetingRecordingEmbed extends StatefulWidget {
   final Uri uri;
-  final Key? viewKey;
 
-  const MeetingRecordingEmbed({
+  MeetingRecordingEmbed({
     super.key,
     required this.uri,
-    this.viewKey,
   });
 
   @override
@@ -1197,7 +1192,6 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
 
     return HtmlElementView(
       viewType: _viewType,
-      key: widget.viewKey,
       onPlatformViewCreated: (int viewId) {
         _viewId = viewId;
         _setSource();
