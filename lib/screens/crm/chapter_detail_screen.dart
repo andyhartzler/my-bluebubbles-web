@@ -187,36 +187,97 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
       }
     }
 
-    final socialMedia = _chapter.socialMedia;
-    if (socialMedia != null && socialMedia.isNotEmpty) {
-      final entries = socialMedia.entries
-          .where((entry) => entry.value is String && (entry.value as String).trim().isNotEmpty)
-          .map((entry) => MapEntry(entry.key, entry.value as String))
-          .toList();
-      if (entries.isNotEmpty) {
-        detailRows.add(
-          _buildHeaderRow(
-            'Social',
-            entries.map((entry) => entry.key).join(', '),
-            trailing: Wrap(
-              spacing: 8,
-              children: entries
-                  .map(
-                    (entry) => ActionChip(
-                      label: Text(entry.key.toUpperCase()),
-                      onPressed: () {
-                        final link = _parseUrl(entry.value);
-                        if (link != null) {
-                          _launchUrl(link);
-                        }
-                      },
-                    ),
-                  )
-                  .toList(),
-            ),
+    // Build social media section
+    final socialPlatforms = <String, String?>{
+      'Twitter/X': _chapter.twitter ?? _chapter.socialMedia?['twitter'],
+      'Bluesky': _chapter.bluesky ?? _chapter.socialMedia?['bluesky'],
+      'Facebook': _chapter.facebook ?? _chapter.socialMedia?['facebook'],
+      'Instagram': _chapter.instagram ?? _chapter.socialMedia?['instagram'],
+      'Threads': _chapter.threads ?? _chapter.socialMedia?['threads'],
+      'TikTok': _chapter.tiktok ?? _chapter.socialMedia?['tiktok'],
+    };
+
+    final hasSocialMedia = socialPlatforms.values.any((v) => v != null && v.trim().isNotEmpty);
+
+    if (hasSocialMedia) {
+      // Add social media heading with edit button
+      detailRows.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 8),
+          child: Row(
+            children: [
+              const Text(
+                'Social Media',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              ),
+              const SizedBox(width: 8),
+              if (_crmReady)
+                TextButton.icon(
+                  onPressed: _editChapter,
+                  icon: const Icon(Icons.edit, size: 16),
+                  label: const Text('Edit'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  ),
+                ),
+            ],
           ),
-        );
+        ),
+      );
+
+      // Add each social platform as a clickable row
+      for (final entry in socialPlatforms.entries) {
+        final value = entry.value;
+        if (value != null && value.trim().isNotEmpty) {
+          detailRows.add(
+            InkWell(
+              onTap: () {
+                final link = _parseUrl(value);
+                if (link != null) {
+                  _launchUrl(link);
+                }
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 100,
+                      child: Text(
+                        entry.key,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        value,
+                        style: const TextStyle(
+                          color: Colors.blue,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.open_in_new, size: 16, color: Colors.blue),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
       }
+    } else if (_crmReady) {
+      // No social media, show add button
+      detailRows.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: OutlinedButton.icon(
+            onPressed: _editChapter,
+            icon: const Icon(Icons.add_link),
+            label: const Text('Add Social Media'),
+          ),
+        ),
+      );
     }
 
     return Card(
@@ -465,27 +526,28 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
 
   Widget _buildHeaderRow(String label, String value, {Widget? trailing}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            flex: 2,
+          SizedBox(
+            width: 100,
             child: Text(
               label,
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
+          const SizedBox(width: 12),
           Expanded(
-            flex: 3,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: Text(value)),
-                if (trailing != null) trailing,
-              ],
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.black87),
             ),
           ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing,
+          ],
         ],
       ),
     );
