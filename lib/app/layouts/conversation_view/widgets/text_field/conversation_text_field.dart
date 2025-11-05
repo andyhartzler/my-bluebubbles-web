@@ -873,7 +873,6 @@ class TextFieldComponentState extends State<TextFieldComponent> {
   late final VoidCallback? onAttachmentsChanged;
 
   late final ValueNotifier<bool> isRecordingNotifier;
-  DateTime? _lastSendTime;
   TextFieldComponentState() : isRecordingNotifier = ValueNotifier<bool>(false);
 
   @override
@@ -1128,10 +1127,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
                   onTap: () {
                     HapticFeedback.selectionClick();
                   },
-                  onSubmitted: (String value) {
-                    if (isChatCreator) {
-                      return;
-                    }
+                  onSubmitted: isChatCreator ? null : (String value) {
                     controller?.focusNode.requestFocus();
                     if (isNullOrEmpty(value) && (controller?.pickedAttachments.isEmpty ?? false)) return;
                     sendMessage.call();
@@ -1193,12 +1189,6 @@ class TextFieldComponentState extends State<TextFieldComponent> {
 
     if (isChatCreator) {
       if (ev.logicalKey == LogicalKeyboardKey.enter && !HardwareKeyboard.instance.isShiftPressed) {
-        // Prevent duplicate sends within 300ms
-        final now = DateTime.now();
-        if (_lastSendTime != null && now.difference(_lastSendTime!).inMilliseconds < 300) {
-          return KeyEventResult.handled;
-        }
-        _lastSendTime = now;
         sendMessage();
         return KeyEventResult.handled;
       }
