@@ -290,7 +290,7 @@ class GlobalSearchService {
         try {
           final objects = await client.storage.from(scope.bucket).list(
                 path: prefix,
-                limit: 100,
+                searchOptions: const SearchOptions(limit: 100),
               );
           for (final object in objects) {
             if (object.id == null || object.name.isEmpty) {
