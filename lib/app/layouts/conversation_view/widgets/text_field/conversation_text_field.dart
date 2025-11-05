@@ -913,7 +913,14 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     final txtController = controller?.textController ?? textController;
     final subjController = controller?.subjectTextController ?? subjectTextController;
     return Focus(
-      onKeyEvent: (_, ev) => handleKey(_, ev, context, isChatCreator),
+      onKeyEvent: (_, ev) {
+        final result = handleKey(_, ev, context, isChatCreator);
+        // For chat creator, if we handled Enter, skip focus traversal
+        if (isChatCreator && result == KeyEventResult.handled && ev is KeyDownEvent && ev.logicalKey == LogicalKeyboardKey.enter) {
+          return KeyEventResult.skipRemainingHandlers;
+        }
+        return result;
+      },
       child: Padding(
         padding: const EdgeInsets.only(right: 5.0),
         child: ValueListenableBuilder<bool>(

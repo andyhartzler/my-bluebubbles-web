@@ -594,7 +594,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
-                              showTitles: true,
+                              showTitles: !isCompact, // Hide labels on mobile to prevent overlap
                               reservedSize: 52,
                               getTitlesWidget: (value, meta) {
                                 final index = value.toInt();
@@ -963,13 +963,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
 
           if (isCompact) {
+            // Show 2 members at a time on mobile with reduced height
             return SizedBox(
-              height: 170,
+              height: 110,
               child: PageView.builder(
-                controller: PageController(viewportFraction: 0.9),
+                controller: PageController(viewportFraction: 0.48),
                 itemCount: tiles.length,
                 itemBuilder: (context, index) => Padding(
-                  padding: EdgeInsets.only(right: index == tiles.length - 1 ? 0 : 12),
+                  padding: EdgeInsets.only(right: index == tiles.length - 1 ? 0 : 8),
                   child: tiles[index],
                 ),
               ),
@@ -1448,6 +1449,7 @@ class _RecentMemberTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isCompact = MediaQuery.of(context).size.width < 480;
     final details = [
       if (member.county != null && member.county!.isNotEmpty) member.county!,
       if (member.congressionalDistrict != null && member.congressionalDistrict!.isNotEmpty)
@@ -1455,7 +1457,7 @@ class _RecentMemberTile extends StatelessWidget {
     ];
 
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(isCompact ? 12 : 16),
       onTap: () {
         Navigator.of(context).push(
           ThemeSwitcher.buildPageRoute(
@@ -1466,43 +1468,58 @@ class _RecentMemberTile extends StatelessWidget {
         );
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(16),
+        margin: EdgeInsets.symmetric(vertical: isCompact ? 4 : 8),
+        padding: EdgeInsets.all(isCompact ? 10 : 16),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceVariant.withOpacity(0.45),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(isCompact ? 12 : 16),
         ),
-        child: Row(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: theme.colorScheme.primaryContainer,
-              child: Text(
-                member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-                style: theme.textTheme.titleMedium,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    member.name,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: isCompact ? 16 : 22,
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  child: Text(
+                    member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
+                    style: isCompact ? theme.textTheme.titleSmall : theme.textTheme.titleMedium,
                   ),
-                  if (details.isNotEmpty)
-                    Text(
-                      details.join(' • '),
-                      style: theme.textTheme.bodySmall,
-                    ),
-                ],
-              ),
+                ),
+                SizedBox(width: isCompact ? 8 : 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        member.name,
+                        style: (isCompact ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (details.isNotEmpty && !isCompact)
+                        Text(
+                          details.join(' • '),
+                          style: theme.textTheme.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            if (member.createdAt != null)
-              Text(
-                _timeAgo(member.createdAt!),
-                style: theme.textTheme.labelSmall,
+            if (member.createdAt != null && isCompact)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  _timeAgo(member.createdAt!),
+                  style: theme.textTheme.labelSmall,
+                ),
               ),
           ],
         ),

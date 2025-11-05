@@ -734,7 +734,10 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     );
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+      padding: EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: MediaQuery.of(context).size.width < 600 ? 8 : 18,
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         boxShadow: [
@@ -748,6 +751,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       child: LayoutBuilder(
         builder: (context, constraints) {
           final bool compact = constraints.maxWidth < 900;
+          final bool mobile = constraints.maxWidth < 600;
           final navChildren = [
             ...navButtons,
             newMessageButton,
@@ -755,8 +759,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           ];
 
           final navigation = Wrap(
-            spacing: 12,
-            runSpacing: 12,
+            spacing: mobile ? 6 : 12,
+            runSpacing: mobile ? 6 : 12,
             alignment: compact ? WrapAlignment.start : WrapAlignment.end,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: navChildren,
@@ -766,8 +770,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildBranding(theme),
-                const SizedBox(height: 12),
+                _buildBranding(theme, mobile: mobile),
+                SizedBox(height: mobile ? 6 : 12),
                 navigation,
               ],
             );
@@ -786,7 +790,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     );
   }
 
-  Widget _buildBranding(ThemeData theme) {
+  Widget _buildBranding(ThemeData theme, {bool mobile = false}) {
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () => _setSection(_HomeSection.dashboard),
@@ -795,10 +799,10 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            height: 60,
-            width: 220,
+            height: mobile ? 40 : 60,
+            width: mobile ? 150 : 220,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: EdgeInsets.symmetric(horizontal: mobile ? 0 : 4),
               child: Image.asset(
                 'assets/images/text-logo-1320x440.png',
                 fit: BoxFit.contain,
@@ -819,11 +823,12 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   }) {
     final theme = Theme.of(context);
     final bool isSelected = _currentSection == section;
+    final bool mobile = MediaQuery.of(context).size.width < 600;
 
     return TextButton.icon(
       onPressed: enabled ? () => _setSection(section) : null,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
+      icon: Icon(icon, size: mobile ? 16 : 18),
+      label: Text(label, style: mobile ? theme.textTheme.bodySmall : null),
       style: ButtonStyle(
         backgroundColor: MaterialStateProperty.resolveWith((states) {
           if (states.contains(MaterialState.disabled)) {
@@ -839,7 +844,12 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           }
           return isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
         }),
-        padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 18, vertical: 12)),
+        padding: MaterialStateProperty.all(
+          EdgeInsets.symmetric(
+            horizontal: mobile ? 10 : 18,
+            vertical: mobile ? 8 : 12,
+          ),
+        ),
         shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
       ),
     );
