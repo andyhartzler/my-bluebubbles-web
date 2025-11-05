@@ -875,6 +875,10 @@ class TextFieldComponentState extends State<TextFieldComponent> {
   late final ValueNotifier<bool> isRecordingNotifier;
   TextFieldComponentState() : isRecordingNotifier = ValueNotifier<bool>(false);
 
+  bool _enterSendInProgress = false;
+  Timer? _enterSendResetTimer;
+  static const Duration _enterSendGuardTimeout = Duration(seconds: 10);
+
   @override
   void initState() {
     super.initState();
@@ -897,6 +901,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
   void dispose() {
     // dispose of the ValueNotifier when the state is disposed
     isRecordingNotifier.dispose();
+    _enterSendResetTimer?.cancel();
     super.dispose();
   }
 
@@ -1196,7 +1201,20 @@ class TextFieldComponentState extends State<TextFieldComponent> {
 
     if (isChatCreator) {
       if (ev.logicalKey == LogicalKeyboardKey.enter && !HardwareKeyboard.instance.isShiftPressed) {
-        sendMessage();
+        if (_enterSendInProgress) {
+          return KeyEventResult.handled;
+        }
+
+        _enterSendInProgress = true;
+        _enterSendResetTimer?.cancel();
+        _enterSendResetTimer = Timer(_enterSendGuardTimeout, _resetEnterSendGuard);
+
+        try {
+          sendMessage().whenComplete(_resetEnterSendGuard);
+        } catch (error, stackTrace) {
+          _resetEnterSendGuard();
+          Error.throwWithStackTrace(error, stackTrace);
+        }
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -1364,5 +1382,11 @@ class TextFieldComponentState extends State<TextFieldComponent> {
       }
     }
     return KeyEventResult.ignored;
+  }
+
+  void _resetEnterSendGuard() {
+    _enterSendResetTimer?.cancel();
+    _enterSendResetTimer = null;
+    _enterSendInProgress = false;
   }
 }
