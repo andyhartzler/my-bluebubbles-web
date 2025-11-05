@@ -156,7 +156,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _openBulkMessaging(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (_) => const TitleBarWrapper(
+        builder: (_) => TitleBarWrapper(
           child: BulkMessageScreen(),
         ),
       ),
