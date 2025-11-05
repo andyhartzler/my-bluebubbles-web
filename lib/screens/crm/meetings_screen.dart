@@ -45,11 +45,6 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   bool _loading = true;
   String? _error;
 
-  static const String _recordingViewType = 'meetings-recording-view';
-  static bool _recordingViewRegistered = false;
-  static final Map<int, html.IFrameElement> _recordingIframes =
-      <int, html.IFrameElement>{};
-
   bool get _isCrmReady => _memberLookup.isReady;
 
   @override
@@ -112,26 +107,6 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
         _loading = false;
       });
     }
-  }
-
-  void _ensureRecordingViewRegistered() {
-    if (_recordingViewRegistered) return;
-
-    // ignore: undefined_prefixed_name
-    ui.platformViewRegistry.registerViewFactory(
-      _recordingViewType,
-      (int viewId) {
-        final element = html.IFrameElement()
-          ..style.border = '0'
-          ..allowFullscreen = true
-          ..allow =
-              'autoplay; encrypted-media; picture-in-picture; fullscreen';
-        _recordingIframes[viewId] = element;
-        return element;
-      },
-    );
-
-    _recordingViewRegistered = true;
   }
 
   Future<void> _editMeeting(Meeting meeting) async {
@@ -1001,8 +976,6 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       );
     }
 
-    _ensureRecordingViewRegistered();
-
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -1015,15 +988,9 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
           ),
           const SizedBox(
             height: 360,
-            child: HtmlElementView(
-              viewType: _recordingViewType,
-              key: ValueKey('recording-${meeting.id}-${uri.toString()}'),
-              onPlatformViewCreated: (int viewId) {
-                final element = _recordingIframes[viewId];
-                if (element != null) {
-                  element.src = uri.toString();
-                }
-              },
+            child: MeetingRecordingEmbed(
+              uri: uri,
+              viewKey: ValueKey('recording-${meeting.id}-${uri.toString()}'),
             ),
           ),
         ],
@@ -1173,5 +1140,97 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
 
   void _launchUrl(Uri uri) {
     launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+class MeetingRecordingEmbed extends StatefulWidget {
+  final Uri uri;
+  final Key? viewKey;
+
+  const MeetingRecordingEmbed({
+    super.key,
+    required this.uri,
+    this.viewKey,
+  });
+
+  @override
+  State<MeetingRecordingEmbed> createState() => _MeetingRecordingEmbedState();
+}
+
+class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
+  static const String _viewType = 'meetings-recording-view';
+  static bool _registered = false;
+  static final Map<int, html.IFrameElement> _iframes =
+      <int, html.IFrameElement>{};
+
+  int? _viewId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _ensureRegistered();
+    }
+  }
+
+  @override
+  void didUpdateWidget(MeetingRecordingEmbed oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.uri != oldWidget.uri) {
+      _setSource();
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_viewId != null) {
+      _iframes.remove(_viewId!);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!kIsWeb) {
+      return const SizedBox.shrink();
+    }
+
+    return HtmlElementView(
+      viewType: _viewType,
+      key: widget.viewKey,
+      onPlatformViewCreated: (int viewId) {
+        _viewId = viewId;
+        _setSource();
+      },
+    );
+  }
+
+  void _ensureRegistered() {
+    if (_registered) return;
+
+    // ignore: undefined_prefixed_name
+    ui.platformViewRegistry.registerViewFactory(
+      _viewType,
+      (int viewId) {
+        final element = html.IFrameElement()
+          ..style.border = '0'
+          ..allowFullscreen = true
+          ..allow =
+              'autoplay; encrypted-media; picture-in-picture; fullscreen';
+        _iframes[viewId] = element;
+        return element;
+      },
+    );
+
+    _registered = true;
+  }
+
+  void _setSource() {
+    if (!kIsWeb || _viewId == null) return;
+
+    final element = _iframes[_viewId!];
+    if (element != null) {
+      element.src = widget.uri.toString();
+    }
   }
 }
