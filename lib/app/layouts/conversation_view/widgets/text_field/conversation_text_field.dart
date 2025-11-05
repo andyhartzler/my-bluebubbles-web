@@ -1127,10 +1127,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
                   onTap: () {
                     HapticFeedback.selectionClick();
                   },
-                  onSubmitted: (String value) {
-                    if (isChatCreator) {
-                      return;
-                    }
+                  onSubmitted: isChatCreator ? null : (String value) {
                     controller?.focusNode.requestFocus();
                     if (isNullOrEmpty(value) && (controller?.pickedAttachments.isEmpty ?? false)) return;
                     sendMessage.call();
