@@ -563,25 +563,39 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
 
   Widget _buildMeetingDetail(Meeting meeting, BoxConstraints constraints) {
     final theme = Theme.of(context);
-    final content = <Widget>[
-      _buildHeroCard(meeting),
-      const SizedBox(height: 16),
-      _buildMeetingStats(meeting),
-      const SizedBox(height: 16),
-      if (meeting.resolvedRecordingEmbedUrl != null || meeting.recordingUrl != null)
-        _buildVideoEmbed(meeting),
-      if (meeting.transcriptFilePath != null && meeting.transcriptFilePath!.isNotEmpty)
+    final List<Widget> content = [];
+
+    content
+      ..add(_buildHeroCard(meeting))
+      ..add(const SizedBox(height: 16))
+      ..add(_buildMeetingStats(meeting))
+      ..add(const SizedBox(height: 16));
+
+    if (meeting.resolvedRecordingEmbedUrl != null || meeting.recordingUrl != null) {
+      content.add(
+        Builder(
+          builder: (context) => _buildVideoEmbed(meeting),
+        ),
+      );
+    }
+
+    if (meeting.transcriptFilePath != null && meeting.transcriptFilePath!.isNotEmpty) {
+      content.add(
         _buildLinkTile(
           icon: Icons.description_outlined,
           label: 'Transcript',
           value: meeting.transcriptFilePath!,
           onTap: () => _launchUrl(Uri.parse(meeting.transcriptFilePath!)),
         ),
-      ..._buildTextSections(meeting),
-      _buildParticipantsPreview(meeting),
-      if (meeting.nonMemberAttendees.isNotEmpty)
-        _buildNonMemberPreview(meeting),
-    ].whereType<Widget>().toList();
+      );
+    }
+
+    content.addAll(_buildTextSections(meeting));
+    content.add(_buildParticipantsPreview(meeting));
+
+    if (meeting.nonMemberAttendees.isNotEmpty) {
+      content.add(_buildNonMemberPreview(meeting));
+    }
 
     return Card(
       elevation: 5,
