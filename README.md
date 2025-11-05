@@ -130,6 +130,12 @@ Deploy the `build/web/` directory to any static hosting service:
 - **Firebase Hosting**: Use `firebase deploy`
 - **AWS S3 + CloudFront**: Upload and configure distribution
 
+#### Production search visibility safeguards
+
+- **Robots directives**: The deployed `index.html` ships with `<meta>` tags and an `X-Robots-Tag` header that instruct search engines not to index or follow links. The published `robots.txt` also blocks all crawlers. Keep these in place until a public release is ready.
+- **Temporary Netlify Basic Auth**: The included `netlify.toml` applies a `Basic-Auth` header for `/*`. Update the credentials (Netlify requires `user:password` pairs) before deploying and rotate them as needed.
+- **Flush prior indexing**: After rolling this change to production, use the [Google Search Console Removals tool](https://search.google.com/search-console/removals) and [Bing Content Removal tool](https://www.bing.com/webmasters/tools/content-removal) to clear any URLs that were indexed previously.
+
 ### Docker
 
 ```dockerfile
