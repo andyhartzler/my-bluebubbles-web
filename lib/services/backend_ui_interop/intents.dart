@@ -1,7 +1,7 @@
 import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/layouts/conversation_details/conversation_details.dart';
 import 'package:bluebubbles/app/layouts/conversation_view/pages/conversation_view.dart';
-import 'package:bluebubbles/app/layouts/conversation_list/pages/search/search_view.dart';
+import 'package:bluebubbles/app/layouts/conversation_list/pages/search/global_crm_search_dialog.dart';
 import 'package:bluebubbles/app/layouts/settings/settings_page.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
@@ -86,9 +86,11 @@ class OpenSearchAction extends Action<OpenSearchIntent> {
   @override
   Object? invoke(covariant OpenSearchIntent intent) async {
     if (ss.settings.finishedSetup.value) {
-      ns.pushLeft(
-        context,
-        SearchView(),
+      await Navigator.of(context).push(
+        ThemeSwitcher.buildPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => const GlobalCrmSearchDialog(),
+        ),
       );
     }
     return null;
