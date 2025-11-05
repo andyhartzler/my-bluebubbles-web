@@ -9,6 +9,7 @@ import 'package:bluebubbles/services/crm/chapter_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
+import 'editors/chapter_edit_sheet.dart';
 import 'member_detail_screen.dart';
 
 class ChapterDetailScreen extends StatefulWidget {
@@ -28,12 +29,14 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   bool _loading = true;
   List<Member> _members = [];
   List<ChapterDocument> _documents = [];
+  late Chapter _chapter;
 
   bool get _crmReady => _supabaseService.isInitialized && CRMConfig.crmEnabled;
 
   @override
   void initState() {
     super.initState();
+    _chapter = widget.chapter;
     _loadChapter();
   }
 
@@ -47,8 +50,8 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
 
     try {
       final results = await Future.wait([
-        _memberRepository.getAllMembers(chapterName: widget.chapter.chapterName),
-        _chapterRepository.getDocumentsForChapter(widget.chapter.chapterName),
+        _memberRepository.getAllMembers(chapterName: _chapter.chapterName),
+        _chapterRepository.getDocumentsForChapter(_chapter.chapterName),
       ]);
 
       if (!mounted) return;
@@ -71,12 +74,39 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
     }
   }
 
+  Future<void> _editChapter() async {
+    if (!_crmReady) return;
+
+    final updated = await showModalBottomSheet<Chapter?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.85,
+        child: ChapterEditSheet(chapter: _chapter),
+      ),
+    );
+
+    if (!mounted || updated == null) return;
+    setState(() => _chapter = updated);
+    await _loadChapter();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final title = '${widget.chapter.chapterName} Chapter';
+    final title = '${_chapter.chapterName} Chapter';
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          if (_crmReady)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit Chapter',
+              onPressed: _editChapter,
+            ),
+        ],
+      ),
       body: !_crmReady
           ? const Center(
               child: Padding(
@@ -96,9 +126,9 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                     children: [
                       _buildChapterHeader(context),
                       const SizedBox(height: 24),
+                      ..._buildDocumentsSection(),
                       ..._buildLeadershipSection(),
                       ..._buildMembersSection(),
-                      ..._buildDocumentsSection(),
                     ],
                   ),
                 ),
@@ -109,41 +139,41 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
     final theme = Theme.of(context);
     final chips = <Widget>[];
 
-    chips.add(_buildPill(Icons.category, widget.chapter.chapterType.toUpperCase()));
+    chips.add(_buildPill(Icons.category, _chapter.chapterType.toUpperCase()));
 
-    if (widget.chapter.status != null && widget.chapter.status!.trim().isNotEmpty) {
-      chips.add(_buildPill(Icons.flag, widget.chapter.status!.trim()));
+    if (_chapter.status != null && _chapter.status!.trim().isNotEmpty) {
+      chips.add(_buildPill(Icons.flag, _chapter.status!.trim()));
     }
 
     chips.add(_buildPill(
-      widget.chapter.isChartered ? Icons.verified : Icons.pending,
-      widget.chapter.isChartered ? 'Chartered' : 'Not Chartered',
+      _chapter.isChartered ? Icons.verified : Icons.pending,
+      _chapter.isChartered ? 'Chartered' : 'Not Chartered',
     ));
 
-    if (widget.chapter.charterDate != null) {
+    if (_chapter.charterDate != null) {
       chips.add(_buildPill(
         Icons.calendar_month,
-        'Chartered ${_formatDate(widget.chapter.charterDate!)}',
+        'Chartered ${_formatDate(_chapter.charterDate!)}',
       ));
     }
 
     final detailRows = <Widget>[];
-    if (widget.chapter.schoolName.isNotEmpty) {
-      detailRows.add(_buildHeaderRow('School', widget.chapter.schoolName));
+    if (_chapter.schoolName.isNotEmpty) {
+      detailRows.add(_buildHeaderRow('School', _chapter.schoolName));
     }
-    if (widget.chapter.contactEmail != null && widget.chapter.contactEmail!.isNotEmpty) {
+    if (_chapter.contactEmail != null && _chapter.contactEmail!.isNotEmpty) {
       detailRows.add(_buildHeaderRow(
         'Contact',
-        widget.chapter.contactEmail!,
+        _chapter.contactEmail!,
         trailing: IconButton(
           tooltip: 'Email chapter',
           icon: const Icon(Icons.email_outlined),
-          onPressed: () => _launchUrl(Uri(scheme: 'mailto', path: widget.chapter.contactEmail!)),
+          onPressed: () => _launchUrl(Uri(scheme: 'mailto', path: _chapter.contactEmail!)),
         ),
       ));
     }
-    if (widget.chapter.website != null && widget.chapter.website!.isNotEmpty) {
-      final uri = _parseUrl(widget.chapter.website!);
+    if (_chapter.website != null && _chapter.website!.isNotEmpty) {
+      final uri = _parseUrl(_chapter.website!);
       if (uri != null) {
         detailRows.add(_buildHeaderRow(
           'Website',
@@ -157,7 +187,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
       }
     }
 
-    final socialMedia = widget.chapter.socialMedia;
+    final socialMedia = _chapter.socialMedia;
     if (socialMedia != null && socialMedia.isNotEmpty) {
       final entries = socialMedia.entries
           .where((entry) => entry.value is String && (entry.value as String).trim().isNotEmpty)
@@ -198,12 +228,12 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.chapter.displayTitle,
+              _chapter.displayTitle,
               style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
-            if (widget.chapter.displaySubtitle.isNotEmpty) ...[
+            if (_chapter.displaySubtitle.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(widget.chapter.displaySubtitle, style: theme.textTheme.titleMedium),
+              Text(_chapter.displaySubtitle, style: theme.textTheme.titleMedium),
             ],
             const SizedBox(height: 16),
             Wrap(
@@ -282,33 +312,89 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
     }
 
     return [
-      _buildSection(
-        icon: Icons.description,
-        title: 'Governing Documents',
-        child: Column(
-          children: _documents
-              .map(
-                (doc) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.insert_drive_file_outlined),
-                  title: Text(doc.displayName),
-                  subtitle: Text(_describeDocument(doc)),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.open_in_new),
-                    tooltip: 'Open document',
-                    onPressed: () {
-                      final uri = _parseUrl(doc.publicUrl);
-                      if (uri != null) {
-                        _launchUrl(uri);
-                      }
-                    },
+      Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.description, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Governing Documents',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
-                ),
-              )
-              .toList(),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: _documents.map(_buildDocumentCard).toList(),
+              ),
+            ],
+          ),
         ),
       ),
+      const SizedBox(height: 24),
     ];
+  }
+
+  Widget _buildDocumentCard(ChapterDocument doc) {
+    final theme = Theme.of(context);
+    final submitted = doc.uploadedAt ?? doc.createdAt;
+    final submittedLabel = submitted != null ? _formatDate(submitted) : 'Date unavailable';
+    final description = _describeDocument(doc);
+
+    return InkWell(
+      onTap: () {
+        final uri = _parseUrl(doc.publicUrl);
+        if (uri != null) {
+          _launchUrl(uri);
+        }
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: 260,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: theme.colorScheme.primary.withOpacity(0.15)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.insert_drive_file_outlined, color: theme.colorScheme.primary),
+            const SizedBox(height: 12),
+            Text(
+              doc.displayName,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Submitted $submittedLabel',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              description,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Icon(Icons.open_in_new, size: 18, color: theme.colorScheme.primary),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildMemberTile(Member member, {bool emphasizeRole = false}) {
