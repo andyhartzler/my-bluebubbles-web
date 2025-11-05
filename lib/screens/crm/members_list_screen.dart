@@ -842,14 +842,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
   Widget _buildFilterChip({
     required String label,
     required bool selected,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
     IconData? icon,
   }) {
     return FilterChip(
       avatar: icon != null ? Icon(icon, size: 18) : null,
       label: Text(label),
       selected: selected,
-      onSelected: (_) => onTap(),
+      onSelected: onTap == null ? null : (_) => onTap(),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
   }
