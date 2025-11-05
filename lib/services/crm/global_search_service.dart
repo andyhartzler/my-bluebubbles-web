@@ -76,6 +76,28 @@ class GlobalSearchResultItem {
   final Object payload;
 }
 
+DateTime? _tryParseDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) {
+    return value.toLocal();
+  }
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true).toLocal();
+  }
+  if (value is String && value.isNotEmpty) {
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) {
+      return parsed.toLocal();
+    }
+
+    final millis = int.tryParse(value);
+    if (millis != null) {
+      return DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true).toLocal();
+    }
+  }
+  return null;
+}
+
 class GlobalSearchTranscript {
   const GlobalSearchTranscript({
     required this.id,
@@ -352,14 +374,6 @@ class GlobalSearchService {
     return const [];
   }
 
-  static DateTime? _tryParseDateTime(dynamic value) {
-    if (value == null) return null;
-    if (value is DateTime) return value.toLocal();
-    if (value is String && value.isNotEmpty) {
-      return DateTime.tryParse(value)?.toLocal();
-    }
-    return null;
-  }
 }
 
 class _StorageScope {
