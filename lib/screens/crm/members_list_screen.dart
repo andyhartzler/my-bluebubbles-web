@@ -77,6 +77,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   void initState() {
     super.initState();
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
+    _activeView = widget.showChaptersOnly ? 1 : 0;
     _loadData();
   }
 

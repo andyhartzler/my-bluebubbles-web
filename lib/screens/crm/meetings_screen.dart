@@ -17,6 +17,8 @@ import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/non_member_attendee_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/member_search_sheet.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
+import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 
@@ -1161,6 +1163,137 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
                   ),
                 ),
               if (_isCrmReady) const SizedBox(height: 12),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  itemCount: meeting.attendance.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final attendance = meeting.attendance[index];
+                    return _buildParticipantTile(meeting, attendance);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showGuestParticipants(Meeting meeting) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.85,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.person_add_alt),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Guest Participants (${meeting.nonMemberAttendees.length})',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  itemCount: meeting.nonMemberAttendees.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final attendee = meeting.nonMemberAttendees[index];
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(child: Text(attendee.initials)),
+                        title: Text(attendee.displayName),
+                        subtitle: Text(
+                          [
+                            if (attendee.totalDurationMinutes != null)
+                              '${attendee.totalDurationMinutes} min',
+                            if (attendee.formattedJoinWindow != null)
+                              attendee.formattedJoinWindow!,
+                            if (attendee.email != null && attendee.email!.isNotEmpty)
+                              attendee.email!,
+                          ].join(' • '),
+                        ),
+                        trailing: const Icon(Icons.edit_outlined),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _editNonMember(meeting, attendee);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLinkTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    VoidCallback? onTap,
+  }) {
+    return Card(
+      child: ListTile(
+        leading: Icon(icon),
+        title: Text(label),
+        subtitle: Text(value),
+        trailing: const Icon(Icons.open_in_new),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Future<void> _showMemberParticipants(Meeting meeting) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.9,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.groups_outlined),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Member Participants (${meeting.attendance.length})',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
               const Divider(height: 1),
               Expanded(
                 child: ListView.separated(
