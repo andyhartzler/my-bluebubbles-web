@@ -5,6 +5,7 @@ import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
+import 'package:bluebubbles/screens/crm/editors/member_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
@@ -168,6 +169,23 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         _loadingAttendance = false;
       });
     }
+  }
+
+  Future<void> _editMember() async {
+    if (!_crmReady) return;
+
+    final updated = await showModalBottomSheet<Member?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.9,
+        child: MemberEditSheet(member: _member),
+      ),
+    );
+
+    if (!mounted || updated == null) return;
+    setState(() => _member = updated);
+    _memberLookup.cacheMember(updated);
   }
 
   Future<void> _startChat({List<PlatformFile> attachments = const []}) async {
@@ -538,6 +556,22 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         label: Text('OPTED OUT'),
                         backgroundColor: Colors.red,
                         labelStyle: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  if (_crmReady)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Edit Member'),
+                            onPressed: _editMember,
+                          ),
+                        ],
                       ),
                     ),
                   const SizedBox(height: 24),
@@ -923,7 +957,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         alignment: Alignment.center,
         child: OutlinedButton.icon(
           icon: const Icon(Icons.event_note),
-          label: const Text('Meeting Attendance'),
+          label: Text('Meeting Attendance (${_meetingAttendance.length})'),
           onPressed: _meetingAttendance.isEmpty ? null : _showMeetingAttendanceSheet,
         ),
       ),
@@ -934,11 +968,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
   Card _buildMeetingSummaryCard(MeetingAttendance attendance) {
     final dateLabel = attendance.formattedMeetingDate ?? 'Date unavailable';
+    final durationLabel = attendance.durationSummary;
     return Card(
       child: ListTile(
         leading: const Icon(Icons.event_available),
         title: Text(attendance.meetingLabel),
-        subtitle: Text('Last attended $dateLabel'),
+        subtitle: Text('Last attended $dateLabel • $durationLabel'),
         trailing: const Icon(Icons.open_in_new),
         onTap: () => _navigateToMeeting(attendance),
       ),
@@ -966,9 +1001,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         itemBuilder: (context, index) {
                           final attendance = _meetingAttendance[index];
                           final dateLabel = attendance.formattedMeetingDate ?? 'Date unavailable';
+                          final details = <String>[
+                            dateLabel,
+                            attendance.durationSummary,
+                            if (attendance.joinWindow != null) attendance.joinWindow!,
+                          ].join(' • ');
                           return ListTile(
                             title: Text(attendance.meetingLabel),
-                            subtitle: Text(dateLabel),
+                            subtitle: Text(details),
                             trailing: const Icon(Icons.open_in_new),
                             onTap: () {
                               Navigator.of(sheetContext).pop();
