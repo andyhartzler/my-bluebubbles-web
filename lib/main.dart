@@ -786,49 +786,36 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   }
 
   Widget _buildBranding(ThemeData theme) {
+    final labelStyle = theme.textTheme.labelLarge?.copyWith(
+      color: theme.colorScheme.onSurface.withOpacity(0.7),
+      letterSpacing: 0.3,
+      fontWeight: FontWeight.w600,
+    );
+
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () => _setSection(_HomeSection.dashboard),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: theme.colorScheme.shadow.withOpacity(0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: SizedBox(
-            height: 68,
-            width: 260,
-            child: Stack(
-              children: [
-                Positioned.fill(child: Container(color: Colors.white)),
-                Positioned.fill(
-                  child: Image.asset(
-                    'assets/images/Blue-Gradient-Background.png',
-                    fit: BoxFit.cover,
-                    color: Colors.white.withOpacity(0.55),
-                    colorBlendMode: BlendMode.srcATop,
-                  ),
-                ),
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Image.asset(
-                      'assets/images/text-logo-1320x440.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-              ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 60,
+            width: 220,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Image.asset(
+                'assets/images/text-logo-1320x440.png',
+                fit: BoxFit.contain,
+              ),
             ),
           ),
-        ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text('Communications Hub', style: labelStyle),
+          ),
+        ],
       ),
     );
   }

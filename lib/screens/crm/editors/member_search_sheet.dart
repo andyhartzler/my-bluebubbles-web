@@ -51,7 +51,7 @@ class _MemberSearchSheetState extends State<_MemberSearchSheet> {
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           children: [
             Padding(
               padding: const EdgeInsets.all(16.0),

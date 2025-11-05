@@ -37,7 +37,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
   bool _loading = true;
   bool _crmReady = false;
   String _searchQuery = '';
-  late int _activeView; // 0 = members, 1 = chapters
 
   // Filter state
   String? _selectedCounty;
@@ -438,6 +437,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     }
 
     final theme = Theme.of(context);
+    final showingChapters = widget.showChaptersOnly;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,20 +446,19 @@ class _MembersListScreenState extends State<MembersListScreen> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: _buildSearchField(),
         ),
-        if (!widget.showChaptersOnly) _buildViewToggle(),
-        if (_activeView == 0) _buildFilterRow(),
+        if (!showingChapters) _buildFilterRow(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Text(
-            _activeView == 0
-                ? 'Showing ${_filteredMembers.length} of ${_members.length} members'
-                : 'Showing ${_filteredChapters.length} of ${_chapters.length} chapters',
+            showingChapters
+                ? 'Showing ${_filteredChapters.length} of ${_chapters.length} chapters'
+                : 'Showing ${_filteredMembers.length} of ${_members.length} members',
             style: theme.textTheme.labelMedium,
           ),
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: _activeView == 0 ? _buildMembersGrid(theme) : _buildChaptersList(theme),
+          child: showingChapters ? _buildChaptersList(theme) : _buildMembersGrid(theme),
         ),
       ],
     );
@@ -589,24 +588,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
             ),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _buildViewToggle() {
-    if (widget.showChaptersOnly) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SegmentedButton<int>(
-        segments: const [
-          ButtonSegment<int>(value: 0, label: Text('Members'), icon: Icon(Icons.people_alt_rounded)),
-          ButtonSegment<int>(value: 1, label: Text('Chapters'), icon: Icon(Icons.account_tree_outlined)),
-        ],
-        selected: <int>{_activeView},
-        onSelectionChanged: (selection) {
-          if (selection.isEmpty) return;
-          _updateFilters(() => _activeView = selection.first);
-        },
       ),
     );
   }

@@ -15,6 +15,7 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/non_member_attendee_edit_sheet.dart';
+import 'package:bluebubbles/screens/crm/editors/member_search_sheet.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
@@ -141,6 +142,75 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
     _applyUpdatedAttendance(updated);
   }
 
+  Future<void> _addMemberParticipant(Meeting meeting) async {
+    if (!_isCrmReady) return;
+
+    final member = await showMemberSearchSheet(context);
+    if (member == null) return;
+
+    try {
+      final created = await _meetingRepository.upsertAttendance(
+        meetingId: meeting.id,
+        memberId: member.id,
+        zoomDisplayName: member.name,
+      );
+
+      if (!mounted || created == null) return;
+      _applyUpdatedAttendance(created);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Linked ${member.name} to ${meeting.meetingTitle}.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add participant: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteAttendance(MeetingAttendance attendance) async {
+    if (!_isCrmReady) return;
+
+    final meetingId = attendance.meetingId ?? attendance.meeting?.id;
+    if (meetingId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Participant'),
+        content: Text('Remove ${attendance.participantName} from this meeting?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _meetingRepository.deleteAttendance(attendance.id);
+      if (!mounted) return;
+      _removeAttendanceFromMeeting(meetingId, attendance.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${attendance.participantName} removed from ${attendance.meetingTitle ?? 'meeting'}.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to remove participant: $e')),
+      );
+    }
+  }
+
   Future<void> _editNonMember(Meeting meeting, NonMemberAttendee attendee) async {
     if (!_isCrmReady) return;
 
@@ -201,12 +271,37 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       updatedAttendance.add(attendance);
     }
 
-    final updatedMeeting = meeting.copyWith(attendance: updatedAttendance);
+    final updatedMeeting = meeting.copyWith(
+      attendance: updatedAttendance,
+      attendanceCount: updatedAttendance.length + meeting.nonMemberAttendees.length,
+    );
     meetings[meetingIndex] = updatedMeeting;
 
     if (attendance.member != null) {
       _memberLookup.cacheMember(attendance.member!);
     }
+
+    setState(() {
+      _meetings = meetings;
+      if (_selectedMeeting?.id == updatedMeeting.id) {
+        _selectedMeeting = updatedMeeting;
+      }
+    });
+  }
+
+  void _removeAttendanceFromMeeting(String meetingId, String attendanceId) {
+    final meetings = List<Meeting>.from(_meetings);
+    final meetingIndex = meetings.indexWhere((element) => element.id == meetingId);
+    if (meetingIndex == -1) return;
+
+    final meeting = meetings[meetingIndex];
+    final updatedAttendance = meeting.attendance.where((entry) => entry.id != attendanceId).toList();
+
+    final updatedMeeting = meeting.copyWith(
+      attendance: updatedAttendance,
+      attendanceCount: updatedAttendance.length + meeting.nonMemberAttendees.length,
+    );
+    meetings[meetingIndex] = updatedMeeting;
 
     setState(() {
       _meetings = meetings;
@@ -309,21 +404,14 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
 
     return Stack(
       children: [
+        Positioned.fill(child: Container(color: Colors.white)),
         Positioned.fill(
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Image.asset(
-                  'assets/images/Blue-Gradient-Background.png',
-                  fit: BoxFit.cover,
-                  color: Colors.white.withOpacity(0.4),
-                  colorBlendMode: BlendMode.srcATop,
-                ),
-              ),
-              Positioned.fill(
-                child: Container(color: Colors.white.withOpacity(0.82)),
-              ),
-            ],
+          child: Opacity(
+            opacity: 0.7,
+            child: Image.asset(
+              'assets/images/Blue-Gradient-Background.png',
+              fit: BoxFit.cover,
+            ),
           ),
         ),
         Positioned.fill(child: _buildContent()),
@@ -695,8 +783,6 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
                   children: [
                     _buildHeroChip(Icons.groups, '$totalGuests participants'),
                     if (hostName != null) _buildHeroChip(Icons.person, 'Host: $hostName'),
-                    if (meeting.zoomMeetingId != null && meeting.zoomMeetingId!.isNotEmpty)
-                      _buildHeroChip(Icons.videocam, 'Zoom ${meeting.zoomMeetingId}'),
                     if (meeting.durationMinutes != null)
                       _buildHeroChip(Icons.timer, '${meeting.durationMinutes} minutes'),
                   ],
@@ -935,6 +1021,12 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
                 icon: const Icon(Icons.edit_outlined),
                 onPressed: () => _editAttendance(attendance),
               ),
+            if (_isCrmReady)
+              IconButton(
+                tooltip: 'Remove from meeting',
+                icon: const Icon(Icons.delete_outline),
+                onPressed: () => _deleteAttendance(attendance),
+              ),
           ],
         ),
       ),
@@ -990,23 +1082,169 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       );
     }
 
+    return Builder(
+      builder: (context) {
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                color: Theme.of(context).colorScheme.surfaceVariant,
+                padding: const EdgeInsets.all(12.0),
+                child: Text('Recording', style: Theme.of(context).textTheme.titleMedium),
+              ),
+              SizedBox(
+                height: 360,
+                child: MeetingRecordingEmbed(uri: uri),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLinkTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    VoidCallback? onTap,
+  }) {
     return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            color: Theme.of(context).colorScheme.surfaceVariant,
-            padding: const EdgeInsets.all(12.0),
-            child: Text('Recording', style: Theme.of(context).textTheme.titleMedium),
+      child: ListTile(
+        leading: Icon(icon),
+        title: Text(label),
+        subtitle: Text(value),
+        trailing: const Icon(Icons.open_in_new),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Future<void> _showMemberParticipants(Meeting meeting) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.9,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.groups_outlined),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Member Participants (${meeting.attendance.length})',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              if (_isCrmReady)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton.icon(
+                      onPressed: () => _addMemberParticipant(meeting),
+                      icon: const Icon(Icons.person_add_alt_1),
+                      label: const Text('Add member participant'),
+                    ),
+                  ),
+                ),
+              if (_isCrmReady) const SizedBox(height: 12),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  itemCount: meeting.attendance.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final attendance = meeting.attendance[index];
+                    return _buildParticipantTile(meeting, attendance);
+                  },
+                ),
+              ),
+            ],
           ),
-          Builder(
-            builder: (context) => SizedBox(
-              height: 360,
-              child: MeetingRecordingEmbed(uri: uri),
-            ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showGuestParticipants(Meeting meeting) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.85,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.person_add_alt),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Guest Participants (${meeting.nonMemberAttendees.length})',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  itemCount: meeting.nonMemberAttendees.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final attendee = meeting.nonMemberAttendees[index];
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(child: Text(attendee.initials)),
+                        title: Text(attendee.displayName),
+                        subtitle: Text(
+                          [
+                            if (attendee.totalDurationMinutes != null)
+                              '${attendee.totalDurationMinutes} min',
+                            if (attendee.formattedJoinWindow != null)
+                              attendee.formattedJoinWindow!,
+                            if (attendee.email != null && attendee.email!.isNotEmpty)
+                              attendee.email!,
+                          ].join(' • '),
+                        ),
+                        trailing: const Icon(Icons.edit_outlined),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _editNonMember(meeting, attendee);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

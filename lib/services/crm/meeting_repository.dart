@@ -322,6 +322,59 @@ class MeetingRepository {
     }
   }
 
+  Future<MeetingAttendance?> upsertAttendance({
+    required String meetingId,
+    required String memberId,
+    String? zoomDisplayName,
+  }) async {
+    if (!_isReady) return null;
+
+    final payload = <String, dynamic>{
+      'meeting_id': meetingId,
+      'member_id': memberId,
+      'matched_by': 'manual-link',
+    };
+
+    if (zoomDisplayName != null && zoomDisplayName.trim().isNotEmpty) {
+      payload['zoom_display_name'] = zoomDisplayName.trim();
+    }
+
+    try {
+      final response = await _supabase.privilegedClient
+          .from('meeting_attendance')
+          .upsert(payload, onConflict: 'meeting_id,member_id')
+          .select(
+            '*, member:members(*), meeting:meetings(id, meeting_date, meeting_title, recording_url, recording_embed_url, '
+            'recording_thumbnail_url, duration_minutes, meeting_host)',
+          )
+          .maybeSingle();
+
+      if (response == null) return null;
+      final json = _coerceJsonMap(response);
+      if (json == null) {
+        throw const FormatException('Supabase returned an unexpected meeting attendance payload');
+      }
+      return MeetingAttendance.fromJson(json);
+    } catch (e) {
+      print('❌ Error upserting meeting attendance: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAttendance(String attendanceId) async {
+    if (!_isReady) return;
+
+    try {
+      await _supabase.privilegedClient
+          .from('meeting_attendance')
+          .delete()
+          .eq('id', attendanceId);
+    } catch (e) {
+      print('❌ Error deleting meeting attendance: $e');
+      rethrow;
+    }
+  }
+
   Future<List<NonMemberAttendee>> getNonMemberAttendeesForMeeting(String meetingId) async {
     if (!_isReady) return [];
 

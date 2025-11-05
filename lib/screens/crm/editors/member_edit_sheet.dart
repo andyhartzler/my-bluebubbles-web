@@ -143,7 +143,7 @@ class _MemberEditSheetState extends State<MemberEditSheet> {
       child: Form(
         key: _formKey,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           children: [
             Padding(
               padding: const EdgeInsets.all(16.0),
