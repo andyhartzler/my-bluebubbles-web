@@ -1000,9 +1000,11 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
             padding: const EdgeInsets.all(12.0),
             child: Text('Recording', style: Theme.of(context).textTheme.titleMedium),
           ),
-          const SizedBox(
-            height: 360,
-            child: MeetingRecordingEmbed(uri: uri),
+          Builder(
+            builder: (context) => SizedBox(
+              height: 360,
+              child: MeetingRecordingEmbed(uri: uri),
+            ),
           ),
         ],
       ),
