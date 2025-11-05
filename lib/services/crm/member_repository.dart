@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 
 import 'supabase_service.dart';
 
@@ -13,6 +14,11 @@ class MemberRepository {
   final CRMSupabaseService _supabase = CRMSupabaseService();
 
   bool get _isReady => _supabase.isInitialized;
+
+  SupabaseClient get _readClient =>
+      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+
+  SupabaseClient get _writeClient => _supabase.privilegedClient;
 
   /// Get all members (with optional filters)
   Future<List<Member>> getAllMembers({
@@ -30,7 +36,7 @@ class MemberRepository {
     if (!_isReady) return [];
 
     try {
-      var query = _supabase.client.from('members').select();
+      var query = _readClient.from('members').select();
 
       if (county != null && county.isNotEmpty) {
         query = query.eq('county', county);
@@ -93,7 +99,7 @@ class MemberRepository {
     if (!_isReady) return null;
 
     try {
-      final response = await _supabase.client
+      final response = await _readClient
           .from('members')
           .select()
           .eq('id', id)
@@ -108,18 +114,39 @@ class MemberRepository {
 
   /// Get member by phone number (E.164 format)
   /// This is the KEY lookup for linking to BlueBubbles Handles
-  Future<Member?> getMemberByPhone(String phoneE164) async {
+  Future<Member?> getMemberByPhone(String phone) async {
     if (!_isReady) return null;
 
-    try {
-      final response = await _supabase.client
-          .from('members')
-          .select()
-          .eq('phone_e164', phoneE164)
-          .maybeSingle();
+    final candidates = buildPhoneLookupCandidates(phone);
+    if (candidates.isEmpty) return null;
 
+    try {
+      final filters = <String>[];
+      for (final candidate in candidates) {
+        final escaped = candidate.replaceAll(',', '\\,');
+        filters.add('phone_e164.eq.$escaped');
+        filters.add('phone.eq.$escaped');
+      }
+
+      var query = _readClient.from('members').select();
+      if (filters.isNotEmpty) {
+        query = query.or(filters.join(','));
+      } else {
+        query = query.eq('phone_e164', phone);
+      }
+
+      final response = await query.limit(1).maybeSingle();
       if (response == null) return null;
-      return Member.fromJson(response as Map<String, dynamic>);
+
+      if (response is Map<String, dynamic>) {
+        return Member.fromJson(response);
+      }
+
+      if (response is Map) {
+        return Member.fromJson(response.map((key, dynamic value) => MapEntry(key.toString(), value)));
+      }
+
+      throw FormatException('Unexpected response type: ${response.runtimeType}');
     } catch (e) {
       print('❌ Error fetching member by phone: $e');
       return null;
@@ -131,7 +158,7 @@ class MemberRepository {
     if (!_isReady) return [];
 
     try {
-      final response = await _supabase.client
+      final response = await _readClient
           .from('members')
           .select('county')
           .not('county', 'is', null);
@@ -179,7 +206,7 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
-      final response = await _supabase.client.from('members').select('committee');
+      final response = await _readClient.from('members').select('committee');
       final counts = <String, int>{};
 
       for (final item in response as List<dynamic>) {
@@ -254,7 +281,7 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
-      final response = await _supabase.client.from('members').select('date_of_birth');
+      final response = await _readClient.from('members').select('date_of_birth');
       final now = DateTime.now();
       final buckets = LinkedHashMap<String, int>.fromEntries([
         MapEntry('14-17', 0),
@@ -320,7 +347,7 @@ class MemberRepository {
     if (!_isReady) return [];
 
     try {
-      final response = await _supabase.client
+      final response = await _readClient
           .from('members')
           .select()
           .order('created_at', ascending: false)
@@ -340,7 +367,7 @@ class MemberRepository {
     if (!_isReady) return [];
 
     try {
-      final response = await _supabase.client
+      final response = await _readClient
           .from('members')
           .select('congressional_district')
           .not('congressional_district', 'is', null);
@@ -367,7 +394,7 @@ class MemberRepository {
     if (!_isReady) return [];
 
     try {
-      final response = await _supabase.client
+      final response = await _readClient
           .from('members')
           .select('committee')
           .not('committee', 'is', null);
@@ -391,7 +418,7 @@ class MemberRepository {
     if (!_isReady) return [];
 
     try {
-      final response = await _supabase.client
+      final response = await _readClient
           .from('members')
           .select('high_school')
           .not('high_school', 'is', null);
@@ -416,7 +443,7 @@ class MemberRepository {
     if (!_isReady) return [];
 
     try {
-      final response = await _supabase.client
+      final response = await _readClient
           .from('members')
           .select('college')
           .not('college', 'is', null);
@@ -441,7 +468,7 @@ class MemberRepository {
     if (!_isReady) return [];
 
     try {
-      final response = await _supabase.client
+      final response = await _readClient
           .from('members')
           .select('chapter_name')
           .not('chapter_name', 'is', null);
@@ -467,7 +494,7 @@ class MemberRepository {
     if (!_isReady) return;
 
     try {
-      await _supabase.client
+      await _writeClient
           .from('members')
           .update({'last_contacted': DateTime.now().toIso8601String()})
           .eq('id', memberId);
@@ -481,7 +508,7 @@ class MemberRepository {
     if (!_isReady) return;
 
     try {
-      await _supabase.client
+      await _writeClient
           .from('members')
           .update({'intro_sent_at': DateTime.now().toIso8601String()})
           .eq('id', memberId);
@@ -508,7 +535,7 @@ class MemberRepository {
         data['opt_out_reason'] = reason;
       }
 
-      await _supabase.client
+      await _writeClient
           .from('members')
           .update(data)
           .eq('id', memberId);
@@ -522,7 +549,7 @@ class MemberRepository {
     if (!_isReady) return;
 
     try {
-      await _supabase.client
+      await _writeClient
           .from('members')
           .update({'notes': notes})
           .eq('id', memberId);
@@ -531,12 +558,36 @@ class MemberRepository {
     }
   }
 
+  Future<Member?> updateMemberFields(String memberId, Map<String, dynamic> updates) async {
+    if (!_isReady || updates.isEmpty) return null;
+
+    final payload = Map<String, dynamic>.from(updates);
+
+    try {
+      final response = await _writeClient
+          .from('members')
+          .update(payload)
+          .eq('id', memberId)
+          .select()
+          .maybeSingle();
+
+      final json = _coerceJsonMap(response);
+      if (json == null) {
+        throw const FormatException('Supabase returned an unexpected member payload');
+      }
+      return Member.fromJson(json);
+    } catch (e) {
+      print('❌ Error updating member: $e');
+      rethrow;
+    }
+  }
+
   /// Search members by name or phone
   Future<List<Member>> searchMembers(String query) async {
     if (!_isReady) return [];
 
     try {
-      final response = await _supabase.client
+      final response = await _readClient
           .from('members')
           .select()
           .or('name.ilike.%$query%,phone.ilike.%$query%,phone_e164.ilike.%$query%');
@@ -558,7 +609,7 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
-      final response = await _supabase.client.from('members').select(column);
+      final response = await _readClient.from('members').select(column);
       final counts = <String, int>{};
 
       for (final item in response as List<dynamic>) {
@@ -584,7 +635,7 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
-      final response = await _supabase.client.from('members').select(column);
+      final response = await _readClient.from('members').select(column);
       final counts = <String, int>{};
       final delimiter = RegExp(r'[;,/\n|]+');
 
@@ -629,7 +680,7 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
-      final response = await _supabase.client.from('members').select(column);
+      final response = await _readClient.from('members').select(column);
       int trueCount = 0;
       int falseCount = 0;
 
@@ -671,20 +722,20 @@ class MemberRepository {
     }
 
     try {
-      final PostgrestResponse totalResponse = await _supabase.client
+      final PostgrestResponse totalResponse = await _readClient
           .from('members')
           .select('id')
           .count(CountOption.exact);
       final total = totalResponse.count ?? 0;
 
-      final PostgrestResponse optedOutResponse = await _supabase.client
+      final PostgrestResponse optedOutResponse = await _readClient
           .from('members')
           .select('id')
           .eq('opt_out', true)
           .count(CountOption.exact);
       final optedOut = optedOutResponse.count ?? 0;
 
-      final PostgrestResponse withPhoneResponse = await _supabase.client
+      final PostgrestResponse withPhoneResponse = await _readClient
           .from('members')
           .select('id')
           .not('phone_e164', 'is', null)
@@ -707,4 +758,16 @@ class MemberRepository {
       };
     }
   }
+}
+
+Map<String, dynamic>? _coerceJsonMap(dynamic value) {
+  if (value == null) return null;
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) {
+    return value.map((key, dynamic v) => MapEntry(key.toString(), v));
+  }
+  if (value is PostgrestResponse) {
+    return _coerceJsonMap(value.data);
+  }
+  return null;
 }
