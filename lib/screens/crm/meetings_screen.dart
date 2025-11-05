@@ -50,9 +50,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   static final Map<int, html.IFrameElement> _recordingIframes =
       <int, html.IFrameElement>{};
 
-  bool get _crmReady => _memberLookup.isReady;
-
-  bool get _crmReady => _memberLookup.isReady;
+  bool get _isCrmReady => _memberLookup.isReady;
 
   @override
   void initState() {
@@ -67,7 +65,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   }
 
   Future<void> _loadMeetings() async {
-    if (!_crmReady) {
+    if (!_isCrmReady) {
       setState(() {
         _loading = false;
         _error = 'CRM Supabase is not configured.';
@@ -137,7 +135,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   }
 
   Future<void> _editMeeting(Meeting meeting) async {
-    if (!_crmReady) return;
+    if (!_isCrmReady) return;
 
     final updated = await showModalBottomSheet<Meeting?>(
       context: context,
@@ -153,7 +151,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   }
 
   Future<void> _editAttendance(MeetingAttendance attendance) async {
-    if (!_crmReady) return;
+    if (!_isCrmReady) return;
 
     final updated = await showModalBottomSheet<MeetingAttendance?>(
       context: context,
@@ -169,7 +167,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   }
 
   Future<void> _editNonMember(Meeting meeting, NonMemberAttendee attendee) async {
-    if (!_crmReady) return;
+    if (!_isCrmReady) return;
 
     final result = await showModalBottomSheet<NonMemberEditResult?>(
       context: context,
@@ -292,7 +290,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_crmReady) {
+    if (!_isCrmReady) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24.0),
@@ -684,7 +682,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
                         ),
                       ),
                     ),
-                    if (_crmReady)
+                    if (_isCrmReady)
                       ElevatedButton.icon(
                         onPressed: () => _editMeeting(meeting),
                         icon: const Icon(Icons.edit_outlined),
@@ -942,7 +940,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
                 icon: const Icon(Icons.person_search_outlined),
                 onPressed: () => _openMemberProfile(attendance.member!),
               ),
-            if (_crmReady)
+            if (_isCrmReady)
               IconButton(
                 tooltip: 'Edit attendance',
                 icon: const Icon(Icons.edit_outlined),
