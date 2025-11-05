@@ -37,6 +37,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   bool _loading = true;
   bool _crmReady = false;
   String _searchQuery = '';
+  late int _activeView;
 
   // Filter state
   String? _selectedCounty;
@@ -80,6 +81,16 @@ class _MembersListScreenState extends State<MembersListScreen> {
     _activeView = widget.showChaptersOnly ? 1 : 0;
     _loadData();
   }
+
+  @override
+  void didUpdateWidget(covariant MembersListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.showChaptersOnly != widget.showChaptersOnly) {
+      _activeView = widget.showChaptersOnly ? 1 : 0;
+    }
+  }
+
+  bool get _showingChapters => widget.showChaptersOnly || _activeView == 1;
 
   Future<void> _loadData() async {
     if (!_crmReady) {
@@ -437,7 +448,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     }
 
     final theme = Theme.of(context);
-    final showingChapters = widget.showChaptersOnly;
+    final showingChapters = _showingChapters;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,7 +476,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   Widget _buildSearchField() {
-    final hint = widget.showChaptersOnly
+    final hint = _showingChapters
         ? 'Search chapters by name, contact, or status...'
         : 'Search by name, contact, chapter, or committee...';
     return TextField(
@@ -487,7 +498,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   Widget _buildFilterRow() {
-    if (widget.showChaptersOnly) return const SizedBox.shrink();
+    if (_showingChapters) return const SizedBox.shrink();
     final hasFilters = _selectedCounty != null ||
         _selectedDistrict != null ||
         _selectedChapter != null ||
@@ -518,7 +529,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
       _buildFilterChip(
         label: _selectedChapter ?? 'Chapter',
         selected: _selectedChapter != null,
-        onTap: _showChapterFilter,
+        onTap: _showingChapters ? null : _showChapterFilter,
         icon: Icons.flag_outlined,
       ),
       _buildFilterChip(
