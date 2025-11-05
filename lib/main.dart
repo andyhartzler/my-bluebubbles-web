@@ -793,7 +793,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     );
 
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(18),
       onTap: () => _setSection(_HomeSection.dashboard),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
