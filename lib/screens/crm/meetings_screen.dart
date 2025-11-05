@@ -17,6 +17,8 @@ import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/non_member_attendee_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/member_search_sheet.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
+import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 
@@ -697,6 +699,167 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       yield widget;
       first = false;
     }
+  }
+
+  Widget _buildHeroCard(Meeting meeting) {
+    final theme = Theme.of(context);
+    final hostName = meeting.host?.name;
+    final totalGuests = meeting.attendance.length + meeting.nonMemberAttendees.length;
+    final thumbnail = meeting.resolvedRecordingThumbnailUrl;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(colors: [Color(0xFF0052D4), Color(0xFF65C7F7)]),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 24,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          if (thumbnail != null)
+            Positioned.fill(
+              child: FadeInImage.assetNetwork(
+                placeholder: 'assets/images/no-video-preview.png',
+                image: thumbnail,
+                fit: BoxFit.cover,
+                imageErrorBuilder: (_, __, ___) => Container(color: Colors.black12),
+              ),
+            ),
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.black.withOpacity(0.55), Colors.black.withOpacity(0.3)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        meeting.meetingTitle,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    if (_isCrmReady)
+                      ElevatedButton.icon(
+                        onPressed: () => _editMeeting(meeting),
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.18),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '${meeting.formattedDate} • ${meeting.formattedTime} CST',
+                  style: theme.textTheme.titleMedium?.copyWith(color: Colors.white.withOpacity(0.85)),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildHeroChip(Icons.groups, '$totalGuests participants'),
+                    if (hostName != null) _buildHeroChip(Icons.person, 'Host: $hostName'),
+                    if (meeting.durationMinutes != null)
+                      _buildHeroChip(Icons.timer, '${meeting.durationMinutes} minutes'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMeetingStats(Meeting meeting) {
+    final tiles = <Widget>[
+      _buildStatTile(
+        icon: Icons.play_circle_outline,
+        label: meeting.recordingUrl != null ? 'Recording Ready' : 'No Recording',
+        description: meeting.recordingUrl ?? 'Upload a recording to share it with the team.',
+        onTap: meeting.recordingUrl != null
+            ? () => launchUrl(Uri.parse(meeting.recordingUrl!), mode: LaunchMode.externalApplication)
+            : null,
+      ),
+      _buildStatTile(
+        icon: Icons.event_available,
+        label: 'Agenda & Outcomes',
+        description: 'Review agenda status, discussion highlights, decisions, and risks.',
+        onTap: () => _scrollToTextSection(),
+      ),
+      _buildStatTile(
+        icon: Icons.groups_outlined,
+        label: '${meeting.attendance.length} Members',
+        description: 'Tap to view the full roster of member attendees.',
+        onTap: () => _showMemberParticipants(meeting),
+      ),
+      _buildStatTile(
+        icon: Icons.person_add_alt,
+        label: '${meeting.nonMemberAttendees.length} Guests',
+        description: 'Identify guests and link them to CRM profiles.',
+        onTap: meeting.nonMemberAttendees.isEmpty ? null : () => _showGuestParticipants(meeting),
+      ),
+    ];
+
+    return Card(
+      elevation: 5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+          itemCount: content.length,
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.only(bottom: 20.0),
+            child: content[index],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildHeroCard(Meeting meeting) {
