@@ -162,14 +162,11 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
       detailRows.add(_buildHeaderRow('School', _chapter.schoolName));
     }
     if (_chapter.contactEmail != null && _chapter.contactEmail!.isNotEmpty) {
-      detailRows.add(_buildHeaderRow(
+      detailRows.add(_buildClickableHeaderRow(
         'Contact',
         _chapter.contactEmail!,
-        trailing: IconButton(
-          tooltip: 'Email chapter',
-          icon: const Icon(Icons.email_outlined),
-          onPressed: () => _launchUrl(Uri(scheme: 'mailto', path: _chapter.contactEmail!)),
-        ),
+        onTap: () => _launchUrl(Uri(scheme: 'mailto', path: _chapter.contactEmail!)),
+        icon: Icons.email_outlined,
       ));
     }
     if (_chapter.website != null && _chapter.website!.isNotEmpty) {
@@ -180,7 +177,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
           uri.toString(),
           trailing: IconButton(
             tooltip: 'Open website',
-            icon: const Icon(Icons.open_in_new),
+            icon: const Icon(Icons.open_in_new, color: Colors.white),
             onPressed: () => _launchUrl(uri),
           ),
         ));
@@ -208,15 +205,20 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
             children: [
               const Text(
                 'Social Media',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(width: 8),
               if (_crmReady)
                 TextButton.icon(
                   onPressed: _editChapter,
-                  icon: const Icon(Icons.edit, size: 16),
+                  icon: const Icon(Icons.edit, size: 16, color: Colors.white),
                   label: const Text('Edit'),
                   style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   ),
                 ),
@@ -237,6 +239,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                   _launchUrl(link);
                 }
               },
+              borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                 child: Row(
@@ -245,7 +248,10 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                       width: 100,
                       child: Text(
                         entry.key,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -253,12 +259,12 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                       child: Text(
                         value,
                         style: const TextStyle(
-                          color: Colors.blue,
+                          color: Colors.white,
                           decoration: TextDecoration.underline,
                         ),
                       ),
                     ),
-                    const Icon(Icons.open_in_new, size: 16, color: Colors.blue),
+                    const Icon(Icons.open_in_new, size: 16, color: Colors.white),
                   ],
                 ),
               ),
@@ -273,8 +279,12 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
           padding: const EdgeInsets.only(top: 12),
           child: OutlinedButton.icon(
             onPressed: _editChapter,
-            icon: const Icon(Icons.add_link),
+            icon: const Icon(Icons.add_link, color: Colors.white),
             label: const Text('Add Social Media'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white),
+            ),
           ),
         ),
       );
@@ -282,6 +292,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
 
     return Card(
       elevation: 2,
+      color: const Color(0xFF273351), // _unityBlue for consistency
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -290,11 +301,19 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
           children: [
             Text(
               _chapter.displayTitle,
-              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
             if (_chapter.displaySubtitle.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(_chapter.displaySubtitle, style: theme.textTheme.titleMedium),
+              Text(
+                _chapter.displaySubtitle,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: Colors.white.withOpacity(0.9),
+                ),
+              ),
             ],
             const SizedBox(height: 16),
             Wrap(
@@ -517,10 +536,13 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
 
   Widget _buildPill(IconData icon, String label) {
     return Chip(
-      avatar: Icon(icon, size: 16),
+      avatar: Icon(icon, size: 16, color: Colors.white),
       label: Text(label),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-      backgroundColor: Colors.blueGrey.withOpacity(0.12),
+      labelStyle: const TextStyle(
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+      backgroundColor: Colors.white.withOpacity(0.2),
     );
   }
 
@@ -534,14 +556,17 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
             width: 100,
             child: Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: Colors.black87),
+              style: const TextStyle(color: Colors.white),
             ),
           ),
           if (trailing != null) ...[
@@ -549,6 +574,51 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
             trailing,
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildClickableHeaderRow(
+    String label,
+    String value, {
+    required VoidCallback onTap,
+    required IconData icon,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 100,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(icon, size: 20, color: Colors.white),
+            ],
+          ),
+        ),
       ),
     );
   }
