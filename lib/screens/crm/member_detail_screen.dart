@@ -511,86 +511,148 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               final notesSection =
                   notesChildren.isEmpty ? null : _buildSection('Notes', notesChildren);
 
-              return ListView(
-                padding: const EdgeInsets.all(16.0),
-                children: [
-                  Center(
-                    child: CircleAvatar(
-                      radius: 50,
-                      child: Text(
-                        _member.name[0].toUpperCase(),
-                        style: const TextStyle(fontSize: 32),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Center(
-                    child: Text(
-                      _member.name,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      if (_member.lastContacted != null)
-                        Chip(
-                          avatar: const Icon(Icons.schedule_send, size: 18),
-                          label: Text('Last contacted ${_formatDate(_member.lastContacted!)}'),
-                        ),
-                      if (_member.introSentAt != null)
-                        Chip(
-                          avatar: const Icon(Icons.auto_awesome, size: 18),
-                          label: Text('Intro sent ${_formatDate(_member.introSentAt!)}'),
-                        ),
-                    ],
-                  ),
-                  if (_member.lastContacted != null || _member.introSentAt != null)
-                    const SizedBox(height: 8),
-                  if (_member.optOut)
-                    const Center(
-                      child: Chip(
-                        label: Text('OPTED OUT'),
-                        backgroundColor: Colors.red,
-                        labelStyle: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  if (_crmReady)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16.0),
-                      child: Wrap(
-                        spacing: 12,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
+              final allSections = <Widget>[
+                ...sections,
+                if (notesSection != null) notesSection,
+                if (metadataSection != null) metadataSection,
+              ];
+
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 768;
+                  final listPadding = isWide
+                      ? const EdgeInsets.symmetric(horizontal: 32, vertical: 24)
+                      : const EdgeInsets.all(16);
+                  final chipsAlignment = isWide ? WrapAlignment.start : WrapAlignment.center;
+                  final actionsAlignment = isWide ? WrapAlignment.start : WrapAlignment.center;
+
+                  Widget? sectionLayout;
+                  if (allSections.isNotEmpty) {
+                    if (isWide) {
+                      const double spacing = 24;
+                      const double maxCardWidth = 420;
+                      const double minCardWidth = 320;
+                      final double availableWidth = constraints.maxWidth - listPadding.horizontal;
+                      double cardWidth = maxCardWidth;
+                      if (availableWidth < maxCardWidth * 2 + spacing) {
+                        if (availableWidth >= minCardWidth * 2 + spacing) {
+                          cardWidth = (availableWidth - spacing) / 2;
+                        } else {
+                          cardWidth = availableWidth;
+                        }
+                      }
+
+                      sectionLayout = Wrap(
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        alignment: WrapAlignment.start,
+                        children: allSections
+                            .map(
+                              (section) => SizedBox(
+                                width: cardWidth.clamp(minCardWidth, maxCardWidth).toDouble(),
+                                child: section,
+                              ),
+                            )
+                            .toList(),
+                      );
+                    } else {
+                      sectionLayout = Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.edit_outlined),
-                            label: const Text('Edit Member'),
-                            onPressed: _editMember,
+                          for (int i = 0; i < allSections.length; i++) ...[
+                            allSections[i],
+                            if (i != allSections.length - 1) const SizedBox(height: 24),
+                          ],
+                        ],
+                      );
+                    }
+                  }
+
+                  return ListView(
+                    padding: listPadding,
+                    children: [
+                      Center(
+                        child: CircleAvatar(
+                          radius: 50,
+                          child: Text(
+                            _member.name[0].toUpperCase(),
+                            style: const TextStyle(fontSize: 32),
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: Text(
+                          _member.name,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        alignment: chipsAlignment,
+                        runAlignment: chipsAlignment,
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          if (_member.lastContacted != null)
+                            Chip(
+                              avatar: const Icon(Icons.schedule_send, size: 18),
+                              label: Text('Last contacted ${_formatDate(_member.lastContacted!)}'),
+                            ),
+                          if (_member.introSentAt != null)
+                            Chip(
+                              avatar: const Icon(Icons.auto_awesome, size: 18),
+                              label: Text('Intro sent ${_formatDate(_member.introSentAt!)}'),
+                            ),
                         ],
                       ),
-                    ),
-                  const SizedBox(height: 24),
-                  ..._buildMeetingAttendanceSection(),
-                  if (_crmReady) const SizedBox(height: 24),
-                  ...sections,
-                  if (notesSection != null) notesSection,
-                  if (metadataSection != null) metadataSection,
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    icon: Icon(_member.optOut ? Icons.check_circle : Icons.block),
-                    label: Text(_member.optOut ? 'Opt In' : 'Opt Out'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _member.optOut ? Colors.green : Colors.red,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: _crmReady ? _toggleOptOut : null,
-                  ),
-                ],
+                      if (_member.lastContacted != null || _member.introSentAt != null)
+                        const SizedBox(height: 8),
+                      if (_member.optOut)
+                        Align(
+                          alignment: isWide ? Alignment.centerLeft : Alignment.center,
+                          child: const Chip(
+                            label: Text('OPTED OUT'),
+                            backgroundColor: Colors.red,
+                            labelStyle: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      if (_crmReady)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          child: Wrap(
+                            spacing: 12,
+                            runSpacing: 8,
+                            alignment: actionsAlignment,
+                            children: [
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.edit_outlined),
+                                label: const Text('Edit Member'),
+                                onPressed: _editMember,
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 24),
+                      ..._buildMeetingAttendanceSection(),
+                      if (_crmReady || sectionLayout != null)
+                        const SizedBox(height: 24),
+                      if (sectionLayout != null) ...[
+                        sectionLayout,
+                        const SizedBox(height: 24),
+                      ],
+                      ElevatedButton.icon(
+                        icon: Icon(_member.optOut ? Icons.check_circle : Icons.block),
+                        label: Text(_member.optOut ? 'Opt In' : 'Opt Out'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _member.optOut ? Colors.green : Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: _crmReady ? _toggleOptOut : null,
+                      ),
+                    ],
+                  );
+                },
               );
             }(),
     );
@@ -685,26 +747,42 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
     final theme = Theme.of(context);
     final palette = _sectionPalette[title];
-    final bool useLightText = palette != null;
-    final Color effectiveColor = useLightText
-        ? Colors.white
-        : theme.textTheme.bodyMedium?.color ?? theme.colorScheme.onSurface;
+    final colorScheme = theme.colorScheme;
+    final bool isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = colorScheme.surface;
+    final List<Color>? blendedPalette = palette?.map((color) {
+      final double blendFactor = isDark ? 0.35 : 0.8;
+      return Color.lerp(color, surfaceColor, blendFactor)!;
+    }).toList();
 
-    final BoxDecoration decoration = palette != null
+    final Color baseBackground = blendedPalette != null && blendedPalette.isNotEmpty
+        ? Color.lerp(blendedPalette.first, blendedPalette.last, 0.5) ?? surfaceColor
+        : colorScheme.surfaceVariant.withOpacity(isDark ? 0.5 : 0.9);
+    final Brightness backgroundBrightness = ThemeData.estimateBrightnessForColor(baseBackground);
+    final Color effectiveColor = backgroundBrightness == Brightness.dark
+        ? Colors.white
+        : theme.textTheme.bodyMedium?.color ?? colorScheme.onSurface;
+
+    final BoxDecoration decoration = blendedPalette != null
         ? BoxDecoration(
-            gradient: LinearGradient(colors: palette, begin: Alignment.topLeft, end: Alignment.bottomRight),
+            gradient: LinearGradient(
+              colors: blendedPalette,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: palette.last.withOpacity(0.25),
+                color: Colors.black.withOpacity(isDark ? 0.4 : 0.12),
                 blurRadius: 24,
                 offset: const Offset(0, 18),
               ),
             ],
           )
         : BoxDecoration(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.65),
+            color: baseBackground,
             borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: colorScheme.outline.withOpacity(isDark ? 0.4 : 0.25)),
           );
 
     final sectionTheme = theme.copyWith(
@@ -736,7 +814,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 24),
       ],
     );
   }
