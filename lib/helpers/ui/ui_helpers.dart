@@ -227,37 +227,36 @@ Future<void> showConversationTileMenu(
           ),
         ),
       ),
-      if (!kIsWeb)
-        PopupMenuItem(
-          padding: EdgeInsets.zero,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              chat.toggleArchived(!chat.isArchived!);
-              Navigator.pop(context);
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 12.0),
-              child: Row(
-                children: <Widget>[
-                  Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: Icon(
-                      chat.isArchived!
-                          ? (ios ? CupertinoIcons.tray_arrow_up : Icons.unarchive)
-                          : (ios ? CupertinoIcons.tray_arrow_down : Icons.archive),
-                      color: context.theme.colorScheme.properOnSurface,
-                    ),
+      PopupMenuItem(
+        padding: EdgeInsets.zero,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            chat.toggleArchived(!chat.isArchived!);
+            Navigator.pop(context);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 12.0),
+            child: Row(
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Icon(
+                    chat.isArchived!
+                        ? (ios ? CupertinoIcons.tray_arrow_up : Icons.unarchive)
+                        : (ios ? CupertinoIcons.tray_arrow_down : Icons.archive),
+                    color: context.theme.colorScheme.properOnSurface,
                   ),
-                  Text(
-                    chat.isArchived! ? 'Unarchive' : 'Archive',
-                    style: textTheme.bodyLarge!.copyWith(color: context.theme.colorScheme.properOnSurface),
-                  ),
-                ],
-              ),
+                ),
+                Text(
+                  chat.isArchived! ? 'Unarchive' : 'Archive',
+                  style: textTheme.bodyLarge!.copyWith(color: context.theme.colorScheme.properOnSurface),
+                ),
+              ],
             ),
           ),
         ),
+      ),
       if (!kIsWeb)
         PopupMenuItem(
           padding: EdgeInsets.zero,

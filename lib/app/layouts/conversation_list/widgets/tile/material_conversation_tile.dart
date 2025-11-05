@@ -226,6 +226,24 @@ class _MaterialTrailingState extends CustomState<MaterialTrailing, void, Convers
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (kIsDesktop || kIsWeb)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6.0),
+                    child: IconButton(
+                      tooltip: controller.chat.isArchived! ? 'Unarchive' : 'Archive',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                      iconSize: 18,
+                      splashRadius: 18,
+                      icon: Icon(
+                        controller.chat.isArchived! ? Icons.unarchive : Icons.archive_outlined,
+                        color: controller.shouldHighlight.value || unread
+                            ? context.theme.colorScheme.onBackground
+                            : context.theme.colorScheme.outline,
+                      ),
+                      onPressed: () => controller.chat.toggleArchived(!controller.chat.isArchived!),
+                    ),
+                  ),
                 Text(
                   (cachedLatestMessage?.error ?? 0) > 0
                       ? "Error"
