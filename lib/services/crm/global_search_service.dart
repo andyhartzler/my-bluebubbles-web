@@ -76,7 +76,7 @@ class GlobalSearchResultItem {
   final Object payload;
 }
 
-DateTime? _tryParseDateTime(dynamic value) {
+DateTime? _tryParseDateTime(Object? value) {
   if (value == null) return null;
   if (value is DateTime) {
     return value.toLocal();
@@ -334,8 +334,8 @@ class GlobalSearchService {
                 path: relativePath,
                 name: object.name,
                 sizeBytes: size is num ? size.toInt() : null,
-                createdAt: object.createdAt,
-                updatedAt: object.updatedAt,
+                createdAt: _tryParseDateTime(object.createdAt),
+                updatedAt: _tryParseDateTime(object.updatedAt),
               ),
             );
           }
