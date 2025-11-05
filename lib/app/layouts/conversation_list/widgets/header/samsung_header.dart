@@ -1,7 +1,6 @@
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/widgets/header/header_widgets.dart';
-import 'package:bluebubbles/app/layouts/conversation_list/pages/search/search_view.dart';
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/config/crm_config.dart';
@@ -139,16 +138,12 @@ class _SamsungHeaderState extends CustomState<SamsungHeader, void, ConversationL
                                 ),
                               if (!showArchived && !showUnknown)
                                 IconButton(
-                                  onPressed: () async {
-                                    ns.pushLeft(
-                                      context,
-                                      SearchView(),
-                                    );
-                                  },
+                                  onPressed: () => goToSearch(context),
                                   icon: Icon(
                                     Icons.search,
                                     color: context.theme.colorScheme.properOnSurface,
-                                  )),
+                                  ),
+                                ),
                               if (!showArchived && !showUnknown)
                                 const Padding(
                                   padding: EdgeInsets.only(right: 8.0),

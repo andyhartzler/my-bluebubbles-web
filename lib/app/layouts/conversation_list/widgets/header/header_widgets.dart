@@ -1,7 +1,7 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:bluebubbles/app/components/avatars/contact_avatar_widget.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
-import 'package:bluebubbles/app/layouts/conversation_list/pages/search/search_view.dart';
+import 'package:bluebubbles/app/layouts/conversation_list/pages/search/global_crm_search_dialog.dart';
 import 'package:bluebubbles/app/layouts/conversation_view/pages/conversation_view.dart';
 import 'package:bluebubbles/app/layouts/findmy/findmy_page.dart';
 import 'package:bluebubbles/app/layouts/settings/pages/profile/profile_panel.dart';
@@ -346,10 +346,12 @@ class CupertinoOverflowMenu extends StatelessWidget {
 
 
 Future<void> goToSearch(BuildContext context) async {
-  final current = ns.ratio(context);
-  eventDispatcher.emit("override-split", 0.3);
-  await ns.pushLeft(context, SearchView());
-  eventDispatcher.emit("override-split", current);
+  await Navigator.of(context).push(
+    ThemeSwitcher.buildPageRoute(
+      fullscreenDialog: true,
+      builder: (BuildContext context) => const GlobalCrmSearchDialog(),
+    ),
+  );
 }
 
 Future<void> goToCRM(BuildContext context) async {

@@ -1,7 +1,6 @@
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/widgets/header/header_widgets.dart';
-import 'package:bluebubbles/app/layouts/conversation_list/pages/search/search_view.dart';
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
@@ -107,17 +106,13 @@ class _MaterialHeaderState extends CustomState<MaterialHeader, void, Conversatio
                                           Padding(
                                             padding: const EdgeInsets.only(left: 2),
                                             child: IconButton(
-                                            onPressed: () async {
-                                              ns.pushLeft(
-                                                context,
-                                                SearchView(),
-                                              );
-                                            },
-                                            icon: Icon(
-                                              Icons.search_rounded,
-                                              color: context.theme.colorScheme.properOnSurface,
+                                              onPressed: () => goToSearch(context),
+                                              icon: Icon(
+                                                Icons.search_rounded,
+                                                color: context.theme.colorScheme.properOnSurface,
+                                              ),
                                             ),
-                                          )),
+                                          ),
                                           const OverflowMenu(),
                                         ],
                                       ),
