@@ -16,6 +16,7 @@ import 'package:bluebubbles/app/layouts/startup/failure_to_start.dart';
 import 'package:bluebubbles/app/layouts/setup/setup_view.dart';
 import 'package:bluebubbles/app/layouts/startup/splash_screen.dart';
 import 'package:bluebubbles/app/layouts/startup/myd_loading_screen.dart';
+import 'package:bluebubbles/app/layouts/startup/password_screen.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
@@ -297,7 +298,7 @@ class Main extends StatelessWidget {
           // Prevent scrolling with multiple fingers accelerating the scrolling
           multitouchDragStrategy: MultitouchDragStrategy.latestPointer,
         ),
-        home: Home(),
+        home: PasswordScreen(child: Home()),
         shortcuts: {
           LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.comma): const OpenSettingsIntent(),
           LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyN): const OpenNewChatCreatorIntent(),
