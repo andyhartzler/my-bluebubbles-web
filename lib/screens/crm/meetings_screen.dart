@@ -21,6 +21,7 @@ import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.da
 import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
+import 'package:bluebubbles/services/crm/storage_uri_resolver.dart';
 
 class MeetingsScreen extends StatefulWidget {
   final String? initialMeetingId;
@@ -925,17 +926,40 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       ..add(_buildNonMemberPreview(meeting, isCompact: isCompact));
 
     return Card(
-      key: ValueKey(meeting.id),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isMobile ? 28 : 32)),
-      child: Padding(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: isMobile ? 48 : 64),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: children,
-          ),
+      elevation: 5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+          children: [
+            _buildHeroCard(meeting),
+            const SizedBox(height: 20),
+            _buildMeetingStats(meeting),
+            const SizedBox(height: 20),
+            if (meeting.resolvedRecordingEmbedUrl != null || meeting.recordingUrl != null) ...[
+              _buildVideoEmbed(meeting),
+              const SizedBox(height: 20),
+            ],
+            if (meeting.transcriptFilePath != null && meeting.transcriptFilePath!.isNotEmpty) ...[
+              _buildLinkTile(
+                icon: Icons.description_outlined,
+                label: 'Transcript',
+                value: meeting.transcriptFilePath!,
+                onTap: () {
+                  _handleTranscriptTap(meeting.transcriptFilePath!);
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+            ..._intersperseSections(narrativeSections),
+            if (narrativeSections.isNotEmpty) const SizedBox(height: 20),
+            _buildParticipantsPreview(meeting),
+            if (meeting.nonMemberAttendees.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              _buildNonMemberPreview(meeting),
+            ],
+          ],
         ),
       ),
     );
@@ -1720,8 +1744,51 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
     );
   }
 
-  void _launchUrl(Uri uri) {
-    launchUrl(uri, mode: LaunchMode.externalApplication);
+  Future<void> _handleTranscriptTap(String rawPath) async {
+    final resolved = await _resolveStorageUri(rawPath);
+    if (!mounted) return;
+
+    if (resolved == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open transcript link.')),
+      );
+      return;
+    }
+
+    await _launchUrl(resolved);
+  }
+
+  Future<Uri?> _resolveStorageUri(String path) {
+    return CRMStorageUriResolver.resolve(path);
+  }
+
+  Future<void> _launchUrl(Uri? uri) async {
+    if (!mounted) return;
+
+    if (uri == null || uri.scheme.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid link.')),
+      );
+      return;
+    }
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.platformDefault,
+        webOnlyWindowName: kIsWeb ? '_blank' : null,
+      );
+
+      if (!launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open ${uri.toString()}')),
+        );
+      }
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to launch link: $error')),
+      );
+    }
   }
 }
 
