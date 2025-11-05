@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PasswordScreen extends StatefulWidget {
   final Widget child;
@@ -16,18 +17,34 @@ class _PasswordScreenState extends State<PasswordScreen> {
   bool _isAuthenticated = false;
   bool _isPasswordVisible = false;
   String? _errorMessage;
+  bool _isLoading = true;
 
   static const String _correctPassword = 'fucktrump67';
+  static const String _authKey = 'app_authenticated';
 
   @override
   void initState() {
     super.initState();
-    // Auto-focus the password field after a short delay
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        _passwordFocusNode.requestFocus();
-      }
+    _checkSavedAuth();
+  }
+
+  Future<void> _checkSavedAuth() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isAuthenticated = prefs.getBool(_authKey) ?? false;
+
+    setState(() {
+      _isAuthenticated = isAuthenticated;
+      _isLoading = false;
     });
+
+    // Auto-focus the password field after a short delay if not authenticated
+    if (!isAuthenticated) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          _passwordFocusNode.requestFocus();
+        }
+      });
+    }
   }
 
   @override
@@ -37,9 +54,13 @@ class _PasswordScreenState extends State<PasswordScreen> {
     super.dispose();
   }
 
-  void _checkPassword() {
+  Future<void> _checkPassword() async {
     final enteredPassword = _passwordController.text;
     if (enteredPassword == _correctPassword) {
+      // Save authentication state
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_authKey, true);
+
       setState(() {
         _isAuthenticated = true;
         _errorMessage = null;
@@ -58,6 +79,29 @@ class _PasswordScreenState extends State<PasswordScreen> {
     // If authenticated, show the actual app
     if (_isAuthenticated) {
       return widget.child;
+    }
+
+    // Show loading indicator while checking saved auth
+    if (_isLoading) {
+      return Scaffold(
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF273351),
+                const Color(0xFF32A6DE),
+              ],
+            ),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+        ),
+      );
     }
 
     // Show password screen
@@ -87,41 +131,6 @@ class _PasswordScreenState extends State<PasswordScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Logo / Title
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.lock_outlined,
-                              size: 64,
-                              color: const Color(0xFF273351),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Missouri Young Democrats',
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF273351),
-                                  ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'CRM System',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: const Color(0xFF32A6DE),
-                                  ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
                       // Password field
                       Card(
                         elevation: 8,
