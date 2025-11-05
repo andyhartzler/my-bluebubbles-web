@@ -1017,7 +1017,9 @@ class TextFieldComponentState extends State<TextFieldComponent> {
                   minLines: 1,
                   autofocus: (kIsWeb || kIsDesktop) && !isChatCreator,
                   enableIMEPersonalizedLearning: !ss.settings.incognitoKeyboard.value,
-                  textInputAction: ss.settings.sendWithReturn.value && !kIsWeb && !kIsDesktop ? TextInputAction.send : TextInputAction.newline,
+                  textInputAction: isChatCreator
+                      ? TextInputAction.none
+                      : (ss.settings.sendWithReturn.value && !kIsWeb && !kIsDesktop ? TextInputAction.send : TextInputAction.newline),
                   cursorColor: context.theme.colorScheme.primary,
                   cursorHeight: context.theme.extension<BubbleText>()!.bubbleText.fontSize! * 1.25,
                   decoration: InputDecoration(
