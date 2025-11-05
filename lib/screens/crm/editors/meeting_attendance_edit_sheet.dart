@@ -70,68 +70,67 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
   @override
   Widget build(BuildContext context) {
     final memberName = widget.attendance.member?.name;
-    return SafeArea(
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  const Icon(Icons.person_search),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Edit Attendance',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.max,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                const Icon(Icons.person_search),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Edit Attendance',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                  )
-                ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                )
+              ],
+            ),
+          ),
+          if (memberName != null && memberName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Linked Member: $memberName',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.green[700])),
               ),
             ),
-            if (memberName != null && memberName.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Linked Member: $memberName',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.green[700])),
-                ),
-              ),
-            const Divider(height: 1),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                child: Column(
-                  children: _fieldTypes.entries
-                      .map((entry) => Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: _buildField(entry.key, entry.value),
-                          ))
-                      .toList(),
-                ),
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              child: Column(
+                children: _fieldTypes.entries
+                    .map((entry) => Padding(
+                          padding: const EdgeInsets.only(bottom: 16.0),
+                          child: _buildField(entry.key, entry.value),
+                        ))
+                    .toList(),
               ),
             ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: _saving ? null : _submit,
-                    icon: _saving
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: _saving ? null : _submit,
+                  icon: _saving
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.save),
                     label: Text(_saving ? 'Saving...' : 'Save Changes'),

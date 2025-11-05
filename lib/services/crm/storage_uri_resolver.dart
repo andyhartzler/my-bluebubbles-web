@@ -99,9 +99,26 @@ class CRMStorageUriResolver {
       return baseUri.resolve(fallbackPath);
     }
 
+    // Handle relative paths - check if they look like storage paths
     final relativePath = trimmed.startsWith('/')
         ? trimmed.substring(1)
         : trimmed;
+
+    // If the path starts with a bucket-like pattern (e.g., "transcripts/", "documents/"),
+    // assume it's from the "meetings" bucket and construct the full storage URL
+    if (relativePath.startsWith('transcripts/') ||
+        relativePath.startsWith('recordings/') ||
+        relativePath.startsWith('documents/')) {
+      final storagePath = 'storage/v1/object/public/meetings/$relativePath';
+      return baseUri.resolve(storagePath);
+    }
+
+    // If it already starts with storage/v1/object, use as-is
+    if (relativePath.startsWith('storage/v1/object/')) {
+      return baseUri.resolve(relativePath);
+    }
+
+    // Otherwise, try to resolve as a regular relative path
     return baseUri.resolve(relativePath);
   }
 }
