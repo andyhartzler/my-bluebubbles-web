@@ -131,15 +131,14 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
                 ElevatedButton.icon(
                   onPressed: _saving ? null : _submit,
                   icon: _saving
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.save),
-                    label: Text(_saving ? 'Saving...' : 'Save Changes'),
-                  ),
-                ],
-              ),
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.save),
+                  label: Text(_saving ? 'Saving...' : 'Save Changes'),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
