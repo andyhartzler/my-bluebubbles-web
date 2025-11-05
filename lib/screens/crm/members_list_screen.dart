@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/chapter.dart';
@@ -14,8 +15,10 @@ import 'member_detail_screen.dart';
 /// Screen showing all CRM members with search and filters
 class MembersListScreen extends StatefulWidget {
   final bool embed;
+  final bool showChaptersOnly;
 
-  const MembersListScreen({Key? key, this.embed = false}) : super(key: key);
+  const MembersListScreen({Key? key, this.embed = false, this.showChaptersOnly = false})
+      : super(key: key);
 
   @override
   State<MembersListScreen> createState() => _MembersListScreenState();
@@ -34,7 +37,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   bool _loading = true;
   bool _crmReady = false;
   String _searchQuery = '';
-  int _activeView = 0; // 0 = members, 1 = chapters
+  late int _activeView; // 0 = members, 1 = chapters
 
   // Filter state
   String? _selectedCounty;
@@ -75,6 +78,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   void initState() {
     super.initState();
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
+    _activeView = widget.showChaptersOnly ? 1 : 0;
     _loadData();
   }
 
@@ -442,7 +446,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: _buildSearchField(),
         ),
-        _buildViewToggle(),
+        if (!widget.showChaptersOnly) _buildViewToggle(),
         if (_activeView == 0) _buildFilterRow(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -462,9 +466,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   Widget _buildSearchField() {
+    final hint = widget.showChaptersOnly
+        ? 'Search chapters by name, contact, or status...'
+        : 'Search by name, contact, chapter, or committee...';
     return TextField(
       decoration: InputDecoration(
-        hintText: 'Search by name, contact, chapter, or committee...',
+        hintText: hint,
         prefixIcon: const Icon(Icons.search),
         suffixIcon: _searchQuery.isNotEmpty
             ? IconButton(
@@ -481,6 +488,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   Widget _buildFilterRow() {
+    if (widget.showChaptersOnly) return const SizedBox.shrink();
     final hasFilters = _selectedCounty != null ||
         _selectedDistrict != null ||
         _selectedChapter != null ||
@@ -586,6 +594,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   Widget _buildViewToggle() {
+    if (widget.showChaptersOnly) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SegmentedButton<int>(
@@ -781,20 +790,30 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   Widget _buildChapterInfoRow(ThemeData theme, IconData icon, String value) {
+    final uri = _parseChapterUri(value);
+    final textStyle = theme.textTheme.bodyMedium?.copyWith(
+      decoration: uri != null ? TextDecoration.underline : null,
+      color: uri != null ? theme.colorScheme.primary : null,
+    );
+
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value,
-              style: theme.textTheme.bodyMedium,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: uri != null ? () => launchUrl(uri, mode: LaunchMode.externalApplication) : null,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                value,
+                style: textStyle,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -817,6 +836,16 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
+
+  Uri? _parseChapterUri(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.contains('@') && !trimmed.contains(' ')) {
+      return Uri(scheme: 'mailto', path: trimmed);
+    }
+    final normalized = trimmed.startsWith('http') ? trimmed : 'https://$trimmed';
+    return Uri.tryParse(normalized);
+  }
 
   Widget _buildFilterChip({
     required String label,

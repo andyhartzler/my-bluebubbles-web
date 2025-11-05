@@ -438,7 +438,7 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
-enum _HomeSection { dashboard, members, meetings, conversations }
+enum _HomeSection { dashboard, members, chapters, meetings, conversations }
 
 class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayListener {
   bool serverCompatible = true;
@@ -683,6 +683,11 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   children: [
                     const DashboardScreen(key: PageStorageKey('dashboard-view')),
                     const MembersListScreen(key: PageStorageKey('members-view'), embed: true),
+                    const MembersListScreen(
+                      key: PageStorageKey('chapters-view'),
+                      embed: true,
+                      showChaptersOnly: true,
+                    ),
                     const MeetingsScreen(key: PageStorageKey('meetings-view')),
                     ConversationList(
                       key: const PageStorageKey('conversations-view'),
@@ -704,6 +709,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     final navButtons = [
       _buildNavButton(context, _HomeSection.dashboard, 'Dashboard', Icons.dashboard_outlined),
       _buildNavButton(context, _HomeSection.members, 'Members', Icons.groups_outlined, enabled: crmReady),
+      _buildNavButton(context, _HomeSection.chapters, 'Chapters', Icons.account_tree_outlined, enabled: crmReady),
       _buildNavButton(context, _HomeSection.meetings, 'Meetings', Icons.video_camera_front_outlined, enabled: crmReady),
       _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline),
     ];
@@ -781,27 +787,47 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
 
   Widget _buildBranding(ThemeData theme) {
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(18),
       onTap: () => _setSection(_HomeSection.dashboard),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Missouri Young Democrats',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Communications Hub',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
-              ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.shadow.withOpacity(0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 12),
             ),
           ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: SizedBox(
+            height: 68,
+            width: 260,
+            child: Stack(
+              children: [
+                Positioned.fill(child: Container(color: Colors.white)),
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/Blue-Gradient-Background.png',
+                    fit: BoxFit.cover,
+                    color: Colors.white.withOpacity(0.55),
+                    colorBlendMode: BlendMode.srcATop,
+                  ),
+                ),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Image.asset(
+                      'assets/images/text-logo-1320x440.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
