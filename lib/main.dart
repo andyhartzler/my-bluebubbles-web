@@ -445,6 +445,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   bool serverCompatible = true;
   bool fullyLoaded = false;
   _HomeSection _currentSection = _HomeSection.dashboard;
+  final FocusNode _mobileMenuButtonFocusNode = FocusNode(debugLabel: 'mobileMenuButton');
   final PageStorageBucket _bucket = PageStorageBucket();
 
   @override
@@ -590,6 +591,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     if (Platform.isLinux) {
       trayManager.removeListener(this);
     }
+    _mobileMenuButtonFocusNode.dispose();
     super.dispose();
   }
 
@@ -707,6 +709,12 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
 
   Widget _buildTopBar(BuildContext context, bool crmReady) {
     final theme = Theme.of(context);
+    final bool isMobileWidth = MediaQuery.of(context).size.width < 600;
+
+    if (isMobileWidth) {
+      return _buildMobileTopBar(context, theme, crmReady);
+    }
+
     final navButtons = [
       _buildNavButton(context, _HomeSection.dashboard, 'Dashboard', Icons.dashboard_outlined),
       _buildNavButton(context, _HomeSection.members, 'Members', Icons.groups_outlined, enabled: crmReady),
@@ -734,10 +742,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     );
 
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 24,
-        vertical: MediaQuery.of(context).size.width < 600 ? 8 : 18,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         boxShadow: [
@@ -787,6 +792,197 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           );
         },
       ),
+    );
+  }
+
+  Widget _buildMobileTopBar(BuildContext context, ThemeData theme, bool crmReady) {
+    return Material(
+      elevation: 4,
+      color: theme.colorScheme.surface,
+      child: SafeArea(
+        bottom: false,
+        child: FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: SizedBox(
+            height: kToolbarHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  FocusTraversalOrder(
+                    order: const NumericFocusOrder(0),
+                    child: Semantics(
+                      label: 'Open navigation menu',
+                      button: true,
+                      focusable: true,
+                      child: FocusableActionDetector(
+                        focusNode: _mobileMenuButtonFocusNode,
+                        shortcuts: const <LogicalKeySet, Intent>{
+                          LogicalKeySet(LogicalKeyboardKey.enter): ActivateIntent(),
+                          LogicalKeySet(LogicalKeyboardKey.space): ActivateIntent(),
+                        },
+                        actions: <Type, Action<Intent>>{
+                          ActivateIntent: CallbackAction<ActivateIntent>(
+                            onInvoke: (intent) {
+                              _showMobileMenu(context, crmReady);
+                              return null;
+                            },
+                          ),
+                        },
+                        child: IconButton(
+                          icon: const Icon(Icons.menu),
+                          tooltip: 'Open navigation menu',
+                          onPressed: () => _showMobileMenu(context, crmReady),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FocusTraversalOrder(
+                      order: const NumericFocusOrder(1),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: _buildBranding(theme, mobile: true),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showMobileMenu(BuildContext context, bool crmReady) async {
+    final BuildContext parentContext = context;
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      builder: (sheetContext) {
+        Widget buildItem({
+          required double order,
+          required IconData icon,
+          required String label,
+          String? subtitle,
+          bool enabled = true,
+          VoidCallback? onActivate,
+        }) {
+          void handleActivate() {
+            Navigator.of(sheetContext).pop();
+            if (onActivate != null) {
+              Future.microtask(onActivate);
+            }
+          }
+
+          return FocusTraversalOrder(
+            order: NumericFocusOrder(order),
+            child: FocusableActionDetector(
+              enabled: enabled,
+              shortcuts: const <LogicalKeySet, Intent>{
+                LogicalKeySet(LogicalKeyboardKey.enter): ActivateIntent(),
+                LogicalKeySet(LogicalKeyboardKey.space): ActivateIntent(),
+              },
+              actions: <Type, Action<Intent>>{
+                ActivateIntent: CallbackAction<ActivateIntent>(
+                  onInvoke: (intent) {
+                    if (enabled) {
+                      handleActivate();
+                    }
+                    return null;
+                  },
+                ),
+              },
+              child: Semantics(
+                button: true,
+                enabled: enabled,
+                label: label,
+                child: ListTile(
+                  leading: Icon(icon),
+                  title: Text(label),
+                  subtitle: subtitle != null ? Text(subtitle) : null,
+                  enabled: enabled,
+                  onTap: enabled && onActivate != null ? handleActivate : null,
+                ),
+              ),
+            ),
+          );
+        }
+
+        final disabledMessage = crmReady ? null : 'Available when CRM is connected';
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: FocusTraversalGroup(
+              policy: OrderedTraversalPolicy(),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(
+                      'Menu',
+                      style: Theme.of(parentContext).textTheme.titleMedium,
+                    ),
+                  ),
+                  buildItem(
+                    order: 0,
+                    icon: Icons.dashboard_outlined,
+                    label: 'Dashboard',
+                    onActivate: () => _setSection(_HomeSection.dashboard),
+                  ),
+                  buildItem(
+                    order: 1,
+                    icon: Icons.groups_outlined,
+                    label: 'Members',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady ? () => _setSection(_HomeSection.members) : null,
+                  ),
+                  buildItem(
+                    order: 2,
+                    icon: Icons.account_tree_outlined,
+                    label: 'Chapters',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady ? () => _setSection(_HomeSection.chapters) : null,
+                  ),
+                  buildItem(
+                    order: 3,
+                    icon: Icons.video_camera_front_outlined,
+                    label: 'Meetings',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady ? () => _setSection(_HomeSection.meetings) : null,
+                  ),
+                  buildItem(
+                    order: 4,
+                    icon: Icons.chat_bubble_outline,
+                    label: 'Conversations',
+                    onActivate: () => _setSection(_HomeSection.conversations),
+                  ),
+                  const Divider(),
+                  buildItem(
+                    order: 5,
+                    icon: Icons.add_comment,
+                    label: 'New Message',
+                    onActivate: () => _openNewMessage(parentContext),
+                  ),
+                  buildItem(
+                    order: 6,
+                    icon: Icons.settings_outlined,
+                    label: 'Settings',
+                    onActivate: () => Actions.invoke(parentContext, const OpenSettingsIntent()),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
