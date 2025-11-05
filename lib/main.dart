@@ -796,6 +796,11 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   }
 
   Widget _buildMobileTopBar(BuildContext context, ThemeData theme, bool crmReady) {
+    final shortcuts = <ShortcutActivator, Intent>{
+      LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
+      LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
+    };
+
     return Material(
       elevation: 4,
       color: theme.colorScheme.surface,
@@ -817,10 +822,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                       focusable: true,
                       child: FocusableActionDetector(
                         focusNode: _mobileMenuButtonFocusNode,
-                        shortcuts: const <LogicalKeySet, Intent>{
-                          const LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
-                          const LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
-                        },
+                        shortcuts: shortcuts,
                         actions: <Type, Action<Intent>>{
                           ActivateIntent: CallbackAction<ActivateIntent>(
                             onInvoke: (intent) {
@@ -881,9 +883,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             order: NumericFocusOrder(order),
             child: FocusableActionDetector(
               enabled: enabled,
-              shortcuts: const <LogicalKeySet, Intent>{
-                const LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
-                const LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
+              shortcuts: <ShortcutActivator, Intent>{
+                LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
+                LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
               },
               actions: <Type, Action<Intent>>{
                 ActivateIntent: CallbackAction<ActivateIntent>(
