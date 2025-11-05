@@ -294,6 +294,8 @@ flutter:
     - assets/images/transparent.png
     - assets/images/no-video-preview.png
     - assets/images/unplayable-video.png
+    - assets/images/Blue-Gradient-Background.png
+    - assets/images/text-logo-1320x440.png
     - assets/icon/icon.png
     - assets/icon/contact-photo.png
     - assets/changelog/changelog.md

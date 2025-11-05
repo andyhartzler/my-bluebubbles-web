@@ -438,7 +438,7 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
-enum _HomeSection { dashboard, members, meetings, conversations }
+enum _HomeSection { dashboard, members, chapters, meetings, conversations }
 
 class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayListener {
   bool serverCompatible = true;
@@ -683,6 +683,11 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   children: [
                     const DashboardScreen(key: PageStorageKey('dashboard-view')),
                     const MembersListScreen(key: PageStorageKey('members-view'), embed: true),
+                    const MembersListScreen(
+                      key: PageStorageKey('chapters-view'),
+                      embed: true,
+                      showChaptersOnly: true,
+                    ),
                     const MeetingsScreen(key: PageStorageKey('meetings-view')),
                     ConversationList(
                       key: const PageStorageKey('conversations-view'),
@@ -704,6 +709,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     final navButtons = [
       _buildNavButton(context, _HomeSection.dashboard, 'Dashboard', Icons.dashboard_outlined),
       _buildNavButton(context, _HomeSection.members, 'Members', Icons.groups_outlined, enabled: crmReady),
+      _buildNavButton(context, _HomeSection.chapters, 'Chapters', Icons.account_tree_outlined, enabled: crmReady),
       _buildNavButton(context, _HomeSection.meetings, 'Meetings', Icons.video_camera_front_outlined, enabled: crmReady),
       _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline),
     ];
@@ -780,29 +786,36 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   }
 
   Widget _buildBranding(ThemeData theme) {
+    final labelStyle = theme.textTheme.labelLarge?.copyWith(
+      color: theme.colorScheme.onSurface.withOpacity(0.7),
+      letterSpacing: 0.3,
+      fontWeight: FontWeight.w600,
+    );
+
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () => _setSection(_HomeSection.dashboard),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Missouri Young Democrats',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 60,
+            width: 220,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Image.asset(
+                'assets/images/text-logo-1320x440.png',
+                fit: BoxFit.contain,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Communications Hub',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text('Communications Hub', style: labelStyle),
+          ),
+        ],
       ),
     );
   }
