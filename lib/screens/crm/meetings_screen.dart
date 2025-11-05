@@ -45,7 +45,12 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   bool _loading = true;
   String? _error;
 
-  static final Set<String> _registeredViewTypes = <String>{};
+  static const String _recordingViewType = 'meetings-recording-view';
+  static bool _recordingViewRegistered = false;
+  static final Map<int, html.IFrameElement> _recordingIframes =
+      <int, html.IFrameElement>{};
+
+  bool get _crmReady => _memberLookup.isReady;
 
   bool get _crmReady => _memberLookup.isReady;
 
@@ -109,6 +114,26 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
         _loading = false;
       });
     }
+  }
+
+  void _ensureRecordingViewRegistered() {
+    if (_recordingViewRegistered) return;
+
+    // ignore: undefined_prefixed_name
+    ui.platformViewRegistry.registerViewFactory(
+      _recordingViewType,
+      (int viewId) {
+        final element = html.IFrameElement()
+          ..style.border = '0'
+          ..allowFullscreen = true
+          ..allow =
+              'autoplay; encrypted-media; picture-in-picture; fullscreen';
+        _recordingIframes[viewId] = element;
+        return element;
+      },
+    );
+
+    _recordingViewRegistered = true;
   }
 
   Future<void> _editMeeting(Meeting meeting) async {
@@ -978,19 +1003,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       );
     }
 
-    final viewType = 'meeting-embed-${meeting.id}';
-    if (!_registeredViewTypes.contains(viewType)) {
-      // ignore: undefined_prefixed_name
-      ui.platformViewRegistry.registerViewFactory(viewType, (int viewId) {
-        final element = html.IFrameElement()
-          ..src = resolvedUrl
-          ..style.border = '0'
-          ..allowFullscreen = true
-          ..allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
-        return element;
-      });
-      _registeredViewTypes.add(viewType);
-    }
+    _ensureRecordingViewRegistered();
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -1004,7 +1017,16 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
           ),
           const SizedBox(
             height: 360,
-            child: HtmlElementView(viewType: viewType),
+            child: HtmlElementView(
+              viewType: _recordingViewType,
+              key: ValueKey('recording-${meeting.id}-${uri.toString()}'),
+              onPlatformViewCreated: (int viewId) {
+                final element = _recordingIframes[viewId];
+                if (element != null) {
+                  element.src = uri.toString();
+                }
+              },
+            ),
           ),
         ],
       ),
@@ -1154,47 +1176,4 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   void _launchUrl(Uri uri) {
     launchUrl(uri, mode: LaunchMode.externalApplication);
   }
-}
-
-String? _resolveEmbedUrl(String? embedUrl, String? fallbackUrl) {
-  final primary = embedUrl?.trim();
-  final fallback = fallbackUrl?.trim();
-  final candidate = (primary != null && primary.isNotEmpty) ? primary : fallback;
-  if (candidate == null || candidate.isEmpty) {
-    return null;
-  }
-
-  final uri = Uri.tryParse(candidate);
-  if (uri == null) {
-    return null;
-  }
-
-  if (uri.host.contains('drive.google.com')) {
-    final id = _extractDriveId(uri);
-    if (id != null) {
-      return 'https://drive.google.com/file/d/$id/preview';
-    }
-  }
-
-  return uri.toString();
-}
-
-String? _extractDriveId(Uri uri) {
-  final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
-  if (segments.length >= 3 && segments.first == 'file') {
-    final dIndex = segments.indexOf('d');
-    if (dIndex != -1 && segments.length > dIndex + 1) {
-      final id = segments[dIndex + 1];
-      if (id.isNotEmpty) {
-        return id;
-      }
-    }
-  }
-
-  final queryId = uri.queryParameters['id'] ?? uri.queryParameters['fileId'];
-  if (queryId != null && queryId.isNotEmpty) {
-    return queryId;
-  }
-
-  return null;
 }
