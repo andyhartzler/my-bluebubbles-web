@@ -361,38 +361,48 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
       }
     }
     final children = [
-      GestureDetector(
-        onTap: _openConversationDetails,
-        child: ContactAvatarGroupWidget(
-          chat: controller.chat,
-          size: 54,
+      MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: _openConversationDetails,
+          child: ContactAvatarGroupWidget(
+            chat: controller.chat,
+            size: 54,
+          ),
         ),
       ),
       const SizedBox(height: 5, width: 5),
-      Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center, children: [
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: ns.width(context) / 2.5,
-          ),
-          child: RichText(
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: context.theme.textTheme.bodyMedium,
-              children: MessageHelper.buildEmojiText(
-                _title,
-                context.theme.textTheme.bodyMedium!,
+      MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _openConversationDetails,
+          child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center, children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: ns.width(context) / 2.5,
+              ),
+              child: RichText(
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  style: context.theme.textTheme.bodyMedium,
+                  children: MessageHelper.buildEmojiText(
+                    _title,
+                    context.theme.textTheme.bodyMedium!,
+                  ),
+                ),
               ),
             ),
-          ),
+            Icon(
+              CupertinoIcons.chevron_right,
+              size: context.theme.textTheme.bodyMedium!.fontSize!,
+              color: context.theme.colorScheme.outline,
+            ),
+          ]),
         ),
-        Icon(
-          CupertinoIcons.chevron_right,
-          size: context.theme.textTheme.bodyMedium!.fontSize!,
-          color: context.theme.colorScheme.outline,
-        ),
-      ]),
+      ),
     ];
 
     if (context.orientation == Orientation.landscape && Platform.isAndroid) {
