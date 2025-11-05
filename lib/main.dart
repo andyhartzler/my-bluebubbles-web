@@ -818,8 +818,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                       child: FocusableActionDetector(
                         focusNode: _mobileMenuButtonFocusNode,
                         shortcuts: const <LogicalKeySet, Intent>{
-                          LogicalKeySet(LogicalKeyboardKey.enter): ActivateIntent(),
-                          LogicalKeySet(LogicalKeyboardKey.space): ActivateIntent(),
+                          const LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
+                          const LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
                         },
                         actions: <Type, Action<Intent>>{
                           ActivateIntent: CallbackAction<ActivateIntent>(
@@ -882,8 +882,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             child: FocusableActionDetector(
               enabled: enabled,
               shortcuts: const <LogicalKeySet, Intent>{
-                LogicalKeySet(LogicalKeyboardKey.enter): ActivateIntent(),
-                LogicalKeySet(LogicalKeyboardKey.space): ActivateIntent(),
+                const LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
+                const LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
               },
               actions: <Type, Action<Intent>>{
                 ActivateIntent: CallbackAction<ActivateIntent>(
