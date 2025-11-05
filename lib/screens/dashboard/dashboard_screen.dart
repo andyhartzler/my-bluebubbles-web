@@ -947,37 +947,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
     /// - Provide a direct action for staff to jump into the full members list.
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 480;
-        final containerPadding = EdgeInsets.all(isCompact ? 20 : 24);
-        final titleStyle = (isCompact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
+        final maxWidth = constraints.maxWidth;
+        final isNarrow = maxWidth < 600;
+        final isTablet = maxWidth >= 600 && maxWidth < 1024;
+        final EdgeInsetsGeometry containerPadding = isNarrow
+            ? const EdgeInsets.symmetric(horizontal: 16, vertical: 20)
+            : const EdgeInsets.all(24);
+        final TextStyle? titleStyle = (isNarrow ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
             ?.copyWith(fontWeight: FontWeight.w700);
-        final tiles = members.map((member) => _RecentMemberTile(member: member)).toList();
+        final verticalSpacing = isNarrow ? 12.0 : 16.0;
 
         Widget buildContent() {
-          if (tiles.isEmpty) {
+          if (members.isEmpty) {
             return Text(
               'No recent members yet. New sign-ups will appear here automatically.',
               style: theme.textTheme.bodyMedium,
-              textAlign: isCompact ? TextAlign.start : TextAlign.center,
+              textAlign: isNarrow ? TextAlign.start : TextAlign.center,
             );
           }
 
-          if (isCompact) {
-            // Show 2 members at a time on mobile with reduced height
+          if (isNarrow) {
             return SizedBox(
-              height: 110,
-              child: PageView.builder(
-                controller: PageController(viewportFraction: 0.48),
-                itemCount: tiles.length,
-                itemBuilder: (context, index) => Padding(
-                  padding: EdgeInsets.only(right: index == tiles.length - 1 ? 0 : 8),
-                  child: tiles[index],
+              height: 124,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: members.length,
+                padding: EdgeInsets.zero,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) => SizedBox(
+                  width: 180,
+                  child: _RecentMemberTile(
+                    member: members[index],
+                    variant: _RecentMemberTileVariant.compact,
+                    margin: EdgeInsets.zero,
+                    showDetails: false,
+                    showTimestamp: true,
+                  ),
                 ),
               ),
             );
           }
 
-          return Column(children: tiles);
+          if (isTablet) {
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: members.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 3.2,
+              ),
+              itemBuilder: (context, index) => _RecentMemberTile(
+                member: members[index],
+                variant: _RecentMemberTileVariant.medium,
+                margin: EdgeInsets.zero,
+                showTimestamp: true,
+              ),
+            );
+          }
+
+          return Column(
+            children: members
+                .map(
+                  (member) => _RecentMemberTile(
+                    member: member,
+                    variant: _RecentMemberTileVariant.regular,
+                  ),
+                )
+                .toList(),
+          );
         }
 
         return Container(
@@ -997,9 +1037,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Newest Members', style: titleStyle),
-              const SizedBox(height: 16),
+              SizedBox(height: verticalSpacing),
               buildContent(),
-              const SizedBox(height: 16),
+              SizedBox(height: verticalSpacing),
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
@@ -1441,23 +1481,93 @@ class _HeaderPill extends StatelessWidget {
   }
 }
 
+enum _RecentMemberTileVariant { compact, medium, regular }
+
 class _RecentMemberTile extends StatelessWidget {
   final Member member;
+  final _RecentMemberTileVariant variant;
+  final EdgeInsetsGeometry? margin;
+  final bool showDetails;
+  final bool showTimestamp;
 
-  const _RecentMemberTile({required this.member});
+  const _RecentMemberTile({
+    required this.member,
+    this.variant = _RecentMemberTileVariant.regular,
+    this.margin,
+    this.showDetails = true,
+    this.showTimestamp = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isCompact = MediaQuery.of(context).size.width < 480;
     final details = [
       if (member.county != null && member.county!.isNotEmpty) member.county!,
       if (member.congressionalDistrict != null && member.congressionalDistrict!.isNotEmpty)
         Member.formatDistrictLabel(member.congressionalDistrict) ?? member.congressionalDistrict!,
     ];
 
+    late final BorderRadius borderRadius;
+    late final EdgeInsetsGeometry padding;
+    late final double avatarRadius;
+    late final double horizontalSpacing;
+    TextStyle? nameStyle;
+    TextStyle? avatarTextStyle;
+
+    switch (variant) {
+      case _RecentMemberTileVariant.compact:
+        borderRadius = BorderRadius.circular(12);
+        padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
+        avatarRadius = 16;
+        horizontalSpacing = 8;
+        nameStyle = theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
+        avatarTextStyle = theme.textTheme.titleSmall?.copyWith(
+          color: theme.colorScheme.onPrimaryContainer,
+          fontWeight: FontWeight.w600,
+        );
+        break;
+      case _RecentMemberTileVariant.medium:
+        borderRadius = BorderRadius.circular(14);
+        padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 14);
+        avatarRadius = 20;
+        horizontalSpacing = 12;
+        nameStyle = theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600);
+        avatarTextStyle = theme.textTheme.titleMedium?.copyWith(
+          color: theme.colorScheme.onPrimaryContainer,
+          fontWeight: FontWeight.w600,
+        );
+        break;
+      case _RecentMemberTileVariant.regular:
+        borderRadius = BorderRadius.circular(16);
+        padding = const EdgeInsets.all(16);
+        avatarRadius = 22;
+        horizontalSpacing = 16;
+        nameStyle = theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600);
+        avatarTextStyle = theme.textTheme.titleLarge?.copyWith(
+          color: theme.colorScheme.onPrimaryContainer,
+          fontWeight: FontWeight.w600,
+        );
+        break;
+    }
+
+    final EdgeInsetsGeometry effectiveMargin;
+    switch (variant) {
+      case _RecentMemberTileVariant.compact:
+        effectiveMargin = margin ?? EdgeInsets.zero;
+        break;
+      case _RecentMemberTileVariant.medium:
+        effectiveMargin = margin ?? const EdgeInsets.symmetric(vertical: 6);
+        break;
+      case _RecentMemberTileVariant.regular:
+        effectiveMargin = margin ?? const EdgeInsets.symmetric(vertical: 8);
+        break;
+    }
+
+    final bool shouldShowDetails = showDetails && details.isNotEmpty;
+    final bool shouldShowTimestamp = showTimestamp && member.createdAt != null;
+
     return InkWell(
-      borderRadius: BorderRadius.circular(isCompact ? 12 : 16),
+      borderRadius: borderRadius,
       onTap: () {
         Navigator.of(context).push(
           ThemeSwitcher.buildPageRoute(
@@ -1468,11 +1578,11 @@ class _RecentMemberTile extends StatelessWidget {
         );
       },
       child: Container(
-        margin: EdgeInsets.symmetric(vertical: isCompact ? 4 : 8),
-        padding: EdgeInsets.all(isCompact ? 10 : 16),
+        margin: effectiveMargin,
+        padding: padding,
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceVariant.withOpacity(0.45),
-          borderRadius: BorderRadius.circular(isCompact ? 12 : 16),
+          borderRadius: borderRadius,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1481,14 +1591,14 @@ class _RecentMemberTile extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  radius: isCompact ? 16 : 22,
+                  radius: avatarRadius,
                   backgroundColor: theme.colorScheme.primaryContainer,
                   child: Text(
                     member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-                    style: isCompact ? theme.textTheme.titleSmall : theme.textTheme.titleMedium,
+                    style: avatarTextStyle,
                   ),
                 ),
-                SizedBox(width: isCompact ? 8 : 16),
+                SizedBox(width: horizontalSpacing),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1496,12 +1606,11 @@ class _RecentMemberTile extends StatelessWidget {
                     children: [
                       Text(
                         member.name,
-                        style: (isCompact ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                        style: nameStyle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (details.isNotEmpty && !isCompact)
+                      if (shouldShowDetails)
                         Text(
                           details.join(' • '),
                           style: theme.textTheme.bodySmall,
@@ -1513,7 +1622,7 @@ class _RecentMemberTile extends StatelessWidget {
                 ),
               ],
             ),
-            if (member.createdAt != null && isCompact)
+            if (shouldShowTimestamp)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
