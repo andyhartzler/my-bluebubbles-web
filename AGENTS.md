@@ -12,7 +12,18 @@
 9. [Testing Strategy](#testing-strategy)
 10. [Deployment Checklist](#deployment-checklist)
 
----
+--- //NEW
+### 🎨 Missouri Young Democrats Brand Colors
+
+#### Primary Colors
+- **Unity Blue** — `#273351`
+- **Momentum Blue** — `#32A6DE`
+
+#### Secondary Colors
+- **Sunrise Gold** — `#FDB813`
+- **Action Red** — `#E63946`
+- **Justice Purple** — `#6A1B9A`
+- **Grassroots Green** — `#43A047`
 
 ## Overview
 
