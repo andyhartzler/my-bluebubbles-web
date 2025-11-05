@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /
+
+# Update this once a sitemap is available for indexing.
+Sitemap: https://example.com/sitemap.xml

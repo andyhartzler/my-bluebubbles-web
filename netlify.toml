@@ -18,3 +18,5 @@
   for = "/*"
   [headers.values]
     X-Frame-Options = "SAMEORIGIN"
+    # Update these credentials in your Netlify environment before deploying.
+    Basic-Auth = "admin:CHANGE_ME"
