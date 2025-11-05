@@ -1157,7 +1157,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
 class MeetingRecordingEmbed extends StatefulWidget {
   final Uri uri;
 
-  MeetingRecordingEmbed({
+  const MeetingRecordingEmbed({
     super.key,
     required this.uri,
   });
