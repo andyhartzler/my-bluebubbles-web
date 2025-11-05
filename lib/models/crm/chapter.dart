@@ -10,7 +10,13 @@ class Chapter {
   final DateTime? charterDate;
   final String? status;
   final String? website;
-  final Map<String, dynamic>? socialMedia;
+  final Map<String, dynamic>? socialMedia; // Deprecated: for backwards compatibility
+  final String? twitter;
+  final String? bluesky;
+  final String? facebook;
+  final String? instagram;
+  final String? threads;
+  final String? tiktok;
   final String? contactEmail;
   final DateTime? lastUpdated;
   final bool isChartered;
@@ -26,6 +32,12 @@ class Chapter {
     this.status,
     this.website,
     this.socialMedia,
+    this.twitter,
+    this.bluesky,
+    this.facebook,
+    this.instagram,
+    this.threads,
+    this.tiktok,
     this.contactEmail,
     this.lastUpdated,
     this.isChartered = false,
@@ -60,6 +72,12 @@ class Chapter {
       status: json['status'] as String?,
       website: json['website'] as String?,
       socialMedia: social,
+      twitter: json['twitter'] as String?,
+      bluesky: json['bluesky'] as String?,
+      facebook: json['facebook'] as String?,
+      instagram: json['instagram'] as String?,
+      threads: json['threads'] as String?,
+      tiktok: json['tiktok'] as String?,
       contactEmail: json['contact_email'] as String?,
       lastUpdated: json['last_updated'] != null
           ? DateTime.tryParse(json['last_updated'] as String)
@@ -79,7 +97,13 @@ class Chapter {
       'charter_date': charterDate?.toIso8601String().split('T').first,
       'status': status,
       'website': website,
-      'social_media': socialMedia,
+      'social_media': socialMedia, // Deprecated: for backwards compatibility
+      'twitter': twitter,
+      'bluesky': bluesky,
+      'facebook': facebook,
+      'instagram': instagram,
+      'threads': threads,
+      'tiktok': tiktok,
       'contact_email': contactEmail,
       'last_updated': lastUpdated?.toIso8601String(),
       'is_chartered': isChartered,
@@ -97,6 +121,12 @@ class Chapter {
     String? status,
     String? website,
     Map<String, dynamic>? socialMedia,
+    String? twitter,
+    String? bluesky,
+    String? facebook,
+    String? instagram,
+    String? threads,
+    String? tiktok,
     String? contactEmail,
     DateTime? lastUpdated,
     bool? isChartered,
@@ -112,6 +142,12 @@ class Chapter {
       status: status ?? this.status,
       website: website ?? this.website,
       socialMedia: socialMedia ?? this.socialMedia,
+      twitter: twitter ?? this.twitter,
+      bluesky: bluesky ?? this.bluesky,
+      facebook: facebook ?? this.facebook,
+      instagram: instagram ?? this.instagram,
+      threads: threads ?? this.threads,
+      tiktok: tiktok ?? this.tiktok,
       contactEmail: contactEmail ?? this.contactEmail,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       isChartered: isChartered ?? this.isChartered,
