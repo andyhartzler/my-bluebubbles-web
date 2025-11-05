@@ -786,12 +786,6 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   }
 
   Widget _buildBranding(ThemeData theme) {
-    final labelStyle = theme.textTheme.labelLarge?.copyWith(
-      color: theme.colorScheme.onSurface.withOpacity(0.7),
-      letterSpacing: 0.3,
-      fontWeight: FontWeight.w600,
-    );
-
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () => _setSection(_HomeSection.dashboard),
@@ -809,11 +803,6 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                 fit: BoxFit.contain,
               ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text('Communications Hub', style: labelStyle),
           ),
         ],
       ),
