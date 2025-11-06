@@ -1179,6 +1179,13 @@ class TextFieldComponentState extends State<TextFieldComponent> {
   }
 
   KeyEventResult handleKey(FocusNode _, KeyEvent ev, BuildContext context, bool isChatCreator) {
+    final isEnterWithoutShift = ev.logicalKey == LogicalKeyboardKey.enter && !HardwareKeyboard.instance.isShiftPressed;
+
+    if (isChatCreator && isEnterWithoutShift && ev is KeyUpEvent) {
+      _resetEnterSendGuard(force: true);
+      return KeyEventResult.handled;
+    }
+
     if (ev is! KeyDownEvent) return KeyEventResult.ignored;
 
     if ((kIsWeb || Platform.isWindows || Platform.isLinux) &&
@@ -1200,17 +1207,21 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     }
 
     if (isChatCreator) {
-      if (ev.logicalKey == LogicalKeyboardKey.enter && !HardwareKeyboard.instance.isShiftPressed) {
+      if (isEnterWithoutShift) {
         if (_enterSendInProgress) {
           return KeyEventResult.handled;
         }
 
         _enterSendInProgress = true;
         _enterSendResetTimer?.cancel();
-        _enterSendResetTimer = Timer(_enterSendGuardTimeout, _resetEnterSendGuard);
+        _enterSendResetTimer = Timer(_enterSendGuardTimeout, () => _resetEnterSendGuard(force: true));
 
         try {
-          sendMessage().whenComplete(_resetEnterSendGuard);
+          final sendFuture = sendMessage();
+          unawaited(sendFuture.catchError((error, stackTrace) {
+            _resetEnterSendGuard();
+            Error.throwWithStackTrace(error, stackTrace);
+          }));
         } catch (error, stackTrace) {
           _resetEnterSendGuard();
           Error.throwWithStackTrace(error, stackTrace);
@@ -1384,7 +1395,11 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     return KeyEventResult.ignored;
   }
 
-  void _resetEnterSendGuard() {
+  void _resetEnterSendGuard({bool force = false}) {
+    if (!force && HardwareKeyboard.instance.physicalKeysPressed.contains(PhysicalKeyboardKey.enter)) {
+      return;
+    }
+
     _enterSendResetTimer?.cancel();
     _enterSendResetTimer = null;
     _enterSendInProgress = false;
