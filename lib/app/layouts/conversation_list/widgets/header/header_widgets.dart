@@ -295,12 +295,6 @@ class CupertinoOverflowMenu extends StatelessWidget {
             icon: CupertinoIcons.location,
             onTap: () => goToFindMy(context),
           ),
-        if (extraItems)
-          PullDownMenuItem(
-            title: 'Search',
-            icon: CupertinoIcons.search,
-            onTap: () => goToSearch(context),
-          ),
         if (extraItems && ss.settings.moveChatCreatorToHeader.value)
           PullDownMenuItem(
             title: 'New Chat',
