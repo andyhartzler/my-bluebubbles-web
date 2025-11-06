@@ -592,6 +592,18 @@ class CRMMessageService {
     final photoLines = await _buildPhotoLines();
     if (photoLines != null) {
       lines.addAll(photoLines);
+
+      final hasEmbeddedPhoto =
+          photoLines.isNotEmpty && photoLines.first.startsWith('PHOTO;TYPE=PNG;VALUE=URI:');
+      Logger.debug(
+        'CRM contact card photo line added (data URI: $hasEmbeddedPhoto)',
+        tag: 'CRMMessageService',
+      );
+    } else {
+      Logger.debug(
+        'CRM contact card photo line missing during build',
+        tag: 'CRMMessageService',
+      );
     }
 
     lines.add('END:VCARD');
@@ -610,7 +622,8 @@ class CRMMessageService {
     try {
       final data = await rootBundle.load('assets/icon/contact-photo.png');
       final encoded = base64Encode(data.buffer.asUint8List());
-      return _foldVCardLine('PHOTO;ENCODING=b;TYPE=PNG:$encoded');
+      final line = 'PHOTO;TYPE=PNG;VALUE=URI:data:image/png;base64,$encoded';
+      return _foldVCardLine(line);
     } catch (_) {
       return null;
     }
