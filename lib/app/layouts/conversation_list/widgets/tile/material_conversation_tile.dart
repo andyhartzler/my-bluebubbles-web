@@ -5,6 +5,7 @@ import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -229,7 +230,7 @@ class _MaterialTrailingState extends CustomState<MaterialTrailing, void, Convers
               children: [
                 Padding(
                   padding: const EdgeInsets.only(right: 6.0),
-                  child: _ArchiveToggleButton(
+                  child: _DeleteChatButton(
                     controller: controller,
                     isUnread: unread,
                     isHighlighted: shouldHighlight,
@@ -296,8 +297,8 @@ class _MaterialTrailingState extends CustomState<MaterialTrailing, void, Convers
   }
 }
 
-class _ArchiveToggleButton extends StatelessWidget {
-  const _ArchiveToggleButton({
+class _DeleteChatButton extends StatelessWidget {
+  const _DeleteChatButton({
     required this.controller,
     required this.isUnread,
     required this.isHighlighted,
@@ -309,24 +310,65 @@ class _ArchiveToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isArchived = controller.chat.isArchived ?? false;
-    final label = isArchived ? 'Unarchive conversation' : 'Archive conversation';
-
-    void handleActivate() {
-      controller.chat.toggleArchived(!isArchived);
-    }
-
     final Color iconColor = isHighlighted || isUnread
         ? context.theme.colorScheme.onBackground
         : context.theme.colorScheme.outline;
 
+    Future<void> handleActivate() async {
+      final bool confirmed = await showDialog<bool>(
+            context: context,
+            builder: (BuildContext dialogContext) {
+              return AlertDialog(
+                backgroundColor: dialogContext.theme.colorScheme.properSurface,
+                title: Text(
+                  'Delete Conversation?',
+                  style: dialogContext.theme.textTheme.titleLarge,
+                ),
+                content: Text(
+                  'Deleting this conversation will permanently remove the chat and its transcript. This action cannot be undone.',
+                  style: dialogContext.theme.textTheme.bodyLarge,
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: Text(
+                      'Cancel',
+                      style: dialogContext.theme.textTheme.bodyLarge!
+                          .copyWith(color: dialogContext.theme.colorScheme.primary),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    child: Text(
+                      'Delete',
+                      style: dialogContext.theme.textTheme.bodyLarge!
+                          .copyWith(color: dialogContext.theme.colorScheme.primary),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ) ??
+          false;
+
+      if (!confirmed) return;
+
+      try {
+        await http.deleteChat(controller.chat.guid);
+        Chat.deleteChat(controller.chat);
+      } catch (error, stackTrace) {
+        showSnackbar('Error', 'Failed to delete the conversation. Please try again.');
+        Logger.error('Failed to delete chat', error: error, trace: stackTrace);
+      }
+    }
+
     return Semantics(
       button: true,
-      label: label,
+      label: 'Delete conversation',
       onTap: handleActivate,
       onLongPress: handleActivate,
       child: Tooltip(
-        message: label,
+        message: 'Delete conversation',
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
@@ -337,7 +379,7 @@ class _ArchiveToggleButton extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(6.0),
               child: Icon(
-                isArchived ? Icons.unarchive : Icons.archive_outlined,
+                Icons.delete_outline,
                 size: 18,
                 color: iconColor,
               ),
