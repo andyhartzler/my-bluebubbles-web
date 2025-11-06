@@ -231,14 +231,11 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
       for (final entry in socialPlatforms.entries) {
         final value = entry.value;
         if (value != null && value.trim().isNotEmpty) {
+          final info = _deriveSocialLinkInfo(entry.key, value);
+          final link = info.uri ?? _parseUrl(value);
           detailRows.add(
             InkWell(
-              onTap: () {
-                final link = _parseUrl(value);
-                if (link != null) {
-                  _launchUrl(link);
-                }
-              },
+              onTap: link != null ? () => _launchUrl(link) : null,
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -257,14 +254,15 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        value,
-                        style: const TextStyle(
+                        info.label,
+                        style: TextStyle(
                           color: Colors.white,
-                          decoration: TextDecoration.underline,
+                          decoration: link != null ? TextDecoration.underline : null,
                         ),
                       ),
                     ),
-                    const Icon(Icons.open_in_new, size: 16, color: Colors.white),
+                    if (link != null)
+                      const Icon(Icons.open_in_new, size: 16, color: Colors.white),
                   ],
                 ),
               ),
@@ -629,6 +627,158 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
     );
   }
 
+  _SocialLinkInfo _deriveSocialLinkInfo(String platform, String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return const _SocialLinkInfo(label: '', uri: null);
+    }
+
+    final lowerPlatform = platform.toLowerCase();
+    Uri? uri = _tryParseSocialUrl(trimmed);
+    final isLikelyUrl = uri != null;
+    String? username;
+
+    if (uri != null) {
+      username = _extractUsernameFromUrl(uri, lowerPlatform);
+      if (lowerPlatform == 'bluesky' && uri.host.toLowerCase().endsWith('.bsky.social')) {
+        username ??= _normalizeHandle(uri.host);
+      }
+    }
+
+    if (username == null && !isLikelyUrl) {
+      username = _normalizeHandle(trimmed);
+    }
+
+    if (username == null || username.isEmpty) {
+      return _SocialLinkInfo(label: trimmed, uri: uri);
+    }
+
+    if (uri == null || (lowerPlatform == 'bluesky' && uri.host.toLowerCase().endsWith('.bsky.social'))) {
+      uri = _buildSocialUri(lowerPlatform, username);
+    }
+
+    final label = '@$username';
+    return _SocialLinkInfo(label: label, uri: uri);
+  }
+
+  Uri? _tryParseSocialUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return Uri.tryParse(trimmed);
+    }
+    if (trimmed.contains('://')) {
+      return Uri.tryParse(trimmed);
+    }
+    if (trimmed.contains('/') || trimmed.contains('.')) {
+      return Uri.tryParse('https://$trimmed');
+    }
+    return null;
+  }
+
+  String? _extractUsernameFromUrl(Uri uri, String platform) {
+    final host = uri.host.toLowerCase().replaceFirst(RegExp(r'^www\.'), '');
+    final segments = uri.pathSegments
+        .map(Uri.decodeComponent)
+        .where((segment) => segment.isNotEmpty)
+        .toList();
+
+    switch (platform) {
+      case 'twitter/x':
+        if ((host.contains('twitter.') || host == 'x.com') && segments.isNotEmpty) {
+          return _normalizeHandle(segments.first);
+        }
+        break;
+      case 'bluesky':
+        if (host == 'bsky.app' && segments.length >= 2 && segments.first == 'profile') {
+          return _normalizeHandle(segments[1]);
+        }
+        if (host.endsWith('.bsky.social')) {
+          return _normalizeHandle(host);
+        }
+        break;
+      case 'facebook':
+        if (host.contains('facebook.') && segments.isNotEmpty) {
+          for (final segment in segments.reversed) {
+            if (segment != 'people' && segment != 'pages' && segment != 'groups') {
+              return _normalizeHandle(segment);
+            }
+          }
+          return _normalizeHandle(segments.last);
+        }
+        break;
+      case 'instagram':
+        if (host.contains('instagram.') && segments.isNotEmpty) {
+          return _normalizeHandle(segments.first);
+        }
+        break;
+      case 'threads':
+        if (host.contains('threads.') && segments.isNotEmpty) {
+          for (final segment in segments) {
+            if (segment.startsWith('@')) {
+              return _normalizeHandle(segment);
+            }
+          }
+          return _normalizeHandle(segments.last);
+        }
+        break;
+      case 'tiktok':
+        if (host.contains('tiktok.') && segments.isNotEmpty) {
+          for (final segment in segments) {
+            if (segment.startsWith('@')) {
+              return _normalizeHandle(segment);
+            }
+          }
+          return _normalizeHandle(segments.last);
+        }
+        break;
+    }
+
+    return null;
+  }
+
+  String _normalizeHandle(String input) {
+    var handle = input.trim();
+    if (handle.startsWith('http://')) {
+      handle = handle.substring(7);
+    } else if (handle.startsWith('https://')) {
+      handle = handle.substring(8);
+    }
+    handle = handle.replaceFirst(RegExp(r'^www\.'), '');
+    if (handle.contains('/')) {
+      handle = handle.split('/').last;
+    }
+    handle = handle.split('?').first;
+    handle = handle.split('#').first;
+    handle = handle.replaceAll(RegExp(r'\s+'), '');
+    if (handle.startsWith('@')) {
+      handle = handle.substring(1);
+    }
+    if (handle.endsWith('/')) {
+      handle = handle.substring(0, handle.length - 1);
+    }
+    return handle;
+  }
+
+  Uri? _buildSocialUri(String platform, String username) {
+    if (username.isEmpty) return null;
+    switch (platform) {
+      case 'twitter/x':
+        return Uri.https('twitter.com', '/$username');
+      case 'bluesky':
+        return Uri.https('bsky.app', '/profile/$username');
+      case 'facebook':
+        return Uri.https('www.facebook.com', '/$username');
+      case 'instagram':
+        return Uri.https('www.instagram.com', '/$username');
+      case 'threads':
+        return Uri.https('www.threads.net', '/@$username');
+      case 'tiktok':
+        return Uri.https('www.tiktok.com', '/@$username');
+    }
+    return null;
+  }
+
   String _describeDocument(ChapterDocument doc) {
     final pieces = <String>[];
     pieces.add(doc.documentType);
@@ -674,4 +824,11 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
       );
     }
   }
+}
+
+class _SocialLinkInfo {
+  final String label;
+  final Uri? uri;
+
+  const _SocialLinkInfo({required this.label, this.uri});
 }
