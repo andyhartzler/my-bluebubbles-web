@@ -33,7 +33,7 @@ class BulkMessageScreen extends StatefulWidget {
 }
 
 class _BulkMessageScreenState extends State<BulkMessageScreen> {
-  final CRMMessageService _messageService = CRMMessageService();
+  final CRMMessageService _messageService = CRMMessageService.instance;
   final MemberRepository _memberRepo = MemberRepository();
   final TextEditingController _messageController = TextEditingController();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();

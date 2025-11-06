@@ -363,7 +363,7 @@ class ActionHandler extends GetxService {
       await MessageHelper.handleNotification(m, c);
     }
     await c.addMessage(m);
-    unawaited(CRMMessageService().handleIncomingAutomation(c, m));
+    unawaited(CRMMessageService.instance.handleIncomingAutomation(c, m));
   }
 
   Future<void> handleUpdatedMessage(Chat c, Message m, String? tempGuid, {bool checkExisting = true}) async {

@@ -22,7 +22,7 @@ class CRMMemberPanel extends StatefulWidget {
 }
 
 class _CRMMemberPanelState extends State<CRMMemberPanel> {
-  final CRMMessageService _messageService = CRMMessageService();
+  final CRMMessageService _messageService = CRMMessageService.instance;
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
   Member? _member;
   bool _loading = true;

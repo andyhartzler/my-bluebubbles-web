@@ -36,7 +36,7 @@ class MemberDetailScreen extends StatefulWidget {
 class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final MemberRepository _memberRepo = MemberRepository();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
-  final CRMMessageService _messageService = CRMMessageService();
+  final CRMMessageService _messageService = CRMMessageService.instance;
   final MeetingRepository _meetingRepository = MeetingRepository();
   final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
   late Member _member;
