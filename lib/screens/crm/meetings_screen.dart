@@ -324,7 +324,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
     );
   }
 
-  Sliver _buildMeetingSliver(List<Meeting> meetings) {
+  Widget _buildMeetingSliver(List<Meeting> meetings) {
     if (meetings.isEmpty) {
       final theme = Theme.of(context);
       return SliverFillRemaining(

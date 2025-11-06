@@ -692,7 +692,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return result;
   }
 
-  Sliver _buildMembersSliver(ThemeData theme) {
+  Widget _buildMembersSliver(ThemeData theme) {
     if (_filteredMembers.isEmpty) {
       return SliverFillRemaining(
         hasScrollBody: false,
@@ -768,7 +768,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  Sliver _buildChaptersSliver(ThemeData theme) {
+  Widget _buildChaptersSliver(ThemeData theme) {
     if (_filteredChapters.isEmpty) {
       return SliverFillRemaining(
         hasScrollBody: false,
