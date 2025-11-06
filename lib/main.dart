@@ -12,6 +12,7 @@ import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/window_effects.dart';
 import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
+import 'package:bluebubbles/app/layouts/conversation_list/pages/search/global_crm_search_dialog.dart';
 import 'package:bluebubbles/app/layouts/startup/failure_to_start.dart';
 import 'package:bluebubbles/app/layouts/setup/setup_view.dart';
 import 'package:bluebubbles/app/layouts/startup/splash_screen.dart';
@@ -733,6 +734,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       ),
     );
 
+    final searchButton = Tooltip(
+      message: crmReady ? 'Search CRM' : 'Search available when CRM is connected',
+      child: IconButton(
+        onPressed: crmReady ? () => _openGlobalSearch(context) : null,
+        icon: const Icon(Icons.search),
+      ),
+    );
+
     final settingsButton = Tooltip(
       message: 'Settings',
       child: IconButton(
@@ -760,6 +769,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           final navChildren = [
             ...navButtons,
             newMessageButton,
+            searchButton,
             settingsButton,
           ];
 
@@ -846,6 +856,20 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: _buildBranding(theme, mobile: true),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  FocusTraversalOrder(
+                    order: const NumericFocusOrder(2),
+                    child: Semantics(
+                      label: crmReady ? 'Open CRM search' : 'CRM search unavailable',
+                      button: true,
+                      enabled: crmReady,
+                      child: IconButton(
+                        tooltip: crmReady ? 'Search CRM' : 'Search available when CRM is connected',
+                        icon: const Icon(Icons.search),
+                        onPressed: crmReady ? () => _openGlobalSearch(context) : null,
                       ),
                     ),
                   ),
@@ -969,12 +993,20 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   const Divider(),
                   buildItem(
                     order: 5,
+                    icon: Icons.search,
+                    label: 'Search CRM',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady ? () => _openGlobalSearch(parentContext) : null,
+                  ),
+                  buildItem(
+                    order: 6,
                     icon: Icons.add_comment,
                     label: 'New Message',
                     onActivate: () => _openNewMessage(parentContext),
                   ),
                   buildItem(
-                    order: 6,
+                    order: 7,
                     icon: Icons.settings_outlined,
                     label: 'Settings',
                     onActivate: () => Actions.invoke(parentContext, const OpenSettingsIntent()),
@@ -1100,6 +1132,15 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         builder: (context) => TitleBarWrapper(child: BulkMessageScreen()),
       ));
     }
+  }
+
+  Future<void> _openGlobalSearch(BuildContext context) async {
+    await Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const GlobalCrmSearchDialog(),
+      ),
+    );
   }
 }
 
