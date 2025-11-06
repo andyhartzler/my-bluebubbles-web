@@ -14,6 +14,7 @@ import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:mime_type/mime_type.dart';
 import 'package:slugify/slugify.dart';
@@ -33,7 +34,7 @@ class CRMMessageService {
 
   final MemberRepository _memberRepo = MemberRepository();
   final Map<String, String> _serviceCache = {};
-  final LinkedHashMap<String, DateTime> _automationGuardCache = LinkedHashMap();
+  final LinkedHashMap<String, _AutomationGuardEntry> _automationGuardCache = LinkedHashMap();
 
   // Rate limiting
   static const int messagesPerMinute = CRMConfig.messagesPerMinute;
@@ -45,6 +46,7 @@ class CRMMessageService {
       'Hi! Thanks for connecting with MO Young Democrats.\n\nTap the contact card below to save our info.\n\nReply STOP to opt out of future messages.';
   static const String _stopResponse =
       'You have been unsubscribed from Missouri Young Democrats updates. Reply START at any time to opt back in.';
+  static const String _automationLogTag = 'CRM-Automation';
 
   bool get _isReady => CRMSupabaseService().isInitialized && CRMConfig.crmEnabled;
 
@@ -207,8 +209,9 @@ class CRMMessageService {
     final address = message.handle?.address;
     if (address == null || address.isEmpty) return;
 
-    final cacheKey = _buildAutomationCacheKey(chat, message, normalized);
-    if (cacheKey != null && _shouldSkipAutomation(cacheKey)) {
+    final messageTimestamp = _resolveAutomationTimestamp(message);
+    final cacheKey = _buildAutomationCacheKey(chat, message, normalized, messageTimestamp);
+    if (cacheKey != null && _shouldSkipAutomation(cacheKey, messageTimestamp)) {
       return;
     }
 
@@ -218,54 +221,106 @@ class CRMMessageService {
     if (normalized == 'STOP') {
       if (member.optOut) return;
       await _memberRepo.updateOptOutStatus(member.id, true, reason: 'STOP keyword');
+      if (cacheKey != null) {
+        _markAutomationHandled(cacheKey, messageTimestamp);
+      }
       await _sendSingleMessage(phoneNumber: address, message: _stopResponse);
     } else if (normalized == 'START') {
       if (!member.optOut) return;
       await _memberRepo.updateOptOutStatus(member.id, false);
       const response =
           'Welcome back! You are now opted in to Missouri Young Democrats messages.';
+      if (cacheKey != null) {
+        _markAutomationHandled(cacheKey, messageTimestamp);
+      }
       await _sendSingleMessage(phoneNumber: address, message: response);
     }
   }
 
-  String? _buildAutomationCacheKey(Chat chat, Message message, String normalized) {
+  String? _buildAutomationCacheKey(
+    Chat chat,
+    Message message,
+    String normalized,
+    DateTime messageTimestamp,
+  ) {
+    final timestampMillis = messageTimestamp.millisecondsSinceEpoch;
+
     final guid = message.guid;
     if (guid != null && guid.isNotEmpty) {
-      return guid;
+      return '$guid|$timestampMillis';
     }
 
     final chatGuid = chat.guid;
-    if (chatGuid != null && chatGuid.isNotEmpty) {
-      return '$chatGuid|$normalized';
+    final text = message.text?.trim();
+    final fallbackChatIdentifier = (chatGuid != null && chatGuid.isNotEmpty)
+        ? chatGuid
+        : (message.handle?.address ?? '');
+
+    if (fallbackChatIdentifier.isEmpty && (text == null || text.isEmpty)) {
+      return null;
     }
 
-    final handleAddress = message.handle?.address;
-    if (handleAddress != null && handleAddress.isNotEmpty) {
-      return '$handleAddress|$normalized';
-    }
-
-    return null;
+    final raw = '$fallbackChatIdentifier|${text ?? normalized}|$timestampMillis';
+    final digest = sha1.convert(utf8.encode(raw)).toString();
+    return '$digest|$timestampMillis';
   }
 
-  bool _shouldSkipAutomation(String key) {
+  bool _shouldSkipAutomation(String key, DateTime messageTimestamp) {
     final now = DateTime.now();
 
     _pruneAutomationCache(now);
 
     final existing = _automationGuardCache[key];
-    if (existing != null && now.difference(existing) < _automationGuardCacheTtl) {
-      return true;
+    if (existing != null) {
+      if (now.difference(existing.handledAt) < _automationGuardCacheTtl) {
+        existing.registerDuplicate();
+        Logger.debug(
+          'Skipping automation response for $key (responses=${existing.responses}, duplicates=${existing.duplicates})',
+          tag: _automationLogTag,
+        );
+        return true;
+      }
+
+      _automationGuardCache.remove(key);
     }
 
-    _automationGuardCache[key] = now;
+    _automationGuardCache[key] = _AutomationGuardEntry(
+      messageTimestamp: messageTimestamp,
+      handledAt: now,
+    );
+    Logger.debug(
+      'Tracking inbound automation message for $key at ${messageTimestamp.toIso8601String()}',
+      tag: _automationLogTag,
+    );
     _enforceAutomationCacheLimit();
     return false;
   }
 
+  void _markAutomationHandled(String key, DateTime messageTimestamp) {
+    final now = DateTime.now();
+    _pruneAutomationCache(now);
+
+    final entry = _automationGuardCache.putIfAbsent(
+      key,
+      () => _AutomationGuardEntry(
+        messageTimestamp: messageTimestamp,
+        handledAt: now,
+      ),
+    );
+
+    entry.markResponse(now);
+    Logger.debug(
+      'Queued automation response #${entry.responses} for $key (message ${entry.messageTimestamp.toIso8601String()})',
+      tag: _automationLogTag,
+    );
+
+    _enforceAutomationCacheLimit();
+  }
+
   void _pruneAutomationCache(DateTime now) {
     final expiredKeys = <String>[];
-    _automationGuardCache.forEach((key, timestamp) {
-      if (now.difference(timestamp) >= _automationGuardCacheTtl) {
+    _automationGuardCache.forEach((key, entry) {
+      if (now.difference(entry.handledAt) >= _automationGuardCacheTtl) {
         expiredKeys.add(key);
       }
     });
@@ -280,6 +335,13 @@ class CRMMessageService {
       final oldestKey = _automationGuardCache.keys.first;
       _automationGuardCache.remove(oldestKey);
     }
+  }
+
+  DateTime _resolveAutomationTimestamp(Message message) {
+    return message.dateCreated ??
+        message.dateDelivered ??
+        message.dateRead ??
+        DateTime.now();
   }
 
   Future<bool> _sendSingleMessage({
@@ -735,5 +797,26 @@ class CRMMessageService {
     }
 
     return null;
+  }
+}
+
+class _AutomationGuardEntry {
+  _AutomationGuardEntry({
+    required this.messageTimestamp,
+    required this.handledAt,
+  });
+
+  final DateTime messageTimestamp;
+  DateTime handledAt;
+  int responses = 0;
+  int duplicates = 0;
+
+  void registerDuplicate() {
+    duplicates += 1;
+  }
+
+  void markResponse(DateTime timestamp) {
+    responses += 1;
+    handledAt = timestamp;
   }
 }
