@@ -480,6 +480,10 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   }
 
   Future<void> _completeSend(Chat chat, {Future<void> Function()? onConversationInit}) async {
+    Logger.info(
+      'ChatCreatorSend: completing send for chat ${chat.guid} (launchConversationOnSend: ${widget.launchConversationOnSend}, popOnSend: ${widget.popOnSend})',
+      tag: 'ChatCreatorSend',
+    );
     _clearComposer();
 
     if (!widget.popOnSend && widget.launchConversationOnSend) {
@@ -544,67 +548,98 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     final replyPart = replyTuple?.item2;
 
     final attachments = List<PlatformFile>.from(_composerAttachments);
-
-    for (final file in attachments) {
-      final message = Message(
-        text: '',
-        dateCreated: DateTime.now(),
-        hasAttachments: true,
-        isFromMe: true,
-        handleId: 0,
-        attachments: [
-          Attachment(
-            isOutgoing: true,
-            mimeType: mime(file.path ?? file.name) ?? 'application/octet-stream',
-            uti: 'public.data',
-            bytes: file.bytes,
-            transferName: file.name,
-            totalBytes: file.size,
-          ),
-        ],
-      );
-
-      message.chat.target = chat;
-      message.generateTempGuid();
-      final attachment = message.attachments.first;
-      if (attachment != null) {
-        attachment.guid = message.guid;
-        attachment.bytes = file.bytes;
-        attachment.totalBytes = file.size;
-      }
-
-      await outq.queue(OutgoingItem(
-        type: QueueType.sendAttachment,
-        chat: chat,
-        message: message,
-        customArgs: const {'audio': false},
-      ));
-    }
-
     final text = textController.text.trimRight();
     final subject = subjectController.text.trimRight();
 
-    if (text.isNotEmpty || subject.isNotEmpty) {
-      final message = Message(
-        text: text.isEmpty && subject.isNotEmpty ? subject : text,
-        subject: text.isEmpty && subject.isNotEmpty ? null : subject,
-        threadOriginatorGuid: attachments.isEmpty ? replyGuid : null,
-        threadOriginatorPart: attachments.isEmpty && replyPart != null ? '$replyPart:0:0' : null,
-        expressiveSendStyleId: effect,
-        dateCreated: DateTime.now(),
-        hasAttachments: false,
-        isFromMe: true,
-        handleId: 0,
+    Logger.info(
+      'ChatCreatorSend: queue start for chat ${chat.guid} (attachments: ${attachments.length}, textLength: ${text.length}, subjectLength: ${subject.length}, hasController: ${controller != null}, hasSendFunc: ${controller?.sendFunc != null})',
+      tag: 'ChatCreatorSend',
+    );
+
+    if (controller != null && controller.sendFunc != null) {
+      controller.pickedAttachments.assignAll(attachments);
+      controller.textController.text = text;
+      controller.subjectTextController.text = subject;
+
+      Logger.info('ChatCreatorSend: dispatching via controller.send for chat ${chat.guid}', tag: 'ChatCreatorSend');
+      await controller.send(
+        attachments,
+        text,
+        subject,
+        attachments.isEmpty ? replyGuid : null,
+        attachments.isEmpty ? replyPart : null,
+        effect,
+        false,
       );
+    } else {
+      for (final file in attachments) {
+        final message = Message(
+          text: '',
+          dateCreated: DateTime.now(),
+          hasAttachments: true,
+          isFromMe: true,
+          handleId: 0,
+          attachments: [
+            Attachment(
+              isOutgoing: true,
+              mimeType: mime(file.path ?? file.name) ?? 'application/octet-stream',
+              uti: 'public.data',
+              bytes: file.bytes,
+              transferName: file.name,
+              totalBytes: file.size,
+            ),
+          ],
+        );
 
-      message.chat.target = chat;
-      message.generateTempGuid();
+        message.chat.target = chat;
+        message.generateTempGuid();
+        final attachment = message.attachments.first;
+        if (attachment != null) {
+          attachment.guid = message.guid;
+          attachment.bytes = file.bytes;
+          attachment.totalBytes = file.size;
+        }
 
-      await outq.queue(OutgoingItem(
-        type: QueueType.sendMessage,
-        chat: chat,
-        message: message,
-      ));
+        Logger.info(
+          'ChatCreatorSend: queueing attachment ${file.name} (${file.size} bytes) for chat ${chat.guid}',
+          tag: 'ChatCreatorSend',
+        );
+
+        await outq.queue(OutgoingItem(
+          type: QueueType.sendAttachment,
+          chat: chat,
+          message: message,
+          customArgs: const {'audio': false},
+        ));
+      }
+
+      if (text.isNotEmpty || subject.isNotEmpty) {
+        final message = Message(
+          text: text.isEmpty && subject.isNotEmpty ? subject : text,
+          subject: text.isEmpty && subject.isNotEmpty ? null : subject,
+          threadOriginatorGuid: attachments.isEmpty ? replyGuid : null,
+          threadOriginatorPart: attachments.isEmpty && replyPart != null ? '$replyPart:0:0' : null,
+          expressiveSendStyleId: effect,
+          dateCreated: DateTime.now(),
+          hasAttachments: false,
+          isFromMe: true,
+          handleId: 0,
+        );
+
+        message.chat.target = chat;
+        message.generateTempGuid();
+
+        Logger.info(
+          'ChatCreatorSend: queueing text payload (length: ${message.text?.length ?? 0}) for chat ${chat.guid}',
+          tag: 'ChatCreatorSend',
+        );
+
+        await outq.queue(OutgoingItem(
+          type: QueueType.sendMessage,
+          chat: chat,
+          message: message,
+        ));
+      }
     }
 
     if (controller != null) {
@@ -619,6 +654,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     if (chat == null) return false;
 
     try {
+      Logger.info('ChatCreatorSend: attempting to send to existing chat ${chat.guid}', tag: 'ChatCreatorSend');
       await _primeConversationController(chat);
       if (_composerAttachments.isEmpty &&
           textController.text.trim().isEmpty &&
@@ -632,6 +668,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       return false;
     }
 
+    Logger.info('ChatCreatorSend: send pipeline completed for chat ${chat.guid}', tag: 'ChatCreatorSend');
     await _completeSend(chat);
     return true;
   }
@@ -853,6 +890,10 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
 
     final previous = cm.activeChat?.chat;
     try {
+      Logger.info(
+        'ChatCreatorSend: dispatching ${_composerAttachments.length} attachment(s) to newly created chat ${chat.guid}',
+        tag: 'ChatCreatorSend',
+      );
       await cm.setActiveChat(chat, clearNotifications: false);
       final controller = cvc(chat);
       controller.pickedAttachments.assignAll(_composerAttachments);
@@ -865,6 +906,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         null,
         false,
       );
+      Logger.info('ChatCreatorSend: attachment dispatch complete for chat ${chat.guid}', tag: 'ChatCreatorSend');
     } catch (e, stack) {
       Logger.warn('Failed to queue attachments for new chat', error: e, trace: stack);
     } finally {
