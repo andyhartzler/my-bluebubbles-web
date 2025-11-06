@@ -38,6 +38,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   bool _crmReady = false;
   String _searchQuery = '';
   late int _activeView;
+  bool _filtersExpandedOnMobile = false;
 
   // Filter state
   String? _selectedCounty;
@@ -511,6 +512,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _maxAgeFilter != null ||
         (_selectedCommittees != null && _selectedCommittees!.isNotEmpty);
 
+    final activeFilterCount = _activeFiltersCount();
     final chips = <Widget>[
       _buildFilterChip(
         label: _selectedCounty ?? 'County',
@@ -584,6 +586,57 @@ class _MembersListScreenState extends State<MembersListScreen> {
       ),
     ];
 
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    if (isMobile) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => setState(() {
+                      _filtersExpandedOnMobile = !_filtersExpandedOnMobile;
+                    }),
+                    icon: Icon(_filtersExpandedOnMobile ? Icons.filter_alt_off : Icons.filter_alt),
+                    label: Text(
+                      _filtersExpandedOnMobile
+                          ? 'Hide Filters'
+                          : 'Show Filters${activeFilterCount > 0 ? ' ($activeFilterCount)' : ''}',
+                    ),
+                  ),
+                ),
+                if (hasFilters) ...[
+                  const SizedBox(width: 12),
+                  TextButton.icon(
+                    onPressed: _clearFilters,
+                    icon: const Icon(Icons.clear_all),
+                    label: const Text('Clear'),
+                  ),
+                ],
+              ],
+            ),
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: chips,
+                ),
+              ),
+              crossFadeState:
+                  _filtersExpandedOnMobile ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -601,6 +654,21 @@ class _MembersListScreenState extends State<MembersListScreen> {
         ],
       ),
     );
+  }
+
+  int _activeFiltersCount() {
+    int count = 0;
+    if (_selectedCounty != null) count++;
+    if (_selectedDistrict != null) count++;
+    if (_selectedChapter != null) count++;
+    if (_selectedChapterStatus != null) count++;
+    if (_selectedCommunityType != null) count++;
+    if (_selectedChapterPosition != null) count++;
+    if (_registeredVoterFilter != null) count++;
+    if (_contactFilter != null) count++;
+    if (_minAgeFilter != null || _maxAgeFilter != null) count++;
+    if (_selectedCommittees != null && _selectedCommittees!.isNotEmpty) count++;
+    return count;
   }
 
   List<Widget> _interleaveChips(List<Widget> chips) {
@@ -635,6 +703,17 @@ class _MembersListScreenState extends State<MembersListScreen> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
+          if (width < 600) {
+            return ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+              itemCount: _filteredMembers.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) =>
+                  _buildMemberCard(_filteredMembers[index], index, isMobile: true),
+            );
+          }
+
           final crossAxisCount = width > 1300
               ? 3
               : width > 900
@@ -652,7 +731,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
               childAspectRatio: aspectRatio,
             ),
             itemCount: _filteredMembers.length,
-            itemBuilder: (context, index) => _buildMemberCard(_filteredMembers[index], index),
+            itemBuilder: (context, index) =>
+                _buildMemberCard(_filteredMembers[index], index, isMobile: false),
           );
         },
       ),
@@ -908,7 +988,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  Widget _buildMemberCard(Member member, int index) {
+  Widget _buildMemberCard(Member member, int index, {required bool isMobile}) {
     final theme = Theme.of(context);
     final gradient = _cardGradients[index % _cardGradients.length];
     final phoneDisplay = member.primaryPhone;
@@ -929,36 +1009,82 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
     final metaChips = <Widget>[];
     if (age != null) {
-      metaChips.add(_buildInfoChip(Icons.cake_outlined, '$age yrs'));
+      metaChips.add(
+        _buildInfoChip(
+          Icons.cake_outlined,
+          '$age yrs',
+          backgroundColor:
+              isMobile ? theme.colorScheme.primary.withOpacity(0.08) : null,
+          iconColor: isMobile ? theme.colorScheme.primary : null,
+          textColor: isMobile ? theme.colorScheme.primary : null,
+        ),
+      );
     }
     if (zodiac != null) {
-      metaChips.add(_buildInfoChip(Icons.auto_awesome, zodiac));
+      metaChips.add(
+        _buildInfoChip(
+          Icons.auto_awesome,
+          zodiac,
+          backgroundColor:
+              isMobile ? theme.colorScheme.primary.withOpacity(0.08) : null,
+          iconColor: isMobile ? theme.colorScheme.primary : null,
+          textColor: isMobile ? theme.colorScheme.primary : null,
+        ),
+      );
     }
     if (_hasText(member.graduationYear)) {
-      metaChips.add(_buildInfoChip(Icons.school, 'Grad ${member.graduationYear!.trim()}'));
+      metaChips.add(
+        _buildInfoChip(
+          Icons.school,
+          'Grad ${member.graduationYear!.trim()}',
+          backgroundColor:
+              isMobile ? theme.colorScheme.primary.withOpacity(0.08) : null,
+          iconColor: isMobile ? theme.colorScheme.primary : null,
+          textColor: isMobile ? theme.colorScheme.primary : null,
+        ),
+      );
     }
+
+    final borderRadius = BorderRadius.circular(isMobile ? 16 : 24);
+    final textColor = isMobile ? theme.colorScheme.onSurface : Colors.white;
+    final detailIconColor = isMobile ? theme.colorScheme.primary : Colors.white;
+    final detailTextStyle = (isMobile ? theme.textTheme.bodyMedium : theme.textTheme.bodyLarge)
+            ?.copyWith(color: textColor, fontWeight: FontWeight.w600, height: 1.3) ??
+        TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: isMobile ? 13.5 : 14.5);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: gradient.last.withOpacity(0.22),
-            blurRadius: 24,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        gradient: isMobile
+            ? null
+            : LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        color: isMobile ? theme.colorScheme.surface : null,
+        borderRadius: borderRadius,
+        border: isMobile ? Border.all(color: theme.colorScheme.outline.withOpacity(0.15)) : null,
+        boxShadow: isMobile
+            ? [
+                BoxShadow(
+                  color: theme.shadowColor.withOpacity(0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: gradient.last.withOpacity(0.22),
+                  blurRadius: 24,
+                  offset: const Offset(0, 14),
+                ),
+              ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: borderRadius,
           onTap: () => _openMember(member),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(isMobile ? 16 : 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -968,56 +1094,97 @@ class _MembersListScreenState extends State<MembersListScreen> {
                     Expanded(
                       child: Text(
                         member.name,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
+                                ?.copyWith(fontWeight: FontWeight.w700, color: textColor) ??
+                            TextStyle(fontWeight: FontWeight.w700, color: textColor, fontSize: isMobile ? 18 : 22),
                       ),
                     ),
                     if (member.optOut)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: isMobile ? 4 : 6),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.25),
+                          color: isMobile
+                              ? theme.colorScheme.errorContainer
+                              : Colors.black.withOpacity(0.25),
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Opted Out',
-                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            color: isMobile
+                                ? theme.colorScheme.onErrorContainer
+                                : Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                   ],
                 ),
                 if (metaChips.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: metaChips,
                   ),
                 ],
-                const SizedBox(height: 12),
-                if (chapterName != null) _buildDetailLine(Icons.flag_outlined, chapterName),
-                if (chapterPosition != null) _buildDetailLine(Icons.emoji_events_outlined, chapterPosition),
-                if (county != null) _buildDetailLine(Icons.map_outlined, county),
+                const SizedBox(height: 10),
+                if (chapterName != null)
+                  _buildDetailLine(Icons.flag_outlined, chapterName,
+                      iconColor: detailIconColor, textStyle: detailTextStyle),
+                if (chapterPosition != null)
+                  _buildDetailLine(Icons.emoji_events_outlined, chapterPosition,
+                      iconColor: detailIconColor, textStyle: detailTextStyle),
+                if (county != null)
+                  _buildDetailLine(Icons.map_outlined, county,
+                      iconColor: detailIconColor, textStyle: detailTextStyle),
                 if (districtLabel != null)
-                  _buildDetailLine(Icons.account_balance, 'District $districtLabel'),
-                if (phoneDisplay != null) _buildDetailLine(Icons.phone, phoneDisplay),
-                if (emailDisplay != null) _buildDetailLine(Icons.email_outlined, emailDisplay),
+                  _buildDetailLine(Icons.account_balance, 'District $districtLabel',
+                      iconColor: detailIconColor, textStyle: detailTextStyle),
+                if (phoneDisplay != null)
+                  _buildDetailLine(Icons.phone, phoneDisplay,
+                      iconColor: detailIconColor, textStyle: detailTextStyle),
+                if (emailDisplay != null)
+                  _buildDetailLine(Icons.email_outlined, emailDisplay,
+                      iconColor: detailIconColor, textStyle: detailTextStyle),
                 if (committeeText.isNotEmpty)
-                  _buildDetailLine(Icons.groups, committeeText),
-                const Spacer(),
+                  _buildDetailLine(Icons.groups, committeeText,
+                      iconColor: detailIconColor, textStyle: detailTextStyle),
+                if (isMobile)
+                  const SizedBox(height: 16)
+                else
+                  const Spacer(),
                 Align(
                   alignment: Alignment.bottomRight,
                   child: TextButton.icon(
                     onPressed: () => _openMember(member),
                     style: TextButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                      foregroundColor:
+                          isMobile ? theme.colorScheme.primary : Colors.white,
+                      backgroundColor: isMobile
+                          ? theme.colorScheme.primary.withOpacity(0.08)
+                          : Colors.white.withOpacity(0.2),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 12 : 16,
+                        vertical: isMobile ? 8 : 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(isMobile ? 12 : 999),
+                      ),
                     ),
                     icon: const Icon(Icons.open_in_new, size: 18),
-                    label: const Text('View Profile'),
+                    label: Text(
+                      'View Profile',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                            color: isMobile ? theme.colorScheme.primary : Colors.white,
+                            fontSize: isMobile ? 13 : null,
+                          ) ??
+                          TextStyle(
+                            color: isMobile ? theme.colorScheme.primary : Colors.white,
+                            fontSize: isMobile ? 13 : 14,
+                          ),
+                    ),
                   ),
                 ),
               ],
@@ -1028,39 +1195,42 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String label) {
+  Widget _buildInfoChip(IconData icon, String label,
+      {Color? backgroundColor, Color? iconColor, Color? textColor}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
+        color: backgroundColor ?? Colors.white.withOpacity(0.18),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.white),
+          Icon(icon, size: 16, color: iconColor ?? Colors.white),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            style: TextStyle(color: textColor ?? Colors.white, fontWeight: FontWeight.w500),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailLine(IconData icon, String value) {
+  Widget _buildDetailLine(IconData icon, String value,
+      {Color? iconColor, TextStyle? textStyle}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: Colors.white),
+          Icon(icon, size: 18, color: iconColor ?? Colors.white),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style: textStyle ??
+                  const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
             ),
           ),
         ],
