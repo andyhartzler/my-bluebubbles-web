@@ -2540,12 +2540,11 @@ packages:
   store_checker:
     dependency: "direct main"
     description:
-      path: "."
-      ref: master
-      resolved-ref: "5881dfbb97c733dea416660e30444899b347ed52"
-      url: "https://github.com/ravitejaavv/store_checker"
-    source: git
-    version: "1.6.0"
+      name: store_checker
+      sha256: "f191b6f1035caff62137c365cba21ad1a3c82c0369b522639052cd29fb48720f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.8.0"
   stream_channel:
     dependency: transitive
     description:

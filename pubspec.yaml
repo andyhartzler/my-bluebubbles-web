@@ -174,10 +174,7 @@ dependencies:
   smooth_page_indicator: ^1.1.0
   socket_io_client: ^2.0.3+1
   sprung: ^3.0.1
-  store_checker: # android namespace issue
-    git:
-      url: https://github.com/ravitejaavv/store_checker
-      ref: master
+  store_checker: ^1.8.0
   synchronized: ^3.1.0+1
   system_tray:
     path: packages/system_tray_stub
