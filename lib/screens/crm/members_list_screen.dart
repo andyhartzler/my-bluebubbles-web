@@ -788,51 +788,50 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _buildMetaTag(Icons.calendar_month, 'Chartered ${_formatDate(chapter.charterDate!)}'),
     ];
 
+    final borderRadius = BorderRadius.circular(20);
+
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: borderRadius),
       elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              chapterName,
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            if (schoolName != null) ...[
-              const SizedBox(height: 4),
-              Text(schoolName, style: theme.textTheme.titleMedium),
-            ],
-            if (chips.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: chips,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openChapter(chapter),
+        borderRadius: borderRadius,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                chapterName,
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _buildStatTile(Icons.people_alt, '$memberCount members'),
-                const SizedBox(width: 12),
-                if (leaderCount > 0)
-                  _buildStatTile(Icons.emoji_events, '$leaderCount leaders'),
+              if (schoolName != null) ...[
+                const SizedBox(height: 4),
+                Text(schoolName, style: theme.textTheme.titleMedium),
               ],
-            ),
-            if (contactEmail != null) _buildChapterInfoRow(theme, Icons.email_outlined, contactEmail),
-            if (website != null) _buildChapterInfoRow(theme, Icons.link, website),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _openChapter(chapter),
-                icon: const Icon(Icons.open_in_new),
-                label: const Text('View Chapter'),
+              if (chips.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: chips,
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildStatTile(Icons.people_alt, '$memberCount members'),
+                  const SizedBox(width: 12),
+                  if (leaderCount > 0)
+                    _buildStatTile(Icons.emoji_events, '$leaderCount leaders'),
+                ],
               ),
-            ),
-          ],
+              if (contactEmail != null)
+                _buildChapterInfoRow(theme, Icons.email_outlined, contactEmail),
+              if (website != null) _buildChapterInfoRow(theme, Icons.link, website),
+            ],
+          ),
         ),
       ),
     );
@@ -863,6 +862,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   Widget _buildChapterInfoRow(ThemeData theme, IconData icon, String value) {
     final uri = _parseChapterUri(value);
+    final displayValue = uri != null && _isWebUrl(uri) ? _formatWebsiteLabel(uri) : value;
     final textStyle = theme.textTheme.bodyMedium?.copyWith(
       decoration: uri != null ? TextDecoration.underline : null,
       color: uri != null ? theme.colorScheme.primary : null,
@@ -880,7 +880,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                value,
+                displayValue,
                 style: textStyle,
               ),
             ),
@@ -917,6 +917,16 @@ class _MembersListScreenState extends State<MembersListScreen> {
     }
     final normalized = trimmed.startsWith('http') ? trimmed : 'https://$trimmed';
     return Uri.tryParse(normalized);
+  }
+
+  bool _isWebUrl(Uri uri) => uri.scheme == 'http' || uri.scheme == 'https';
+
+  String _formatWebsiteLabel(Uri uri) {
+    final host = uri.host.replaceFirst(RegExp(r'^www\.'), '');
+    final path = uri.path == '/' ? '' : uri.path;
+    final query = uri.hasQuery ? '?${uri.query}' : '';
+    final fragment = uri.hasFragment ? '#${uri.fragment}' : '';
+    return '$host$path$query$fragment';
   }
 
   Widget _buildFilterChip({
