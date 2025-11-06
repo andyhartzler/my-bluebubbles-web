@@ -10,7 +10,6 @@ import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/services/network/http_overrides.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/window_effects.dart';
-import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/search/global_crm_search_dialog.dart';
 import 'package:bluebubbles/app/layouts/startup/failure_to_start.dart';
@@ -1090,48 +1089,19 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     setState(() => _currentSection = section);
   }
 
-  void _openNewMessage(BuildContext context) async {
-    final selection = await showModalBottomSheet<int>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: const Text('Single Message'),
-              subtitle: const Text('Compose a conversation with one member'),
-              onTap: () => Navigator.pop(context, 0),
-            ),
-            ListTile(
-              leading: const Icon(Icons.groups),
-              title: const Text('Member Outreach'),
-              subtitle: const Text('Send individual messages to a filtered group'),
-              onTap: () => Navigator.pop(context, 1),
-            ),
-          ],
-        ),
+  void _openNewMessage(BuildContext context) {
+    if (!CRMConfig.crmEnabled || !CRMSupabaseService().isInitialized) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('CRM Supabase is not configured.')),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(child: const BulkMessageScreen()),
       ),
     );
-
-    if (selection == 0) {
-      await Navigator.of(context, rootNavigator: true).push(
-        ThemeSwitcher.buildPageRoute(
-          builder: (context) => TitleBarWrapper(child: ChatCreator()),
-        ),
-      );
-    } else if (selection == 1) {
-      if (!CRMConfig.crmEnabled || !CRMSupabaseService().isInitialized) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('CRM Supabase is not configured.')),
-        );
-        return;
-      }
-
-      await Navigator.of(context).push(ThemeSwitcher.buildPageRoute(
-        builder: (context) => TitleBarWrapper(child: BulkMessageScreen()),
-      ));
-    }
   }
 
   Future<void> _openGlobalSearch(BuildContext context) async {
