@@ -217,6 +217,8 @@ class _CupertinoTrailingState extends CustomState<CupertinoTrailing, void, Conve
               }
             }
 
+            final bool shouldHighlight = controller.shouldHighlight.value;
+
             return Text(
               (cachedLatestMessage?.error ?? 0) > 0
                   ? "Error"
@@ -226,38 +228,91 @@ class _CupertinoTrailingState extends CustomState<CupertinoTrailing, void, Conve
                   .copyWith(
                     color: (cachedLatestMessage?.error ?? 0) > 0
                         ? context.theme.colorScheme.error
-                        : controller.shouldHighlight.value
+                        : shouldHighlight
                             ? context.theme.colorScheme.onBubble(context, controller.chat.isIMessage)
                             : context.theme.colorScheme.outline,
-                    fontWeight: controller.shouldHighlight.value ? FontWeight.w500 : null,
+                    fontWeight: shouldHighlight ? FontWeight.w500 : null,
                   )
                   .apply(fontSizeFactor: 1.1),
               overflow: TextOverflow.clip,
             );
           }),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                CupertinoIcons.forward,
-                color: controller.shouldHighlight.value
-                    ? context.theme.colorScheme.onBubble(context, controller.chat.isIMessage)
-                    : context.theme.colorScheme.outline,
-                size: 15,
-              ),
-              if (controller.chat.muteType == "mute")
-                Padding(
+          Obx(() {
+            final bool shouldHighlight = controller.shouldHighlight.value;
+            final bool isMuted = controller.chat.muteType == "mute";
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _CupertinoArchiveButton(
+                  controller: controller,
+                  isHighlighted: shouldHighlight,
+                ),
+                if (isMuted)
+                  Padding(
                     padding: const EdgeInsets.only(top: 5.0),
                     child: Icon(
                       CupertinoIcons.bell_slash_fill,
-                      color: controller.shouldHighlight.value
+                      color: shouldHighlight
                           ? context.theme.colorScheme.onBubble(context, controller.chat.isIMessage)
                           : context.theme.colorScheme.outline,
                       size: 12,
-                    ))
-            ],
-          ),
+                    ),
+                  ),
+              ],
+            );
+          }),
         ],
+      ),
+    );
+  }
+}
+
+class _CupertinoArchiveButton extends StatelessWidget {
+  const _CupertinoArchiveButton({
+    required this.controller,
+    required this.isHighlighted,
+  });
+
+  final ConversationTileController controller;
+  final bool isHighlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isArchived = controller.chat.isArchived ?? false;
+    final String label = isArchived ? 'Unarchive conversation' : 'Archive conversation';
+
+    void handleActivate() {
+      controller.chat.toggleArchived(!isArchived);
+    }
+
+    final Color iconColor = isHighlighted
+        ? context.theme.colorScheme.onBubble(context, controller.chat.isIMessage)
+        : context.theme.colorScheme.outline;
+
+    return Semantics(
+      button: true,
+      label: label,
+      onTap: handleActivate,
+      onLongPress: handleActivate,
+      child: Tooltip(
+        message: label,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: handleActivate,
+            onLongPress: handleActivate,
+            customBorder: const CircleBorder(),
+            child: Padding(
+              padding: const EdgeInsets.all(6.0),
+              child: Icon(
+                isArchived ? CupertinoIcons.tray_arrow_up : CupertinoIcons.archivebox,
+                color: iconColor,
+                size: 18,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
