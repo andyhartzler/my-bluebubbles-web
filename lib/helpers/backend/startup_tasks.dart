@@ -198,11 +198,6 @@ class StartupTasks {
       updated = true;
     }
 
-    if (!ss.settings.privateSubjectLine.value) {
-      ss.settings.privateSubjectLine.value = true;
-      updated = true;
-    }
-
     if (!ss.settings.finishedSetup.value) {
       ss.settings.finishedSetup.value = true;
       updated = true;
