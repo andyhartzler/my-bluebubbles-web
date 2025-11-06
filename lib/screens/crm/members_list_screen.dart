@@ -451,16 +451,18 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final theme = Theme.of(context);
     final showingChapters = _showingChapters;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: _buildSearchField(),
+    final slivers = <Widget>[
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        sliver: SliverToBoxAdapter(child: _buildSearchField()),
+      ),
+      if (!showingChapters)
+        SliverToBoxAdapter(
+          child: _buildFilterRow(),
         ),
-        if (!showingChapters) _buildFilterRow(),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        sliver: SliverToBoxAdapter(
           child: Text(
             showingChapters
                 ? 'Showing ${_filteredChapters.length} of ${_chapters.length} chapters'
@@ -468,11 +470,18 @@ class _MembersListScreenState extends State<MembersListScreen> {
             style: theme.textTheme.labelMedium,
           ),
         ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: showingChapters ? _buildChaptersList(theme) : _buildMembersGrid(theme),
-        ),
-      ],
+      ),
+      const SliverToBoxAdapter(child: SizedBox(height: 8)),
+      showingChapters ? _buildChaptersSliver(theme) : _buildMembersSliver(theme),
+    ];
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: CustomScrollView(
+        key: const PageStorageKey<String>('members-scroll-view'),
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        slivers: slivers,
+      ),
     );
   }
 
@@ -683,85 +692,116 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return result;
   }
 
-  Widget _buildMembersGrid(ThemeData theme) {
+  Sliver _buildMembersSliver(ThemeData theme) {
     if (_filteredMembers.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _loadData,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          children: [
-            const SizedBox(height: 96),
-            _buildEmptyMembersState(theme),
-          ],
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 96),
+                _buildEmptyMembersState(theme),
+              ],
+            ),
+          ),
         ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          if (width < 600) {
-            return ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-              itemCount: _filteredMembers.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) =>
-                  _buildMemberCard(_filteredMembers[index], index, isMobile: true),
-            );
-          }
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.crossAxisExtent;
+        if (width < 600) {
+          final itemCount = _filteredMembers.length * 2 - 1;
+          return SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  if (index.isOdd) {
+                    return const SizedBox(height: 12);
+                  }
+                  final itemIndex = index ~/ 2;
+                  return _buildMemberCard(
+                    _filteredMembers[itemIndex],
+                    itemIndex,
+                    isMobile: true,
+                  );
+                },
+                childCount: itemCount > 0 ? itemCount : 0,
+              ),
+            ),
+          );
+        }
 
-          final crossAxisCount = width > 1300
-              ? 3
-              : width > 900
-                  ? 2
-                  : 1;
-          final aspectRatio = crossAxisCount == 1 ? 2.4 : 1.6;
+        final crossAxisCount = width > 1300
+            ? 3
+            : width > 900
+                ? 2
+                : 1;
+        final aspectRatio = crossAxisCount == 1 ? 2.4 : 1.6;
 
-          return GridView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        return SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _buildMemberCard(
+                _filteredMembers[index],
+                index,
+                isMobile: false,
+              ),
+              childCount: _filteredMembers.length,
+            ),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
               crossAxisSpacing: 18,
               mainAxisSpacing: 18,
               childAspectRatio: aspectRatio,
             ),
-            itemCount: _filteredMembers.length,
-            itemBuilder: (context, index) =>
-                _buildMemberCard(_filteredMembers[index], index, isMobile: false),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildChaptersList(ThemeData theme) {
+  Sliver _buildChaptersSliver(ThemeData theme) {
     if (_filteredChapters.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _loadData,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          children: [
-            const SizedBox(height: 96),
-            _buildEmptyChaptersState(theme),
-          ],
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 96),
+                _buildEmptyChaptersState(theme),
+              ],
+            ),
+          ),
         ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        itemBuilder: (context, index) => _buildChapterCard(_filteredChapters[index]),
-        separatorBuilder: (_, __) => const SizedBox(height: 16),
-        itemCount: _filteredChapters.length,
+    final itemCount = _filteredChapters.length * 2 - 1;
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            if (index.isOdd) {
+              return const SizedBox(height: 12);
+            }
+            final itemIndex = index ~/ 2;
+            return _buildChapterCard(_filteredChapters[itemIndex]);
+          },
+          childCount: itemCount > 0 ? itemCount : 0,
+        ),
       ),
     );
   }

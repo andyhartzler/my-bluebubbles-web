@@ -212,6 +212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               : const EdgeInsets.fromLTRB(24, 24, 24, 32);
 
           return ListView(
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             padding: padding,
             children: [
               _buildHeader(context, theme, data),

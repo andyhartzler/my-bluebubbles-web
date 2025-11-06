@@ -647,8 +647,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             return const MYDLoadingScreen();
           }
 
+          final bool isMobileWidth = MediaQuery.of(context).size.width < 600;
+          final bool useGradientBackground = ts.isGradientBg(context);
+
           return Scaffold(
-            backgroundColor: context.theme.colorScheme.background.themeOpacity(context),
+            extendBodyBehindAppBar: isMobileWidth,
+            backgroundColor: useGradientBackground
+                ? Colors.transparent
+                : context.theme.colorScheme.background.themeOpacity(context),
             body: Builder(
               builder: (BuildContext context) {
                 if (!serverCompatible && kIsWeb) {
@@ -670,40 +676,57 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   Widget _buildShell(BuildContext context) {
     final theme = Theme.of(context);
     final bool crmReady = CRMConfig.crmEnabled && CRMSupabaseService().isInitialized;
+    final bool useGradientBackground = ts.isGradientBg(context);
 
-    return SafeArea(
-      top: false,
-      bottom: false,
-      child: Column(
-        children: [
-          _buildTopBar(context, crmReady),
-          Expanded(
-            child: Container(
-              color: theme.colorScheme.background,
-              child: PageStorage(
-                bucket: _bucket,
-                child: IndexedStack(
-                  index: _currentSection.index,
-                  children: [
-                    const DashboardScreen(key: PageStorageKey('dashboard-view')),
-                    const MembersListScreen(key: PageStorageKey('members-view'), embed: true),
-                    const MembersListScreen(
-                      key: PageStorageKey('chapters-view'),
-                      embed: true,
-                      showChaptersOnly: true,
-                    ),
-                    const MeetingsScreen(key: PageStorageKey('meetings-view')),
-                    ConversationList(
-                      key: const PageStorageKey('conversations-view'),
-                      showArchivedChats: false,
-                      showUnknownSenders: false,
-                    ),
-                  ],
+    final decoration = BoxDecoration(
+      color: useGradientBackground ? null : theme.colorScheme.background,
+      gradient: useGradientBackground
+          ? LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                theme.colorScheme.surface.withOpacity(0.92),
+                theme.colorScheme.background,
+              ],
+            )
+          : null,
+    );
+
+    return DecoratedBox(
+      decoration: decoration,
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: SizedBox.expand(
+          child: Column(
+            children: [
+              _buildTopBar(context, crmReady),
+              Expanded(
+                child: PageStorage(
+                  bucket: _bucket,
+                  child: IndexedStack(
+                    index: _currentSection.index,
+                    children: [
+                      const DashboardScreen(key: PageStorageKey('dashboard-view')),
+                      const MembersListScreen(key: PageStorageKey('members-view'), embed: true),
+                      const MembersListScreen(
+                        key: PageStorageKey('chapters-view'),
+                        embed: true,
+                        showChaptersOnly: true,
+                      ),
+                      const MeetingsScreen(key: PageStorageKey('meetings-view')),
+                      ConversationList(
+                        key: const PageStorageKey('conversations-view'),
+                        showArchivedChats: false,
+                        showUnknownSenders: false,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

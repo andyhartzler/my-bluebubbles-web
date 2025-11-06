@@ -255,27 +255,31 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       builder: (context, constraints) {
         final filteredMeetings = _filterMeetings(_meetings);
         final isCompact = constraints.maxWidth < 720;
-        final padding = EdgeInsets.fromLTRB(
-          isCompact ? 12 : 32,
-          24,
-          isCompact ? 12 : 32,
-          isCompact ? 16 : 32,
-        );
+        final horizontalPadding = isCompact ? 12.0 : 32.0;
+        final topPadding = 24.0;
+        final bottomPadding = isCompact ? 16.0 : 32.0;
 
-        return Padding(
-          padding: padding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHeader(filteredMeetings.length),
-              const SizedBox(height: 16),
-              _buildFilterControls(isCompact),
-              const SizedBox(height: 24),
-              Expanded(
-                child: _buildMeetingGrid(constraints, filteredMeetings),
+        return CustomScrollView(
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(horizontalPadding, topPadding, horizontalPadding, 0),
+              sliver: SliverToBoxAdapter(
+                child: _buildHeader(filteredMeetings.length),
               ),
-            ],
-          ),
+            ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 0),
+              sliver: SliverToBoxAdapter(
+                child: _buildFilterControls(isCompact),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, bottomPadding),
+              sliver: _buildMeetingSliver(filteredMeetings),
+            ),
+          ],
         );
       },
     );
@@ -320,31 +324,40 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
     );
   }
 
-  Widget _buildMeetingGrid(BoxConstraints constraints, List<Meeting> meetings) {
+  Sliver _buildMeetingSliver(List<Meeting> meetings) {
     if (meetings.isEmpty) {
       final theme = Theme.of(context);
-      return Center(
-        child: Container(
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: theme.colorScheme.outlineVariant ?? theme.dividerColor),
-          ),
-          child: Text(
-            'Adjust your filters or refresh to see more meetings.',
-            style: theme.textTheme.bodyMedium,
-            textAlign: TextAlign.center,
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: theme.colorScheme.outlineVariant ?? theme.dividerColor),
+            ),
+            child: Text(
+              'Adjust your filters or refresh to see more meetings.',
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       );
     }
 
-    return ListView.separated(
-      itemCount: meetings.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        return _buildMeetingPill(meetings[index]);
-      },
+    final itemCount = meetings.length * 2 - 1;
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          if (index.isOdd) {
+            return const SizedBox(height: 12);
+          }
+          final itemIndex = index ~/ 2;
+          return _buildMeetingPill(meetings[itemIndex]);
+        },
+        childCount: itemCount > 0 ? itemCount : 0,
+      ),
     );
   }
 
