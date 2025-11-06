@@ -26,7 +26,9 @@ enum _RecipientMode {
 
 /// Screen for sending bulk individual messages
 class BulkMessageScreen extends StatefulWidget {
-  const BulkMessageScreen({Key? key}) : super(key: key);
+  const BulkMessageScreen({Key? key, this.initialFilter}) : super(key: key);
+
+  final MessageFilter? initialFilter;
 
   @override
   State<BulkMessageScreen> createState() => _BulkMessageScreenState();
@@ -38,7 +40,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   final TextEditingController _messageController = TextEditingController();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
 
-  MessageFilter _filter = MessageFilter();
+  late MessageFilter _filter;
   final List<PlatformFile> _attachments = [];
   _RecipientMode _mode = _RecipientMode.manual;
   List<Member> _previewMembers = [];
@@ -68,7 +70,11 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   @override
   void initState() {
     super.initState();
+    _filter = widget.initialFilter ?? MessageFilter();
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
+    if (_filter.chapterName != null && _filter.chapterName!.isNotEmpty) {
+      _mode = _RecipientMode.chapter;
+    }
     _searchController.addListener(_onSearchChanged);
     if (_crmReady) {
       _loadFilterOptions();
