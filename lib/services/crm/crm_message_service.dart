@@ -25,6 +25,12 @@ import 'supabase_service.dart';
 /// Bridge between CRM and BlueBubbles messaging
 /// Handles bulk messaging by creating individual chats
 class CRMMessageService {
+  CRMMessageService._internal();
+
+  static final CRMMessageService instance = CRMMessageService._internal();
+
+  factory CRMMessageService() => instance;
+
   final MemberRepository _memberRepo = MemberRepository();
   final Map<String, String> _serviceCache = {};
   final LinkedHashMap<String, DateTime> _automationGuardCache = LinkedHashMap();
