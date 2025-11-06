@@ -81,7 +81,7 @@ class _PrivateAPIPanelState extends CustomState<PrivateAPIPanel, void, PrivateAP
                               children: [
                                 const TextSpan(text: "Private API features give you the ability to:\n"),
                                 const TextSpan(text: " - Send tapbacks, effects, and mentions\n"),
-                                const TextSpan(text: " - Send messages with subject lines\n"),
+                                const TextSpan(text: " - Unlock optional subject lines for messages (enable the subject field from Settings)\n"),
                                 if (ss.isMinBigSurSync) const TextSpan(text: " - Send replies\n"),
                                 if (ss.isMinVenturaSync) const TextSpan(text: " - Edit & Unsend messages\n"),
                                 if (ss.isMinBigSurSync) const TextSpan(text: " - Receive Digital Touch messages\n"),

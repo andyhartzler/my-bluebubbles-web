@@ -197,7 +197,7 @@ class SettingsService extends GetxService {
                                 const Text("Private API features give you the ability to:"),
                                 const Text(" - Send & Receive typing indicators"),
                                 const Text(" - Send tapbacks, effects, and mentions"),
-                                const Text(" - Send messages with subject lines"),
+                                const Text(" - Unlock optional subject lines (enable the subject field from Settings)"),
                                 if (isMinBigSurSync) const Text(" - Send replies"),
                                 if (isMinVenturaSync) const Text(" - Edit & Unsend messages"),
                                 const SizedBox(height: 10),
