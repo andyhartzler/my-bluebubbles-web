@@ -5,11 +5,14 @@ import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/chapter_document.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/services/crm/chapter_repository.dart';
+import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 import 'editors/chapter_edit_sheet.dart';
+import 'bulk_message_screen.dart';
 import 'member_detail_screen.dart';
 
 class ChapterDetailScreen extends StatefulWidget {
@@ -25,11 +28,14 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   final ChapterRepository _chapterRepository = ChapterRepository();
   final MemberRepository _memberRepository = MemberRepository();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
+  final CRMMessageService _messageService = CRMMessageService.instance;
 
   bool _loading = true;
   List<Member> _members = [];
   List<ChapterDocument> _documents = [];
   late Chapter _chapter;
+  bool _openingBulkMessage = false;
+  bool _sendingIntro = false;
 
   bool get _crmReady => _supabaseService.isInitialized && CRMConfig.crmEnabled;
 
@@ -99,12 +105,23 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
       appBar: AppBar(
         title: Text(title),
         actions: [
-          if (_crmReady)
+          if (_crmReady) ...[
+            IconButton(
+              icon: const Icon(Icons.chat_outlined),
+              tooltip: 'Send Message to Chapter',
+              onPressed: _openingBulkMessage ? null : _handleSendMessageToChapter,
+            ),
+            IconButton(
+              icon: const Icon(Icons.campaign_outlined),
+              tooltip: 'Send Intro to Chapter',
+              onPressed: _sendingIntro ? null : _handleSendIntroToChapter,
+            ),
             IconButton(
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Edit Chapter',
               onPressed: _editChapter,
             ),
+          ],
         ],
       ),
       body: !_crmReady
@@ -125,6 +142,10 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                     padding: const EdgeInsets.all(16),
                     children: [
                       _buildChapterHeader(context),
+                      if (_crmReady) ...[
+                        const SizedBox(height: 16),
+                        _buildChapterActions(context),
+                      ],
                       const SizedBox(height: 24),
                       ..._buildDocumentsSection(),
                       ..._buildLeadershipSection(),
@@ -133,6 +154,168 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                   ),
                 ),
     );
+  }
+
+  Future<void> _handleSendMessageToChapter() async {
+    if (!_crmReady || _openingBulkMessage) return;
+
+    final filter = MessageFilter(chapterName: _chapter.chapterName);
+
+    setState(() => _openingBulkMessage = true);
+
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BulkMessageScreen(initialFilter: filter),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _openingBulkMessage = false);
+      } else {
+        _openingBulkMessage = false;
+      }
+    }
+  }
+
+  Future<void> _handleSendIntroToChapter() async {
+    if (!_crmReady || _sendingIntro) return;
+
+    final eligibleMembers =
+        _members.where((member) => member.canContact && member.introSentAt == null).length;
+
+    if (eligibleMembers == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No eligible members to receive the intro message.')),
+      );
+      return;
+    }
+
+    final alreadyIntroduced =
+        _members.where((member) => member.canContact && member.introSentAt != null).length;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final introNote = alreadyIntroduced > 0
+            ? '\n\n$alreadyIntroduced member${alreadyIntroduced == 1 ? '' : 's'} have already '
+                'received the intro and will be skipped.'
+            : '';
+        return AlertDialog(
+          title: const Text('Send Intro to Chapter'),
+          content: Text(
+            'Send the standard introduction message to $eligibleMembers '
+            'member${eligibleMembers == 1 ? '' : 's'} in the ${_chapter.chapterName} chapter?$introNote',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Send Intro'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _sendingIntro = true);
+
+    final filter = MessageFilter(chapterName: _chapter.chapterName);
+    int current = 0;
+    int total = eligibleMembers;
+    StateSetter? updateDialog;
+    bool progressDialogVisible = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            updateDialog = setState;
+            final hasTotal = total > 0;
+            final progressValue = hasTotal ? current / total : null;
+            final progressLabel = hasTotal
+                ? 'Sending $current of $total intro messages...'
+                : 'Preparing intro messages...';
+            return AlertDialog(
+              title: const Text('Sending Intro Messages'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LinearProgressIndicator(value: progressValue),
+                  const SizedBox(height: 12),
+                  Text(progressLabel),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).then((_) => progressDialogVisible = false);
+
+    try {
+      final results = await _messageService.sendIntroToFilteredMembers(
+        filter,
+        onProgress: (currentProgress, totalProgress) {
+          current = currentProgress;
+          total = totalProgress;
+          updateDialog?.call(() {});
+        },
+      );
+
+      if (progressDialogVisible) {
+        Navigator.of(context, rootNavigator: true).pop();
+        progressDialogVisible = false;
+      }
+
+      if (!mounted) return;
+
+      final attempted = results.length;
+      final successCount = results.values.where((value) => value).length;
+
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Intro Messages Sent'),
+          content: Text(
+            attempted == 0
+                ? 'No intro messages were sent. No eligible members matched the filter.'
+                : 'Successfully sent intro messages to $successCount of $attempted members.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+
+      await _loadChapter();
+    } catch (e) {
+      if (progressDialogVisible) {
+        Navigator.of(context, rootNavigator: true).pop();
+        progressDialogVisible = false;
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sending intro messages: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _sendingIntro = false);
+      } else {
+        _sendingIntro = false;
+      }
+    }
   }
 
   Widget _buildChapterHeader(BuildContext context) {
@@ -325,6 +508,46 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
               const SizedBox(height: 16),
               ...detailRows,
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChapterActions(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Chapter Actions',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.sms_outlined),
+                  label: const Text('Send Message to Chapter'),
+                  onPressed: _openingBulkMessage ? null : _handleSendMessageToChapter,
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.campaign_outlined),
+                  label: const Text('Send Intro to Chapter'),
+                  onPressed: _sendingIntro ? null : _handleSendIntroToChapter,
+                ),
+              ],
+            ),
           ],
         ),
       ),
