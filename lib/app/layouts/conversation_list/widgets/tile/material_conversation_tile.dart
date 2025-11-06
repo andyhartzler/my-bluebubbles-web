@@ -208,6 +208,7 @@ class _MaterialTrailingState extends CustomState<MaterialTrailing, void, Convers
       child: Obx(() {
         final unread = GlobalChatService.unreadState(controller.chat.guid).value;
         final muteType = GlobalChatService.muteState(controller.chat.guid).value;
+        final shouldHighlight = controller.shouldHighlight.value;
 
         String indicatorText = "";
         if (ss.settings.statusIndicatorsOnChats.value && (cachedLatestMessage?.isFromMe ?? false) && !controller.chat.isGroup) {
@@ -226,24 +227,14 @@ class _MaterialTrailingState extends CustomState<MaterialTrailing, void, Convers
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (kIsDesktop || kIsWeb)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6.0),
-                    child: IconButton(
-                      tooltip: controller.chat.isArchived! ? 'Unarchive' : 'Archive',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                      iconSize: 18,
-                      splashRadius: 18,
-                      icon: Icon(
-                        controller.chat.isArchived! ? Icons.unarchive : Icons.archive_outlined,
-                        color: controller.shouldHighlight.value || unread
-                            ? context.theme.colorScheme.onBackground
-                            : context.theme.colorScheme.outline,
-                      ),
-                      onPressed: () => controller.chat.toggleArchived(!controller.chat.isArchived!),
-                    ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 6.0),
+                  child: _ArchiveToggleButton(
+                    controller: controller,
+                    isUnread: unread,
+                    isHighlighted: shouldHighlight,
                   ),
+                ),
                 Text(
                   (cachedLatestMessage?.error ?? 0) > 0
                       ? "Error"
@@ -253,12 +244,12 @@ class _MaterialTrailingState extends CustomState<MaterialTrailing, void, Convers
                       .copyWith(
                         color: (cachedLatestMessage?.error ?? 0) > 0
                             ? context.theme.colorScheme.error
-                            : controller.shouldHighlight.value || unread
+                            : shouldHighlight || unread
                                 ? context.theme.colorScheme.onBackground
                                 : context.theme.colorScheme.outline,
                         fontWeight: unread
                             ? FontWeight.w600
-                            : controller.shouldHighlight.value
+                            : shouldHighlight
                                 ? FontWeight.w500
                                 : null,
                       )
@@ -289,16 +280,71 @@ class _MaterialTrailingState extends CustomState<MaterialTrailing, void, Convers
                 if (muteType == "mute")
                   const SizedBox(width: 5),
                 if (muteType == "mute")
-                  Obx(() => Icon(
-                        Icons.notifications_off_outlined,
-                        color: controller.shouldHighlight.value || unread ? context.theme.colorScheme.primary : context.theme.colorScheme.outline,
-                        size: 15,
-                      )),
+                  Icon(
+                    Icons.notifications_off_outlined,
+                    color: shouldHighlight || unread
+                        ? context.theme.colorScheme.primary
+                        : context.theme.colorScheme.outline,
+                    size: 15,
+                  ),
               ],
             ),
           ],
         );
     })
+    );
+  }
+}
+
+class _ArchiveToggleButton extends StatelessWidget {
+  const _ArchiveToggleButton({
+    required this.controller,
+    required this.isUnread,
+    required this.isHighlighted,
+  });
+
+  final ConversationTileController controller;
+  final bool isUnread;
+  final bool isHighlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final isArchived = controller.chat.isArchived ?? false;
+    final label = isArchived ? 'Unarchive conversation' : 'Archive conversation';
+
+    void handleActivate() {
+      controller.chat.toggleArchived(!isArchived);
+    }
+
+    final Color iconColor = isHighlighted || isUnread
+        ? context.theme.colorScheme.onBackground
+        : context.theme.colorScheme.outline;
+
+    return Semantics(
+      button: true,
+      label: label,
+      onTap: handleActivate,
+      onLongPress: handleActivate,
+      child: Tooltip(
+        message: label,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: handleActivate,
+            onLongPress: handleActivate,
+            customBorder: const CircleBorder(),
+            splashColor: context.theme.colorScheme.primary.withOpacity(0.12),
+            child: Padding(
+              padding: const EdgeInsets.all(6.0),
+              child: Icon(
+                isArchived ? Icons.unarchive : Icons.archive_outlined,
+                size: 18,
+                color: iconColor,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
