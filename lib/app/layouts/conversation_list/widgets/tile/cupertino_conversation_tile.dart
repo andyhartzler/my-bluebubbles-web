@@ -7,6 +7,7 @@ import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -244,7 +245,7 @@ class _CupertinoTrailingState extends CustomState<CupertinoTrailing, void, Conve
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _CupertinoArchiveButton(
+                _CupertinoDeleteButton(
                   controller: controller,
                   isHighlighted: shouldHighlight,
                 ),
@@ -268,8 +269,8 @@ class _CupertinoTrailingState extends CustomState<CupertinoTrailing, void, Conve
   }
 }
 
-class _CupertinoArchiveButton extends StatelessWidget {
-  const _CupertinoArchiveButton({
+class _CupertinoDeleteButton extends StatelessWidget {
+  const _CupertinoDeleteButton({
     required this.controller,
     required this.isHighlighted,
   });
@@ -279,24 +280,53 @@ class _CupertinoArchiveButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isArchived = controller.chat.isArchived ?? false;
-    final String label = isArchived ? 'Unarchive conversation' : 'Archive conversation';
-
-    void handleActivate() {
-      controller.chat.toggleArchived(!isArchived);
-    }
-
     final Color iconColor = isHighlighted
         ? context.theme.colorScheme.onBubble(context, controller.chat.isIMessage)
         : context.theme.colorScheme.outline;
 
+    Future<void> handleActivate() async {
+      final bool confirmed = await showCupertinoDialog<bool>(
+            context: context,
+            builder: (BuildContext dialogContext) {
+              return CupertinoAlertDialog(
+                title: const Text('Delete Conversation?'),
+                content: const Text(
+                  'Deleting this conversation will permanently remove the chat and its transcript. This action cannot be undone.',
+                ),
+                actions: <Widget>[
+                  CupertinoDialogAction(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  CupertinoDialogAction(
+                    isDestructiveAction: true,
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    child: const Text('Delete'),
+                  ),
+                ],
+              );
+            },
+          ) ??
+          false;
+
+      if (!confirmed) return;
+
+      try {
+        await http.deleteChat(controller.chat.guid);
+        Chat.deleteChat(controller.chat);
+      } catch (error, stackTrace) {
+        showSnackbar('Error', 'Failed to delete the conversation. Please try again.');
+        Logger.error('Failed to delete chat', error: error, trace: stackTrace);
+      }
+    }
+
     return Semantics(
       button: true,
-      label: label,
+      label: 'Delete conversation',
       onTap: handleActivate,
       onLongPress: handleActivate,
       child: Tooltip(
-        message: label,
+        message: 'Delete conversation',
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
@@ -306,7 +336,7 @@ class _CupertinoArchiveButton extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(6.0),
               child: Icon(
-                isArchived ? CupertinoIcons.tray_arrow_up : CupertinoIcons.archivebox,
+                CupertinoIcons.trash,
                 color: iconColor,
                 size: 18,
               ),
