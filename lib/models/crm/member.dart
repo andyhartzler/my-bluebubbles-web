@@ -776,12 +776,35 @@ class MemberProfilePhoto {
     }
 
     final sanitizedBucket = bucket.isEmpty ? _defaultBucket : bucket;
-    if (trimmed.startsWith('storage/v1/object/')) {
-      final normalized = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
-      return Uri.parse(normalized);
+
+    String normalizedPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+
+    const storagePrefix = 'storage/v1/object/';
+    if (normalizedPath.startsWith(storagePrefix)) {
+      normalizedPath = normalizedPath.substring(storagePrefix.length);
+      if (normalizedPath.startsWith('/')) {
+        normalizedPath = normalizedPath.substring(1);
+      }
     }
 
-    final normalizedPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+    final publicBucketPrefix = 'public/$sanitizedBucket/';
+    if (normalizedPath == 'public/$sanitizedBucket') {
+      normalizedPath = '';
+    } else if (normalizedPath.startsWith(publicBucketPrefix)) {
+      normalizedPath = normalizedPath.substring(publicBucketPrefix.length);
+    } else {
+      final bucketPrefix = '$sanitizedBucket/';
+      if (normalizedPath == sanitizedBucket) {
+        normalizedPath = '';
+      } else if (normalizedPath.startsWith(bucketPrefix)) {
+        normalizedPath = normalizedPath.substring(bucketPrefix.length);
+      }
+    }
+
+    if (normalizedPath.startsWith('/')) {
+      normalizedPath = normalizedPath.substring(1);
+    }
+
     final publicPath = 'storage/v1/object/public/$sanitizedBucket/$normalizedPath';
     return Uri.parse(publicPath);
   }
