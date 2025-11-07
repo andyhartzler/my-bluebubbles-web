@@ -340,11 +340,22 @@ class CupertinoOverflowMenu extends StatelessWidget {
 
 
 Future<void> goToSearch(BuildContext context) async {
-  await Navigator.of(context).push(
-    ThemeSwitcher.buildPageRoute(
-      fullscreenDialog: true,
-      builder: (BuildContext context) => const GlobalCrmSearchDialog(),
-    ),
+  await showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    barrierLabel: 'CRM Search',
+    barrierColor: Colors.transparent,
+    transitionDuration: const Duration(milliseconds: 200),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        ),
+        child: const GlobalCrmSearchDialog(),
+      );
+    },
   );
 }
 

@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -25,6 +27,7 @@ class GlobalCrmSearchDialog extends StatefulWidget {
 class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
   final TextEditingController _queryController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final FocusScopeNode _focusScopeNode = FocusScopeNode(debugLabel: 'GlobalCrmSearchDialog');
   final GlobalSearchService _searchService = GlobalSearchService();
   final MeetingRepository _meetingRepository = MeetingRepository();
 
@@ -60,6 +63,7 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
     _queryController.removeListener(_handleQueryChanged);
     _queryController.dispose();
     _focusNode.dispose();
+    _focusScopeNode.dispose();
     super.dispose();
   }
 
@@ -126,53 +130,139 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
-        title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          child: TextField(
-            controller: _queryController,
-            focusNode: _focusNode,
-            textInputAction: TextInputAction.search,
-            onSubmitted: _performSearch,
-            decoration: InputDecoration(
-              hintText: 'Search members, meetings, transcripts, documents...',
-              border: InputBorder.none,
-              suffixIcon: _queryController.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Clear',
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _queryController.clear();
-                        setState(() {
-                          _results = null;
-                          _selectedFacet = null;
-                          _error = null;
-                        });
+    final theme = Theme.of(context);
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+      child: Container(
+        color: Colors.black.withOpacity(0.35),
+        child: SafeArea(
+          child: Shortcuts(
+            shortcuts: const <LogicalKeySet, Intent>{
+              LogicalKeySet(LogicalKeyboardKey.escape): const DismissIntent(),
+              LogicalKeySet(LogicalKeyboardKey.goBack): const DismissIntent(),
+              LogicalKeySet(LogicalKeyboardKey.browserBack): const DismissIntent(),
+            },
+            child: Actions(
+              actions: <Type, Action<Intent>>{
+                DismissIntent: CallbackAction<DismissIntent>(
+                  onInvoke: (intent) {
+                    Navigator.of(context).maybePop();
+                    return null;
+                  },
+                ),
+              },
+              child: FocusTraversalGroup(
+                child: FocusScope(
+                  node: _focusScopeNode,
+                  autofocus: true,
+                  child: Center(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final bool isCompact = constraints.maxWidth < 720;
+                        final double widthFactor = isCompact ? 1 : 0.85;
+                        final double heightFactor = isCompact ? 1 : 0.9;
+                        final BorderRadius borderRadius = isCompact
+                            ? BorderRadius.zero
+                            : BorderRadius.circular(24);
+
+                        return FractionallySizedBox(
+                          widthFactor: widthFactor,
+                          heightFactor: heightFactor,
+                          child: Padding(
+                            padding: EdgeInsets.all(isCompact ? 0 : 24),
+                            child: Material(
+                              color: theme.colorScheme.surface,
+                              elevation: isCompact ? 0 : 16,
+                              borderRadius: borderRadius,
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildHeader(context, isCompact),
+                                  const Divider(height: 1, thickness: 1),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        _buildFacetBar(),
+                                        Expanded(
+                                          child: _buildResultsBody(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
                       },
                     ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Close search',
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
-        ],
       ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, bool isCompact) {
+    final theme = Theme.of(context);
+    final Color searchFieldColor = theme.colorScheme.surfaceVariant
+        .withOpacity(theme.brightness == Brightness.dark ? 0.35 : 0.18);
+
+    return Material(
+      color: theme.colorScheme.surface,
+      elevation: isCompact ? 0 : 2,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(isCompact ? 16 : 24, 16, 16, 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _buildFacetBar(),
             Expanded(
-              child: _buildResultsBody(),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: searchFieldColor,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _queryController,
+                    focusNode: _focusNode,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: _performSearch,
+                    decoration: InputDecoration(
+                      hintText: 'Search members, meetings, transcripts, documents...',
+                      border: InputBorder.none,
+                      suffixIcon: _queryController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear',
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _queryController.clear();
+                                setState(() {
+                                  _results = null;
+                                  _selectedFacet = null;
+                                  _error = null;
+                                });
+                              },
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Tooltip(
+              message: 'Close search',
+              child: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
             ),
           ],
         ),
