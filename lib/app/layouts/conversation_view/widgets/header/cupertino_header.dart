@@ -459,18 +459,15 @@ class _ChatIconAndTitleState extends CustomState<_ChatIconAndTitle, void, Conver
 
   bool _shouldUseCRMName(Member? member) {
     if (member == null) return false;
-    if (controller.chat.isGroup || controller.chat.participants.isEmpty) return false;
-    final handle = controller.chat.participants.first;
-    if (handle.contact == null) return true;
+    if (controller.chat.isGroup || controller.chat.participants.length != 1) return false;
 
-    final trimmedTitle = title.trim();
-    if (trimmedTitle.isEmpty) return true;
-    if (trimmedTitle == handle.address.trim()) return true;
-    final identifier = controller.chat.chatIdentifier?.trim();
-    if (identifier != null && identifier.isNotEmpty && identifier == trimmedTitle) {
-      return true;
-    }
-    return false;
+    final crmName = member.name.trim();
+    if (crmName.isEmpty) return false;
+
+    final customTitle = controller.chat.displayName?.trim();
+    if (customTitle != null && customTitle.isNotEmpty) return false;
+
+    return true;
   }
 
   void _openConversationDetails() {
