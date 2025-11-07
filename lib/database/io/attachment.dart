@@ -2,7 +2,8 @@ import 'dart:convert';
 
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/database/database.dart';
-import 'package:bluebubbles/objectbox.g.dart';
+import 'package:bluebubbles/database/html/objectbox.dart'
+    if (dart.library.io) 'package:bluebubbles/objectbox.g.dart';
 import 'package:bluebubbles/database/io/message.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:collection/collection.dart';

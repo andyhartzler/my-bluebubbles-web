@@ -16,8 +16,8 @@ export 'package:bluebubbles/database/io/launch_at_startup.dart'
     if (dart.library.html) 'package:bluebubbles/database/html/launch_at_startup.dart';
 export 'package:bluebubbles/database/io/message.dart'
     if (dart.library.html) 'package:bluebubbles/database/html/message.dart';
-export 'package:bluebubbles/objectbox.g.dart'
-    if (dart.library.html) 'package:bluebubbles/database/html/objectbox.dart' hide Version;
+export 'package:bluebubbles/database/html/objectbox.dart' hide Version
+    if (dart.library.io) 'package:bluebubbles/objectbox.g.dart';
 export 'package:bluebubbles/database/io/theme.dart'
     if (dart.library.html) 'package:bluebubbles/database/html/theme.dart';
 export 'package:bluebubbles/database/io/theme_entry.dart'
