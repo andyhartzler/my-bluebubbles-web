@@ -1,8 +1,8 @@
 import 'dart:core';
 
 import 'package:bluebubbles/database/database.dart';
-import 'package:bluebubbles/database/html/objectbox.dart'
-    if (dart.library.io) 'package:bluebubbles/objectbox.g.dart';
+import 'package:bluebubbles/objectbox.g.dart'
+    if (dart.library.html) 'package:bluebubbles/database/html/objectbox.dart';
 import 'package:bluebubbles/database/io/theme_entry.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:flutter/foundation.dart';
