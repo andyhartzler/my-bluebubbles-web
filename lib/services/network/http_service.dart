@@ -19,6 +19,8 @@ class HttpService extends GetxService {
   String get origin => originOverride ?? (Uri.parse(ss.settings.serverAddress.value).hasScheme ? Uri.parse(ss.settings.serverAddress.value).origin : '');
   String get apiRoot => "$origin/api/v1";
 
+  String _encodeGuid(String guid) => Uri.encodeComponent(guid);
+
   /// Helper function to build query params, this way we only need to add the
   /// required guid auth param in one place
   Map<String, dynamic> buildQueryParams([Map<String, dynamic> params = const {}]) {
@@ -259,9 +261,10 @@ class HttpService extends GetxService {
 
   /// Get the attachemnt data for the specified [guid]
   Future<Response> attachment(String guid, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.get(
-          "$apiRoot/attachment/$guid",
+          "$apiRoot/attachment/$encodedGuid",
           queryParameters: buildQueryParams(),
           cancelToken: cancelToken
       );
@@ -271,9 +274,10 @@ class HttpService extends GetxService {
 
   /// Get the attachment data for the specified [guid]
   Future<Response> downloadAttachment(String guid, {void Function(int, int)? onReceiveProgress, bool original = false, CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.get(
-          "$apiRoot/attachment/$guid/download",
+          "$apiRoot/attachment/$encodedGuid/download",
           queryParameters: buildQueryParams({"original": original}),
           options: Options(responseType: ResponseType.bytes, receiveTimeout: dio.options.receiveTimeout! * 12, headers: headers),
           cancelToken: cancelToken,
@@ -285,9 +289,10 @@ class HttpService extends GetxService {
 
   /// Get the live photo data for the specified [guid]
   Future<Response> downloadLivePhoto(String guid, {void Function(int, int)? onReceiveProgress, CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.get(
-        "$apiRoot/attachment/$guid/live",
+        "$apiRoot/attachment/$encodedGuid/live",
         queryParameters: buildQueryParams(),
         options: Options(responseType: ResponseType.bytes, receiveTimeout: dio.options.receiveTimeout! * 12, headers: headers),
         cancelToken: cancelToken,
@@ -299,9 +304,10 @@ class HttpService extends GetxService {
 
   /// Get the attachment blurhash for the specified [guid]
   Future<Response> attachmentBlurhash(String guid, {void Function(int, int)? onReceiveProgress, CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.get(
-        "$apiRoot/attachment/$guid/blurhash",
+        "$apiRoot/attachment/$encodedGuid/blurhash",
         queryParameters: buildQueryParams(),
         options: Options(responseType: ResponseType.bytes, receiveTimeout: dio.options.receiveTimeout! * 12, headers: headers),
         cancelToken: cancelToken,
@@ -345,9 +351,10 @@ class HttpService extends GetxService {
   /// [withQuery] options: `"attachment"` / `"attachments"`, `"handle"` / `"handles"`
   /// `"sms"`, `"message.attributedbody"` (set as one string, comma separated, no spaces)
   Future<Response> chatMessages(String guid, {String withQuery = "", String sort = "DESC", int? before, int? after, int offset = 0, int limit = 100, CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.get(
-          "$apiRoot/chat/$guid/message",
+          "$apiRoot/chat/$encodedGuid/message",
           queryParameters: buildQueryParams({"with": withQuery, "sort": sort, "before": before, "after": after, "offset": offset, "limit": limit}),
           cancelToken: cancelToken
       );
@@ -359,9 +366,10 @@ class HttpService extends GetxService {
   /// tells whether to add or remove, and use [address] to specify the address
   /// of the participant to add / remove.
   Future<Response> chatParticipant(String method, String guid, String address, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.post(
-          "$apiRoot/chat/$guid/participant/$method",
+          "$apiRoot/chat/$encodedGuid/participant/$method",
           queryParameters: buildQueryParams(),
           data: {"address": address},
           cancelToken: cancelToken
@@ -372,9 +380,10 @@ class HttpService extends GetxService {
 
   /// Leave a chat
   Future<Response> leaveChat(String guid, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.post(
-          "$apiRoot/chat/$guid/leave",
+          "$apiRoot/chat/$encodedGuid/leave",
           queryParameters: buildQueryParams(),
           cancelToken: cancelToken
       );
@@ -385,9 +394,10 @@ class HttpService extends GetxService {
   /// Update the specified chat (using [guid]). Use [displayName] to specify the
   /// new chat name.
   Future<Response> updateChat(String guid, String displayName, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.put(
-          "$apiRoot/chat/$guid",
+          "$apiRoot/chat/$encodedGuid",
           queryParameters: buildQueryParams(),
           data: {"displayName": displayName},
           cancelToken: cancelToken
@@ -433,9 +443,10 @@ class HttpService extends GetxService {
   /// [withQuery] options: `"participants"`, `"lastmessage"`
   /// (set as one string, comma separated, no spaces)
   Future<Response> singleChat(String guid, {String withQuery = "", CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.get(
-          "$apiRoot/chat/$guid",
+          "$apiRoot/chat/$encodedGuid",
           queryParameters: buildQueryParams({"with": withQuery}),
           cancelToken: cancelToken
       );
@@ -445,9 +456,10 @@ class HttpService extends GetxService {
 
   /// Mark a chat read by its [guid]
   Future<Response> markChatRead(String guid, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.post(
-          "$apiRoot/chat/$guid/read",
+          "$apiRoot/chat/$encodedGuid/read",
           queryParameters: buildQueryParams(),
           cancelToken: cancelToken,
       );
@@ -457,9 +469,10 @@ class HttpService extends GetxService {
 
   /// Mark a chat read by its [guid]
   Future<Response> markChatUnread(String guid, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.post(
-        "$apiRoot/chat/$guid/unread",
+        "$apiRoot/chat/$encodedGuid/unread",
         queryParameters: buildQueryParams(),
         cancelToken: cancelToken,
       );
@@ -470,9 +483,10 @@ class HttpService extends GetxService {
   /// Add or remove a participant (specify [method] as "add" or "remove")
   /// to a chat by its [guid]. Provide a participant [address].
   Future<Response> addRemoveParticipant(String method, String guid, String address, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.post(
-          "$apiRoot/chat/$guid/participant/$method",
+          "$apiRoot/chat/$encodedGuid/participant/$method",
           queryParameters: buildQueryParams(),
           cancelToken: cancelToken,
           data: {"address": address}
@@ -483,9 +497,10 @@ class HttpService extends GetxService {
 
   /// Get a group chat icon by the chat [guid]
   Future<Response> getChatIcon(String guid, {void Function(int, int)? onReceiveProgress, CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.get(
-          "$apiRoot/chat/$guid/icon",
+          "$apiRoot/chat/$encodedGuid/icon",
           queryParameters: buildQueryParams(),
           options: Options(responseType: ResponseType.bytes, receiveTimeout: dio.options.receiveTimeout! * 12, headers: headers),
           cancelToken: cancelToken,
@@ -497,12 +512,13 @@ class HttpService extends GetxService {
 
   /// Get a group chat icon by the chat [guid]
   Future<Response> setChatIcon(String guid, String path, {void Function(int, int)? onSendProgress, CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     final formData = FormData.fromMap({
       "icon": await MultipartFile.fromFile(path),
     });
     return runApiGuarded(() async {
       final response = await dio.post(
-        "$apiRoot/chat/$guid/icon",
+        "$apiRoot/chat/$encodedGuid/icon",
         queryParameters: buildQueryParams(),
         data: formData,
         options: Options(sendTimeout: dio.options.sendTimeout! * 12, receiveTimeout: dio.options.receiveTimeout! * 12, headers: headers),
@@ -515,9 +531,10 @@ class HttpService extends GetxService {
 
   /// Get a group chat icon by the chat [guid]
   Future<Response> deleteChatIcon(String guid, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.delete(
-        "$apiRoot/chat/$guid/icon",
+        "$apiRoot/chat/$encodedGuid/icon",
         queryParameters: buildQueryParams(),
         cancelToken: cancelToken,
       );
@@ -527,9 +544,10 @@ class HttpService extends GetxService {
 
   /// Delete a chat by [guid]
   Future<Response> deleteChat(String guid, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.delete(
-          "$apiRoot/chat/$guid",
+          "$apiRoot/chat/$encodedGuid",
           queryParameters: buildQueryParams(),
           cancelToken: cancelToken
       );
@@ -539,9 +557,11 @@ class HttpService extends GetxService {
 
   /// Delete a message by [guid]
   Future<Response> deleteMessage(String guid, String messageGuid, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
+    final encodedMessageGuid = _encodeGuid(messageGuid);
     return runApiGuarded(() async {
       final response = await dio.delete(
-          "$apiRoot/chat/$guid/$messageGuid",
+          "$apiRoot/chat/$encodedGuid/$encodedMessageGuid",
           queryParameters: buildQueryParams(),
           cancelToken: cancelToken
       );
@@ -589,9 +609,10 @@ class HttpService extends GetxService {
   /// [withQuery] options: `"chats"` / `"chat"`, `"attachment"` / `"attachments"`,
   /// `"chats.participants"` / `"chat.participants"`, `"attributedBody"` (set as one string, comma separated, no spaces)
   Future<Response> singleMessage(String guid, {String withQuery = "", CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.get(
-          "$apiRoot/message/$guid",
+          "$apiRoot/message/$encodedGuid",
           queryParameters: buildQueryParams({"with": withQuery}),
           cancelToken: cancelToken
       );
@@ -601,9 +622,10 @@ class HttpService extends GetxService {
 
   /// Get embedded media for a single digital touch or handwritten message by [guid].
   Future<Response> embeddedMedia(String guid, {void Function(int, int)? onReceiveProgress, CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.get(
-          "$apiRoot/message/$guid/embedded-media",
+          "$apiRoot/message/$encodedGuid/embedded-media",
           queryParameters: buildQueryParams(),
           options: Options(responseType: ResponseType.bytes, receiveTimeout: dio.options.receiveTimeout! * 12, headers: headers),
           cancelToken: cancelToken,
@@ -809,9 +831,10 @@ class HttpService extends GetxService {
 
   /// Get a single handle by [guid]
   Future<Response> handle(String guid, {CancelToken? cancelToken}) async {
+    final encodedGuid = _encodeGuid(guid);
     return runApiGuarded(() async {
       final response = await dio.get(
-          "$apiRoot/handle/$guid",
+          "$apiRoot/handle/$encodedGuid",
           queryParameters: buildQueryParams(),
           cancelToken: cancelToken
       );
