@@ -697,18 +697,31 @@ class MemberProfilePhoto {
 
     if (raw is Map) {
       final map = raw.map((key, value) => MapEntry(key.toString(), value));
-      final String? rawPath = _coerceString(
-            map['storage_path'] ?? map['path'] ?? map['file_path'] ?? map['url'],
-          ) ??
-          (map['publicUrl'] is String ? map['publicUrl'] as String : null);
+      final String? bucketValue =
+          _coerceString(map['bucket'] ?? map['bucket_id']);
+      final String resolvedBucket =
+          bucketValue == null || bucketValue.isEmpty ? _defaultBucket : bucketValue;
+
+      String? rawPath = _coerceString(
+        map['storage_path'] ?? map['path'] ?? map['file_path'] ?? map['url'],
+      );
+      rawPath ??= _coerceString(map['publicUrl'] ?? map['public_url']);
+
+      final String? inferredName = _coerceString(map['filename'] ?? map['name']);
+      if (rawPath == null || rawPath.trim().isEmpty) {
+        if (inferredName != null && inferredName.isNotEmpty) {
+          rawPath = 'storage/v1/object/public/$resolvedBucket/$inferredName';
+        }
+      }
+
       if (rawPath == null || rawPath.trim().isEmpty) {
         throw const FormatException('Missing profile photo path');
       }
 
       return MemberProfilePhoto(
         path: rawPath,
-        bucket: _coerceString(map['bucket']) ?? _defaultBucket,
-        filename: _coerceString(map['filename'] ?? map['name']),
+        bucket: resolvedBucket,
+        filename: inferredName,
         uploadedAt: _coerceDate(map['uploaded_at'] ?? map['created_at']),
         isPrimary: map['primary'] == true,
         metadata: map['metadata'] is Map
