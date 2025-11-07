@@ -1125,16 +1125,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
         ),
       );
     }
-    if (_hasText(member.graduationYear)) {
-      metaChips.add(
-        _buildInfoChip(
-          Icons.school,
-          'Grad ${member.graduationYear!.trim()}',
-          backgroundColor: Colors.white.withOpacity(0.18),
-        ),
-      );
-    }
-
     final borderRadius = BorderRadius.circular(isMobile ? 16 : 24);
     const textColor = Colors.white;
     final detailIconColor = Colors.white.withOpacity(0.92);
@@ -1203,6 +1193,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
                         style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
                                 ?.copyWith(fontWeight: FontWeight.w700, color: textColor) ??
                             TextStyle(fontWeight: FontWeight.w700, color: textColor, fontSize: isMobile ? 18 : 22),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
                       ),
                     ),
                     if (member.optOut)
@@ -1394,6 +1387,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
               value,
               style: textStyle ??
                   const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
             ),
           ),
         ],

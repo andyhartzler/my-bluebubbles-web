@@ -697,20 +697,67 @@ class MemberProfilePhoto {
 
     if (raw is Map) {
       final map = raw.map((key, value) => MapEntry(key.toString(), value));
-      final String? rawPath = _coerceString(
-            map['storage_path'] ?? map['path'] ?? map['file_path'] ?? map['url'],
-          ) ??
-          (map['publicUrl'] is String ? map['publicUrl'] as String : null);
+
+      final String? publicUrlValue =
+          _coerceString(map['publicUrl'] ?? map['public_url']);
+
+      String? bucketValue = _coerceString(
+        map['bucket'] ??
+            map['bucket_id'] ??
+            map['bucketId'] ??
+            map['bucket_name'] ??
+            map['bucketName'],
+      );
+
+      if ((bucketValue == null || bucketValue.isEmpty) && publicUrlValue != null) {
+        bucketValue = _inferBucketFromPath(publicUrlValue);
+      }
+
+      final String resolvedBucket =
+          bucketValue == null || bucketValue.isEmpty ? _defaultBucket : bucketValue;
+
+      String? rawPath = _coerceString(
+        map['storage_path'] ??
+            map['path'] ??
+            map['file_path'] ??
+            map['url'] ??
+            map['public_path'] ??
+            map['publicPath'],
+      );
+
+      rawPath ??= publicUrlValue;
+
+      final String? inferredNameRaw = _coerceString(
+        map['filename'] ??
+            map['file_name'] ??
+            map['fileName'] ??
+            map['name'] ??
+            map['full_path'] ??
+            map['fullPath'],
+      );
+      final String? inferredName =
+          inferredNameRaw == null ? null : _sanitizeObjectName(inferredNameRaw, resolvedBucket);
+
       if (rawPath == null || rawPath.trim().isEmpty) {
+        if (inferredName != null && inferredName.isNotEmpty) {
+          rawPath = 'storage/v1/object/public/$resolvedBucket/$inferredName';
+        } else if (publicUrlValue != null && publicUrlValue.isNotEmpty) {
+          rawPath = publicUrlValue;
+        }
+      }
+
+      final Uri? normalizedUri =
+          rawPath == null ? null : _normalizePath(rawPath, bucket: resolvedBucket);
+      if (normalizedUri == null) {
         throw const FormatException('Missing profile photo path');
       }
 
       return MemberProfilePhoto(
-        path: rawPath,
-        bucket: _coerceString(map['bucket']) ?? _defaultBucket,
-        filename: _coerceString(map['filename'] ?? map['name']),
+        path: normalizedUri.toString(),
+        bucket: resolvedBucket,
+        filename: inferredName?.isNotEmpty == true ? inferredName : null,
         uploadedAt: _coerceDate(map['uploaded_at'] ?? map['created_at']),
-        isPrimary: map['primary'] == true,
+        isPrimary: map['primary'] == true || map['is_primary'] == true,
         metadata: map['metadata'] is Map
             ? Map<String, dynamic>.from(map['metadata'] as Map)
             : null,
@@ -753,17 +800,42 @@ class MemberProfilePhoto {
     final normalized = _normalizePath(path, bucket: bucket);
     if (normalized == null) return null;
 
-    final supabaseUrl = CRMConfig.supabaseUrl;
-    if (supabaseUrl.isEmpty) return normalized.toString();
-
-    final baseUri = Uri.tryParse(supabaseUrl);
-    if (baseUri == null) return normalized.toString();
-
     if (normalized.hasScheme) {
       return normalized.toString();
     }
 
-    return baseUri.resolveUri(normalized).toString();
+    final supabaseUrl = CRMConfig.supabaseUrl;
+    final normalizedPath = normalized.path.startsWith('/')
+        ? normalized.path
+        : '/${normalized.path}';
+    final query = normalized.hasQuery ? normalized.query : null;
+    final fragment = normalized.fragment.isEmpty ? null : normalized.fragment;
+    final normalizedBase = query == null ? normalizedPath : '$normalizedPath?$query';
+    final normalizedString =
+        fragment == null ? normalizedBase : '$normalizedBase#$fragment';
+
+    if (supabaseUrl.isEmpty) {
+      return normalizedString;
+    }
+
+    final baseUri = Uri.tryParse(supabaseUrl);
+    if (baseUri == null || baseUri.host.isEmpty) {
+      return normalizedString;
+    }
+
+    final origin = Uri(
+      scheme: baseUri.scheme.isEmpty ? 'https' : baseUri.scheme,
+      host: baseUri.host,
+      port: baseUri.hasPort ? baseUri.port : null,
+    );
+
+    final resolved = origin.replace(
+      path: normalizedPath,
+      query: query,
+      fragment: fragment,
+    );
+
+    return resolved.toString();
   }
 
   static Uri? _normalizePath(String path, {required String bucket}) {
@@ -807,6 +879,58 @@ class MemberProfilePhoto {
 
     final publicPath = 'storage/v1/object/public/$sanitizedBucket/$normalizedPath';
     return Uri.parse(publicPath);
+  }
+
+  static String? _sanitizeObjectName(String name, String bucket) {
+    var trimmed = name.trim();
+    if (trimmed.isEmpty) return null;
+
+    trimmed = trimmed.replaceAll(RegExp(r'^/+'), '');
+
+    const storagePrefix = 'storage/v1/object/';
+    if (trimmed.startsWith(storagePrefix)) {
+      trimmed = trimmed.substring(storagePrefix.length);
+    }
+
+    const publicPrefix = 'public/';
+    if (trimmed.startsWith(publicPrefix)) {
+      trimmed = trimmed.substring(publicPrefix.length);
+    }
+
+    final bucketPrefix = '$bucket/';
+    if (trimmed == bucket) {
+      trimmed = '';
+    } else if (trimmed.startsWith(bucketPrefix)) {
+      trimmed = trimmed.substring(bucketPrefix.length);
+    }
+
+    return trimmed;
+  }
+
+  static String? _inferBucketFromPath(String path) {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty) return null;
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null) {
+      return _extractBucketFromSegments(uri.pathSegments);
+    }
+
+    final segments = trimmed.split('/').where((segment) => segment.isNotEmpty).toList();
+    return _extractBucketFromSegments(segments);
+  }
+
+  static String? _extractBucketFromSegments(List<String> segments) {
+    if (segments.isEmpty) return null;
+    final publicIndex = segments.indexOf('public');
+    if (publicIndex != -1 && publicIndex + 1 < segments.length) {
+      return segments[publicIndex + 1];
+    }
+
+    final nonEmpty = segments.where((segment) => segment.isNotEmpty).toList();
+    if (nonEmpty.length <= 1) return null;
+
+    return nonEmpty.first;
   }
 
   static String? _coerceString(dynamic value) {
