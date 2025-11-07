@@ -1,5 +1,9 @@
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
+
+import 'package:bluebubbles/config/crm_config.dart';
+
 /// Member model - maps to Supabase 'members' table
 /// This is a separate model from BlueBubbles Contact/Handle
 class Member {
@@ -63,6 +67,7 @@ class Member {
   final String? chapterPosition;
   final DateTime? dateElected;
   final DateTime? termExpiration;
+  final List<MemberProfilePhoto> profilePhotos;
 
   Member({
     required this.id,
@@ -125,7 +130,8 @@ class Member {
     this.chapterPosition,
     this.dateElected,
     this.termExpiration,
-  });
+    List<MemberProfilePhoto> profilePhotos = const [],
+  }) : profilePhotos = List<MemberProfilePhoto>.unmodifiable(profilePhotos);
 
   /// Helper used to normalize free-form Supabase fields that may be stored as
   /// raw strings, JSON objects, or Airtable-style maps.
@@ -372,6 +378,7 @@ class Member {
       termExpiration: json['term_expiration'] != null
           ? DateTime.tryParse(json['term_expiration'] as String)
           : null,
+      profilePhotos: MemberProfilePhoto.parseList(json['profile_pictures']),
     );
   }
 
@@ -438,6 +445,7 @@ class Member {
       'chapter_position': chapterPosition,
       'date_elected': dateElected?.toIso8601String().split('T').first,
       'term_expiration': termExpiration?.toIso8601String().split('T').first,
+      'profile_pictures': profilePhotos.map((photo) => photo.toJson()).toList(),
     };
   }
 
@@ -458,6 +466,16 @@ class Member {
 
   /// Helper: Format committees as string
   String get committeesString => committee?.join(', ') ?? 'None';
+
+  /// Whether the member has at least one stored profile photo reference.
+  bool get hasProfilePhoto => profilePhotos.isNotEmpty;
+
+  /// Best-effort public URL for the member's primary profile photo.
+  String? get primaryProfilePhotoUrl {
+    final primary = profilePhotos.firstWhereOrNull((photo) => photo.isPrimary) ??
+        profilePhotos.firstOrNull;
+    return primary?.publicUrl;
+  }
 
   /// Preferred school/education label prioritizing dedicated columns.
   String? get primarySchool => college ?? highSchool ?? schoolName;
@@ -524,6 +542,7 @@ class Member {
     String? chapterPosition,
     DateTime? dateElected,
     DateTime? termExpiration,
+    List<MemberProfilePhoto>? profilePhotos,
   }) {
     return Member(
       id: id ?? this.id,
@@ -586,6 +605,7 @@ class Member {
       chapterPosition: chapterPosition ?? this.chapterPosition,
       dateElected: dateElected ?? this.dateElected,
       termExpiration: termExpiration ?? this.termExpiration,
+      profilePhotos: profilePhotos ?? this.profilePhotos,
     );
   }
 
@@ -602,6 +622,185 @@ class Member {
       return phoneE164;
     }
 
+    return null;
+  }
+}
+
+class MemberProfilePhoto {
+  MemberProfilePhoto({
+    required this.path,
+    this.bucket = _defaultBucket,
+    this.filename,
+    this.uploadedAt,
+    this.isPrimary = false,
+    this.metadata,
+  });
+
+  static const String _defaultBucket = 'member-photos';
+
+  final String path;
+  final String bucket;
+  final String? filename;
+  final DateTime? uploadedAt;
+  final bool isPrimary;
+  final Map<String, dynamic>? metadata;
+
+  static List<MemberProfilePhoto> parseList(dynamic raw) {
+    if (raw == null) return const [];
+
+    List<dynamic> decoded;
+    if (raw is String) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) return const [];
+      try {
+        final parsed = jsonDecode(trimmed);
+        if (parsed is List) {
+          decoded = parsed;
+        } else {
+          decoded = [parsed];
+        }
+      } catch (_) {
+        decoded = [raw];
+      }
+    } else if (raw is List) {
+      decoded = raw;
+    } else {
+      decoded = [raw];
+    }
+
+    final photos = <MemberProfilePhoto>[];
+    for (final entry in decoded) {
+      try {
+        photos.add(MemberProfilePhoto.fromJson(entry));
+      } catch (_) {
+        continue;
+      }
+    }
+
+    if (photos.isEmpty) return const [];
+
+    if (!photos.any((photo) => photo.isPrimary)) {
+      photos[0] = photos.first.copyWith(isPrimary: true);
+    }
+
+    return List<MemberProfilePhoto>.unmodifiable(photos);
+  }
+
+  factory MemberProfilePhoto.fromJson(dynamic raw) {
+    if (raw == null) {
+      throw const FormatException('Cannot parse null profile photo');
+    }
+
+    if (raw is String) {
+      return MemberProfilePhoto(path: raw);
+    }
+
+    if (raw is Map) {
+      final map = raw.map((key, value) => MapEntry(key.toString(), value));
+      final String? rawPath = _coerceString(
+            map['storage_path'] ?? map['path'] ?? map['file_path'] ?? map['url'],
+          ) ??
+          (map['publicUrl'] is String ? map['publicUrl'] as String : null);
+      if (rawPath == null || rawPath.trim().isEmpty) {
+        throw const FormatException('Missing profile photo path');
+      }
+
+      return MemberProfilePhoto(
+        path: rawPath,
+        bucket: _coerceString(map['bucket']) ?? _defaultBucket,
+        filename: _coerceString(map['filename'] ?? map['name']),
+        uploadedAt: _coerceDate(map['uploaded_at'] ?? map['created_at']),
+        isPrimary: map['primary'] == true,
+        metadata: map['metadata'] is Map
+            ? Map<String, dynamic>.from(map['metadata'] as Map)
+            : null,
+      );
+    }
+
+    throw FormatException('Unsupported profile photo payload: ${raw.runtimeType}');
+  }
+
+  MemberProfilePhoto copyWith({
+    String? path,
+    String? bucket,
+    String? filename,
+    DateTime? uploadedAt,
+    bool? isPrimary,
+    Map<String, dynamic>? metadata,
+  }) {
+    return MemberProfilePhoto(
+      path: path ?? this.path,
+      bucket: bucket ?? this.bucket,
+      filename: filename ?? this.filename,
+      uploadedAt: uploadedAt ?? this.uploadedAt,
+      isPrimary: isPrimary ?? this.isPrimary,
+      metadata: metadata ?? this.metadata,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'bucket': bucket,
+      'path': path,
+      if (filename != null) 'filename': filename,
+      if (uploadedAt != null) 'uploaded_at': uploadedAt!.toIso8601String(),
+      'primary': isPrimary,
+      if (metadata != null) 'metadata': metadata,
+    };
+  }
+
+  String? get publicUrl {
+    final normalized = _normalizePath(path, bucket: bucket);
+    if (normalized == null) return null;
+
+    final supabaseUrl = CRMConfig.supabaseUrl;
+    if (supabaseUrl.isEmpty) return normalized.toString();
+
+    final baseUri = Uri.tryParse(supabaseUrl);
+    if (baseUri == null) return normalized.toString();
+
+    if (normalized.hasScheme) {
+      return normalized.toString();
+    }
+
+    return baseUri.resolveUri(normalized).toString();
+  }
+
+  static Uri? _normalizePath(String path, {required String bucket}) {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty) return null;
+
+    final parsed = Uri.tryParse(trimmed);
+    if (parsed != null && parsed.hasScheme) {
+      return parsed;
+    }
+
+    final sanitizedBucket = bucket.isEmpty ? _defaultBucket : bucket;
+    if (trimmed.startsWith('storage/v1/object/')) {
+      final normalized = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+      return Uri.parse(normalized);
+    }
+
+    final normalizedPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+    final publicPath = 'storage/v1/object/public/$sanitizedBucket/$normalizedPath';
+    return Uri.parse(publicPath);
+  }
+
+  static String? _coerceString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+    return value.toString();
+  }
+
+  static DateTime? _coerceDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
     return null;
   }
 }

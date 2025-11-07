@@ -17,6 +17,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:file_picker/file_picker.dart' as file_picker;
 
 enum _SocialPlatform { instagram, tiktok, x }
 
@@ -47,6 +48,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   bool _hasLoadedAttendance = false;
   String? _attendanceError;
   List<MeetingAttendance> _meetingAttendance = [];
+  bool _uploadingPhoto = false;
 
   bool get _crmReady => _supabaseService.isInitialized;
 
@@ -186,6 +188,55 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     if (!mounted || updated == null) return;
     setState(() => _member = updated);
     _memberLookup.cacheMember(updated);
+  }
+
+  Future<void> _selectProfilePhoto() async {
+    if (!_crmReady || _uploadingPhoto) return;
+
+    final result = await file_picker.FilePicker.platform.pickFiles(
+      type: file_picker.FileType.custom,
+      allowedExtensions: const ['png', 'jpg', 'jpeg', 'heic', 'heif', 'webp'],
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+
+    final picked = result.files.first;
+    final platformFile = PlatformFile(
+      path: picked.path,
+      name: picked.name,
+      size: picked.size,
+      bytes: picked.bytes,
+    );
+
+    setState(() => _uploadingPhoto = true);
+
+    try {
+      final updated = await _memberRepo.uploadProfilePhoto(member: _member, file: platformFile);
+      if (!mounted) return;
+      if (updated != null) {
+        setState(() => _member = updated);
+        _memberLookup.cacheMember(updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile photo updated')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to update profile photo')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading photo: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingPhoto = false);
+      }
+    }
   }
 
   Future<void> _startChat({List<PlatformFile> attachments = const []}) async {
@@ -571,15 +622,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   return ListView(
                     padding: listPadding,
                     children: [
-                      Center(
-                        child: CircleAvatar(
-                          radius: 50,
-                          child: Text(
-                            _member.name[0].toUpperCase(),
-                            style: const TextStyle(fontSize: 32),
-                          ),
-                        ),
-                      ),
+                      Center(child: _buildProfilePhoto()),
                       const SizedBox(height: 16),
                       Center(
                         child: Text(
@@ -625,6 +668,23 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                             runSpacing: 8,
                             alignment: actionsAlignment,
                             children: [
+                              OutlinedButton.icon(
+                                icon: _uploadingPhoto
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : Icon(
+                                        _member.hasProfilePhoto
+                                            ? Icons.photo_camera_outlined
+                                            : Icons.add_a_photo_outlined,
+                                      ),
+                                label: Text(_uploadingPhoto
+                                    ? 'Uploading...'
+                                    : (_member.hasProfilePhoto ? 'Update Photo' : 'Add Photo')),
+                                onPressed: _uploadingPhoto ? null : _selectProfilePhoto,
+                              ),
                               OutlinedButton.icon(
                                 icon: const Icon(Icons.edit_outlined),
                                 label: const Text('Edit Member'),
@@ -740,6 +800,84 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final visible = rows.whereType<Widget>().toList();
     if (visible.isEmpty) return null;
     return _buildSection(title, visible);
+  }
+
+  Widget _buildProfilePhoto() {
+    const double size = 120;
+    final theme = Theme.of(context);
+    final photoUrl = _member.primaryProfilePhotoUrl;
+    final borderColor = theme.colorScheme.primary.withOpacity(0.35);
+
+    Widget buildFallback() {
+      final trimmed = _member.name.trim();
+      final initial = trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '?';
+      return Container(
+        width: size,
+        height: size,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF1B262C), Color(0xFF3282B8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            initial,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 48,
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget content;
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      content = ClipOval(
+        child: Image.network(
+          photoUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => buildFallback(),
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Center(
+              child: SizedBox(
+                width: size * 0.4,
+                height: size * 0.4,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      content = ClipOval(child: buildFallback());
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: borderColor, width: 4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: content,
+    );
   }
 
   Widget _buildSection(String title, List<Widget> children) {

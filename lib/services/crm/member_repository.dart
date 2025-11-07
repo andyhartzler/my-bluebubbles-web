@@ -1,10 +1,14 @@
 import 'dart:collection';
+import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
+import 'package:bluebubbles/database/global/platform_file.dart';
+import 'package:mime_type/mime_type.dart';
+import 'package:universal_io/io.dart' as io;
 
 import 'supabase_service.dart';
 
@@ -580,6 +584,70 @@ class MemberRepository {
       print('❌ Error updating member: $e');
       rethrow;
     }
+  }
+
+  /// Upload a new profile photo for the given member and persist metadata.
+  Future<Member?> uploadProfilePhoto({
+    required Member member,
+    required PlatformFile file,
+    bool makePrimary = true,
+  }) async {
+    if (!_isReady) return null;
+
+    final bytes = await _resolveFileBytes(file);
+    final now = DateTime.now().toUtc();
+    final bucket = 'member-photos';
+    final sanitizedName = _sanitizeFileName(file.name);
+    final path = '${member.id}/$sanitizedName-${now.millisecondsSinceEpoch}';
+    final contentType = mime(file.name) ?? 'application/octet-stream';
+
+    await _writeClient.storage
+        .from(bucket)
+        .uploadBinary(path, bytes, fileOptions: FileOptions(contentType: contentType, upsert: true));
+
+    final newPhoto = MemberProfilePhoto(
+      path: path,
+      bucket: bucket,
+      filename: file.name,
+      uploadedAt: now,
+      isPrimary: makePrimary,
+    );
+
+    final updatedPhotos = <MemberProfilePhoto>[
+      newPhoto,
+      ...member.profilePhotos.map((photo) => makePrimary ? photo.copyWith(isPrimary: false) : photo),
+    ];
+
+    try {
+      final updated = await updateMemberFields(member.id, {
+        'profile_pictures': updatedPhotos.map((photo) => photo.toJson()).toList(),
+      });
+      return updated ?? member.copyWith(profilePhotos: updatedPhotos);
+    } catch (error) {
+      rethrow;
+    }
+  }
+
+  Future<Uint8List> _resolveFileBytes(PlatformFile file) async {
+    if (file.bytes != null) {
+      return file.bytes!;
+    }
+
+    if (file.path != null) {
+      final io.File ioFile = io.File(file.path!);
+      return await ioFile.readAsBytes();
+    }
+
+    throw StateError('Selected file does not contain readable data.');
+  }
+
+  String _sanitizeFileName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      return 'member-photo';
+    }
+    final safe = trimmed.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return safe.replaceAll(RegExp(r'_+'), '_');
   }
 
   /// Search members by name or phone
