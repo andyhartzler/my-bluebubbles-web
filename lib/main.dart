@@ -337,6 +337,8 @@ class Main extends StatelessWidget {
         builder: (context, child) => SafeArea(
           top: false,
           bottom: false,
+          left: false,
+          right: false,
           child: SecureApplication(
             child: Builder(
               builder: (context) {
@@ -696,6 +698,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       child: SafeArea(
         top: false,
         bottom: false,
+        left: false,
+        right: false,
         child: SizedBox.expand(
           child: Column(
             children: [

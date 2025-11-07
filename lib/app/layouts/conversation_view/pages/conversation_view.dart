@@ -111,6 +111,8 @@ class ConversationViewState extends OptimizedState<ConversationView> {
           child: SafeArea(
             top: false,
             bottom: false,
+            left: false,
+            right: false,
             child: Scaffold(
               backgroundColor: ss.settings.windowEffect.value != WindowEffect.disabled ? Colors.transparent : context.theme.colorScheme.background,
               extendBodyBehindAppBar: true,
