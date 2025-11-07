@@ -4,7 +4,11 @@ import 'package:async_task/async_task.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/database/database.dart';
-import 'package:bluebubbles/database/models.dart';
+import 'package:bluebubbles/database/io/message.dart';
+import 'package:bluebubbles/objectbox.g.dart'
+    if (dart.library.html) 'package:bluebubbles/database/html/objectbox.dart';
+import 'package:bluebubbles/database/io/attachment.dart';
+import 'package:bluebubbles/database/io/handle.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
@@ -610,7 +614,12 @@ class Chat {
     if (kIsWeb) return;
     // close the convo view page if open and wait for it to be disposed before deleting
     if (cm.activeChat?.chat.guid == chat.guid) {
-      ns.closeAllConversationView(Get.context!);
+      BuildContext? navContext = Get.context ?? Get.key.currentContext ?? Get.overlayContext;
+      if (navContext != null) {
+        ns.closeAllConversationView(navContext);
+      } else {
+        Logger.debug('No navigator context available while deleting chat ${chat.guid}');
+      }
       await cm.setAllInactive();
       await Future.delayed(const Duration(milliseconds: 500));
     }
@@ -626,7 +635,12 @@ class Chat {
     if (kIsWeb) return;
     // close the convo view page if open and wait for it to be disposed before deleting
     if (cm.activeChat?.chat.guid == chat.guid) {
-      ns.closeAllConversationView(Get.context!);
+      BuildContext? navContext = Get.context ?? Get.key.currentContext ?? Get.overlayContext;
+      if (navContext != null) {
+        ns.closeAllConversationView(navContext);
+      } else {
+        Logger.debug('No navigator context available while soft deleting chat ${chat.guid}');
+      }
       await cm.setAllInactive();
       await Future.delayed(const Duration(milliseconds: 500));
     }

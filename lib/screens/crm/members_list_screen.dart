@@ -69,14 +69,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   int? _availableMinAge;
   int? _availableMaxAge;
 
-  static const List<List<Color>> _cardGradients = [
-    [Color(0xFF273351), Color(0xFF32A6DE)],
-    [Color(0xFF273351), Color(0xFFFDB813)],
-    [Color(0xFF32A6DE), Color(0xFFE63946)],
-    [Color(0xFF6A1B9A), Color(0xFF32A6DE)],
-    [Color(0xFFE63946), Color(0xFF43A047)],
-    [Color(0xFF273351), Color(0xFF6A1B9A)],
-  ];
+  static const List<Color> _memberCardGradient = [Color(0xFF0F4C75), Color(0xFF3282B8)];
 
   @override
   void initState() {
@@ -305,7 +298,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
       return true;
     }).toList()
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      ..sort((a, b) {
+        final aHasPhoto = a.hasProfilePhoto;
+        final bHasPhoto = b.hasProfilePhoto;
+        if (aHasPhoto != bHasPhoto) {
+          return aHasPhoto ? -1 : 1;
+        }
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
 
     return filtered;
   }
@@ -1066,7 +1066,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   Widget _buildMemberCard(Member member, int index, {required bool isMobile}) {
     final theme = Theme.of(context);
-    final gradient = _cardGradients[index % _cardGradients.length];
+    const gradient = _memberCardGradient;
     final phoneDisplay = member.primaryPhone;
     final emailDisplay = _cleanValue(member.preferredEmail);
     final chapterName = _cleanValue(member.chapterName);
@@ -1089,10 +1089,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _buildInfoChip(
           Icons.cake_outlined,
           '$age yrs',
-          backgroundColor:
-              isMobile ? theme.colorScheme.primary.withOpacity(0.08) : null,
-          iconColor: isMobile ? theme.colorScheme.primary : null,
-          textColor: isMobile ? theme.colorScheme.primary : null,
+          backgroundColor: Colors.white.withOpacity(0.18),
         ),
       );
     }
@@ -1101,10 +1098,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _buildInfoChip(
           Icons.auto_awesome,
           zodiac,
-          backgroundColor:
-              isMobile ? theme.colorScheme.primary.withOpacity(0.08) : null,
-          iconColor: isMobile ? theme.colorScheme.primary : null,
-          textColor: isMobile ? theme.colorScheme.primary : null,
+          backgroundColor: Colors.white.withOpacity(0.18),
         ),
       );
     }
@@ -1113,17 +1107,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _buildInfoChip(
           Icons.school,
           'Grad ${member.graduationYear!.trim()}',
-          backgroundColor:
-              isMobile ? theme.colorScheme.primary.withOpacity(0.08) : null,
-          iconColor: isMobile ? theme.colorScheme.primary : null,
-          textColor: isMobile ? theme.colorScheme.primary : null,
+          backgroundColor: Colors.white.withOpacity(0.18),
         ),
       );
     }
 
     final borderRadius = BorderRadius.circular(isMobile ? 16 : 24);
-    final textColor = isMobile ? theme.colorScheme.onSurface : Colors.white;
-    final detailIconColor = isMobile ? theme.colorScheme.primary : Colors.white;
+    const textColor = Colors.white;
+    final detailIconColor = Colors.white.withOpacity(0.92);
     final detailTextStyle = (isMobile ? theme.textTheme.bodyMedium : theme.textTheme.bodyLarge)
             ?.copyWith(color: textColor, fontWeight: FontWeight.w600, height: 1.3) ??
         TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: isMobile ? 13.5 : 14.5);
@@ -1204,34 +1195,44 @@ class _MembersListScreenState extends State<MembersListScreen> {
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildProfileAvatar(member, isMobile: isMobile),
+          const SizedBox(width: 16),
           Expanded(
-            child: Text(
-              member.name,
-              style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
-                      ?.copyWith(fontWeight: FontWeight.w700, color: textColor) ??
-                  TextStyle(fontWeight: FontWeight.w700, color: textColor, fontSize: isMobile ? 18 : 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        member.name,
+                        style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
+                                ?.copyWith(fontWeight: FontWeight.w700, color: textColor) ??
+                            TextStyle(fontWeight: FontWeight.w700, color: textColor, fontSize: isMobile ? 18 : 22),
+                      ),
+                    ),
+                    if (member.optOut)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: isMobile ? 4 : 6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.28),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'Opted Out',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
-          if (member.optOut)
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: isMobile ? 4 : 6),
-              decoration: BoxDecoration(
-                color: isMobile
-                    ? theme.colorScheme.errorContainer
-                    : Colors.black.withOpacity(0.25),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                'Opted Out',
-                style: TextStyle(
-                  color: isMobile
-                      ? theme.colorScheme.onErrorContainer
-                      : Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
         ],
       ),
     ];
@@ -1252,17 +1253,15 @@ class _MembersListScreenState extends State<MembersListScreen> {
       columnChildren.addAll(detailLines);
     }
 
-    columnChildren.addAll([
-      const SizedBox(height: 12),
-      Align(
-        alignment: Alignment.bottomRight,
-        child: TextButton.icon(
-          onPressed: () => _openMember(member),
-          style: TextButton.styleFrom(
-            foregroundColor: isMobile ? theme.colorScheme.primary : Colors.white,
-            backgroundColor: isMobile
-                ? theme.colorScheme.primary.withOpacity(0.08)
-                : Colors.white.withOpacity(0.2),
+      columnChildren.addAll([
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.bottomRight,
+          child: TextButton.icon(
+            onPressed: () => _openMember(member),
+            style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.white.withOpacity(0.18),
             padding: EdgeInsets.symmetric(
               horizontal: isMobile ? 12 : 18,
               vertical: isMobile ? 8 : 10,
@@ -1270,48 +1269,42 @@ class _MembersListScreenState extends State<MembersListScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(isMobile ? 12 : 999),
             ),
-          ),
-          icon: const Icon(Icons.open_in_new, size: 18),
-          label: Text(
-            'View Profile',
-            style: theme.textTheme.labelLarge?.copyWith(
-                  color: isMobile ? theme.colorScheme.primary : Colors.white,
+            ),
+            icon: const Icon(Icons.open_in_new, size: 18),
+            label: Text(
+              'View Profile',
+              style: theme.textTheme.labelLarge?.copyWith(
+                  color: Colors.white,
                   fontSize: isMobile ? 13 : null,
                 ) ??
                 TextStyle(
-                  color: isMobile ? theme.colorScheme.primary : Colors.white,
+                  color: Colors.white,
                   fontSize: isMobile ? 13 : 14,
                 ),
+            ),
           ),
         ),
-      ),
     ]);
+
+    final gradientBackground = const LinearGradient(
+      colors: _memberCardGradient,
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        gradient: isMobile
-            ? null
-            : LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
-        color: isMobile ? theme.colorScheme.surface : null,
+        gradient: gradientBackground,
         borderRadius: borderRadius,
-        border: isMobile ? Border.all(color: theme.colorScheme.outline.withOpacity(0.15)) : null,
-        boxShadow: isMobile
-            ? [
-                BoxShadow(
-                  color: theme.shadowColor.withOpacity(0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 6),
-                ),
-              ]
-            : [
-                BoxShadow(
-                  color: gradient.last.withOpacity(0.22),
-                  blurRadius: 24,
-                  offset: const Offset(0, 14),
-                ),
-              ],
+        boxShadow: [
+          BoxShadow(
+            color: gradient.last.withOpacity(0.28),
+            blurRadius: isMobile ? 16 : 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -1331,6 +1324,77 @@ class _MembersListScreenState extends State<MembersListScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildProfileAvatar(Member member, {required bool isMobile}) {
+    final double size = isMobile ? 56 : 72;
+    final String? photoUrl = member.primaryProfilePhotoUrl;
+    final borderColor = Colors.white.withOpacity(0.35);
+
+    Widget buildFallback() {
+      final trimmed = member.name.trim();
+      final String initial = trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '?';
+      return Container(
+        width: size,
+        height: size,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            colors: [Color(0xFF1B262C), Color(0xFF3282B8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: size * 0.45,
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget content;
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      content = ClipOval(
+        child: Image.network(
+          photoUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => buildFallback(),
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Center(
+              child: SizedBox(
+                width: size * 0.4,
+                height: size * 0.4,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      content = buildFallback();
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: borderColor, width: 2),
+      ),
+      child: content,
     );
   }
 
