@@ -3,9 +3,18 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PasswordScreen extends StatefulWidget {
+  static const String authKey = 'app_authenticated';
+  static const String authTimestampKey = 'app_authenticated_at';
+
   final Widget child;
 
   const PasswordScreen({super.key, required this.child});
+
+  static Future<void> clearSavedAuth({SharedPreferences? prefs}) async {
+    final sharedPrefs = prefs ?? await SharedPreferences.getInstance();
+    await sharedPrefs.remove(authKey);
+    await sharedPrefs.remove(authTimestampKey);
+  }
 
   @override
   State<PasswordScreen> createState() => _PasswordScreenState();
@@ -20,7 +29,6 @@ class _PasswordScreenState extends State<PasswordScreen> {
   bool _isLoading = true;
 
   static const String _correctPassword = 'fucktrump67';
-  static const String _authKey = 'app_authenticated';
 
   @override
   void initState() {
@@ -30,15 +38,25 @@ class _PasswordScreenState extends State<PasswordScreen> {
 
   Future<void> _checkSavedAuth() async {
     final prefs = await SharedPreferences.getInstance();
-    final isAuthenticated = prefs.getBool(_authKey) ?? false;
+    final isAuthenticated = prefs.getBool(PasswordScreen.authKey) ?? false;
+    final lastAuthenticatedAt = prefs.getInt(PasswordScreen.authTimestampKey);
+
+    bool isValid = isAuthenticated;
+    if (isAuthenticated) {
+      final cutoff = DateTime.now().subtract(const Duration(minutes: 30)).millisecondsSinceEpoch;
+      if (lastAuthenticatedAt == null || lastAuthenticatedAt < cutoff) {
+        await PasswordScreen.clearSavedAuth(prefs: prefs);
+        isValid = false;
+      }
+    }
 
     setState(() {
-      _isAuthenticated = isAuthenticated;
+      _isAuthenticated = isValid;
       _isLoading = false;
     });
 
     // Auto-focus the password field after a short delay if not authenticated
-    if (!isAuthenticated) {
+    if (!isValid) {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
           _passwordFocusNode.requestFocus();
@@ -59,7 +77,9 @@ class _PasswordScreenState extends State<PasswordScreen> {
     if (enteredPassword == _correctPassword) {
       // Save authentication state
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_authKey, true);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await prefs.setBool(PasswordScreen.authKey, true);
+      await prefs.setInt(PasswordScreen.authTimestampKey, now);
 
       setState(() {
         _isAuthenticated = true;
