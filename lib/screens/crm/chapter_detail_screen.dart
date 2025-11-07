@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:file_picker/file_picker.dart' as file_picker;
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/chapter.dart';
@@ -10,6 +11,7 @@ import 'package:bluebubbles/services/crm/chapter_repository.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/database/global/platform_file.dart';
 
 import 'editors/chapter_edit_sheet.dart';
 import 'bulk_message_screen.dart';
@@ -36,6 +38,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   late Chapter _chapter;
   bool _openingBulkMessage = false;
   bool _sendingIntro = false;
+  bool _uploadingDocument = false;
 
   bool get _crmReady => _supabaseService.isInitialized && CRMConfig.crmEnabled;
 
@@ -314,6 +317,67 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
         setState(() => _sendingIntro = false);
       } else {
         _sendingIntro = false;
+      }
+    }
+  }
+
+  Future<void> _handleUploadChapterDocument() async {
+    if (!_crmReady || _uploadingDocument) return;
+
+    final result = await file_picker.FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+
+    final picked = result.files.first;
+    final platformFile = PlatformFile(
+      path: picked.path,
+      name: picked.name,
+      size: picked.size,
+      bytes: picked.bytes,
+    );
+
+    setState(() => _uploadingDocument = true);
+
+    try {
+      final uploaded = await _chapterRepository.uploadChapterDocument(
+        chapterName: _chapter.chapterName,
+        file: platformFile,
+      );
+
+      if (!mounted) return;
+
+      if (uploaded != null) {
+        setState(() {
+          final updated = List<ChapterDocument>.from(_documents)
+            ..removeWhere((doc) => doc.id == uploaded.id)
+            ..add(uploaded)
+            ..sort((a, b) => a.documentType.toLowerCase().compareTo(b.documentType.toLowerCase()));
+          _documents = updated;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Uploaded ${uploaded.displayName}')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to upload document.')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading document: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingDocument = false);
+      } else {
+        _uploadingDocument = false;
       }
     }
   }
@@ -607,7 +671,14 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
         _buildSection(
           icon: Icons.description_outlined,
           title: 'Governing Documents',
-          child: const Text('No governing documents have been uploaded for this chapter yet.'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('No governing documents have been uploaded for this chapter yet.'),
+              const SizedBox(height: 12),
+              _buildDocumentUploadButton(),
+            ],
+          ),
         ),
       ];
     }
@@ -629,6 +700,8 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                     'Governing Documents',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
+                  const Spacer(),
+                  _buildDocumentUploadButton(compact: true),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1027,6 +1100,36 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   }
 
   String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
+
+  Widget _buildDocumentUploadButton({bool compact = false}) {
+    final label = _uploadingDocument ? 'Uploading…' : 'Add Document';
+    final iconWidget = _uploadingDocument
+        ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.upload_file_outlined);
+    final onPressed = _uploadingDocument ? null : _handleUploadChapterDocument;
+
+    if (compact) {
+      return TextButton.icon(
+        onPressed: onPressed,
+        icon: iconWidget,
+        label: Text(label),
+        style: TextButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+      );
+    }
+
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: iconWidget,
+      label: Text(label),
+    );
+  }
 
   Uri? _parseUrl(String raw) {
     final trimmed = raw.trim();
