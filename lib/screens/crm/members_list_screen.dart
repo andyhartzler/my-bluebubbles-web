@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -68,11 +70,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
   int? _availableMaxAge;
 
   static const List<List<Color>> _cardGradients = [
-    [Color(0xFF4e54c8), Color(0xFF8f94fb)],
-    [Color(0xFF11998e), Color(0xFF38ef7d)],
-    [Color(0xFFee0979), Color(0xFFff6a00)],
-    [Color(0xFFfc5c7d), Color(0xFF6a82fb)],
-    [Color(0xFF00b09b), Color(0xFF96c93d)],
+    [Color(0xFF273351), Color(0xFF32A6DE)],
+    [Color(0xFF273351), Color(0xFFFDB813)],
+    [Color(0xFF32A6DE), Color(0xFFE63946)],
+    [Color(0xFF6A1B9A), Color(0xFF32A6DE)],
+    [Color(0xFFE63946), Color(0xFF43A047)],
+    [Color(0xFF273351), Color(0xFF6A1B9A)],
   ];
 
   @override
@@ -718,12 +721,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
         if (width < 600) {
           final itemCount = _filteredMembers.length * 2 - 1;
           return SliverPadding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   if (index.isOdd) {
-                    return const SizedBox(height: 12);
+                    return const SizedBox(height: 16);
                   }
                   final itemIndex = index ~/ 2;
                   return _buildMemberCard(
@@ -738,29 +741,52 @@ class _MembersListScreenState extends State<MembersListScreen> {
           );
         }
 
-        final crossAxisCount = width > 1300
-            ? 3
-            : width > 900
-                ? 2
-                : 1;
-        final aspectRatio = crossAxisCount == 1 ? 2.4 : 1.6;
-
         return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          sliver: SliverGrid(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _buildMemberCard(
-                _filteredMembers[index],
-                index,
-                isMobile: false,
-              ),
-              childCount: _filteredMembers.length,
-            ),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 18,
-              mainAxisSpacing: 18,
-              childAspectRatio: aspectRatio,
+          padding: EdgeInsets.fromLTRB(width < 900 ? 16 : 24, 0, width < 900 ? 16 : 24, 32),
+          sliver: SliverToBoxAdapter(
+            child: LayoutBuilder(
+              builder: (context, boxConstraints) {
+                final availableWidth = boxConstraints.maxWidth;
+                const minTileWidth = 280.0;
+                const maxTileWidth = 360.0;
+                const spacing = 20.0;
+
+                int columnCount = math.max(1, (availableWidth / (minTileWidth + spacing)).floor());
+                columnCount = math.min(columnCount, 4);
+                double tileWidth = (availableWidth - spacing * (columnCount - 1)) / columnCount;
+                tileWidth = tileWidth.clamp(minTileWidth, maxTileWidth).toDouble();
+
+                final effectiveColumns = math.min(columnCount, _filteredMembers.length);
+                final wrapWidth = effectiveColumns <= 1
+                    ? tileWidth
+                    : math.min(
+                        availableWidth,
+                        effectiveColumns * tileWidth + spacing * (effectiveColumns - 1),
+                      );
+
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: wrapWidth,
+                    child: Wrap(
+                      spacing: spacing,
+                      runSpacing: spacing,
+                      alignment: WrapAlignment.start,
+                      children: [
+                        for (int i = 0; i < _filteredMembers.length; i++)
+                          SizedBox(
+                            width: tileWidth,
+                            child: _buildMemberCard(
+                              _filteredMembers[i],
+                              i,
+                              isMobile: false,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         );
@@ -790,12 +816,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
     final itemCount = _filteredChapters.length * 2 - 1;
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) {
             if (index.isOdd) {
-              return const SizedBox(height: 12);
+              return const SizedBox(height: 16);
             }
             final itemIndex = index ~/ 2;
             return _buildChapterCard(_filteredChapters[itemIndex]);
@@ -1102,6 +1128,165 @@ class _MembersListScreenState extends State<MembersListScreen> {
             ?.copyWith(color: textColor, fontWeight: FontWeight.w600, height: 1.3) ??
         TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: isMobile ? 13.5 : 14.5);
 
+    final detailLines = <Widget>[];
+    if (chapterName != null) {
+      detailLines.add(
+        _buildDetailLine(
+          Icons.flag_outlined,
+          chapterName,
+          iconColor: detailIconColor,
+          textStyle: detailTextStyle,
+        ),
+      );
+    }
+    if (chapterPosition != null) {
+      detailLines.add(
+        _buildDetailLine(
+          Icons.emoji_events_outlined,
+          chapterPosition,
+          iconColor: detailIconColor,
+          textStyle: detailTextStyle,
+        ),
+      );
+    }
+    if (county != null) {
+      detailLines.add(
+        _buildDetailLine(
+          Icons.map_outlined,
+          county,
+          iconColor: detailIconColor,
+          textStyle: detailTextStyle,
+        ),
+      );
+    }
+    if (districtLabel != null) {
+      detailLines.add(
+        _buildDetailLine(
+          Icons.account_balance,
+          'District $districtLabel',
+          iconColor: detailIconColor,
+          textStyle: detailTextStyle,
+        ),
+      );
+    }
+    if (phoneDisplay != null) {
+      detailLines.add(
+        _buildDetailLine(
+          Icons.phone,
+          phoneDisplay,
+          iconColor: detailIconColor,
+          textStyle: detailTextStyle,
+        ),
+      );
+    }
+    if (emailDisplay != null) {
+      detailLines.add(
+        _buildDetailLine(
+          Icons.email_outlined,
+          emailDisplay,
+          iconColor: detailIconColor,
+          textStyle: detailTextStyle,
+        ),
+      );
+    }
+    if (committeeText.isNotEmpty) {
+      detailLines.add(
+        _buildDetailLine(
+          Icons.groups,
+          committeeText,
+          iconColor: detailIconColor,
+          textStyle: detailTextStyle,
+        ),
+      );
+    }
+
+    final columnChildren = <Widget>[
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              member.name,
+              style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
+                      ?.copyWith(fontWeight: FontWeight.w700, color: textColor) ??
+                  TextStyle(fontWeight: FontWeight.w700, color: textColor, fontSize: isMobile ? 18 : 22),
+            ),
+          ),
+          if (member.optOut)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: isMobile ? 4 : 6),
+              decoration: BoxDecoration(
+                color: isMobile
+                    ? theme.colorScheme.errorContainer
+                    : Colors.black.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'Opted Out',
+                style: TextStyle(
+                  color: isMobile
+                      ? theme.colorScheme.onErrorContainer
+                      : Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+        ],
+      ),
+    ];
+
+    if (metaChips.isNotEmpty) {
+      columnChildren.addAll([
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: metaChips,
+        ),
+      ]);
+    }
+
+    if (detailLines.isNotEmpty) {
+      columnChildren.add(const SizedBox(height: 14));
+      columnChildren.addAll(detailLines);
+    }
+
+    columnChildren.addAll([
+      const SizedBox(height: 12),
+      Align(
+        alignment: Alignment.bottomRight,
+        child: TextButton.icon(
+          onPressed: () => _openMember(member),
+          style: TextButton.styleFrom(
+            foregroundColor: isMobile ? theme.colorScheme.primary : Colors.white,
+            backgroundColor: isMobile
+                ? theme.colorScheme.primary.withOpacity(0.08)
+                : Colors.white.withOpacity(0.2),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 12 : 18,
+              vertical: isMobile ? 8 : 10,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(isMobile ? 12 : 999),
+            ),
+          ),
+          icon: const Icon(Icons.open_in_new, size: 18),
+          label: Text(
+            'View Profile',
+            style: theme.textTheme.labelLarge?.copyWith(
+                  color: isMobile ? theme.colorScheme.primary : Colors.white,
+                  fontSize: isMobile ? 13 : null,
+                ) ??
+                TextStyle(
+                  color: isMobile ? theme.colorScheme.primary : Colors.white,
+                  fontSize: isMobile ? 13 : 14,
+                ),
+          ),
+        ),
+      ),
+    ]);
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
@@ -1134,110 +1319,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
           borderRadius: borderRadius,
           onTap: () => _openMember(member),
           child: Padding(
-            padding: EdgeInsets.all(isMobile ? 16 : 20),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16 : 24,
+              vertical: isMobile ? 16 : 24,
+            ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        member.name,
-                        style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
-                                ?.copyWith(fontWeight: FontWeight.w700, color: textColor) ??
-                            TextStyle(fontWeight: FontWeight.w700, color: textColor, fontSize: isMobile ? 18 : 22),
-                      ),
-                    ),
-                    if (member.optOut)
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: isMobile ? 4 : 6),
-                        decoration: BoxDecoration(
-                          color: isMobile
-                              ? theme.colorScheme.errorContainer
-                              : Colors.black.withOpacity(0.25),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          'Opted Out',
-                          style: TextStyle(
-                            color: isMobile
-                                ? theme.colorScheme.onErrorContainer
-                                : Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                if (metaChips.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: metaChips,
-                  ),
-                ],
-                const SizedBox(height: 10),
-                if (chapterName != null)
-                  _buildDetailLine(Icons.flag_outlined, chapterName,
-                      iconColor: detailIconColor, textStyle: detailTextStyle),
-                if (chapterPosition != null)
-                  _buildDetailLine(Icons.emoji_events_outlined, chapterPosition,
-                      iconColor: detailIconColor, textStyle: detailTextStyle),
-                if (county != null)
-                  _buildDetailLine(Icons.map_outlined, county,
-                      iconColor: detailIconColor, textStyle: detailTextStyle),
-                if (districtLabel != null)
-                  _buildDetailLine(Icons.account_balance, 'District $districtLabel',
-                      iconColor: detailIconColor, textStyle: detailTextStyle),
-                if (phoneDisplay != null)
-                  _buildDetailLine(Icons.phone, phoneDisplay,
-                      iconColor: detailIconColor, textStyle: detailTextStyle),
-                if (emailDisplay != null)
-                  _buildDetailLine(Icons.email_outlined, emailDisplay,
-                      iconColor: detailIconColor, textStyle: detailTextStyle),
-                if (committeeText.isNotEmpty)
-                  _buildDetailLine(Icons.groups, committeeText,
-                      iconColor: detailIconColor, textStyle: detailTextStyle),
-                if (isMobile)
-                  const SizedBox(height: 16)
-                else
-                  const Spacer(),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: TextButton.icon(
-                    onPressed: () => _openMember(member),
-                    style: TextButton.styleFrom(
-                      foregroundColor:
-                          isMobile ? theme.colorScheme.primary : Colors.white,
-                      backgroundColor: isMobile
-                          ? theme.colorScheme.primary.withOpacity(0.08)
-                          : Colors.white.withOpacity(0.2),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 12 : 16,
-                        vertical: isMobile ? 8 : 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(isMobile ? 12 : 999),
-                      ),
-                    ),
-                    icon: const Icon(Icons.open_in_new, size: 18),
-                    label: Text(
-                      'View Profile',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                            color: isMobile ? theme.colorScheme.primary : Colors.white,
-                            fontSize: isMobile ? 13 : null,
-                          ) ??
-                          TextStyle(
-                            color: isMobile ? theme.colorScheme.primary : Colors.white,
-                            fontSize: isMobile ? 13 : 14,
-                          ),
-                    ),
-                  ),
-                ),
-              ],
+              children: columnChildren,
             ),
           ),
         ),
