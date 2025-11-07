@@ -1373,7 +1373,10 @@ class TextFieldComponentState extends State<TextFieldComponent> {
       }
     }
 
-    if ((kIsDesktop || kIsWeb) && ev.logicalKey == LogicalKeyboardKey.enter && !HardwareKeyboard.instance.isShiftPressed) {
+    if (!isChatCreator &&
+        (kIsDesktop || kIsWeb) &&
+        ev.logicalKey == LogicalKeyboardKey.enter &&
+        !HardwareKeyboard.instance.isShiftPressed) {
       sendMessage();
       controller!.focusNode.requestFocus();
       return KeyEventResult.handled;
