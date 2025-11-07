@@ -800,17 +800,42 @@ class MemberProfilePhoto {
     final normalized = _normalizePath(path, bucket: bucket);
     if (normalized == null) return null;
 
-    final supabaseUrl = CRMConfig.supabaseUrl;
-    if (supabaseUrl.isEmpty) return normalized.toString();
-
-    final baseUri = Uri.tryParse(supabaseUrl);
-    if (baseUri == null) return normalized.toString();
-
     if (normalized.hasScheme) {
       return normalized.toString();
     }
 
-    return baseUri.resolveUri(normalized).toString();
+    final supabaseUrl = CRMConfig.supabaseUrl;
+    final normalizedPath = normalized.path.startsWith('/')
+        ? normalized.path
+        : '/${normalized.path}';
+    final query = normalized.hasQuery ? normalized.query : null;
+    final fragment = normalized.fragment.isEmpty ? null : normalized.fragment;
+    final normalizedBase = query == null ? normalizedPath : '$normalizedPath?$query';
+    final normalizedString =
+        fragment == null ? normalizedBase : '$normalizedBase#$fragment';
+
+    if (supabaseUrl.isEmpty) {
+      return normalizedString;
+    }
+
+    final baseUri = Uri.tryParse(supabaseUrl);
+    if (baseUri == null || baseUri.host.isEmpty) {
+      return normalizedString;
+    }
+
+    final origin = Uri(
+      scheme: baseUri.scheme.isEmpty ? 'https' : baseUri.scheme,
+      host: baseUri.host,
+      port: baseUri.hasPort ? baseUri.port : null,
+    );
+
+    final resolved = origin.replace(
+      path: normalizedPath,
+      query: query,
+      fragment: fragment,
+    );
+
+    return resolved.toString();
   }
 
   static Uri? _normalizePath(String path, {required String bucket}) {

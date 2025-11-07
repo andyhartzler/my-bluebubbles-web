@@ -66,4 +66,25 @@ void main() {
       'https://example.supabase.co/storage/v1/object/public/custom-bucket/profile.jpg',
     );
   });
+
+  test('publicUrl ignores rest path in Supabase URL origin', () async {
+    await dotenv.testLoad(
+      fileInput: 'SUPABASE_URL=https://example.supabase.co/rest/v1',
+    );
+
+    final payload = [
+      {
+        'bucket_id': 'member-photos',
+        'name': 'profile.png',
+      },
+    ];
+
+    final photos = MemberProfilePhoto.parseList(payload);
+
+    expect(photos, hasLength(1));
+    expect(
+      photos.first.publicUrl,
+      'https://example.supabase.co/storage/v1/object/public/member-photos/profile.png',
+    );
+  });
 }
