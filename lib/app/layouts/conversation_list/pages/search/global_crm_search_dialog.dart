@@ -138,9 +138,9 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
         child: SafeArea(
           child: Shortcuts(
             shortcuts: const <LogicalKeySet, Intent>{
-              LogicalKeySet(LogicalKeyboardKey.escape): const DismissIntent(),
-              LogicalKeySet(LogicalKeyboardKey.goBack): const DismissIntent(),
-              LogicalKeySet(LogicalKeyboardKey.browserBack): const DismissIntent(),
+              const LogicalKeySet(LogicalKeyboardKey.escape): const DismissIntent(),
+              const LogicalKeySet(LogicalKeyboardKey.goBack): const DismissIntent(),
+              const LogicalKeySet(LogicalKeyboardKey.browserBack): const DismissIntent(),
             },
             child: Actions(
               actions: <Type, Action<Intent>>{
