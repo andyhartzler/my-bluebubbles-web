@@ -1,7 +1,9 @@
 import 'dart:math';
 
 import 'package:bluebubbles/database/database.dart';
-import 'package:bluebubbles/database/models.dart';
+import 'package:bluebubbles/objectbox.g.dart'
+    if (dart.library.html) 'package:bluebubbles/database/html/objectbox.dart';
+import 'package:bluebubbles/database/io/contact.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:faker/faker.dart';
