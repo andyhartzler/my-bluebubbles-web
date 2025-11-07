@@ -396,6 +396,28 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   String? _formatDistrict(String? value) => Member.formatDistrictLabel(value);
 
+  String? _formatMemberPhone(Member member) {
+    final e164 = member.phoneE164?.trim();
+    if (e164 != null && e164.isNotEmpty) {
+      final match = RegExp(r'^\+1(\d{10})$').firstMatch(e164);
+      if (match != null) {
+        final digits = match.group(1)!;
+        final areaCode = digits.substring(0, 3);
+        final prefix = digits.substring(3, 6);
+        final lineNumber = digits.substring(6);
+        return '+1 ($areaCode) $prefix-$lineNumber';
+      }
+      return e164;
+    }
+
+    final fallback = member.phone?.trim();
+    if (fallback != null && fallback.isNotEmpty) {
+      return fallback;
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final body = _buildContent(context);
@@ -1067,23 +1089,24 @@ class _MembersListScreenState extends State<MembersListScreen> {
   Widget _buildMemberCard(Member member, int index, {required bool isMobile}) {
     final theme = Theme.of(context);
     const gradient = _memberCardGradient;
-    final phoneDisplay = member.primaryPhone;
+    final phoneDisplay = _formatMemberPhone(member);
     final emailDisplay = _cleanValue(member.preferredEmail);
-    final chapterName = _cleanValue(member.chapterName);
-    final chapterPosition = _cleanValue(member.chapterPosition);
     final county = _cleanValue(member.county);
     final districtLabel = _formatDistrict(member.congressionalDistrict);
-    final committees = member.committee != null
-        ? member.committee!
-            .map(_cleanValue)
-            .whereType<String>()
-            .toList()
-        : <String>[];
-    final committeeText = committees.join(', ');
     final age = member.age;
     final zodiac = _cleanValue(member.zodiacSign);
+    final joinedDate = member.dateJoined;
 
     final metaChips = <Widget>[];
+    if (districtLabel != null) {
+      metaChips.add(
+        _buildInfoChip(
+          Icons.account_balance,
+          districtLabel,
+          backgroundColor: Colors.white.withOpacity(0.18),
+        ),
+      );
+    }
     if (age != null) {
       metaChips.add(
         _buildInfoChip(
@@ -1120,41 +1143,11 @@ class _MembersListScreenState extends State<MembersListScreen> {
         TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: isMobile ? 13.5 : 14.5);
 
     final detailLines = <Widget>[];
-    if (chapterName != null) {
-      detailLines.add(
-        _buildDetailLine(
-          Icons.flag_outlined,
-          chapterName,
-          iconColor: detailIconColor,
-          textStyle: detailTextStyle,
-        ),
-      );
-    }
-    if (chapterPosition != null) {
-      detailLines.add(
-        _buildDetailLine(
-          Icons.emoji_events_outlined,
-          chapterPosition,
-          iconColor: detailIconColor,
-          textStyle: detailTextStyle,
-        ),
-      );
-    }
     if (county != null) {
       detailLines.add(
         _buildDetailLine(
           Icons.map_outlined,
           county,
-          iconColor: detailIconColor,
-          textStyle: detailTextStyle,
-        ),
-      );
-    }
-    if (districtLabel != null) {
-      detailLines.add(
-        _buildDetailLine(
-          Icons.account_balance,
-          'District $districtLabel',
           iconColor: detailIconColor,
           textStyle: detailTextStyle,
         ),
@@ -1180,11 +1173,11 @@ class _MembersListScreenState extends State<MembersListScreen> {
         ),
       );
     }
-    if (committeeText.isNotEmpty) {
+    if (joinedDate != null) {
       detailLines.add(
         _buildDetailLine(
-          Icons.groups,
-          committeeText,
+          Icons.calendar_month,
+          'Joined ${_formatDate(joinedDate)}',
           iconColor: detailIconColor,
           textStyle: detailTextStyle,
         ),
@@ -1252,39 +1245,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
       columnChildren.add(const SizedBox(height: 14));
       columnChildren.addAll(detailLines);
     }
-
-      columnChildren.addAll([
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.bottomRight,
-          child: TextButton.icon(
-            onPressed: () => _openMember(member),
-            style: TextButton.styleFrom(
-            foregroundColor: Colors.white,
-            backgroundColor: Colors.white.withOpacity(0.18),
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 12 : 18,
-              vertical: isMobile ? 8 : 10,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(isMobile ? 12 : 999),
-            ),
-            ),
-            icon: const Icon(Icons.open_in_new, size: 18),
-            label: Text(
-              'View Profile',
-              style: theme.textTheme.labelLarge?.copyWith(
-                  color: Colors.white,
-                  fontSize: isMobile ? 13 : null,
-                ) ??
-                TextStyle(
-                  color: Colors.white,
-                  fontSize: isMobile ? 13 : 14,
-                ),
-            ),
-          ),
-        ),
-    ]);
 
     final gradientBackground = const LinearGradient(
       colors: _memberCardGradient,
