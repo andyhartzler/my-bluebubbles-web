@@ -87,4 +87,43 @@ void main() {
       'https://example.supabase.co/storage/v1/object/public/member-photos/profile.png',
     );
   });
+
+  test('parseList unwraps nested data objects from Supabase storage responses', () {
+    final payload = {
+      'data': [
+        {
+          'public_url':
+              'https://example.supabase.co/storage/v1/object/public/member-photos/nested.png',
+          'bucket_id': 'member-photos',
+          'name': 'nested.png',
+        },
+      ],
+    };
+
+    final photos = MemberProfilePhoto.parseList(payload);
+
+    expect(photos, hasLength(1));
+    expect(
+      photos.first.publicUrl,
+      'https://example.supabase.co/storage/v1/object/public/member-photos/nested.png',
+    );
+    expect(photos.first.filename, 'nested.png');
+  });
+
+  test('parseList supports keyed map payloads', () {
+    final payload = {
+      '1ab98a1f-fd21-410a-929e-847570452693': {
+        'bucket_id': 'member-photos',
+        'name': '1ab98a1f-fd21-410a-929e-847570452693-instagram.jpeg',
+      },
+    };
+
+    final photos = MemberProfilePhoto.parseList(payload);
+
+    expect(photos, hasLength(1));
+    expect(
+      photos.first.publicUrl,
+      'https://example.supabase.co/storage/v1/object/public/member-photos/1ab98a1f-fd21-410a-929e-847570452693-instagram.jpeg',
+    );
+  });
 }

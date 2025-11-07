@@ -648,33 +648,80 @@ class MemberProfilePhoto {
   static List<MemberProfilePhoto> parseList(dynamic raw) {
     if (raw == null) return const [];
 
-    List<dynamic> decoded;
-    if (raw is String) {
-      final trimmed = raw.trim();
-      if (trimmed.isEmpty) return const [];
-      try {
-        final parsed = jsonDecode(trimmed);
-        if (parsed is List) {
-          decoded = parsed;
-        } else {
-          decoded = [parsed];
-        }
-      } catch (_) {
-        decoded = [raw];
-      }
-    } else if (raw is List) {
-      decoded = raw;
-    } else {
-      decoded = [raw];
-    }
-
+    final pending = <dynamic>[raw];
     final photos = <MemberProfilePhoto>[];
-    for (final entry in decoded) {
-      try {
-        photos.add(MemberProfilePhoto.fromJson(entry));
-      } catch (_) {
+
+    while (pending.isNotEmpty) {
+      final current = pending.removeAt(0);
+      if (current == null) continue;
+
+      if (current is String) {
+        final trimmed = current.trim();
+        if (trimmed.isEmpty) continue;
+
+        try {
+          final decoded = jsonDecode(trimmed);
+          pending.add(decoded);
+          continue;
+        } catch (_) {
+          try {
+            photos.add(MemberProfilePhoto.fromJson(trimmed));
+          } catch (_) {}
+          continue;
+        }
+      }
+
+      if (current is List) {
+        for (final item in current) {
+          pending.add(item);
+        }
         continue;
       }
+
+      if (current is Map) {
+        final normalizedMap =
+            current.map((key, value) => MapEntry(key.toString(), value));
+
+        if (_looksLikePhotoEntry(normalizedMap)) {
+          try {
+            photos.add(MemberProfilePhoto.fromJson(normalizedMap));
+          } catch (_) {}
+          continue;
+        }
+
+        bool pushedNested = false;
+        for (final nestedKey in const [
+          'data',
+          'items',
+          'list',
+          'results',
+          'entries',
+          'photos',
+          'profile_pictures',
+          'profilePhotos',
+          'objects',
+          'files',
+        ]) {
+          if (normalizedMap.containsKey(nestedKey)) {
+            pending.add(normalizedMap[nestedKey]);
+            pushedNested = true;
+          }
+        }
+
+        if (!pushedNested) {
+          for (final value in normalizedMap.values) {
+            if (value is Map || value is List) {
+              pending.add(value);
+            }
+          }
+        }
+
+        continue;
+      }
+
+      try {
+        photos.add(MemberProfilePhoto.fromJson(current));
+      } catch (_) {}
     }
 
     if (photos.isEmpty) return const [];
@@ -940,6 +987,34 @@ class MemberProfilePhoto {
       return trimmed.isEmpty ? null : trimmed;
     }
     return value.toString();
+  }
+
+  static bool _looksLikePhotoEntry(Map<String, dynamic> map) {
+    const candidateKeys = {
+      'public_url',
+      'publicUrl',
+      'url',
+      'public_path',
+      'publicPath',
+      'storage_path',
+      'path',
+      'file_path',
+      'bucket',
+      'bucket_id',
+      'bucketId',
+      'bucket_name',
+      'bucketName',
+      'name',
+      'filename',
+      'file_name',
+      'fileName',
+      'full_path',
+      'fullPath',
+      'primary',
+      'is_primary',
+    };
+
+    return map.keys.any(candidateKeys.contains);
   }
 
   static DateTime? _coerceDate(dynamic value) {
