@@ -689,6 +689,32 @@ class MemberProfilePhoto {
           continue;
         }
 
+        final inferredStrings = <MapEntry<String, String>>[];
+        for (final entry in normalizedMap.entries) {
+          if (entry.value is! String) continue;
+          final coerced = _coerceString(entry.value);
+          if (coerced != null && coerced.isNotEmpty) {
+            inferredStrings.add(MapEntry(entry.key, coerced));
+          }
+        }
+
+        for (final entry in inferredStrings) {
+          final normalized =
+              _normalizePath(entry.value, bucket: _defaultBucket);
+          if (normalized == null) continue;
+
+          final metadata = entry.key.isEmpty
+              ? null
+              : <String, dynamic>{'source': entry.key};
+          photos.add(
+            MemberProfilePhoto(
+              path: normalized.toString(),
+              bucket: _defaultBucket,
+              metadata: metadata,
+            ),
+          );
+        }
+
         bool pushedNested = false;
         for (final nestedKey in const [
           'data',
