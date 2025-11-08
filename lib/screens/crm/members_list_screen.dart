@@ -1341,11 +1341,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
                         softWrap: false,
                       ),
                     ),
-                    if (isExecutive)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: _buildExecutiveBadge(isMobile: isMobile),
-                      ),
                     if (member.optOut)
                       Padding(
                         padding: const EdgeInsets.only(left: 8),
