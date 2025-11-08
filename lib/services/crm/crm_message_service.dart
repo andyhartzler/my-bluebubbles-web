@@ -350,16 +350,68 @@ class CRMMessageService {
     bool includeContactCard = false,
     List<file_picker.PlatformFile> attachments = const [],
   }) async {
+    return _sendSingleMessageImpl(
+      phoneNumber: phoneNumber,
+      message: message,
+      includeContactCard: includeContactCard,
+      attachments: attachments,
+    );
+  }
+
+  @visibleForTesting
+  Future<bool> sendSingleMessageForTest({
+    required String phoneNumber,
+    required String message,
+    bool includeContactCard = false,
+    List<file_picker.PlatformFile> attachments = const [],
+    Future<Chat?> Function(String cleaned)? findExistingChatOverride,
+    Future<Chat?> Function(String cleaned, {Chat? seed})? waitForChatOverride,
+    Future<bool> Function(Chat chat, String message)? queueTextMessageOverride,
+    Future<String> Function(String address)? determineServiceOverride,
+    Future<dynamic> Function(List<String> addresses, String? message, String service)? createChatOverride,
+  }) async {
+    return _sendSingleMessageImpl(
+      phoneNumber: phoneNumber,
+      message: message,
+      includeContactCard: includeContactCard,
+      attachments: attachments,
+      findExistingChatOverride: findExistingChatOverride,
+      waitForChatOverride: waitForChatOverride,
+      queueTextMessageOverride: queueTextMessageOverride,
+      determineServiceOverride: determineServiceOverride,
+      createChatOverride: createChatOverride,
+    );
+  }
+
+  Future<bool> _sendSingleMessageImpl({
+    required String phoneNumber,
+    required String message,
+    bool includeContactCard = false,
+    List<file_picker.PlatformFile> attachments = const [],
+    Future<Chat?> Function(String cleaned)? findExistingChatOverride,
+    Future<Chat?> Function(String cleaned, {Chat? seed})? waitForChatOverride,
+    Future<bool> Function(Chat chat, String message)? queueTextMessageOverride,
+    Future<String> Function(String address)? determineServiceOverride,
+    Future<dynamic> Function(List<String> addresses, String? message, String service)? createChatOverride,
+  }) async {
     if (phoneNumber.isEmpty) return false;
 
     final cleaned = phoneNumber.contains('@') ? phoneNumber : cleansePhoneNumber(phoneNumber);
-    Chat? chat = await _findExistingChat(cleaned);
+    final findChat = findExistingChatOverride ?? _findExistingChat;
+    final waitForChat = waitForChatOverride ?? _waitForChat;
+    final queueText = queueTextMessageOverride ?? _queueTextMessage;
+    final determineService = determineServiceOverride ?? _determineService;
+    final createChat =
+        createChatOverride ?? ((addresses, msg, service) => http.createChat(addresses, msg, service));
+
+    Chat? chat = await findChat(cleaned);
     bool sentViaCreate = false;
+    bool messageQueued = false;
 
     if (chat == null) {
-      final service = await _determineService(cleaned);
+      final service = await determineService(cleaned);
       try {
-        final response = await http.createChat([cleaned], message, service);
+        final response = await createChat([cleaned], message, service);
         sentViaCreate = true;
         final body = response.data;
         Map<String, dynamic>? payload;
@@ -383,31 +435,33 @@ class CRMMessageService {
         }
       } catch (e, stack) {
         Logger.warn('Failed to create chat for $cleaned via API, attempting fallback send', error: e, trace: stack);
-        chat = await _waitForChat(cleaned);
+        chat = await waitForChat(cleaned);
         if (chat == null) {
           return false;
         }
-        final queued = await _queueTextMessage(chat, message);
+        final queued = await queueText(chat, message);
         if (!queued) {
           return false;
         }
+        messageQueued = true;
       }
     }
 
-    if (!sentViaCreate) {
-      chat ??= await _waitForChat(cleaned);
+    if (!sentViaCreate && !messageQueued) {
+      chat ??= await waitForChat(cleaned, seed: chat);
       if (chat == null) {
         return false;
       }
       if (message.trim().isNotEmpty) {
-        final queued = await _queueTextMessage(chat, message);
+        final queued = await queueText(chat, message);
         if (!queued) {
           return false;
         }
+        messageQueued = true;
       }
     }
 
-    final readyChat = await _waitForChat(cleaned, seed: chat);
+    final readyChat = await waitForChat(cleaned, seed: chat);
     if (readyChat == null) {
       Logger.warn('Queued CRM message but could not confirm chat for $cleaned');
       return true;
