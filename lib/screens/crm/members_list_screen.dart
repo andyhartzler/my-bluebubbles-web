@@ -339,46 +339,154 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   static const List<String> _executiveRoleOrder = [
     'president',
-    'executive vice president',
+    'vice president',
     'secretary',
     'treasurer',
     'chief of staff',
-    'executive director',
-    'deputy executive director',
-    'national press secretary',
-    'national communications director',
-    'national organizing director',
-    'national outreach director',
-    'national programming director',
-    'national membership director',
     'young democrats of america representative',
     'young democrats of america representative',
-    'chair communications',
-    'co chair communications',
-    'chair community engagement',
-    'co chair community engagement',
-    'chair development',
-    'co chair development',
-    'chair finance',
-    'co chair finance',
-    'chair fundraising',
-    'co chair fundraising',
-    'chair membership and outreach',
-    'co chair membership and outreach',
-    'chair organizing',
-    'co chair organizing',
-    'chair political affairs',
-    'co chair political affairs',
+    'district 1 representative',
+    'district 2 representative',
+    'district 3 representative',
+    'district 4 representative',
+    'district 5 representative',
+    'district 6 representative',
+    'district 7 representative',
+    'district 8 representative',
+    'college democrats chair',
+    'college democrats co chair',
+    'high school democrats chair',
+    'high school democrats co chair',
+    'communications chair',
+    'communications co chair',
+    'fundraising chair',
+    'fundraising co chair',
+    'membership and outreach chair',
+    'membership and outreach co chair',
+    'policy and advocacy chair',
+    'policy and advocacy co chair',
+    'political affairs chair',
+    'political affairs co chair',
   ];
 
   static String _normalizeExecutiveRole(String? role) {
     if (role == null) return '';
-    final normalized = role
-        .toLowerCase()
+
+    final ordinals = <String, String>{
+      'first': '1st',
+      'second': '2nd',
+      'third': '3rd',
+      'fourth': '4th',
+      'fifth': '5th',
+      'sixth': '6th',
+      'seventh': '7th',
+      'eighth': '8th',
+    };
+
+    var working = role.toLowerCase();
+    ordinals.forEach((word, replacement) {
+      working = working.replaceAll(word, replacement);
+    });
+
+    working = working
+        .replaceAll('cochair', 'co chair')
+        .replaceAll(RegExp(r'[\-–—/]'), ' ')
+        .replaceAll('&', ' and ')
         .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-        .split(' ')
-        .where((part) => part.isNotEmpty);
-    return normalized.join(' ');
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    if (working.isEmpty) return working;
+
+    int? _districtNumberFromMatch(RegExp pattern) {
+      final match = pattern.firstMatch(working);
+      if (match == null) return null;
+      final value = match.group(1);
+      return value == null ? null : int.tryParse(value);
+    }
+
+    final districtPatterns = [
+      RegExp(r'(\d+)(?:st|nd|rd|th)? (?:congressional )?district'),
+      RegExp(r'district (\d+)(?:st|nd|rd|th)?'),
+      RegExp(r'(?:representative|rep) (\d+)(?:st|nd|rd|th)?'),
+    ];
+
+    for (final pattern in districtPatterns) {
+      final districtNumber = _districtNumberFromMatch(pattern);
+      if (districtNumber != null) {
+        return 'district $districtNumber representative';
+      }
+    }
+
+    final containsRepKeyword = working.contains('representative') ||
+        working.contains(' rep') ||
+        working.endsWith('rep');
+
+    if ((working.contains('young democrats of america') ||
+            working.contains('yda')) &&
+        containsRepKeyword) {
+      return 'young democrats of america representative';
+    }
+
+    if (working.contains('vice president')) {
+      return 'vice president';
+    }
+
+    if (working.contains('president')) {
+      return 'president';
+    }
+
+    if (working.contains('secretary')) {
+      return 'secretary';
+    }
+
+    if (working.contains('treasurer')) {
+      return 'treasurer';
+    }
+
+    if (working.contains('chief of staff')) {
+      return 'chief of staff';
+    }
+
+    String? committeeRole(String keyword, String canonicalBase) {
+      if (!working.contains(keyword) || !working.contains('chair')) {
+        return null;
+      }
+      final isCoChair = working.contains('co chair');
+      final suffix = isCoChair ? 'co chair' : 'chair';
+      return '$canonicalBase $suffix';
+    }
+
+    if (working.contains('college democrats') && working.contains('chair')) {
+      return working.contains('co chair')
+          ? 'college democrats co chair'
+          : 'college democrats chair';
+    }
+
+    if (working.contains('high school democrats') && working.contains('chair')) {
+      return working.contains('co chair')
+          ? 'high school democrats co chair'
+          : 'high school democrats chair';
+    }
+
+    final committeeMappings = <String, String>{
+      'communications': 'communications',
+      'fundraising': 'fundraising',
+      'membership and outreach': 'membership and outreach',
+      'membership outreach': 'membership and outreach',
+      'policy and advocacy': 'policy and advocacy',
+      'policy advocacy': 'policy and advocacy',
+      'political affairs': 'political affairs',
+    };
+
+    for (final entry in committeeMappings.entries) {
+      final normalized = committeeRole(entry.key, entry.value);
+      if (normalized != null) {
+        return normalized;
+      }
+    }
+
+    return working;
   }
 
   static int _compareMembers(Member a, Member b) {
