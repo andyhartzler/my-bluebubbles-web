@@ -73,9 +73,6 @@ class Member {
   final String? chapterPosition;
   final DateTime? dateElected;
   final DateTime? termExpiration;
-  final bool executiveCommittee;
-  final String? executiveTitle;
-  final String? executiveRole;
   final List<MemberProfilePhoto> profilePhotos;
   final MemberInternalInfo internalInfo;
 
@@ -146,9 +143,6 @@ class Member {
     this.chapterPosition,
     this.dateElected,
     this.termExpiration,
-    this.executiveCommittee = false,
-    this.executiveTitle,
-    this.executiveRole,
     List<MemberProfilePhoto> profilePhotos = const [],
     MemberInternalInfo internalInfo = const MemberInternalInfo(),
   }) : profilePhotos = List<MemberProfilePhoto>.unmodifiable(profilePhotos),
@@ -421,9 +415,6 @@ class Member {
       termExpiration: json['term_expiration'] != null
           ? DateTime.tryParse(json['term_expiration'] as String)
           : null,
-      executiveCommittee: json['executive_committee'] as bool? ?? false,
-      executiveTitle: _normalizeText(json['executive_title']),
-      executiveRole: _normalizeText(json['executive_role']),
       profilePhotos: MemberProfilePhoto.parseList(json['profile_pictures']),
       internalInfo: MemberInternalInfo.fromJson(json['internal_member_info']),
     );
@@ -498,9 +489,6 @@ class Member {
       'chapter_position': chapterPosition,
       'date_elected': dateElected?.toIso8601String().split('T').first,
       'term_expiration': termExpiration?.toIso8601String().split('T').first,
-      'executive_committee': executiveCommittee,
-      'executive_title': executiveTitle,
-      'executive_role': executiveRole,
       'profile_pictures': profilePhotos.map((photo) => photo.toJson()).toList(),
       'internal_member_info': internalInfo.toJson(),
     };
@@ -528,11 +516,10 @@ class Member {
   bool get hasProfilePhoto => profilePhotos.isNotEmpty;
 
   /// Convenience getter for executive flag used by downstream UI.
-  bool get isExecutive => executive;
+  bool get isExecutive => executiveCommittee;
 
   /// Whether we have any structured internal information available.
-  bool get hasInternalMemberInfo =>
-      internalMemberInfo != null && internalMemberInfo!.isNotEmpty;
+  bool get hasInternalMemberInfo => internalInfo.hasReports;
 
   /// Best-effort public URL for the member's primary profile photo.
   String? get primaryProfilePhotoUrl {
@@ -612,10 +599,6 @@ class Member {
     String? chapterPosition,
     DateTime? dateElected,
     DateTime? termExpiration,
-    bool? executive,
-    String? executiveTitle,
-    String? executiveRole,
-    MemberInternalInfo? internalMemberInfo,
     List<MemberProfilePhoto>? profilePhotos,
     MemberInternalInfo? internalInfo,
   }) {
@@ -686,10 +669,6 @@ class Member {
       chapterPosition: chapterPosition ?? this.chapterPosition,
       dateElected: dateElected ?? this.dateElected,
       termExpiration: termExpiration ?? this.termExpiration,
-      executive: executive ?? this.executive,
-      executiveTitle: executiveTitle ?? this.executiveTitle,
-      executiveRole: executiveRole ?? this.executiveRole,
-      internalMemberInfo: internalMemberInfo ?? this.internalMemberInfo,
       profilePhotos: profilePhotos ?? this.profilePhotos,
       internalInfo: internalInfo ?? this.internalInfo,
     );
