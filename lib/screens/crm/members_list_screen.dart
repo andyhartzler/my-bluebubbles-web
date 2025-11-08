@@ -71,6 +71,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   static const List<Color> _memberCardGradient = [Color(0xFF0F4C75), Color(0xFF3282B8)];
   static const Color _executiveAccentColor = Color(0xFFFDB813);
+  static const int _minAllowedAge = 14;
+  static const int _maxAllowedAge = 36;
 
   @override
   void initState() {
@@ -268,15 +270,16 @@ class _MembersListScreenState extends State<MembersListScreen> {
         continue;
       }
 
-      if (_selectedCommunityType != null && !_equalsIgnoreCase(member.communityType, _selectedCommunityType)) {
-        return false;
+      if (_selectedCommunityType != null &&
+          !_equalsIgnoreCase(member.communityType, _selectedCommunityType)) {
+        continue;
       }
 
       if (leadershipFilterActive) {
         final hasLeadershipRole = _cleanValue(member.chapterPosition) != null;
         final chapterKey = _normalizeKey(member.chapterName);
         if (!hasLeadershipRole || chapterKey == null || !leadershipChapterKeys.contains(chapterKey)) {
-          return false;
+          continue;
         }
       }
 
