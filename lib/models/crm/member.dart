@@ -17,6 +17,8 @@ class Member {
   final String? preferredPronouns;
   final String? genderIdentity;
   final String? address;
+  final String? city;
+  final String? state;
   final String? county;
   final String? congressionalDistrict;
   final String? race;
@@ -61,6 +63,10 @@ class Member {
   final String? passionateIssues;
   final String? whyIssuesMatter;
   final String? areasOfInterest;
+  final bool executiveCommittee;
+  final String? executiveTitle;
+  final String? executiveRole;
+  final String? executiveRoleShort;
   final String? currentChapterMember;
   final String? chapterName;
   final String? graduationYear;
@@ -83,6 +89,8 @@ class Member {
     this.preferredPronouns,
     this.genderIdentity,
     this.address,
+    this.city,
+    this.state,
     this.county,
     this.congressionalDistrict,
     this.race,
@@ -127,6 +135,10 @@ class Member {
     this.passionateIssues,
     this.whyIssuesMatter,
     this.areasOfInterest,
+    this.executiveCommittee = false,
+    this.executiveTitle,
+    this.executiveRole,
+    this.executiveRoleShort,
     this.currentChapterMember,
     this.chapterName,
     this.graduationYear,
@@ -247,27 +259,17 @@ class Member {
     return normalized.toList();
   }
 
-  static bool? coerceBool(dynamic value) {
+  static bool? _normalizeBool(dynamic value) {
     if (value == null) return null;
     if (value is bool) return value;
     if (value is num) return value != 0;
     if (value is String) {
       final normalized = value.trim().toLowerCase();
       if (normalized.isEmpty) return null;
-      switch (normalized) {
-        case 'true':
-        case 't':
-        case 'yes':
-        case 'y':
-        case '1':
-          return true;
-        case 'false':
-        case 'f':
-        case 'no':
-        case 'n':
-        case '0':
-          return false;
-      }
+      const truthy = {'true', 't', '1', 'yes', 'y'};
+      const falsy = {'false', 'f', '0', 'no', 'n'};
+      if (truthy.contains(normalized)) return true;
+      if (falsy.contains(normalized)) return false;
     }
     return null;
   }
@@ -345,6 +347,8 @@ class Member {
       preferredPronouns: _normalizeText(json['preferred_pronouns']),
       genderIdentity: _normalizeText(json['gender_identity']),
       address: _normalizeText(json['address']),
+      city: _normalizeText(json['city'] ?? json['address_city']),
+      state: _normalizeText(json['state'] ?? json['address_state']),
       county: _normalizeText(json['county']),
       congressionalDistrict: normalizeDistrict(json['congressional_district']),
       race: _normalizeText(json['race']),
@@ -398,6 +402,11 @@ class Member {
       passionateIssues: _normalizeText(json['passionate_issues']),
       whyIssuesMatter: _normalizeText(json['why_issues_matter']),
       areasOfInterest: _normalizeText(json['areas_of_interest']),
+      executiveCommittee: _normalizeBool(json['executive_committee']) ?? false,
+      executiveTitle: _normalizeText(json['executive_title']),
+      executiveRole: _normalizeText(json['executive_role']),
+      executiveRoleShort:
+          _normalizeText(json['executive_role_short'] ?? json['executive_role_small']),
       currentChapterMember: _normalizeText(json['current_chapter_member']),
       chapterName: _normalizeText(json['chapter_name']),
       graduationYear: _normalizeText(json['graduation_year']),
@@ -429,6 +438,8 @@ class Member {
       'preferred_pronouns': preferredPronouns,
       'gender_identity': genderIdentity,
       'address': address,
+      'city': city,
+      'state': state,
       'county': county,
       'congressional_district': congressionalDistrict,
       'race': race,
@@ -473,6 +484,10 @@ class Member {
       'passionate_issues': passionateIssues,
       'why_issues_matter': whyIssuesMatter,
       'areas_of_interest': areasOfInterest,
+      'executive_committee': executiveCommittee,
+      'executive_title': executiveTitle,
+      'executive_role': executiveRole,
+      'executive_role_short': executiveRoleShort,
       'current_chapter_member': currentChapterMember,
       'chapter_name': chapterName,
       'graduation_year': graduationYear,
@@ -537,6 +552,8 @@ class Member {
     String? genderIdentity,
     String? address,
     String? county,
+    String? city,
+    String? state,
     String? congressionalDistrict,
     String? race,
     String? sexualOrientation,
@@ -579,6 +596,10 @@ class Member {
     String? passionateIssues,
     String? whyIssuesMatter,
     String? areasOfInterest,
+    bool? executiveCommittee,
+    String? executiveTitle,
+    String? executiveRole,
+    String? executiveRoleShort,
     String? currentChapterMember,
     String? chapterName,
     String? graduationYear,
@@ -607,6 +628,8 @@ class Member {
       genderIdentity: genderIdentity ?? this.genderIdentity,
       address: address ?? this.address,
       county: county ?? this.county,
+      city: city ?? this.city,
+      state: state ?? this.state,
       congressionalDistrict: congressionalDistrict ?? this.congressionalDistrict,
       race: race ?? this.race,
       sexualOrientation: sexualOrientation ?? this.sexualOrientation,
@@ -650,6 +673,10 @@ class Member {
       passionateIssues: passionateIssues ?? this.passionateIssues,
       whyIssuesMatter: whyIssuesMatter ?? this.whyIssuesMatter,
       areasOfInterest: areasOfInterest ?? this.areasOfInterest,
+      executiveCommittee: executiveCommittee ?? this.executiveCommittee,
+      executiveTitle: executiveTitle ?? this.executiveTitle,
+      executiveRole: executiveRole ?? this.executiveRole,
+      executiveRoleShort: executiveRoleShort ?? this.executiveRoleShort,
       currentChapterMember: currentChapterMember ?? this.currentChapterMember,
       chapterName: chapterName ?? this.chapterName,
       graduationYear: graduationYear ?? this.graduationYear,
@@ -669,6 +696,9 @@ class Member {
 
   /// Convenience accessor to prefer personal email while falling back to school email.
   String? get preferredEmail => email ?? schoolEmail;
+
+  /// Shortened executive role display preferring the compact label when available.
+  String? get executiveRoleDisplay => executiveRoleShort ?? executiveRole;
 
   /// Best effort phone display choosing formatted phone first then E.164 value.
   String? get primaryPhone {
