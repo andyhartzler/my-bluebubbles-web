@@ -461,6 +461,43 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
   }
 
+  Future<void> _refreshMember() async {
+    if (!_crmReady || _refreshingMember) return;
+
+    setState(() => _refreshingMember = true);
+
+    try {
+      final refreshed = await _memberRepo.getMemberById(_member.id);
+      if (!mounted) return;
+
+      if (refreshed != null) {
+        setState(() {
+          _member = refreshed;
+          if (!_editingNotes) {
+            _notesController.text = refreshed.notes ?? '';
+          }
+        });
+        _memberLookup.cacheMember(refreshed);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Member refreshed')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to refresh member')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error refreshing member: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _refreshingMember = false);
+      }
+    }
+  }
+
   Future<void> _loadMeetingAttendance() async {
     if (!_crmReady) return;
 
@@ -689,6 +726,22 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         title: Text(_member.name),
         actions: [
           IconButton(
+            icon: _refreshingMember
+                ? SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            onPressed: !_crmReady || _refreshingMember ? null : _refreshMember,
+            tooltip: 'Refresh Member',
+          ),
+          IconButton(
             icon: const Icon(Icons.message),
             onPressed: _member.canContact ? _startChat : null,
             tooltip: 'Start Chat',
@@ -711,18 +764,33 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               ),
             )
           : () {
+              final theme = Theme.of(context);
               final phoneDisplay = _cleanText(_member.phone);
               final phoneE164 = _cleanText(_member.phoneE164);
               final primaryPhone = phoneDisplay ?? phoneE164;
               final phoneCopyValue = phoneE164 ?? phoneDisplay;
               final email = _cleanText(_member.email);
-              final address = _cleanText(_member.address);
               final county = _cleanText(_member.county);
+              final addressParts = _buildAddressParts(
+                street: _member.address,
+                city: _member.city,
+                county: _member.county,
+                state: _member.state,
+              );
+              final addressDisplay =
+                  addressParts.isEmpty ? null : addressParts.join('\n');
+              final addressCopyValue =
+                  addressParts.isEmpty ? null : addressParts.join(', ');
+              final addressLink = _buildAppleMapsLink(addressParts);
               final districtLabel = _formatDistrict(_member.congressionalDistrict);
               final committees = (_member.committee != null && _member.committee!.isNotEmpty)
                   ? _member.committeesString
                   : null;
               final notesValue = _cleanText(_member.notes);
+              final isExecutive = _member.executiveCommittee;
+              final executiveTitle =
+                  _cleanText(_member.executiveTitle) ?? (isExecutive ? 'Executive Committee' : null);
+              final executiveRole = _cleanText(_member.executiveRoleDisplay);
               final chapterStatus = _cleanText(_member.currentChapterMember);
               final chapterName = _cleanText(_member.chapterName);
               final chapterPosition = _cleanText(_member.chapterPosition);
@@ -740,7 +808,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   _copyRow('Phone', primaryPhone, copyValue: phoneCopyValue),
                   _copyRow('Email', email),
                   _copyRow('School Email', schoolEmail),
-                  _infoRowOrNull('Address', address),
+                  _copyRow('Address', addressDisplay,
+                      copyValue: addressCopyValue, link: addressLink),
                 ]),
                 _buildOptionalSection('Chapter Involvement', [
                   _infoRowOrNull('Current Chapter Member', chapterStatus),
@@ -946,9 +1015,33 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                       Center(child: _buildProfilePhoto()),
                       const SizedBox(height: 16),
                       Center(
-                        child: Text(
-                          _member.name,
-                          style: Theme.of(context).textTheme.headlineSmall,
+                        child: Column(
+                          children: [
+                            Text(
+                              _member.name,
+                              style: theme.textTheme.headlineSmall,
+                              textAlign: TextAlign.center,
+                            ),
+                            if (isExecutive && (executiveTitle != null || executiveRole != null)) ...[
+                              const SizedBox(height: 6),
+                              if (executiveTitle != null)
+                                Text(
+                                  executiveTitle,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              if (executiveRole != null)
+                                Text(
+                                  executiveRole,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.75),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                            ],
+                          ],
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1104,6 +1197,51 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             ),
       link: link,
     );
+  }
+
+  List<String> _buildAddressParts({
+    String? street,
+    String? city,
+    String? county,
+    String? state,
+  }) {
+    final parts = <String>[];
+    final streetValue = _cleanText(street);
+    final cityValue = _cleanText(city);
+    final countyValue = _cleanText(county);
+    final stateValue = _cleanText(state);
+
+    if (streetValue != null) {
+      parts.add(streetValue);
+    }
+    if (cityValue != null) {
+      parts.add(cityValue);
+    }
+    if (countyValue != null) {
+      final normalizedCounty = countyValue.toLowerCase().contains('county')
+          ? countyValue
+          : '$countyValue County';
+      final alreadyPresent = parts.any(
+        (part) => part.toLowerCase() == normalizedCounty.toLowerCase(),
+      );
+      if (!alreadyPresent) {
+        parts.add(normalizedCounty);
+      }
+    }
+    if (stateValue != null) {
+      parts.add(stateValue);
+    }
+
+    return parts;
+  }
+
+  Uri? _buildAppleMapsLink(List<String> parts) {
+    final query = parts
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .join(', ');
+    if (query.isEmpty) return null;
+    return Uri.https('maps.apple.com', '/', {'q': query});
   }
 
   Widget? _socialRow(_SocialPlatform platform, String label, String? value) {

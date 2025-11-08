@@ -876,6 +876,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
   TextFieldComponentState() : isRecordingNotifier = ValueNotifier<bool>(false);
 
   bool _enterSendInProgress = false;
+  bool _enterKeyPressed = false;
   Timer? _enterSendResetTimer;
   static const Duration _enterSendGuardTimeout = Duration(seconds: 10);
 
@@ -1182,7 +1183,8 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     final isEnterWithoutShift = ev.logicalKey == LogicalKeyboardKey.enter && !HardwareKeyboard.instance.isShiftPressed;
 
     if (isChatCreator && isEnterWithoutShift && ev is KeyUpEvent) {
-      _resetEnterSendGuard(force: true);
+      _enterKeyPressed = false;
+      _resetEnterSendGuard();
       return KeyEventResult.handled;
     }
 
@@ -1208,22 +1210,28 @@ class TextFieldComponentState extends State<TextFieldComponent> {
 
     if (isChatCreator) {
       if (isEnterWithoutShift) {
-        if (_enterSendInProgress) {
+        final wasKeyAlreadyPressed = _enterKeyPressed;
+        if (_enterSendInProgress || wasKeyAlreadyPressed) {
+          _enterKeyPressed = true;
           return KeyEventResult.handled;
         }
 
+        _enterKeyPressed = true;
+        
         _enterSendInProgress = true;
         _enterSendResetTimer?.cancel();
         _enterSendResetTimer = Timer(_enterSendGuardTimeout, () => _resetEnterSendGuard(force: true));
 
         try {
           final sendFuture = sendMessage();
-          unawaited(sendFuture.catchError((error, stackTrace) {
-            _resetEnterSendGuard();
+          unawaited(sendFuture.then((_) {
+            _onEnterSendPipelineFinished();
+          }, onError: (error, stackTrace) {
+            _onEnterSendPipelineFinished(forceReset: true);
             Error.throwWithStackTrace(error, stackTrace);
           }));
         } catch (error, stackTrace) {
-          _resetEnterSendGuard();
+          _onEnterSendPipelineFinished(forceReset: true);
           Error.throwWithStackTrace(error, stackTrace);
         }
         return KeyEventResult.handled;
@@ -1398,13 +1406,25 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     return KeyEventResult.ignored;
   }
 
+  void _onEnterSendPipelineFinished({bool forceReset = false}) {
+    _enterSendInProgress = false;
+    if (forceReset) {
+      _resetEnterSendGuard(force: true);
+    } else {
+      _resetEnterSendGuard();
+    }
+  }
+
   void _resetEnterSendGuard({bool force = false}) {
-    if (!force && HardwareKeyboard.instance.physicalKeysPressed.contains(PhysicalKeyboardKey.enter)) {
-      return;
+    if (!force) {
+      if (_enterSendInProgress || _enterKeyPressed) {
+        return;
+      }
     }
 
     _enterSendResetTimer?.cancel();
     _enterSendResetTimer = null;
     _enterSendInProgress = false;
+    _enterKeyPressed = false;
   }
 }

@@ -17,6 +17,8 @@ class Member {
   final String? preferredPronouns;
   final String? genderIdentity;
   final String? address;
+  final String? city;
+  final String? state;
   final String? county;
   final String? congressionalDistrict;
   final String? race;
@@ -61,12 +63,19 @@ class Member {
   final String? passionateIssues;
   final String? whyIssuesMatter;
   final String? areasOfInterest;
+  final bool executiveCommittee;
+  final String? executiveTitle;
+  final String? executiveRole;
+  final String? executiveRoleShort;
   final String? currentChapterMember;
   final String? chapterName;
   final String? graduationYear;
   final String? chapterPosition;
   final DateTime? dateElected;
   final DateTime? termExpiration;
+  final bool executiveCommittee;
+  final String? executiveTitle;
+  final String? executiveRole;
   final List<MemberProfilePhoto> profilePhotos;
   final MemberInternalInfo internalInfo;
 
@@ -81,6 +90,8 @@ class Member {
     this.preferredPronouns,
     this.genderIdentity,
     this.address,
+    this.city,
+    this.state,
     this.county,
     this.congressionalDistrict,
     this.race,
@@ -125,12 +136,19 @@ class Member {
     this.passionateIssues,
     this.whyIssuesMatter,
     this.areasOfInterest,
+    this.executiveCommittee = false,
+    this.executiveTitle,
+    this.executiveRole,
+    this.executiveRoleShort,
     this.currentChapterMember,
     this.chapterName,
     this.graduationYear,
     this.chapterPosition,
     this.dateElected,
     this.termExpiration,
+    this.executiveCommittee = false,
+    this.executiveTitle,
+    this.executiveRole,
     List<MemberProfilePhoto> profilePhotos = const [],
     MemberInternalInfo internalInfo = const MemberInternalInfo(),
   }) : profilePhotos = List<MemberProfilePhoto>.unmodifiable(profilePhotos),
@@ -244,6 +262,21 @@ class Member {
     return normalized.toList();
   }
 
+  static bool? _normalizeBool(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized.isEmpty) return null;
+      const truthy = {'true', 't', '1', 'yes', 'y'};
+      const falsy = {'false', 'f', '0', 'no', 'n'};
+      if (truthy.contains(normalized)) return true;
+      if (falsy.contains(normalized)) return false;
+    }
+    return null;
+  }
+
 
   /// Attempt to pull a human readable value out of loosely formatted JSON blobs.
   static String? _extractCommonValue(String source) {
@@ -317,6 +350,8 @@ class Member {
       preferredPronouns: _normalizeText(json['preferred_pronouns']),
       genderIdentity: _normalizeText(json['gender_identity']),
       address: _normalizeText(json['address']),
+      city: _normalizeText(json['city'] ?? json['address_city']),
+      state: _normalizeText(json['state'] ?? json['address_state']),
       county: _normalizeText(json['county']),
       congressionalDistrict: normalizeDistrict(json['congressional_district']),
       race: _normalizeText(json['race']),
@@ -370,6 +405,11 @@ class Member {
       passionateIssues: _normalizeText(json['passionate_issues']),
       whyIssuesMatter: _normalizeText(json['why_issues_matter']),
       areasOfInterest: _normalizeText(json['areas_of_interest']),
+      executiveCommittee: _normalizeBool(json['executive_committee']) ?? false,
+      executiveTitle: _normalizeText(json['executive_title']),
+      executiveRole: _normalizeText(json['executive_role']),
+      executiveRoleShort:
+          _normalizeText(json['executive_role_short'] ?? json['executive_role_small']),
       currentChapterMember: _normalizeText(json['current_chapter_member']),
       chapterName: _normalizeText(json['chapter_name']),
       graduationYear: _normalizeText(json['graduation_year']),
@@ -381,6 +421,9 @@ class Member {
       termExpiration: json['term_expiration'] != null
           ? DateTime.tryParse(json['term_expiration'] as String)
           : null,
+      executiveCommittee: json['executive_committee'] as bool? ?? false,
+      executiveTitle: _normalizeText(json['executive_title']),
+      executiveRole: _normalizeText(json['executive_role']),
       profilePhotos: MemberProfilePhoto.parseList(json['profile_pictures']),
       internalInfo: MemberInternalInfo.fromJson(json['internal_member_info']),
     );
@@ -399,6 +442,8 @@ class Member {
       'preferred_pronouns': preferredPronouns,
       'gender_identity': genderIdentity,
       'address': address,
+      'city': city,
+      'state': state,
       'county': county,
       'congressional_district': congressionalDistrict,
       'race': race,
@@ -443,12 +488,19 @@ class Member {
       'passionate_issues': passionateIssues,
       'why_issues_matter': whyIssuesMatter,
       'areas_of_interest': areasOfInterest,
+      'executive_committee': executiveCommittee,
+      'executive_title': executiveTitle,
+      'executive_role': executiveRole,
+      'executive_role_short': executiveRoleShort,
       'current_chapter_member': currentChapterMember,
       'chapter_name': chapterName,
       'graduation_year': graduationYear,
       'chapter_position': chapterPosition,
       'date_elected': dateElected?.toIso8601String().split('T').first,
       'term_expiration': termExpiration?.toIso8601String().split('T').first,
+      'executive_committee': executiveCommittee,
+      'executive_title': executiveTitle,
+      'executive_role': executiveRole,
       'profile_pictures': profilePhotos.map((photo) => photo.toJson()).toList(),
       'internal_member_info': internalInfo.toJson(),
     };
@@ -475,6 +527,13 @@ class Member {
   /// Whether the member has at least one stored profile photo reference.
   bool get hasProfilePhoto => profilePhotos.isNotEmpty;
 
+  /// Convenience getter for executive flag used by downstream UI.
+  bool get isExecutive => executive;
+
+  /// Whether we have any structured internal information available.
+  bool get hasInternalMemberInfo =>
+      internalMemberInfo != null && internalMemberInfo!.isNotEmpty;
+
   /// Best-effort public URL for the member's primary profile photo.
   String? get primaryProfilePhotoUrl {
     final primary = profilePhotos.firstWhereOrNull((photo) => photo.isPrimary) ??
@@ -498,6 +557,8 @@ class Member {
     String? genderIdentity,
     String? address,
     String? county,
+    String? city,
+    String? state,
     String? congressionalDistrict,
     String? race,
     String? sexualOrientation,
@@ -540,6 +601,10 @@ class Member {
     String? passionateIssues,
     String? whyIssuesMatter,
     String? areasOfInterest,
+    bool? executiveCommittee,
+    String? executiveTitle,
+    String? executiveRole,
+    String? executiveRoleShort,
     String? currentChapterMember,
     String? chapterName,
     String? graduationYear,
@@ -547,6 +612,10 @@ class Member {
     String? chapterPosition,
     DateTime? dateElected,
     DateTime? termExpiration,
+    bool? executive,
+    String? executiveTitle,
+    String? executiveRole,
+    MemberInternalInfo? internalMemberInfo,
     List<MemberProfilePhoto>? profilePhotos,
     MemberInternalInfo? internalInfo,
   }) {
@@ -562,6 +631,8 @@ class Member {
       genderIdentity: genderIdentity ?? this.genderIdentity,
       address: address ?? this.address,
       county: county ?? this.county,
+      city: city ?? this.city,
+      state: state ?? this.state,
       congressionalDistrict: congressionalDistrict ?? this.congressionalDistrict,
       race: race ?? this.race,
       sexualOrientation: sexualOrientation ?? this.sexualOrientation,
@@ -605,12 +676,20 @@ class Member {
       passionateIssues: passionateIssues ?? this.passionateIssues,
       whyIssuesMatter: whyIssuesMatter ?? this.whyIssuesMatter,
       areasOfInterest: areasOfInterest ?? this.areasOfInterest,
+      executiveCommittee: executiveCommittee ?? this.executiveCommittee,
+      executiveTitle: executiveTitle ?? this.executiveTitle,
+      executiveRole: executiveRole ?? this.executiveRole,
+      executiveRoleShort: executiveRoleShort ?? this.executiveRoleShort,
       currentChapterMember: currentChapterMember ?? this.currentChapterMember,
       chapterName: chapterName ?? this.chapterName,
       graduationYear: graduationYear ?? this.graduationYear,
       chapterPosition: chapterPosition ?? this.chapterPosition,
       dateElected: dateElected ?? this.dateElected,
       termExpiration: termExpiration ?? this.termExpiration,
+      executive: executive ?? this.executive,
+      executiveTitle: executiveTitle ?? this.executiveTitle,
+      executiveRole: executiveRole ?? this.executiveRole,
+      internalMemberInfo: internalMemberInfo ?? this.internalMemberInfo,
       profilePhotos: profilePhotos ?? this.profilePhotos,
       internalInfo: internalInfo ?? this.internalInfo,
     );
@@ -618,6 +697,9 @@ class Member {
 
   /// Convenience accessor to prefer personal email while falling back to school email.
   String? get preferredEmail => email ?? schoolEmail;
+
+  /// Shortened executive role display preferring the compact label when available.
+  String? get executiveRoleDisplay => executiveRoleShort ?? executiveRole;
 
   /// Best effort phone display choosing formatted phone first then E.164 value.
   String? get primaryPhone {
@@ -630,6 +712,127 @@ class Member {
     }
 
     return null;
+  }
+}
+
+class MemberInternalInfo {
+  MemberInternalInfo._(Map<String, dynamic> data)
+      : _data = Map<String, dynamic>.unmodifiable(data);
+
+  final Map<String, dynamic> _data;
+
+  factory MemberInternalInfo._fromMap(Map<dynamic, dynamic> raw) {
+    final normalized = <String, dynamic>{};
+    raw.forEach((key, value) {
+      final keyString = key.toString().trim();
+      if (keyString.isEmpty) return;
+      final normalizedValue = _normalizeValue(value);
+      if (normalizedValue != null) {
+        normalized[keyString] = normalizedValue;
+      }
+    });
+    return MemberInternalInfo._(normalized);
+  }
+
+  static MemberInternalInfo? tryParse(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is MemberInternalInfo) return raw;
+
+    if (raw is Map) {
+      if (raw.isEmpty) return null;
+      return MemberInternalInfo._fromMap(raw);
+    }
+
+    if (raw is Iterable) {
+      final normalizedList = raw
+          .map(_normalizeValue)
+          .where((element) => element != null)
+          .cast<dynamic>()
+          .toList();
+      if (normalizedList.isEmpty) return null;
+      return MemberInternalInfo._({'items': normalizedList});
+    }
+
+    if (raw is String) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) return null;
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map) {
+          if (decoded.isEmpty) return null;
+          return MemberInternalInfo._fromMap(decoded);
+        }
+        if (decoded is Iterable) {
+          final normalizedList = decoded
+              .map(_normalizeValue)
+              .where((element) => element != null)
+              .cast<dynamic>()
+              .toList();
+          if (normalizedList.isEmpty) return null;
+          return MemberInternalInfo._({'items': normalizedList});
+        }
+      } catch (_) {
+        // Fallback to treating the string as free-form text value.
+      }
+
+      final normalizedValue = _normalizeValue(trimmed);
+      if (normalizedValue == null) return null;
+      return MemberInternalInfo._({'value': normalizedValue});
+    }
+
+    final normalizedValue = _normalizeValue(raw);
+    if (normalizedValue == null) return null;
+    return MemberInternalInfo._({'value': normalizedValue});
+  }
+
+  Map<String, dynamic> toJson() => Map<String, dynamic>.from(_data);
+
+  bool get isEmpty => _data.isEmpty;
+
+  bool get isNotEmpty => _data.isNotEmpty;
+
+  dynamic operator [](String key) => _data[key];
+
+  static dynamic _normalizeValue(dynamic value) {
+    if (value == null) return null;
+
+    if (value is bool) return value;
+    if (value is num) return value;
+    if (value is DateTime) return value.toIso8601String();
+
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+      final boolCandidate = Member.coerceBool(trimmed);
+      if (boolCandidate != null) return boolCandidate;
+      final normalized = Member._normalizeText(trimmed);
+      return normalized ?? trimmed;
+    }
+
+    if (value is Map) {
+      final nested = <String, dynamic>{};
+      value.forEach((key, nestedValue) {
+        final keyString = key.toString().trim();
+        if (keyString.isEmpty) return;
+        final normalizedNested = _normalizeValue(nestedValue);
+        if (normalizedNested != null) {
+          nested[keyString] = normalizedNested;
+        }
+      });
+      return nested.isEmpty ? null : nested;
+    }
+
+    if (value is Iterable) {
+      final list = value
+          .map(_normalizeValue)
+          .where((element) => element != null)
+          .cast<dynamic>()
+          .toList();
+      return list.isEmpty ? null : list;
+    }
+
+    final normalized = Member._normalizeText(value);
+    return normalized ?? value.toString();
   }
 }
 
