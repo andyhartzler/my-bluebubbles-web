@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -21,6 +22,10 @@ class MembersListScreen extends StatefulWidget {
 
   const MembersListScreen({Key? key, this.embed = false, this.showChaptersOnly = false})
       : super(key: key);
+
+  @visibleForTesting
+  static int compareMembersForTesting(Member a, Member b) =>
+      _MembersListScreenState._compareMembers(a, b);
 
   @override
   State<MembersListScreen> createState() => _MembersListScreenState();
@@ -334,7 +339,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   static const List<String> _executiveRoleOrder = [
     'president',
-    'vice president',
+    'executive vice president',
     'secretary',
     'treasurer',
     'chief of staff',
@@ -347,17 +352,26 @@ class _MembersListScreenState extends State<MembersListScreen> {
     'national programming director',
     'national membership director',
     'young democrats of america representative',
+    'young democrats of america representative',
+    'chair communications',
     'co chair communications',
+    'chair community engagement',
     'co chair community engagement',
+    'chair development',
     'co chair development',
+    'chair finance',
     'co chair finance',
+    'chair fundraising',
     'co chair fundraising',
+    'chair membership and outreach',
     'co chair membership and outreach',
+    'chair organizing',
     'co chair organizing',
+    'chair political affairs',
     'co chair political affairs',
   ];
 
-  String _normalizeExecutiveRole(String? role) {
+  static String _normalizeExecutiveRole(String? role) {
     if (role == null) return '';
     final normalized = role
         .toLowerCase()
@@ -367,7 +381,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return normalized.join(' ');
   }
 
-  int _compareMembers(Member a, Member b) {
+  static int _compareMembers(Member a, Member b) {
     final aIsExecutive = a.executiveCommittee;
     final bIsExecutive = b.executiveCommittee;
 
