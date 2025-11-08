@@ -5,6 +5,7 @@ class Chapter {
   final DateTime? createdAt;
   final String chapterName;
   final String standardizedName;
+  final String? nameAbbreviation;
   final String schoolName;
   final String chapterType;
   final DateTime? charterDate;
@@ -26,6 +27,7 @@ class Chapter {
     this.createdAt,
     required this.chapterName,
     required this.standardizedName,
+    this.nameAbbreviation,
     required this.schoolName,
     required this.chapterType,
     this.charterDate,
@@ -64,6 +66,7 @@ class Chapter {
           : null,
       chapterName: (json['chapter_name'] ?? '') as String,
       standardizedName: (json['standardized_name'] ?? '') as String,
+      nameAbbreviation: (json['name_abbreviation'] as String?)?.trim(),
       schoolName: (json['school_name'] ?? '') as String,
       chapterType: (json['chapter_type'] ?? '') as String,
       charterDate: json['charter_date'] != null
@@ -92,6 +95,7 @@ class Chapter {
       'created_at': createdAt?.toIso8601String(),
       'chapter_name': chapterName,
       'standardized_name': standardizedName,
+      'name_abbreviation': nameAbbreviation,
       'school_name': schoolName,
       'chapter_type': chapterType,
       'charter_date': charterDate?.toIso8601String().split('T').first,
@@ -115,6 +119,7 @@ class Chapter {
     DateTime? createdAt,
     String? chapterName,
     String? standardizedName,
+    String? nameAbbreviation,
     String? schoolName,
     String? chapterType,
     DateTime? charterDate,
@@ -136,6 +141,7 @@ class Chapter {
       createdAt: createdAt ?? this.createdAt,
       chapterName: chapterName ?? this.chapterName,
       standardizedName: standardizedName ?? this.standardizedName,
+      nameAbbreviation: nameAbbreviation ?? this.nameAbbreviation,
       schoolName: schoolName ?? this.schoolName,
       chapterType: chapterType ?? this.chapterType,
       charterDate: charterDate ?? this.charterDate,
