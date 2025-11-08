@@ -1143,16 +1143,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
         ),
       );
     }
-    if (phoneDisplay != null) {
-      detailLines.add(
-        _buildDetailLine(
-          Icons.phone,
-          phoneDisplay,
-          iconColor: detailIconColor,
-          textStyle: detailTextStyle,
-        ),
-      );
-    }
+    detailLines.add(
+      _buildDetailLine(
+        Icons.phone,
+        phoneDisplay ?? '-',
+        iconColor: detailIconColor,
+        textStyle: detailTextStyle,
+      ),
+    );
     if (emailDisplay != null) {
       detailLines.add(
         _buildDetailLine(
