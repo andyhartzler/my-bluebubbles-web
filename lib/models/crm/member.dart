@@ -150,7 +150,7 @@ class Member {
     this.executiveTitle,
     this.executiveRole,
     List<MemberProfilePhoto> profilePhotos = const [],
-    MemberInternalInfo internalInfo = const MemberInternalInfo(),
+    MemberInternalInfo internalInfo = MemberInternalInfo.empty,
   }) : profilePhotos = List<MemberProfilePhoto>.unmodifiable(profilePhotos),
        internalInfo = internalInfo;
 
@@ -262,7 +262,11 @@ class Member {
     return normalized.toList();
   }
 
-  static bool? _normalizeBool(dynamic value) {
+  static bool? _normalizeBool(dynamic value) => coerceBool(value);
+
+  /// Coerce a dynamic value into a nullable boolean, handling common truthy
+  /// and falsy string/number representations used across Supabase imports.
+  static bool? coerceBool(dynamic value) {
     if (value == null) return null;
     if (value is bool) return value;
     if (value is num) return value != 0;
@@ -531,8 +535,7 @@ class Member {
   bool get isExecutive => executive;
 
   /// Whether we have any structured internal information available.
-  bool get hasInternalMemberInfo =>
-      internalMemberInfo != null && internalMemberInfo!.isNotEmpty;
+  bool get hasInternalMemberInfo => internalInfo.isNotEmpty;
 
   /// Best-effort public URL for the member's primary profile photo.
   String? get primaryProfilePhotoUrl {
@@ -715,89 +718,73 @@ class Member {
   }
 }
 
+
 class MemberInternalInfo {
-  MemberInternalInfo._(Map<String, dynamic> data)
-      : _data = Map<String, dynamic>.unmodifiable(data);
+  static const MemberInternalInfo empty = MemberInternalInfo._const();
 
   final Map<String, dynamic> _data;
+  final List<MemberInternalReportEntry> reports;
+  final bool _includeReportsKey;
 
-  factory MemberInternalInfo._fromMap(Map<dynamic, dynamic> raw) {
-    final normalized = <String, dynamic>{};
-    raw.forEach((key, value) {
-      final keyString = key.toString().trim();
-      if (keyString.isEmpty) return;
-      final normalizedValue = _normalizeValue(value);
-      if (normalizedValue != null) {
-        normalized[keyString] = normalizedValue;
-      }
-    });
-    return MemberInternalInfo._(normalized);
+  const MemberInternalInfo._const()
+      : _data = const {},
+        reports = const [],
+        _includeReportsKey = false;
+
+  const factory MemberInternalInfo() = MemberInternalInfo._const;
+
+  MemberInternalInfo._({
+    Map<String, dynamic> data = const {},
+    List<MemberInternalReportEntry> reports = const [],
+    bool includeReportsKey = false,
+  })  : _data = Map<String, dynamic>.unmodifiable(data),
+        reports = List<MemberInternalReportEntry>.unmodifiable(reports),
+        _includeReportsKey = includeReportsKey;
+
+  bool get hasReports => reports.isNotEmpty;
+
+  bool get isEmpty => _data.isEmpty && !hasReports;
+
+  bool get isNotEmpty => !isEmpty;
+
+  MemberInternalInfo copyWith({List<MemberInternalReportEntry>? reports}) {
+    final newReports = reports ?? this.reports;
+    return MemberInternalInfo._(
+      data: _data,
+      reports: newReports,
+      includeReportsKey: _includeReportsKey || reports != null,
+    );
+  }
+
+  factory MemberInternalInfo.fromJson(dynamic raw) {
+    return tryParse(raw) ?? MemberInternalInfo.empty;
   }
 
   static MemberInternalInfo? tryParse(dynamic raw) {
-    if (raw == null) return null;
-    if (raw is MemberInternalInfo) return raw;
-
-    if (raw is Map) {
-      if (raw.isEmpty) return null;
-      return MemberInternalInfo._fromMap(raw);
-    }
-
-    if (raw is Iterable) {
-      final normalizedList = raw
-          .map(_normalizeValue)
-          .where((element) => element != null)
-          .cast<dynamic>()
-          .toList();
-      if (normalizedList.isEmpty) return null;
-      return MemberInternalInfo._({'items': normalizedList});
-    }
-
-    if (raw is String) {
-      final trimmed = raw.trim();
-      if (trimmed.isEmpty) return null;
-      try {
-        final decoded = jsonDecode(trimmed);
-        if (decoded is Map) {
-          if (decoded.isEmpty) return null;
-          return MemberInternalInfo._fromMap(decoded);
-        }
-        if (decoded is Iterable) {
-          final normalizedList = decoded
-              .map(_normalizeValue)
-              .where((element) => element != null)
-              .cast<dynamic>()
-              .toList();
-          if (normalizedList.isEmpty) return null;
-          return MemberInternalInfo._({'items': normalizedList});
-        }
-      } catch (_) {
-        // Fallback to treating the string as free-form text value.
-      }
-
-      final normalizedValue = _normalizeValue(trimmed);
-      if (normalizedValue == null) return null;
-      return MemberInternalInfo._({'value': normalizedValue});
-    }
-
-    final normalizedValue = _normalizeValue(raw);
-    if (normalizedValue == null) return null;
-    return MemberInternalInfo._({'value': normalizedValue});
+    final parsed = _ParsedInternalInfo.tryParse(raw);
+    if (parsed == null) return null;
+    return MemberInternalInfo._(
+      data: parsed.data,
+      reports: parsed.reports,
+      includeReportsKey: parsed.includeReportsKey,
+    );
   }
 
-  Map<String, dynamic> toJson() => Map<String, dynamic>.from(_data);
-
-  bool get isEmpty => _data.isEmpty;
-
-  bool get isNotEmpty => _data.isNotEmpty;
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{..._data};
+    if (_includeReportsKey || reports.isNotEmpty) {
+      json['reports'] = reports.map((entry) => entry.toJson()).toList();
+    }
+    return json;
+  }
 
   dynamic operator [](String key) => _data[key];
 
   static dynamic _normalizeValue(dynamic value) {
     if (value == null) return null;
 
-    if (value is bool) return value;
-    if (value is num) return value;
+    if (value is bool || value is num) return value;
+
     if (value is DateTime) return value.toIso8601String();
 
     if (value is String) {
@@ -833,6 +820,205 @@ class MemberInternalInfo {
 
     final normalized = Member._normalizeText(value);
     return normalized ?? value.toString();
+  }
+
+  static bool _looksLikeReportsKey(String key) {
+    final normalized = key.trim().toLowerCase();
+    return const {
+      'reports',
+      'report',
+      'report_entries',
+      'reportentries',
+      'entries',
+      'items',
+      'data',
+    }.contains(normalized);
+  }
+
+  static List<MemberInternalReportEntry> _parseReports(dynamic value) {
+    if (value == null) {
+      return const [];
+    }
+
+    if (value is MemberInternalInfo) {
+      return value.reports;
+    }
+
+    if (value is MemberInternalReportEntry) {
+      return [value];
+    }
+
+    if (value is Iterable) {
+      final entries = <MemberInternalReportEntry>[];
+      for (final item in value) {
+        try {
+          entries.add(MemberInternalReportEntry.fromJson(item));
+        } catch (_) {}
+      }
+      return entries;
+    }
+
+    if (value is Map) {
+      final normalizedMap =
+          value.map((key, val) => MapEntry(key.toString(), val));
+      for (final key in const ['reports', 'entries', 'items', 'data']) {
+        if (normalizedMap.containsKey(key)) {
+          final nested = _parseReports(normalizedMap[key]);
+          if (nested.isNotEmpty || normalizedMap[key] != null) {
+            return nested;
+          }
+        }
+      }
+
+      try {
+        return [MemberInternalReportEntry.fromJson(normalizedMap)];
+      } catch (_) {}
+
+      final firstIterable =
+          normalizedMap.values.whereType<Iterable>().firstOrNull;
+      if (firstIterable != null) {
+        return _parseReports(firstIterable);
+      }
+
+      return const [];
+    }
+
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) {
+        return const [];
+      }
+      try {
+        final decoded = jsonDecode(trimmed);
+        final parsed = _parseReports(decoded);
+        if (parsed.isNotEmpty) {
+          return parsed;
+        }
+      } catch (_) {}
+      try {
+        return [MemberInternalReportEntry.fromJson(trimmed)];
+      } catch (_) {
+        return const [];
+      }
+    }
+
+    try {
+      return [MemberInternalReportEntry.fromJson(value)];
+    } catch (_) {
+      return const [];
+    }
+  }
+}
+
+class _ParsedInternalInfo {
+  _ParsedInternalInfo({
+    required this.data,
+    required this.reports,
+    required this.includeReportsKey,
+  });
+
+  final Map<String, dynamic> data;
+  final List<MemberInternalReportEntry> reports;
+  final bool includeReportsKey;
+
+  static _ParsedInternalInfo? tryParse(dynamic raw) {
+    if (raw == null) return null;
+
+    if (raw is MemberInternalInfo) {
+      return _ParsedInternalInfo(
+        data: raw._data,
+        reports: raw.reports,
+        includeReportsKey: raw._includeReportsKey,
+      );
+    }
+
+    if (raw is Map) {
+      if (raw.isEmpty) return null;
+
+      final normalized = <String, dynamic>{};
+      var reports = <MemberInternalReportEntry>[];
+      var includeReportsKey = false;
+
+      raw.forEach((key, value) {
+        final keyString = key.toString().trim();
+        if (keyString.isEmpty) return;
+
+        if (MemberInternalInfo._looksLikeReportsKey(keyString)) {
+          includeReportsKey = true;
+          reports = MemberInternalInfo._parseReports(value);
+          return;
+        }
+
+        final normalizedValue = MemberInternalInfo._normalizeValue(value);
+        if (normalizedValue != null) {
+          normalized[keyString] = normalizedValue;
+        }
+      });
+
+      if (normalized.isEmpty && reports.isEmpty && !includeReportsKey) {
+        return null;
+      }
+
+      return _ParsedInternalInfo(
+        data: normalized,
+        reports: reports,
+        includeReportsKey: includeReportsKey || reports.isNotEmpty,
+      );
+    }
+
+    if (raw is Iterable) {
+      final parsedReports = MemberInternalInfo._parseReports(raw);
+      if (parsedReports.isNotEmpty || raw.isEmpty) {
+        return _ParsedInternalInfo(
+          data: const {},
+          reports: parsedReports,
+          includeReportsKey: true,
+        );
+      }
+
+      final list = raw
+          .map(MemberInternalInfo._normalizeValue)
+          .where((element) => element != null)
+          .cast<dynamic>()
+          .toList();
+      if (list.isEmpty) return null;
+      return _ParsedInternalInfo(
+        data: {'items': list},
+        reports: const [],
+        includeReportsKey: false,
+      );
+    }
+
+    if (raw is String) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) return null;
+
+      try {
+        final decoded = jsonDecode(trimmed);
+        final parsed = tryParse(decoded);
+        if (parsed != null) {
+          return parsed;
+        }
+      } catch (_) {}
+
+      final normalizedValue = MemberInternalInfo._normalizeValue(trimmed);
+      if (normalizedValue == null) return null;
+
+      return _ParsedInternalInfo(
+        data: {'value': normalizedValue},
+        reports: const [],
+        includeReportsKey: false,
+      );
+    }
+
+    final normalizedValue = MemberInternalInfo._normalizeValue(raw);
+    if (normalizedValue == null) return null;
+
+    return _ParsedInternalInfo(
+      data: {'value': normalizedValue},
+      reports: const [],
+      includeReportsKey: false,
+    );
   }
 }
 
@@ -1260,73 +1446,6 @@ class MemberProfilePhoto {
       return DateTime.tryParse(value);
     }
     return null;
-  }
-}
-
-class MemberInternalInfo {
-  final List<MemberInternalReportEntry> reports;
-
-  const MemberInternalInfo({List<MemberInternalReportEntry> reports = const []})
-      : reports = List<MemberInternalReportEntry>.unmodifiable(reports);
-
-  bool get hasReports => reports.isNotEmpty;
-
-  MemberInternalInfo copyWith({List<MemberInternalReportEntry>? reports}) {
-    return MemberInternalInfo(
-      reports: reports ?? this.reports,
-    );
-  }
-
-  factory MemberInternalInfo.fromJson(dynamic raw) {
-    if (raw == null) {
-      return const MemberInternalInfo();
-    }
-
-    dynamic payload = raw;
-    if (raw is String) {
-      final trimmed = raw.trim();
-      if (trimmed.isEmpty) {
-        return const MemberInternalInfo();
-      }
-      try {
-        payload = jsonDecode(trimmed);
-      } catch (_) {
-        return const MemberInternalInfo();
-      }
-    }
-
-    List<dynamic> rawEntries;
-    if (payload is List) {
-      rawEntries = payload;
-    } else if (payload is Map) {
-      final map = payload.map((key, value) => MapEntry(key.toString(), value));
-      final dynamic reportsValue =
-          map['reports'] ?? map['entries'] ?? map['data'] ?? map['items'];
-      if (reportsValue is List) {
-        rawEntries = reportsValue;
-      } else if (reportsValue == null && map.isNotEmpty) {
-        rawEntries = map.values.whereType<List>().firstOrNull ?? const [];
-      } else {
-        rawEntries = const [];
-      }
-    } else {
-      rawEntries = const [];
-    }
-
-    final entries = <MemberInternalReportEntry>[];
-    for (final item in rawEntries) {
-      try {
-        entries.add(MemberInternalReportEntry.fromJson(item));
-      } catch (_) {}
-    }
-
-    return MemberInternalInfo(reports: entries);
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'reports': reports.map((entry) => entry.toJson()).toList(),
-    };
   }
 }
 
