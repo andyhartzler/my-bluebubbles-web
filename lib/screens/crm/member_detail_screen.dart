@@ -4,6 +4,7 @@ import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/editors/member_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
@@ -131,15 +132,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
     final additions = <PlatformFile>[];
     for (final file in result.files) {
-      if ((file.bytes == null || file.bytes!.isEmpty) && (file.path == null || file.path!.isEmpty)) {
+      final platformFile = await materializePickedPlatformFile(file);
+      if (platformFile == null) {
         continue;
       }
-      final platformFile = PlatformFile(
-        path: file.path,
-        name: file.name,
-        size: file.size,
-        bytes: file.bytes,
-      );
       additions.add(platformFile);
     }
 
@@ -561,12 +557,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
 
     final picked = result.files.first;
-    final platformFile = PlatformFile(
-      path: picked.path,
-      name: picked.name,
-      size: picked.size,
-      bytes: picked.bytes,
-    );
+    final platformFile = await materializePickedPlatformFile(picked);
+    if (platformFile == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to read selected photo. Please try again.')),
+      );
+      return;
+    }
 
     setState(() => _uploadingPhoto = true);
 
