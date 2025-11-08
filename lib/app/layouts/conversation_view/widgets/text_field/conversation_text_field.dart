@@ -875,10 +875,22 @@ class TextFieldComponentState extends State<TextFieldComponent> {
   late final ValueNotifier<bool> isRecordingNotifier;
   TextFieldComponentState() : isRecordingNotifier = ValueNotifier<bool>(false);
 
+  bool _sendInProgress = false;
   bool _enterSendInProgress = false;
   bool _enterKeyPressed = false;
   Timer? _enterSendResetTimer;
   static const Duration _enterSendGuardTimeout = Duration(seconds: 10);
+
+  Future<void> _sendWithGuard({String? effect}) async {
+    if (_sendInProgress) return;
+
+    _sendInProgress = true;
+    try {
+      await sendMessage(effect: effect);
+    } finally {
+      _sendInProgress = false;
+    }
+  }
 
   @override
   void initState() {
@@ -1063,7 +1075,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
                               textController: txtController,
                               controller: controller,
                               recorderController: recorderController,
-                              sendMessage: sendMessage,
+                              sendMessage: _sendWithGuard,
                               isChatCreator: isChatCreator,
                             ),
                           ),
@@ -1143,7 +1155,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
                   onSubmitted: isChatCreator ? null : (String value) {
                     controller?.focusNode.requestFocus();
                     if (isNullOrEmpty(value) && (controller?.pickedAttachments.isEmpty ?? false)) return;
-                    sendMessage.call();
+                    _sendWithGuard();
                   },
                   contentInsertionConfiguration: ContentInsertionConfiguration(onContentInserted: onContentCommit),
                 ),
@@ -1211,19 +1223,19 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     if (isChatCreator) {
       if (isEnterWithoutShift) {
         final wasKeyAlreadyPressed = _enterKeyPressed;
-        if (_enterSendInProgress || wasKeyAlreadyPressed) {
+        if (_enterSendInProgress || wasKeyAlreadyPressed || _sendInProgress) {
           _enterKeyPressed = true;
           return KeyEventResult.handled;
         }
 
         _enterKeyPressed = true;
-        
+
         _enterSendInProgress = true;
         _enterSendResetTimer?.cancel();
         _enterSendResetTimer = Timer(_enterSendGuardTimeout, () => _resetEnterSendGuard(force: true));
 
         try {
-          final sendFuture = sendMessage();
+          final sendFuture = _sendWithGuard();
           unawaited(sendFuture.then((_) {
             _onEnterSendPipelineFinished();
           }, onError: (error, stackTrace) {
@@ -1385,7 +1397,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
         (kIsDesktop || kIsWeb) &&
         ev.logicalKey == LogicalKeyboardKey.enter &&
         !HardwareKeyboard.instance.isShiftPressed) {
-      sendMessage();
+      _sendWithGuard();
       controller!.focusNode.requestFocus();
       return KeyEventResult.handled;
     }
@@ -1393,7 +1405,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     if (kIsDesktop || kIsWeb) return KeyEventResult.ignored;
     if (ev.physicalKey == PhysicalKeyboardKey.enter && ss.settings.sendWithReturn.value) {
       if (!isNullOrEmpty(textController.text) || !isNullOrEmpty(controller!.subjectTextController.text)) {
-        sendMessage();
+        _sendWithGuard();
         controller!.focusNode.previousFocus(); // I genuinely don't know why this works
         return KeyEventResult.handled;
       } else {
