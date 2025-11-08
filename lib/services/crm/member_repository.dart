@@ -8,6 +8,7 @@ import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
+import 'package:flutter/foundation.dart';
 import 'package:mime_type/mime_type.dart';
 import 'package:universal_io/io.dart' as io;
 
@@ -772,11 +773,30 @@ class MemberRepository {
     }
 
     if (file.path != null) {
-      final io.File ioFile = io.File(file.path!);
-      return await ioFile.readAsBytes();
+      final dataUriBytes = _tryDecodeDataUri(file.path!);
+      if (dataUriBytes != null) {
+        return dataUriBytes;
+      }
+      if (!kIsWeb) {
+        final io.File ioFile = io.File(file.path!);
+        return await ioFile.readAsBytes();
+      }
     }
 
     throw StateError('Selected file does not contain readable data.');
+  }
+
+  Uint8List? _tryDecodeDataUri(String value) {
+    try {
+      final uri = Uri.parse(value);
+      final data = uri.data;
+      if (data == null) {
+        return null;
+      }
+      return Uint8List.fromList(data.contentAsBytes());
+    } catch (_) {
+      return null;
+    }
   }
 
   String _sanitizeFileName(String name) {

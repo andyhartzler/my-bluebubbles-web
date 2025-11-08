@@ -6,16 +6,29 @@ import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/foundation.dart';
 
+import 'file_picker_materializer_web_fallback_stub.dart'
+    if (dart.library.html) 'file_picker_materializer_web_fallback.dart'
+        as web_fallback;
+
+typedef WebFileHydrator = Future<Uint8List?> Function(
+  file_picker.PlatformFile file, {
+  file_picker.FilePickerResult? source,
+});
+
+@visibleForTesting
+WebFileHydrator? debugOverrideWebFileHydrator;
+
 /// Hydrates a [file_picker.PlatformFile] with in-memory bytes so it can be
 /// consumed as the app's [PlatformFile].
 Future<PlatformFile?> materializePickedPlatformFile(
   file_picker.PlatformFile file,
+  {file_picker.FilePickerResult? source,}
 ) async {
   Uint8List? resolvedBytes = file.bytes;
   Object? hydrationError;
   StackTrace? hydrationTrace;
   if (resolvedBytes == null || resolvedBytes.isEmpty) {
-    final readResult = await _readFileBytes(file);
+    final readResult = await _readFileBytes(file, source: source);
     resolvedBytes = readResult.bytes;
     hydrationError = readResult.error;
     hydrationTrace = readResult.stackTrace;
@@ -28,6 +41,19 @@ Future<PlatformFile?> materializePickedPlatformFile(
     } else if (hydrationError == null) {
       hydrationError = fallbackRead.error;
       hydrationTrace = fallbackRead.stackTrace;
+    }
+  }
+
+  if (resolvedBytes == null || resolvedBytes.isEmpty) {
+    final webFallback = await _readFileUsingWebFallback(
+      file,
+      source: source,
+    );
+    if (webFallback.bytes != null && webFallback.bytes!.isNotEmpty) {
+      resolvedBytes = webFallback.bytes;
+    } else if (hydrationError == null) {
+      hydrationError = webFallback.error;
+      hydrationTrace = webFallback.stackTrace;
     }
   }
 
@@ -48,61 +74,43 @@ Future<PlatformFile?> materializePickedPlatformFile(
   }
 
   return PlatformFile(
-    path: file.path,
+    path: kIsWeb ? null : file.path,
     name: file.name,
-    size: file.size,
+    size: resolvedBytes?.length ?? file.size,
     bytes: resolvedBytes,
   );
 }
 
 Future<({Uint8List? bytes, Object? error, StackTrace? stackTrace})> _readFileBytes(
-    file_picker.PlatformFile file) async {
+    file_picker.PlatformFile file,
+    {file_picker.FilePickerResult? source}) async {
   Object? lastError;
   StackTrace? lastStackTrace;
 
-  final xFile = file.xFile;
-  if (xFile != null) {
-    final attempts = kIsWeb ? 2 : 1;
-    for (var attempt = 0; attempt < attempts; attempt++) {
-      try {
-        final bytes = await xFile.readAsBytes();
-        if (bytes.isNotEmpty) {
-          return (bytes: bytes, error: null, stackTrace: null);
-        }
-      } catch (error, stackTrace) {
-        lastError = error;
-        lastStackTrace = stackTrace;
-        if (!kIsWeb) {
-          break;
-        }
-      }
+  final candidates = _collectCandidates(file, source: source);
 
-      if (!kIsWeb) {
-        break;
-      }
-
-      // Give the browser a moment to populate the in-memory file bytes
-      // before retrying.
-      await Future<void>.delayed(const Duration(milliseconds: 16));
-    }
+  final xFileResult = await _readBytesFromXFiles(candidates);
+  if (xFileResult.bytes != null && xFileResult.bytes!.isNotEmpty) {
+    return xFileResult;
   }
+  lastError = xFileResult.error ?? lastError;
+  lastStackTrace = xFileResult.stackTrace ?? lastStackTrace;
 
-  if (!kIsWeb) {
-    final stream = file.readStream;
-    if (stream != null) {
-      try {
-        final builder = BytesBuilder(copy: false);
-        await for (final chunk in stream) {
-          builder.add(chunk);
-        }
-        final bytes = builder.takeBytes();
-        if (bytes.isNotEmpty) {
-          return (bytes: Uint8List.fromList(bytes), error: null, stackTrace: null);
-        }
-      } catch (error, stackTrace) {
-        lastError = error;
-        lastStackTrace = stackTrace;
+  for (final candidate in candidates) {
+    final stream = candidate.readStream;
+    if (stream == null) continue;
+    try {
+      final builder = BytesBuilder(copy: false);
+      await for (final chunk in stream) {
+        builder.add(chunk);
       }
+      final bytes = builder.takeBytes();
+      if (bytes.isNotEmpty) {
+        return (bytes: bytes, error: null, stackTrace: null);
+      }
+    } catch (error, stackTrace) {
+      lastError = error;
+      lastStackTrace = stackTrace;
     }
   }
 
@@ -153,5 +161,115 @@ Future<({Uint8List? bytes, Object? error, StackTrace? stackTrace})>
     return (bytes: null, error: lastError, stackTrace: lastStackTrace);
   } catch (error, stackTrace) {
     return (bytes: null, error: error, stackTrace: stackTrace);
+  }
+}
+
+Future<({Uint8List? bytes, Object? error, StackTrace? stackTrace})>
+    _readFileUsingWebFallback(
+  file_picker.PlatformFile file, {
+  file_picker.FilePickerResult? source,
+}) async {
+  if (!kIsWeb && debugOverrideWebFileHydrator == null) {
+    return (bytes: null, error: null, stackTrace: null);
+  }
+
+  try {
+    final reader = debugOverrideWebFileHydrator ?? web_fallback.readPickedFileBytes;
+    final bytes = await reader(file, source: source);
+    if (bytes != null && bytes.isNotEmpty) {
+      return (bytes: bytes, error: null, stackTrace: null);
+    }
+  } catch (error, stackTrace) {
+    return (bytes: null, error: error, stackTrace: stackTrace);
+  }
+
+  final dataUriBytes = _decodeDataUri(file.path) ?? _decodeDataUri(file.identifier);
+  if (dataUriBytes != null && dataUriBytes.isNotEmpty) {
+    return (bytes: dataUriBytes, error: null, stackTrace: null);
+  }
+
+  return (bytes: null, error: null, stackTrace: null);
+}
+
+List<file_picker.PlatformFile> _collectCandidates(
+  file_picker.PlatformFile file, {
+  file_picker.FilePickerResult? source,
+}) {
+  final candidates = <file_picker.PlatformFile>[file];
+  if (source == null) {
+    return candidates;
+  }
+
+  for (final candidate in source.files) {
+    if (identical(candidate, file)) {
+      continue;
+    }
+    final namesMatch = candidate.name == file.name;
+    final sizesMatch = candidate.size == file.size ||
+        candidate.size == 0 ||
+        file.size == 0;
+    if (namesMatch && sizesMatch) {
+      candidates.add(candidate);
+    }
+  }
+
+  return candidates;
+}
+
+Future<({Uint8List? bytes, Object? error, StackTrace? stackTrace})>
+    _readBytesFromXFiles(List<file_picker.PlatformFile> candidates) async {
+  Object? lastError;
+  StackTrace? lastStackTrace;
+
+  for (final candidate in candidates) {
+    try {
+      if (kIsWeb && (candidate.bytes == null || candidate.bytes!.isEmpty)) {
+        continue;
+      }
+      final xFile = candidate.xFile;
+      final attempts = kIsWeb ? 2 : 1;
+      for (var attempt = 0; attempt < attempts; attempt++) {
+        try {
+          final bytes = await xFile.readAsBytes();
+          if (bytes.isNotEmpty) {
+            return (bytes: bytes, error: null, stackTrace: null);
+          }
+        } catch (error, stackTrace) {
+          lastError = error;
+          lastStackTrace = stackTrace;
+          if (!kIsWeb) {
+            break;
+          }
+        }
+
+        if (!kIsWeb) {
+          break;
+        }
+
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+      }
+    } catch (error, stackTrace) {
+      lastError = error;
+      lastStackTrace = stackTrace;
+    }
+  }
+
+  return (bytes: null, error: lastError, stackTrace: lastStackTrace);
+}
+
+Uint8List? _decodeDataUri(String? uriString) {
+  if (uriString == null || uriString.isEmpty) {
+    return null;
+  }
+
+  try {
+    final uri = Uri.parse(uriString);
+    final data = uri.data;
+    if (data == null) {
+      return null;
+    }
+    return Uint8List.fromList(data.contentAsBytes());
+  } catch (_) {
+    return null;
   }
 }

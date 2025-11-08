@@ -135,7 +135,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final additions = <PlatformFile>[];
     final failedHydrations = <String>[];
     for (final file in result.files) {
-      final platformFile = await materializePickedPlatformFile(file);
+      final platformFile =
+          await materializePickedPlatformFile(file, source: result);
       if (platformFile == null) {
         failedHydrations.add(file.name);
         continue;
@@ -152,7 +153,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     if (!mounted) return;
 
     setState(() {
-      final existingNames = _pendingReportFiles.map((file) => file.name.toLowerCase()).toSet();
+      final existingNames =
+          _pendingReportFiles.map((file) => file.name.toLowerCase()).toSet();
       final merged = [..._pendingReportFiles];
       for (final file in additions) {
         if (!existingNames.contains(file.name.toLowerCase())) {
@@ -166,6 +168,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               'We couldn\'t read the selected files. Please try again or choose different files.')
           : errorMessage;
     });
+
+    if (errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    }
   }
 
   void _removePendingReportFile(PlatformFile file) {
@@ -572,7 +580,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
 
     final picked = result.files.first;
-    final platformFile = await materializePickedPlatformFile(picked);
+    final platformFile =
+        await materializePickedPlatformFile(picked, source: result);
     if (platformFile == null) {
       if (!mounted) return;
       setState(() {

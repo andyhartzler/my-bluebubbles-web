@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
-import 'package:cross_file/cross_file.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,12 +9,12 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('materializePickedPlatformFile', () {
-    test('hydrates xFile selections for pending report files', () async {
+    test('hydrates provided byte data for pending report files', () async {
       final rawBytes = Uint8List.fromList([1, 2, 3, 4]);
       final pickerFile = file_picker.PlatformFile(
         name: 'report.pdf',
         size: rawBytes.length,
-        xFile: XFile.fromData(rawBytes, name: 'report.pdf'),
+        bytes: rawBytes,
       );
 
       final result = await materializePickedPlatformFile(pickerFile);
@@ -70,13 +69,40 @@ void main() {
         path: 'does-not-exist.txt',
       );
 
-      final result = await materializePickedPlatformFile(pickerFile);
+      final result = await materializePickedPlatformFile(
+        pickerFile,
+        source: file_picker.FilePickerResult([pickerFile]),
+      );
 
       expect(fakePicker.readFileCallCount, equals(1));
       expect(result, isNotNull);
       expect(result!.bytes, isNotNull);
       expect(result.bytes, equals(fallbackBytes));
       expect(result.name, equals('fallback.txt'));
+    });
+
+    test('hydrates browser-only selections using debug web fallback', () async {
+      final fallbackBytes = Uint8List.fromList([11, 12, 13]);
+      debugOverrideWebFileHydrator = (
+        file_picker.PlatformFile _, {
+        file_picker.FilePickerResult? source,
+      }) async => fallbackBytes;
+      addTearDown(() => debugOverrideWebFileHydrator = null);
+
+      final pickerFile = file_picker.PlatformFile(
+        name: 'safari-upload.png',
+        size: fallbackBytes.length,
+      );
+
+      final result = await materializePickedPlatformFile(
+        pickerFile,
+        source: file_picker.FilePickerResult([pickerFile]),
+      );
+
+      expect(result, isNotNull);
+      expect(result!.bytes, isNotNull);
+      expect(result.bytes, equals(fallbackBytes));
+      expect(result.size, equals(fallbackBytes.length));
     });
   });
 }

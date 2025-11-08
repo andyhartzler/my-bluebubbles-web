@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -65,4 +66,13 @@ class CRMSupabaseService {
   bool get hasServiceRole => _serviceClient != null;
 
   SupabaseClient get privilegedClient => _serviceClient ?? client;
+
+  @visibleForTesting
+  void debugSetInitialized(bool value) {
+    _initialized = value;
+    if (!value) {
+      _client = null;
+      _serviceClient = null;
+    }
+  }
 }
