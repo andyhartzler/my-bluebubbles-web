@@ -7,11 +7,12 @@ Member _execMember(
   String name, {
   String? role,
   String? roleShort,
+  bool executive = true,
 }) {
   return Member(
     id: id,
     name: name,
-    executiveCommittee: true,
+    executiveCommittee: executive,
     executiveRole: role,
     executiveRoleShort: roleShort,
   );
@@ -95,6 +96,20 @@ void main() {
     expect(
       members.map((member) => member.name).toList(),
       ['Darla District 1', 'Derek District 2', 'Dina District 3'],
+    );
+  });
+
+  test('Executive comparator respects hierarchy even when flag missing', () {
+    final members = <Member>[
+      _execMember('1', 'Tina Treasurer', role: 'Treasurer', executive: false),
+      _execMember('2', 'Paula President', role: 'President', executive: false),
+    ];
+
+    members.sort(MembersListScreen.compareMembersForTesting);
+
+    expect(
+      members.map((member) => member.name).toList(),
+      ['Paula President', 'Tina Treasurer'],
     );
   });
 

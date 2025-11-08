@@ -55,6 +55,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   List<Member> _agedOutMembers = [];
   List<Chapter> _chapters = [];
   List<Chapter> _filteredChapters = [];
+  Map<String, Chapter> _chaptersByKey = {};
 
   bool _loading = true;
   bool _crmReady = false;
@@ -182,6 +183,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _districts = districts;
         _committees = committees;
         _chapters = chapters;
+        _chaptersByKey = _buildChapterLookup(chapters);
         _chapterNames = chapterNames;
         _communityTypes = communityTypes;
         _leadershipChapterOptions = leadershipChapters;
@@ -445,13 +447,10 @@ class _MembersListScreenState extends State<MembersListScreen> {
         }
       }
 
-      final containsRepKeyword = working.contains('representative') ||
-          working.contains(' rep') ||
-          working.endsWith('rep');
+      final containsYoungDemocrats =
+          working.contains('young democrats of america') || working.contains('yda');
 
-      if ((working.contains('young democrats of america') ||
-              working.contains('yda')) &&
-          containsRepKeyword) {
+      if (containsYoungDemocrats) {
         return 'young democrats of america representative';
       }
 
@@ -554,8 +553,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   static int _compareMembers(Member a, Member b) {
-    final aIsExecutive = a.executiveCommittee;
-    final bIsExecutive = b.executiveCommittee;
+    final aIsExecutive = _isExecutiveMember(a);
+    final bIsExecutive = _isExecutiveMember(b);
+
+    if (aIsExecutive != bIsExecutive) {
+      return aIsExecutive ? -1 : 1;
+    }
 
     if (aIsExecutive && bIsExecutive) {
       final aResolution = _resolveExecutiveRole(a);
@@ -591,6 +594,18 @@ class _MembersListScreenState extends State<MembersListScreen> {
       return aHasPhoto ? -1 : 1;
     }
     return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  }
+
+  static bool _isExecutiveMember(Member member) {
+    if (member.executiveCommittee) {
+      return true;
+    }
+
+    bool hasText(String? value) => value != null && value.trim().isNotEmpty;
+
+    return hasText(member.executiveRoleShort) ||
+        hasText(member.executiveRole) ||
+        hasText(member.executiveTitle);
   }
 
   static _ExecutiveRoleResolution _resolveExecutiveRole(Member member) {
@@ -672,6 +687,104 @@ class _MembersListScreenState extends State<MembersListScreen> {
       ..sort((a, b) => a.chapterName.toLowerCase().compareTo(b.chapterName.toLowerCase()));
 
     return filtered;
+  }
+
+  Map<String, Chapter> _buildChapterLookup(List<Chapter> chapters) {
+    final lookup = <String, Chapter>{};
+
+    for (final chapter in chapters) {
+      final candidates = <String?>[
+        chapter.chapterName,
+        chapter.standardizedName,
+        chapter.nameAbbreviation,
+        chapter.schoolName,
+      ];
+
+      for (final candidate in candidates) {
+        final cleaned = _cleanValue(candidate);
+        if (cleaned == null) continue;
+        final normalized = _normalizeKey(cleaned);
+        if (normalized == null) continue;
+        lookup.putIfAbsent(normalized, () => chapter);
+      }
+    }
+
+    return lookup;
+  }
+
+  Chapter? _findChapterForMember(Member member) {
+    final candidates = <String?>[
+      member.chapterName,
+      member.schoolName,
+    ];
+
+    for (final candidate in candidates) {
+      final cleaned = _cleanValue(candidate);
+      if (cleaned == null) continue;
+      final normalized = _normalizeKey(cleaned);
+      if (normalized == null) continue;
+      final chapter = _chaptersByKey[normalized];
+      if (chapter != null) {
+        return chapter;
+      }
+    }
+
+    return null;
+  }
+
+  String? _formatChapterAffiliation(Member member) {
+    final chapter = _findChapterForMember(member);
+    final abbreviation =
+        _cleanValue(chapter?.nameAbbreviation) ?? _cleanValue(member.chapterName);
+    if (abbreviation == null) return null;
+
+    final chapterType = _formatChapterTypeLabel(chapter?.chapterType);
+    final buffer = StringBuffer(abbreviation);
+
+    if (chapterType != null && chapterType.isNotEmpty) {
+      buffer
+        ..write(' ')
+        ..write(chapterType);
+
+      final typeHasDemocrats = chapterType.toLowerCase().contains('democrat');
+      if (!typeHasDemocrats) {
+        buffer.write(' Democrats');
+      }
+    } else if (!abbreviation.toLowerCase().contains('democrat')) {
+      buffer.write(' Democrats');
+    }
+
+    return buffer.toString().trim();
+  }
+
+  String? _formatChapterTypeLabel(String? value) {
+    final cleaned = _cleanValue(value);
+    if (cleaned == null) return null;
+
+    final lower = cleaned.toLowerCase();
+    if (lower == 'n/a' || lower == 'none') {
+      return null;
+    }
+
+    return _titleCaseWords(cleaned);
+  }
+
+  String _titleCaseWords(String value) {
+    final words = value.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
+    if (words.isEmpty) return value;
+
+    return words
+        .map((word) {
+          if (word.length <= 2 && word == word.toUpperCase()) {
+            return word;
+          }
+          if (word == word.toUpperCase()) {
+            return word;
+          }
+          final lower = word.toLowerCase();
+          return '${lower[0].toUpperCase()}${lower.substring(1)}';
+        })
+        .join(' ');
   }
 
   bool _matchesMemberQuery(Member member, String query) {
@@ -1532,9 +1645,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final age = member.age;
     final zodiac = _cleanValue(member.zodiacSign);
     final joinedDate = member.dateJoined;
-    final isExecutive = member.executiveCommittee;
-    final executiveTitle = _cleanValue(member.executiveTitle) ?? 'Executive Committee';
+    final isExecutive = _isExecutiveMember(member);
+    final executiveTitle =
+        isExecutive ? (_cleanValue(member.executiveTitle) ?? 'Executive Committee') : null;
     final rawExecutiveRole = _cleanValue(member.executiveRole);
+    final chapterPosition = _cleanValue(member.chapterPosition);
+    final chapterAffiliation = _formatChapterAffiliation(member);
 
     final metaChips = <Widget>[];
     if (districtLabel != null) {
@@ -1594,6 +1710,30 @@ class _MembersListScreenState extends State<MembersListScreen> {
           fontWeight: FontWeight.w500,
           fontSize: isMobile ? 12 : 13,
           height: 1.2,
+        );
+    final chapterPositionStyle = (isMobile ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
+            ?.copyWith(
+              color: Colors.white.withOpacity(0.9),
+              fontWeight: FontWeight.w600,
+              height: 1.22,
+            ) ??
+        TextStyle(
+          color: Colors.white.withOpacity(0.9),
+          fontWeight: FontWeight.w600,
+          fontSize: isMobile ? 14.5 : 16,
+          height: 1.22,
+        );
+    final chapterAffiliationStyle = (isMobile ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium)
+            ?.copyWith(
+              color: Colors.white.withOpacity(0.8),
+              fontWeight: FontWeight.w500,
+              height: 1.18,
+            ) ??
+        TextStyle(
+          color: Colors.white.withOpacity(0.8),
+          fontWeight: FontWeight.w500,
+          fontSize: isMobile ? 12.5 : 13.5,
+          height: 1.18,
         );
 
     final detailLines = <Widget>[
@@ -1677,14 +1817,33 @@ class _MembersListScreenState extends State<MembersListScreen> {
                       ),
                   ],
                 ),
-                if (isExecutive) ...[
+                if (chapterPosition != null) ...[
                   const SizedBox(height: 6),
                   Text(
-                    executiveTitle,
-                    style: executiveTitleStyle,
+                    chapterPosition,
+                    style: chapterPositionStyle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (chapterAffiliation != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      chapterAffiliation,
+                      style: chapterAffiliationStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+                if (isExecutive) ...[
+                  const SizedBox(height: 6),
+                  if (executiveTitle != null)
+                    Text(
+                      executiveTitle,
+                      style: executiveTitleStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   if (rawExecutiveRole != null && rawExecutiveRole.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
