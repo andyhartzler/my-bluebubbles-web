@@ -82,4 +82,34 @@ void main() {
       ],
     );
   });
+
+  test('Executive comparator derives district ranking from long role labels', () {
+    final members = <Member>[
+      _execMember('1', 'Darla District 1', role: '1st Congressional District', roleShort: 'Representative'),
+      _execMember('2', 'Derek District 2', role: '2nd Congressional District', roleShort: 'Representative'),
+      _execMember('3', 'Dina District 3', role: 'Third Congressional District', roleShort: 'Representative'),
+    ];
+
+    members.sort(MembersListScreen.compareMembersForTesting);
+
+    expect(
+      members.map((member) => member.name).toList(),
+      ['Darla District 1', 'Derek District 2', 'Dina District 3'],
+    );
+  });
+
+  test('Executive comparator combines short and long committee labels', () {
+    final members = <Member>[
+      _execMember('1', 'Carla Communications', role: 'Communications Committee', roleShort: 'Chair'),
+      _execMember('2', 'Colin Communications', role: 'Communications Committee', roleShort: 'Co-Chair'),
+      _execMember('3', 'Polly Political', role: 'Political Affairs Committee', roleShort: 'Chair'),
+    ];
+
+    members.sort(MembersListScreen.compareMembersForTesting);
+
+    expect(
+      members.map((member) => member.name).toList(),
+      ['Carla Communications', 'Colin Communications', 'Polly Political'],
+    );
+  });
 }

@@ -31,6 +31,20 @@ class MembersListScreen extends StatefulWidget {
   State<MembersListScreen> createState() => _MembersListScreenState();
 }
 
+class _ExecutiveRoleCandidate {
+  final String raw;
+  final String normalized;
+
+  const _ExecutiveRoleCandidate({required this.raw, required this.normalized});
+}
+
+class _ExecutiveRoleResolution {
+  final String normalized;
+  final String? displayLabel;
+
+  const _ExecutiveRoleResolution({required this.normalized, this.displayLabel});
+}
+
 class _MembersListScreenState extends State<MembersListScreen> {
   final MemberRepository _memberRepo = MemberRepository();
   final ChapterRepository _chapterRepository = ChapterRepository();
@@ -372,6 +386,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
   static String _normalizeExecutiveRole(String? role) {
     if (role == null) return '';
 
+    final trimmedRole = role.trim();
+    if (trimmedRole.isEmpty) return '';
+
     final ordinals = <String, String>{
       'first': '1st',
       'second': '2nd',
@@ -383,110 +400,157 @@ class _MembersListScreenState extends State<MembersListScreen> {
       'eighth': '8th',
     };
 
-    var working = role.toLowerCase();
-    ordinals.forEach((word, replacement) {
-      working = working.replaceAll(word, replacement);
-    });
+    String _sanitize(String input) {
+      var working = input.toLowerCase();
+      ordinals.forEach((word, replacement) {
+        working = working.replaceAll(word, replacement);
+      });
 
-    working = working
-        .replaceAll('cochair', 'co chair')
-        .replaceAll(RegExp(r'[\-–—/]'), ' ')
-        .replaceAll('&', ' and ')
-        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+      working = working
+          .replaceAll('cochair', 'co chair')
+          .replaceAll('representatives', 'representative')
+          .replaceAll('chairs', 'chair')
+          .replaceAll(RegExp(r'[\-–—/]'), ' ')
+          .replaceAll('&', ' and ')
+          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
 
-    if (working.isEmpty) return working;
-
-    int? _districtNumberFromMatch(RegExp pattern) {
-      final match = pattern.firstMatch(working);
-      if (match == null) return null;
-      final value = match.group(1);
-      return value == null ? null : int.tryParse(value);
+      return working;
     }
 
-    final districtPatterns = [
-      RegExp(r'(\d+)(?:st|nd|rd|th)? (?:congressional )?district'),
-      RegExp(r'district (\d+)(?:st|nd|rd|th)?'),
-      RegExp(r'(?:representative|rep) (\d+)(?:st|nd|rd|th)?'),
-    ];
+    String _evaluate(String rawInput) {
+      final workingSanitized = _sanitize(rawInput);
+      if (workingSanitized.isEmpty) return workingSanitized;
 
-    for (final pattern in districtPatterns) {
-      final districtNumber = _districtNumberFromMatch(pattern);
-      if (districtNumber != null) {
-        return 'district $districtNumber representative';
+      var working = workingSanitized;
+
+      int? districtNumberFromMatch(RegExp pattern) {
+        final match = pattern.firstMatch(working);
+        if (match == null) return null;
+        final value = match.group(1);
+        return value == null ? null : int.tryParse(value);
+      }
+
+      final districtPatterns = [
+        RegExp(r'(\d+)(?:st|nd|rd|th)? (?:congressional )?district'),
+        RegExp(r'district (\d+)(?:st|nd|rd|th)?'),
+        RegExp(r'(?:representative|rep) (\d+)(?:st|nd|rd|th)?'),
+      ];
+
+      for (final pattern in districtPatterns) {
+        final districtNumber = districtNumberFromMatch(pattern);
+        if (districtNumber != null) {
+          return 'district $districtNumber representative';
+        }
+      }
+
+      final containsRepKeyword = working.contains('representative') ||
+          working.contains(' rep') ||
+          working.endsWith('rep');
+
+      if ((working.contains('young democrats of america') ||
+              working.contains('yda')) &&
+          containsRepKeyword) {
+        return 'young democrats of america representative';
+      }
+
+      if (working.contains('vice president')) {
+        return 'vice president';
+      }
+
+      if (working.contains('president')) {
+        return 'president';
+      }
+
+      if (working.contains('secretary')) {
+        return 'secretary';
+      }
+
+      if (working.contains('treasurer')) {
+        return 'treasurer';
+      }
+
+      if (working.contains('chief of staff')) {
+        return 'chief of staff';
+      }
+
+      String? committeeRole(String keyword, String canonicalBase) {
+        if (!working.contains(keyword) || !working.contains('chair')) {
+          return null;
+        }
+        final isCoChair = working.contains('co chair');
+        final suffix = isCoChair ? 'co chair' : 'chair';
+        return '$canonicalBase $suffix';
+      }
+
+      if (working.contains('college democrats') && working.contains('chair')) {
+        return working.contains('co chair')
+            ? 'college democrats co chair'
+            : 'college democrats chair';
+      }
+
+      if (working.contains('high school democrats') && working.contains('chair')) {
+        return working.contains('co chair')
+            ? 'high school democrats co chair'
+            : 'high school democrats chair';
+      }
+
+      final committeeMappings = <String, String>{
+        'communications': 'communications',
+        'fundraising': 'fundraising',
+        'membership and outreach': 'membership and outreach',
+        'membership outreach': 'membership and outreach',
+        'policy and advocacy': 'policy and advocacy',
+        'policy advocacy': 'policy and advocacy',
+        'political affairs': 'political affairs',
+      };
+
+      for (final entry in committeeMappings.entries) {
+        final normalized = committeeRole(entry.key, entry.value);
+        if (normalized != null) {
+          return normalized;
+        }
+      }
+
+      return working;
+    }
+
+    final primary = _evaluate(trimmedRole);
+    if (_executiveRoleOrder.contains(primary)) {
+      return primary;
+    }
+
+    final separators = RegExp(r'\s*[\-/]+\s*');
+    final parts = trimmedRole
+        .split(separators)
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+
+    if (parts.length > 1) {
+      final fillerPhrases = {'executive committee', 'executive board'};
+      final combinations = <String>{};
+
+      combinations.add(parts.join(' '));
+      combinations.add(parts.reversed.join(' '));
+
+      final filteredParts =
+          parts.where((part) => !fillerPhrases.contains(part.toLowerCase())).toList();
+      if (filteredParts.isNotEmpty && filteredParts.length < parts.length) {
+        combinations.add(filteredParts.join(' '));
+        combinations.add(filteredParts.reversed.join(' '));
+      }
+
+      for (final combination in combinations) {
+        final normalized = _evaluate(combination);
+        if (_executiveRoleOrder.contains(normalized)) {
+          return normalized;
+        }
       }
     }
 
-    final containsRepKeyword = working.contains('representative') ||
-        working.contains(' rep') ||
-        working.endsWith('rep');
-
-    if ((working.contains('young democrats of america') ||
-            working.contains('yda')) &&
-        containsRepKeyword) {
-      return 'young democrats of america representative';
-    }
-
-    if (working.contains('vice president')) {
-      return 'vice president';
-    }
-
-    if (working.contains('president')) {
-      return 'president';
-    }
-
-    if (working.contains('secretary')) {
-      return 'secretary';
-    }
-
-    if (working.contains('treasurer')) {
-      return 'treasurer';
-    }
-
-    if (working.contains('chief of staff')) {
-      return 'chief of staff';
-    }
-
-    String? committeeRole(String keyword, String canonicalBase) {
-      if (!working.contains(keyword) || !working.contains('chair')) {
-        return null;
-      }
-      final isCoChair = working.contains('co chair');
-      final suffix = isCoChair ? 'co chair' : 'chair';
-      return '$canonicalBase $suffix';
-    }
-
-    if (working.contains('college democrats') && working.contains('chair')) {
-      return working.contains('co chair')
-          ? 'college democrats co chair'
-          : 'college democrats chair';
-    }
-
-    if (working.contains('high school democrats') && working.contains('chair')) {
-      return working.contains('co chair')
-          ? 'high school democrats co chair'
-          : 'high school democrats chair';
-    }
-
-    final committeeMappings = <String, String>{
-      'communications': 'communications',
-      'fundraising': 'fundraising',
-      'membership and outreach': 'membership and outreach',
-      'membership outreach': 'membership and outreach',
-      'policy and advocacy': 'policy and advocacy',
-      'policy advocacy': 'policy and advocacy',
-      'political affairs': 'political affairs',
-    };
-
-    for (final entry in committeeMappings.entries) {
-      final normalized = committeeRole(entry.key, entry.value);
-      if (normalized != null) {
-        return normalized;
-      }
-    }
-
-    return working;
+    return primary;
   }
 
   static int _compareMembers(Member a, Member b) {
@@ -494,10 +558,10 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final bIsExecutive = b.executiveCommittee;
 
     if (aIsExecutive && bIsExecutive) {
-      final aRoleRaw = a.executiveRoleDisplay;
-      final bRoleRaw = b.executiveRoleDisplay;
-      final aRoleKey = _normalizeExecutiveRole(aRoleRaw);
-      final bRoleKey = _normalizeExecutiveRole(bRoleRaw);
+      final aResolution = _resolveExecutiveRole(a);
+      final bResolution = _resolveExecutiveRole(b);
+      final aRoleKey = aResolution.normalized;
+      final bRoleKey = bResolution.normalized;
 
       final defaultRank = _executiveRoleOrder.length;
       final aRankIndex = _executiveRoleOrder.indexOf(aRoleKey);
@@ -509,6 +573,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
         return aRank.compareTo(bRank);
       }
 
+      final aRoleRaw = aResolution.displayLabel;
+      final bRoleRaw = bResolution.displayLabel;
       if (aRoleRaw != null && bRoleRaw != null) {
         final roleCompare = aRoleRaw.toLowerCase().compareTo(bRoleRaw.toLowerCase());
         if (roleCompare != 0) {
@@ -525,6 +591,71 @@ class _MembersListScreenState extends State<MembersListScreen> {
       return aHasPhoto ? -1 : 1;
     }
     return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  }
+
+  static _ExecutiveRoleResolution _resolveExecutiveRole(Member member) {
+    final shortRole = member.executiveRoleShort?.trim();
+    final longRole = member.executiveRole?.trim();
+
+    final candidateLabels = <String>[];
+    if (shortRole != null && shortRole.isNotEmpty) {
+      candidateLabels.add(shortRole);
+    }
+
+    if (shortRole != null &&
+        shortRole.isNotEmpty &&
+        longRole != null &&
+        longRole.isNotEmpty) {
+      final combined = '$shortRole / $longRole';
+      candidateLabels.add(combined);
+
+      if (shortRole.toLowerCase() != longRole.toLowerCase()) {
+        candidateLabels.add('$longRole / $shortRole');
+      }
+    }
+
+    if (longRole != null && longRole.isNotEmpty) {
+      candidateLabels.add(longRole);
+    }
+
+    final seenLabels = <String>{};
+    final candidates = <_ExecutiveRoleCandidate>[];
+
+    for (final raw in candidateLabels) {
+      final lower = raw.toLowerCase();
+      if (!seenLabels.add(lower)) continue;
+      final normalized = _normalizeExecutiveRole(raw);
+      candidates.add(_ExecutiveRoleCandidate(raw: raw, normalized: normalized));
+    }
+
+    if (candidates.isEmpty) {
+      return const _ExecutiveRoleResolution(normalized: '', displayLabel: null);
+    }
+
+    for (final candidate in candidates) {
+      if (candidate.normalized.isNotEmpty &&
+          _executiveRoleOrder.contains(candidate.normalized)) {
+        return _ExecutiveRoleResolution(
+          normalized: candidate.normalized,
+          displayLabel: candidate.raw,
+        );
+      }
+    }
+
+    for (final candidate in candidates) {
+      if (candidate.normalized.isNotEmpty) {
+        return _ExecutiveRoleResolution(
+          normalized: candidate.normalized,
+          displayLabel: candidate.raw,
+        );
+      }
+    }
+
+    final fallback = candidates.first.raw;
+    return _ExecutiveRoleResolution(
+      normalized: '',
+      displayLabel: fallback.isEmpty ? null : fallback,
+    );
   }
 
   List<Chapter> _computeFilteredChapters() {
