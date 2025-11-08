@@ -15,6 +15,7 @@ import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -124,7 +125,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final result = await file_picker.FilePicker.platform.pickFiles(
       allowMultiple: true,
       withData: true,
-      withReadStream: true,
+      withReadStream: !kIsWeb,
     );
 
     if (result == null || result.files.isEmpty) {
@@ -132,27 +133,25 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
 
     final additions = <PlatformFile>[];
+    final failedHydrations = <String>[];
     for (final file in result.files) {
       final platformFile = await materializePickedPlatformFile(file);
       if (platformFile == null) {
+        failedHydrations.add(file.name);
         continue;
       }
       additions.add(platformFile);
     }
 
-    if (additions.isEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _reportComposerError =
-            'We couldn\'t read the selected files. Please try again or choose different files.';
-      });
-      return;
-    }
+    final errorMessage = failedHydrations.isEmpty
+        ? null
+        : failedHydrations.length == 1
+            ? 'We couldn\'t read "${failedHydrations.first}". Please try again or choose a different file.'
+            : 'We couldn\'t read ${failedHydrations.length} files: ${failedHydrations.join(', ')}. Please try again or choose different files.';
 
     if (!mounted) return;
 
     setState(() {
-      _reportComposerError = null;
       final existingNames = _pendingReportFiles.map((file) => file.name.toLowerCase()).toSet();
       final merged = [..._pendingReportFiles];
       for (final file in additions) {
@@ -162,6 +161,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         }
       }
       _pendingReportFiles = merged;
+      _reportComposerError = additions.isEmpty
+          ? (errorMessage ??
+              'We couldn\'t read the selected files. Please try again or choose different files.')
+          : errorMessage;
     });
   }
 
@@ -561,7 +564,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       type: file_picker.FileType.custom,
       allowedExtensions: const ['png', 'jpg', 'jpeg', 'heic', 'heif', 'webp'],
       withData: true,
-      withReadStream: true,
+      withReadStream: !kIsWeb,
     );
 
     if (result == null || result.files.isEmpty) {
@@ -572,13 +575,20 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final platformFile = await materializePickedPlatformFile(picked);
     if (platformFile == null) {
       if (!mounted) return;
+      setState(() {
+        _reportComposerError =
+            'We couldn\'t read the selected photo. Please try again or choose a different file.';
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to read selected photo. Please try again.')),
       );
       return;
     }
 
-    setState(() => _uploadingPhoto = true);
+    setState(() {
+      _uploadingPhoto = true;
+      _reportComposerError = null;
+    });
 
     try {
       final updated = await _memberRepo.uploadProfilePhoto(member: _member, file: platformFile);
