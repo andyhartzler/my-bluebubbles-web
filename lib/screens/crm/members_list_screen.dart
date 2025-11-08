@@ -49,9 +49,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
   String? _selectedDistrict;
   List<String>? _selectedCommittees;
   String? _selectedChapter;
-  String? _selectedChapterStatus;
   String? _selectedCommunityType;
-  String? _selectedChapterPosition;
+  List<String>? _selectedLeadershipChapters;
   String? _registeredVoterFilter;
   String? _contactFilter;
   int? _minAgeFilter;
@@ -62,9 +61,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
   List<String> _districts = [];
   List<String> _committees = [];
   List<String> _chapterNames = [];
-  List<String> _chapterStatuses = [];
   List<String> _communityTypes = [];
-  List<String> _chapterPositions = [];
+  List<String> _leadershipChapterOptions = [];
 
   Map<String, int> _memberCountByChapter = {};
   Map<String, int> _leaderCountByChapter = {};
@@ -110,9 +108,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _memberRepo.getUniqueCongressionalDistricts(),
         _memberRepo.getUniqueCommittees(),
         _memberRepo.getChapterCounts(),
-        _memberRepo.getChapterStatusCounts(),
         _memberRepo.getCommunityTypeCounts(),
-        _memberRepo.getChapterPositionCounts(),
         _chapterRepository.getAllChapters(),
       ]);
 
@@ -123,10 +119,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
       final districts = results[2] as List<String>;
       final committees = results[3] as List<String>;
       final rawChapterCounts = Map<String, int>.from(results[4] as Map);
-      final chapterStatusCounts = Map<String, int>.from(results[5] as Map);
-      final communityCounts = Map<String, int>.from(results[6] as Map);
-      final chapterPositionCounts = Map<String, int>.from(results[7] as Map);
-      final chapters = results[8] as List<Chapter>;
+      final communityCounts = Map<String, int>.from(results[5] as Map);
+      final chapters = results[6] as List<Chapter>;
 
       final normalizedChapterCounts = <String, int>{};
       final chapterNameMap = <String, String>{};
@@ -147,13 +141,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
       final chapterNames = chapterNameMap.values.toList()
         ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-      final chapterStatuses = chapterStatusCounts.keys
-          .map(_cleanValue)
-          .whereType<String>()
-          .toSet()
-          .toList()
-        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
       final communityTypes = communityCounts.keys
           .map(_cleanValue)
           .whereType<String>()
@@ -161,8 +148,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
           .toList()
         ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-      final chapterPositions = chapterPositionCounts.keys
-          .map(_cleanValue)
+      final leadershipChapters = members
+          .where((member) => _cleanValue(member.chapterPosition) != null)
+          .map((member) => _cleanValue(member.chapterName))
           .whereType<String>()
           .toSet()
           .toList()
@@ -175,9 +163,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _committees = committees;
         _chapters = chapters;
         _chapterNames = chapterNames;
-        _chapterStatuses = chapterStatuses;
         _communityTypes = communityTypes;
-        _chapterPositions = chapterPositions;
+        _leadershipChapterOptions = leadershipChapters;
         _memberCountByChapter = normalizedChapterCounts;
         _leaderCountByChapter = _computeLeaderCounts(members);
         _deriveAgeBounds(members);
@@ -252,6 +239,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   List<Member> _computeFilteredMembers() {
     final query = _searchQuery.trim().toLowerCase();
+    final leadershipFilterActive =
+        _selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty;
+    final leadershipChapterKeys = leadershipFilterActive
+        ? _selectedLeadershipChapters!
+            .map(_normalizeKey)
+            .whereType<String>()
+            .toSet()
+        : const <String>{};
 
     final primaryMembers = <Member>[];
     final agedOutMembers = <Member>[];
@@ -274,19 +269,16 @@ class _MembersListScreenState extends State<MembersListScreen> {
         continue;
       }
 
-      if (_selectedChapterStatus != null &&
-          !_equalsIgnoreCase(member.currentChapterMember, _selectedChapterStatus)) {
-        continue;
+      if (_selectedCommunityType != null && !_equalsIgnoreCase(member.communityType, _selectedCommunityType)) {
+        return false;
       }
 
-      if (_selectedCommunityType != null &&
-          !_equalsIgnoreCase(member.communityType, _selectedCommunityType)) {
-        continue;
-      }
-
-      if (_selectedChapterPosition != null &&
-          !_equalsIgnoreCase(member.chapterPosition, _selectedChapterPosition)) {
-        continue;
+      if (leadershipFilterActive) {
+        final hasLeadershipRole = _cleanValue(member.chapterPosition) != null;
+        final chapterKey = _normalizeKey(member.chapterName);
+        if (!hasLeadershipRole || chapterKey == null || !leadershipChapterKeys.contains(chapterKey)) {
+          return false;
+        }
       }
 
       if (_selectedCommittees != null && _selectedCommittees!.isNotEmpty) {
@@ -419,9 +411,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
       _selectedDistrict = null;
       _selectedCommittees = null;
       _selectedChapter = null;
-      _selectedChapterStatus = null;
       _selectedCommunityType = null;
-      _selectedChapterPosition = null;
+      _selectedLeadershipChapters = null;
       _registeredVoterFilter = null;
       _contactFilter = null;
       _minAgeFilter = null;
@@ -582,9 +573,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final hasFilters = _selectedCounty != null ||
         _selectedDistrict != null ||
         _selectedChapter != null ||
-        _selectedChapterStatus != null ||
+        (_selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty) ||
         _selectedCommunityType != null ||
-        _selectedChapterPosition != null ||
         _registeredVoterFilter != null ||
         _contactFilter != null ||
         _minAgeFilter != null ||
@@ -601,8 +591,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
       ),
       _buildFilterChip(
         label: _selectedDistrict != null
-            ? 'District ${_formatDistrict(_selectedDistrict) ?? _selectedDistrict!}'
-            : 'District',
+            ? (_formatDistrict(_selectedDistrict) ?? _selectedDistrict!)
+            : 'Congressional District',
         selected: _selectedDistrict != null,
         onTap: _showDistrictFilter,
         icon: Icons.account_balance,
@@ -614,15 +604,11 @@ class _MembersListScreenState extends State<MembersListScreen> {
         icon: Icons.flag_outlined,
       ),
       _buildFilterChip(
-        label: _selectedChapterStatus ?? 'Chapter Status',
-        selected: _selectedChapterStatus != null,
-        onTap: _showChapterStatusFilter,
-        icon: Icons.how_to_vote,
-      ),
-      _buildFilterChip(
-        label: _selectedChapterPosition ?? 'Leadership Role',
-        selected: _selectedChapterPosition != null,
-        onTap: _showChapterPositionFilter,
+        label: _selectedLeadershipChapters == null || _selectedLeadershipChapters!.isEmpty
+            ? 'Chapter Leadership'
+            : '${_selectedLeadershipChapters!.length} chapters',
+        selected: _selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty,
+        onTap: _showLeadershipFilter,
         icon: Icons.emoji_events_outlined,
       ),
       _buildFilterChip(
@@ -740,9 +726,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
     if (_selectedCounty != null) count++;
     if (_selectedDistrict != null) count++;
     if (_selectedChapter != null) count++;
-    if (_selectedChapterStatus != null) count++;
+    if (_selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty) count++;
     if (_selectedCommunityType != null) count++;
-    if (_selectedChapterPosition != null) count++;
     if (_registeredVoterFilter != null) count++;
     if (_contactFilter != null) count++;
     if (_minAgeFilter != null || _maxAgeFilter != null) count++;
@@ -1597,7 +1582,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
       title: 'Filter by Congressional District',
       options: _districts,
       currentValue: _selectedDistrict,
-      labelBuilder: (value) => 'District ${_formatDistrict(value) ?? value}',
+      labelBuilder: (value) => _formatDistrict(value) ?? value,
       onSelected: (value) => _updateFilters(() => _selectedDistrict = value),
     );
   }
@@ -1611,15 +1596,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  void _showChapterStatusFilter() {
-    _showSingleChoiceDialog(
-      title: 'Filter by Chapter Status',
-      options: _chapterStatuses,
-      currentValue: _selectedChapterStatus,
-      onSelected: (value) => _updateFilters(() => _selectedChapterStatus = value),
-    );
-  }
-
   void _showCommunityFilter() {
     _showSingleChoiceDialog(
       title: 'Filter by Community Type',
@@ -1629,12 +1605,64 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  void _showChapterPositionFilter() {
-    _showSingleChoiceDialog(
-      title: 'Filter by Chapter Position',
-      options: _chapterPositions,
-      currentValue: _selectedChapterPosition,
-      onSelected: (value) => _updateFilters(() => _selectedChapterPosition = value),
+  void _showLeadershipFilter() {
+    final tempSelected = List<String>.from(_selectedLeadershipChapters ?? []);
+    tempSelected.retainWhere(_leadershipChapterOptions.contains);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Filter by Chapter Leadership'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: StatefulBuilder(
+            builder: (context, setDialogState) => ListView(
+              shrinkWrap: true,
+              children: _leadershipChapterOptions.map((chapter) {
+                final isSelected = tempSelected.contains(chapter);
+                return CheckboxListTile(
+                  title: Text(chapter),
+                  value: isSelected,
+                  onChanged: (checked) {
+                    setDialogState(() {
+                      if (checked == true) {
+                        if (!tempSelected.contains(chapter)) {
+                          tempSelected.add(chapter);
+                        }
+                      } else {
+                        tempSelected.remove(chapter);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _updateFilters(() => _selectedLeadershipChapters = null);
+            },
+            child: const Text('Clear'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _updateFilters(
+                () => _selectedLeadershipChapters =
+                    tempSelected.isEmpty ? null : List<String>.from(tempSelected),
+              );
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
     );
   }
 
