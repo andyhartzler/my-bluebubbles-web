@@ -1218,8 +1218,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final isExecutive = member.executiveCommittee;
     final executiveTitle = _cleanValue(member.executiveTitle) ?? 'Executive Committee';
     final rawExecutiveRole = _cleanValue(member.executiveRole);
-    final executiveRoleText =
-        (rawExecutiveRole != null && rawExecutiveRole.isNotEmpty) ? rawExecutiveRole : '-';
 
     final metaChips = <Widget>[];
     if (districtLabel != null) {
@@ -1375,13 +1373,15 @@ class _MembersListScreenState extends State<MembersListScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Role: $executiveRoleText',
-                    style: executiveRoleStyle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  if (rawExecutiveRole != null && rawExecutiveRole.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      rawExecutiveRole,
+                      style: executiveRoleStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ],
             ),
