@@ -67,10 +67,9 @@ class Member {
   final String? chapterPosition;
   final DateTime? dateElected;
   final DateTime? termExpiration;
-  final bool executive;
+  final bool executiveCommittee;
   final String? executiveTitle;
   final String? executiveRole;
-  final MemberInternalInfo? internalMemberInfo;
   final List<MemberProfilePhoto> profilePhotos;
 
   Member({
@@ -134,10 +133,9 @@ class Member {
     this.chapterPosition,
     this.dateElected,
     this.termExpiration,
-    this.executive = false,
+    this.executiveCommittee = false,
     this.executiveTitle,
     this.executiveRole,
-    this.internalMemberInfo,
     List<MemberProfilePhoto> profilePhotos = const [],
   }) : profilePhotos = List<MemberProfilePhoto>.unmodifiable(profilePhotos);
 
@@ -411,10 +409,9 @@ class Member {
       termExpiration: json['term_expiration'] != null
           ? DateTime.tryParse(json['term_expiration'] as String)
           : null,
-      executive: coerceBool(json['executive']) ?? false,
+      executiveCommittee: json['executive_committee'] as bool? ?? false,
       executiveTitle: _normalizeText(json['executive_title']),
       executiveRole: _normalizeText(json['executive_role']),
-      internalMemberInfo: MemberInternalInfo.tryParse(json['internal_member_info']),
       profilePhotos: MemberProfilePhoto.parseList(json['profile_pictures']),
     );
   }
@@ -482,10 +479,9 @@ class Member {
       'chapter_position': chapterPosition,
       'date_elected': dateElected?.toIso8601String().split('T').first,
       'term_expiration': termExpiration?.toIso8601String().split('T').first,
-      'executive': executive,
+      'executive_committee': executiveCommittee,
       'executive_title': executiveTitle,
       'executive_role': executiveRole,
-      'internal_member_info': internalMemberInfo?.toJson(),
       'profile_pictures': profilePhotos.map((photo) => photo.toJson()).toList(),
     };
   }
@@ -595,6 +591,9 @@ class Member {
     String? executiveRole,
     MemberInternalInfo? internalMemberInfo,
     List<MemberProfilePhoto>? profilePhotos,
+    bool? executiveCommittee,
+    String? executiveTitle,
+    String? executiveRole,
   }) {
     return Member(
       id: id ?? this.id,
@@ -662,6 +661,9 @@ class Member {
       executiveRole: executiveRole ?? this.executiveRole,
       internalMemberInfo: internalMemberInfo ?? this.internalMemberInfo,
       profilePhotos: profilePhotos ?? this.profilePhotos,
+      executiveCommittee: executiveCommittee ?? this.executiveCommittee,
+      executiveTitle: executiveTitle ?? this.executiveTitle,
+      executiveRole: executiveRole ?? this.executiveRole,
     );
   }
 

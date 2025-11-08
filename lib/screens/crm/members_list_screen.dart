@@ -70,8 +70,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   int? _availableMaxAge;
 
   static const List<Color> _memberCardGradient = [Color(0xFF0F4C75), Color(0xFF3282B8)];
-  static const int _minAllowedAge = 14;
-  static const int _maxAllowedAge = 36;
+  static const Color _executiveAccentColor = Color(0xFFFDB813);
 
   @override
   void initState() {
@@ -1213,6 +1212,11 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final age = member.age;
     final zodiac = _cleanValue(member.zodiacSign);
     final joinedDate = member.dateJoined;
+    final isExecutive = member.executiveCommittee;
+    final executiveTitle = _cleanValue(member.executiveTitle) ?? 'Executive Committee';
+    final rawExecutiveRole = _cleanValue(member.executiveRole);
+    final executiveRoleText =
+        (rawExecutiveRole != null && rawExecutiveRole.isNotEmpty) ? rawExecutiveRole : '-';
 
     final metaChips = <Widget>[];
     if (districtLabel != null) {
@@ -1249,25 +1253,39 @@ class _MembersListScreenState extends State<MembersListScreen> {
             ?.copyWith(color: textColor, fontWeight: FontWeight.w600, height: 1.3) ??
         TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: isMobile ? 13.5 : 14.5);
 
-    final detailLines = <Widget>[];
-    if (county != null) {
-      detailLines.add(
-        _buildDetailLine(
-          Icons.map_outlined,
-          county,
-          iconColor: detailIconColor,
-          textStyle: detailTextStyle,
-        ),
-      );
-    }
-    detailLines.add(
+    final executiveTitleStyle = (isMobile ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
+            ?.copyWith(
+              color: Colors.white.withOpacity(0.95),
+              fontWeight: FontWeight.w600,
+              height: 1.25,
+            ) ??
+        TextStyle(
+          color: Colors.white.withOpacity(0.95),
+          fontWeight: FontWeight.w600,
+          fontSize: isMobile ? 15 : 17,
+          height: 1.25,
+        );
+    final executiveRoleStyle = (isMobile ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium)
+            ?.copyWith(
+              color: Colors.white.withOpacity(0.82),
+              fontWeight: FontWeight.w500,
+              height: 1.2,
+            ) ??
+        TextStyle(
+          color: Colors.white.withOpacity(0.82),
+          fontWeight: FontWeight.w500,
+          fontSize: isMobile ? 12 : 13,
+          height: 1.2,
+        );
+
+    final detailLines = <Widget>[
       _buildDetailLine(
         Icons.phone,
         phoneDisplay ?? '-',
         iconColor: detailIconColor,
         textStyle: detailTextStyle,
       ),
-    );
+    ];
     if (emailDisplay != null) {
       detailLines.add(
         _buildDetailLine(
@@ -1278,16 +1296,23 @@ class _MembersListScreenState extends State<MembersListScreen> {
         ),
       );
     }
-    if (joinedDate != null) {
-      detailLines.add(
-        _buildDetailLine(
-          Icons.calendar_month,
-          'Joined ${_formatDate(joinedDate)}',
-          iconColor: detailIconColor,
-          textStyle: detailTextStyle,
-        ),
-      );
-    }
+    detailLines.insert(
+      0,
+      _buildDetailLine(
+        Icons.map_outlined,
+        county ?? '-',
+        iconColor: detailIconColor,
+        textStyle: detailTextStyle,
+      ),
+    );
+    detailLines.add(
+      _buildDetailLine(
+        Icons.calendar_month,
+        'Joined ${joinedDate != null ? _formatDate(joinedDate) : '-'}',
+        iconColor: detailIconColor,
+        textStyle: detailTextStyle,
+      ),
+    );
 
     final columnChildren = <Widget>[
       Row(
@@ -1313,24 +1338,48 @@ class _MembersListScreenState extends State<MembersListScreen> {
                         softWrap: false,
                       ),
                     ),
+                    if (isExecutive)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: _buildExecutiveBadge(isMobile: isMobile),
+                      ),
                     if (member.optOut)
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: isMobile ? 4 : 6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.28),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Text(
-                          'Opted Out',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: isMobile ? 4 : 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.28),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text(
+                            'Opted Out',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
                   ],
                 ),
+                if (isExecutive) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    executiveTitle,
+                    style: executiveTitleStyle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Role: $executiveRoleText',
+                    style: executiveRoleStyle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ),
           ),
@@ -1360,6 +1409,13 @@ class _MembersListScreenState extends State<MembersListScreen> {
       end: Alignment.bottomRight,
     );
 
+    final BoxBorder? accentBorder = isExecutive
+        ? Border.all(
+            color: _executiveAccentColor.withOpacity(0.65),
+            width: isMobile ? 1.4 : 1.8,
+          )
+        : null;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
@@ -1373,6 +1429,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
             offset: const Offset(0, 12),
           ),
         ],
+        border: accentBorder,
       ),
       child: Material(
         color: Colors.transparent,
@@ -1391,6 +1448,33 @@ class _MembersListScreenState extends State<MembersListScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildExecutiveBadge({required bool isMobile}) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 12, vertical: isMobile ? 4 : 6),
+      decoration: BoxDecoration(
+        color: _executiveAccentColor.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _executiveAccentColor.withOpacity(0.7), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.workspace_premium_outlined, size: isMobile ? 14 : 16, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            'Executive',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: isMobile ? 11 : 12.5,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
       ),
     );
   }
