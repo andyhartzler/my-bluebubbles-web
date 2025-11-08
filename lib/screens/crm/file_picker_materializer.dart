@@ -21,6 +21,16 @@ Future<PlatformFile?> materializePickedPlatformFile(
     hydrationTrace = readResult.stackTrace;
   }
 
+  if (resolvedBytes == null || resolvedBytes.isEmpty) {
+    final fallbackRead = await _readFileUsingFilePickerPlatform(file);
+    if (fallbackRead.bytes != null && fallbackRead.bytes!.isNotEmpty) {
+      resolvedBytes = fallbackRead.bytes;
+    } else if (hydrationError == null) {
+      hydrationError = fallbackRead.error;
+      hydrationTrace = fallbackRead.stackTrace;
+    }
+  }
+
   if ((resolvedBytes == null || resolvedBytes.isEmpty) &&
       (file.path == null || file.path!.isEmpty)) {
     final message =
@@ -97,4 +107,51 @@ Future<({Uint8List? bytes, Object? error, StackTrace? stackTrace})> _readFileByt
   }
 
   return (bytes: null, error: lastError, stackTrace: lastStackTrace);
+}
+
+Future<({Uint8List? bytes, Object? error, StackTrace? stackTrace})>
+    _readFileUsingFilePickerPlatform(file_picker.PlatformFile file) async {
+  try {
+    final dynamic platform = file_picker.FilePicker.platform;
+    Object? lastError;
+    StackTrace? lastStackTrace;
+
+    Uint8List? asUint8List(dynamic value) {
+      if (value is Uint8List) {
+        return value;
+      }
+      if (value is List<int>) {
+        return Uint8List.fromList(value);
+      }
+      return null;
+    }
+
+    final List<dynamic Function()> readAttempts = [
+      () => platform.readFile(file: file),
+      () => platform.readFile(file),
+    ];
+
+    for (final attempt in readAttempts) {
+      try {
+        dynamic result = attempt();
+        if (result is Future) {
+          result = await result;
+        }
+        final bytes = asUint8List(result);
+        if (bytes != null) {
+          return (bytes: bytes, error: null, stackTrace: null);
+        }
+      } catch (error, stackTrace) {
+        lastError = error;
+        lastStackTrace = stackTrace;
+        if (error is! NoSuchMethodError) {
+          break;
+        }
+      }
+    }
+
+    return (bytes: null, error: lastError, stackTrace: lastStackTrace);
+  } catch (error, stackTrace) {
+    return (bytes: null, error: error, stackTrace: stackTrace);
+  }
 }
