@@ -33,6 +33,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   List<Member> _members = [];
   List<Member> _filteredMembers = [];
+  List<Member> _agedOutMembers = [];
   List<Chapter> _chapters = [];
   List<Chapter> _filteredChapters = [];
 
@@ -41,15 +42,15 @@ class _MembersListScreenState extends State<MembersListScreen> {
   String _searchQuery = '';
   late int _activeView;
   bool _filtersExpandedOnMobile = false;
+  bool _showAgedOutMembers = false;
 
   // Filter state
   String? _selectedCounty;
   String? _selectedDistrict;
   List<String>? _selectedCommittees;
   String? _selectedChapter;
-  String? _selectedChapterStatus;
   String? _selectedCommunityType;
-  String? _selectedChapterPosition;
+  List<String>? _selectedLeadershipChapters;
   String? _registeredVoterFilter;
   String? _contactFilter;
   int? _minAgeFilter;
@@ -60,9 +61,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
   List<String> _districts = [];
   List<String> _committees = [];
   List<String> _chapterNames = [];
-  List<String> _chapterStatuses = [];
   List<String> _communityTypes = [];
-  List<String> _chapterPositions = [];
+  List<String> _leadershipChapterOptions = [];
 
   Map<String, int> _memberCountByChapter = {};
   Map<String, int> _leaderCountByChapter = {};
@@ -107,9 +107,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _memberRepo.getUniqueCongressionalDistricts(),
         _memberRepo.getUniqueCommittees(),
         _memberRepo.getChapterCounts(),
-        _memberRepo.getChapterStatusCounts(),
         _memberRepo.getCommunityTypeCounts(),
-        _memberRepo.getChapterPositionCounts(),
         _chapterRepository.getAllChapters(),
       ]);
 
@@ -120,10 +118,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
       final districts = results[2] as List<String>;
       final committees = results[3] as List<String>;
       final rawChapterCounts = Map<String, int>.from(results[4] as Map);
-      final chapterStatusCounts = Map<String, int>.from(results[5] as Map);
-      final communityCounts = Map<String, int>.from(results[6] as Map);
-      final chapterPositionCounts = Map<String, int>.from(results[7] as Map);
-      final chapters = results[8] as List<Chapter>;
+      final communityCounts = Map<String, int>.from(results[5] as Map);
+      final chapters = results[6] as List<Chapter>;
 
       final normalizedChapterCounts = <String, int>{};
       final chapterNameMap = <String, String>{};
@@ -144,13 +140,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
       final chapterNames = chapterNameMap.values.toList()
         ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-      final chapterStatuses = chapterStatusCounts.keys
-          .map(_cleanValue)
-          .whereType<String>()
-          .toSet()
-          .toList()
-        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
       final communityTypes = communityCounts.keys
           .map(_cleanValue)
           .whereType<String>()
@@ -158,8 +147,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
           .toList()
         ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-      final chapterPositions = chapterPositionCounts.keys
-          .map(_cleanValue)
+      final leadershipChapters = members
+          .where((member) => _cleanValue(member.chapterPosition) != null)
+          .map((member) => _cleanValue(member.chapterName))
           .whereType<String>()
           .toSet()
           .toList()
@@ -172,13 +162,15 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _committees = committees;
         _chapters = chapters;
         _chapterNames = chapterNames;
-        _chapterStatuses = chapterStatuses;
         _communityTypes = communityTypes;
-        _chapterPositions = chapterPositions;
+        _leadershipChapterOptions = leadershipChapters;
         _memberCountByChapter = normalizedChapterCounts;
         _leaderCountByChapter = _computeLeaderCounts(members);
         _deriveAgeBounds(members);
         _filteredMembers = _computeFilteredMembers();
+        if (_agedOutMembers.isEmpty) {
+          _showAgedOutMembers = false;
+        }
         _filteredChapters = _computeFilteredChapters();
         _loading = false;
       });
@@ -203,14 +195,22 @@ class _MembersListScreenState extends State<MembersListScreen> {
       return;
     }
 
-    _availableMinAge = ages.first;
-    _availableMaxAge = ages.last;
+    int clampAge(int value) => value.clamp(_minAllowedAge, _maxAllowedAge).toInt();
 
-    if (_minAgeFilter != null && _availableMinAge != null && _minAgeFilter! < _availableMinAge!) {
-      _minAgeFilter = _availableMinAge;
+    final constrainedMin = clampAge(ages.first);
+    final constrainedMax = clampAge(ages.last);
+
+    _availableMinAge = constrainedMin;
+    _availableMaxAge = constrainedMax;
+
+    if (_minAgeFilter != null && _minAgeFilter! < _minAllowedAge) {
+      _minAgeFilter = _minAllowedAge;
     }
-    if (_maxAgeFilter != null && _availableMaxAge != null && _maxAgeFilter! > _availableMaxAge!) {
-      _maxAgeFilter = _availableMaxAge;
+    if (_minAgeFilter != null && _minAgeFilter! < constrainedMin) {
+      _minAgeFilter = constrainedMin;
+    }
+    if (_maxAgeFilter != null && _maxAgeFilter! > constrainedMax) {
+      _maxAgeFilter = constrainedMax;
     }
   }
 
@@ -229,86 +229,113 @@ class _MembersListScreenState extends State<MembersListScreen> {
     setState(() {
       updater();
       _filteredMembers = _computeFilteredMembers();
+      if (_agedOutMembers.isEmpty) {
+        _showAgedOutMembers = false;
+      }
       _filteredChapters = _computeFilteredChapters();
     });
   }
 
   List<Member> _computeFilteredMembers() {
     final query = _searchQuery.trim().toLowerCase();
+    final leadershipFilterActive =
+        _selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty;
+    final leadershipChapterKeys = leadershipFilterActive
+        ? _selectedLeadershipChapters!
+            .map(_normalizeKey)
+            .whereType<String>()
+            .toSet()
+        : const <String>{};
 
-    final filtered = _members.where((member) {
+    final primaryMembers = <Member>[];
+    final agedOutMembers = <Member>[];
+
+    for (final member in _members) {
       if (query.isNotEmpty && !_matchesMemberQuery(member, query)) {
-        return false;
+        continue;
       }
 
       if (_selectedCounty != null && !_equalsIgnoreCase(member.county, _selectedCounty)) {
-        return false;
+        continue;
       }
 
-      if (_selectedDistrict != null && !_equalsIgnoreCase(member.congressionalDistrict, _selectedDistrict)) {
-        return false;
+      if (_selectedDistrict != null &&
+          !_equalsIgnoreCase(member.congressionalDistrict, _selectedDistrict)) {
+        continue;
       }
 
       if (_selectedChapter != null && !_equalsIgnoreCase(member.chapterName, _selectedChapter)) {
-        return false;
-      }
-
-      if (_selectedChapterStatus != null && !_equalsIgnoreCase(member.currentChapterMember, _selectedChapterStatus)) {
-        return false;
+        continue;
       }
 
       if (_selectedCommunityType != null && !_equalsIgnoreCase(member.communityType, _selectedCommunityType)) {
         return false;
       }
 
-      if (_selectedChapterPosition != null && !_equalsIgnoreCase(member.chapterPosition, _selectedChapterPosition)) {
-        return false;
+      if (leadershipFilterActive) {
+        final hasLeadershipRole = _cleanValue(member.chapterPosition) != null;
+        final chapterKey = _normalizeKey(member.chapterName);
+        if (!hasLeadershipRole || chapterKey == null || !leadershipChapterKeys.contains(chapterKey)) {
+          return false;
+        }
       }
 
       if (_selectedCommittees != null && _selectedCommittees!.isNotEmpty) {
-        if (member.committee == null) return false;
+        if (member.committee == null) continue;
         final normalizedCommittees = member.committee!
             .map(_normalizeKey)
             .whereType<String>()
             .toSet();
+        bool missingCommittee = false;
         for (final committee in _selectedCommittees!) {
           final normalized = _normalizeKey(committee);
           if (normalized == null || !normalizedCommittees.contains(normalized)) {
-            return false;
+            missingCommittee = true;
+            break;
           }
         }
+        if (missingCommittee) continue;
       }
 
       if (_registeredVoterFilter != null) {
         final isRegistered = member.registeredVoter == true;
-        if (_registeredVoterFilter == 'registered' && !isRegistered) return false;
-        if (_registeredVoterFilter == 'not_registered' && isRegistered) return false;
+        if (_registeredVoterFilter == 'registered' && !isRegistered) continue;
+        if (_registeredVoterFilter == 'not_registered' && isRegistered) continue;
       }
 
       if (_contactFilter != null) {
-        if (_contactFilter == 'contactable' && member.optOut) return false;
-        if (_contactFilter == 'opted_out' && !member.optOut) return false;
+        if (_contactFilter == 'contactable' && member.optOut) continue;
+        if (_contactFilter == 'opted_out' && !member.optOut) continue;
       }
 
+      final age = member.age;
       if (_minAgeFilter != null || _maxAgeFilter != null) {
-        final age = member.age;
-        if (age == null) return false;
-        if (_minAgeFilter != null && age < _minAgeFilter!) return false;
-        if (_maxAgeFilter != null && age > _maxAgeFilter!) return false;
+        if (age == null) continue;
+        if (_minAgeFilter != null && age < _minAgeFilter!) continue;
+        if (_maxAgeFilter != null && age > _maxAgeFilter!) continue;
       }
 
-      return true;
-    }).toList()
-      ..sort((a, b) {
-        final aHasPhoto = a.hasProfilePhoto;
-        final bHasPhoto = b.hasProfilePhoto;
-        if (aHasPhoto != bHasPhoto) {
-          return aHasPhoto ? -1 : 1;
-        }
-        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-      });
+      if (age != null && age > _maxAllowedAge) {
+        agedOutMembers.add(member);
+      } else {
+        primaryMembers.add(member);
+      }
+    }
 
-    return filtered;
+    primaryMembers.sort(_compareMembers);
+    agedOutMembers.sort(_compareMembers);
+    _agedOutMembers = agedOutMembers;
+
+    return primaryMembers;
+  }
+
+  int _compareMembers(Member a, Member b) {
+    final aHasPhoto = a.hasProfilePhoto;
+    final bHasPhoto = b.hasProfilePhoto;
+    if (aHasPhoto != bHasPhoto) {
+      return aHasPhoto ? -1 : 1;
+    }
+    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
   }
 
   List<Chapter> _computeFilteredChapters() {
@@ -383,9 +410,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
       _selectedDistrict = null;
       _selectedCommittees = null;
       _selectedChapter = null;
-      _selectedChapterStatus = null;
       _selectedCommunityType = null;
-      _selectedChapterPosition = null;
+      _selectedLeadershipChapters = null;
       _registeredVoterFilter = null;
       _contactFilter = null;
       _minAgeFilter = null;
@@ -477,6 +503,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final theme = Theme.of(context);
     final showingChapters = _showingChapters;
 
+    final visibleMembersCount = _filteredMembers.length;
+    final totalMembersCount = visibleMembersCount + _agedOutMembers.length;
+
     final slivers = <Widget>[
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -492,14 +521,19 @@ class _MembersListScreenState extends State<MembersListScreen> {
           child: Text(
             showingChapters
                 ? 'Showing ${_filteredChapters.length} of ${_chapters.length} chapters'
-                : 'Showing ${_filteredMembers.length} of ${_members.length} members',
+                : 'Showing $visibleMembersCount of $totalMembersCount members',
             style: theme.textTheme.labelMedium,
           ),
         ),
       ),
       const SliverToBoxAdapter(child: SizedBox(height: 8)),
-      showingChapters ? _buildChaptersSliver(theme) : _buildMembersSliver(theme),
     ];
+
+    if (showingChapters) {
+      slivers.add(_buildChaptersSliver(theme));
+    } else {
+      slivers.addAll(_buildMembersSlivers(theme));
+    }
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -538,9 +572,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final hasFilters = _selectedCounty != null ||
         _selectedDistrict != null ||
         _selectedChapter != null ||
-        _selectedChapterStatus != null ||
+        (_selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty) ||
         _selectedCommunityType != null ||
-        _selectedChapterPosition != null ||
         _registeredVoterFilter != null ||
         _contactFilter != null ||
         _minAgeFilter != null ||
@@ -557,8 +590,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
       ),
       _buildFilterChip(
         label: _selectedDistrict != null
-            ? 'District ${_formatDistrict(_selectedDistrict) ?? _selectedDistrict!}'
-            : 'District',
+            ? (_formatDistrict(_selectedDistrict) ?? _selectedDistrict!)
+            : 'Congressional District',
         selected: _selectedDistrict != null,
         onTap: _showDistrictFilter,
         icon: Icons.account_balance,
@@ -570,15 +603,11 @@ class _MembersListScreenState extends State<MembersListScreen> {
         icon: Icons.flag_outlined,
       ),
       _buildFilterChip(
-        label: _selectedChapterStatus ?? 'Chapter Status',
-        selected: _selectedChapterStatus != null,
-        onTap: _showChapterStatusFilter,
-        icon: Icons.how_to_vote,
-      ),
-      _buildFilterChip(
-        label: _selectedChapterPosition ?? 'Leadership Role',
-        selected: _selectedChapterPosition != null,
-        onTap: _showChapterPositionFilter,
+        label: _selectedLeadershipChapters == null || _selectedLeadershipChapters!.isEmpty
+            ? 'Chapter Leadership'
+            : '${_selectedLeadershipChapters!.length} chapters',
+        selected: _selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty,
+        onTap: _showLeadershipFilter,
         icon: Icons.emoji_events_outlined,
       ),
       _buildFilterChip(
@@ -696,9 +725,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
     if (_selectedCounty != null) count++;
     if (_selectedDistrict != null) count++;
     if (_selectedChapter != null) count++;
-    if (_selectedChapterStatus != null) count++;
+    if (_selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty) count++;
     if (_selectedCommunityType != null) count++;
-    if (_selectedChapterPosition != null) count++;
     if (_registeredVoterFilter != null) count++;
     if (_contactFilter != null) count++;
     if (_minAgeFilter != null || _maxAgeFilter != null) count++;
@@ -718,33 +746,65 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return result;
   }
 
-  Widget _buildMembersSliver(ThemeData theme) {
-    if (_filteredMembers.isEmpty) {
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 96),
-                _buildEmptyMembersState(theme),
-              ],
+  List<Widget> _buildMembersSlivers(ThemeData theme) {
+    final hasAgedOutMembers = _agedOutMembers.isNotEmpty;
+    final hasPrimaryMembers = _filteredMembers.isNotEmpty;
+
+    if (!hasPrimaryMembers && !hasAgedOutMembers) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 96),
+                  _buildEmptyMembersState(theme),
+                ],
+              ),
             ),
           ),
+        ),
+      ];
+    }
+
+    final slivers = <Widget>[];
+
+    if (hasPrimaryMembers) {
+      final bottomPadding = hasAgedOutMembers ? 16.0 : 32.0;
+      slivers.add(_buildMemberCollectionSliver(_filteredMembers, bottomPadding: bottomPadding));
+    } else {
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          sliver: SliverToBoxAdapter(child: _buildEmptyMembersState(theme)),
         ),
       );
     }
 
+    if (hasAgedOutMembers) {
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+          sliver: SliverToBoxAdapter(child: _buildAgedOutMembersPanel(theme)),
+        ),
+      );
+    }
+
+    return slivers;
+  }
+
+  Widget _buildMemberCollectionSliver(List<Member> members, {double bottomPadding = 32}) {
     return SliverLayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.crossAxisExtent;
         if (width < 600) {
-          final itemCount = _filteredMembers.length * 2 - 1;
+          final itemCount = members.length * 2 - 1;
           return SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
@@ -753,7 +813,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
                   }
                   final itemIndex = index ~/ 2;
                   return _buildMemberCard(
-                    _filteredMembers[itemIndex],
+                    members[itemIndex],
                     itemIndex,
                     isMobile: true,
                   );
@@ -764,56 +824,111 @@ class _MembersListScreenState extends State<MembersListScreen> {
           );
         }
 
+        final horizontalPadding = width < 900 ? 16.0 : 24.0;
         return SliverPadding(
-          padding: EdgeInsets.fromLTRB(width < 900 ? 16 : 24, 0, width < 900 ? 16 : 24, 32),
+          padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, bottomPadding),
           sliver: SliverToBoxAdapter(
             child: LayoutBuilder(
               builder: (context, boxConstraints) {
                 final availableWidth = boxConstraints.maxWidth;
-                const minTileWidth = 280.0;
-                const maxTileWidth = 360.0;
-                const spacing = 20.0;
-
-                int columnCount = math.max(1, (availableWidth / (minTileWidth + spacing)).floor());
-                columnCount = math.min(columnCount, 4);
-                double tileWidth = (availableWidth - spacing * (columnCount - 1)) / columnCount;
-                tileWidth = tileWidth.clamp(minTileWidth, maxTileWidth).toDouble();
-
-                final effectiveColumns = math.min(columnCount, _filteredMembers.length);
-                final wrapWidth = effectiveColumns <= 1
-                    ? tileWidth
-                    : math.min(
-                        availableWidth,
-                        effectiveColumns * tileWidth + spacing * (effectiveColumns - 1),
-                      );
-
-                return Align(
-                  alignment: Alignment.topCenter,
-                  child: SizedBox(
-                    width: wrapWidth,
-                    child: Wrap(
-                      spacing: spacing,
-                      runSpacing: spacing,
-                      alignment: WrapAlignment.start,
-                      children: [
-                        for (int i = 0; i < _filteredMembers.length; i++)
-                          SizedBox(
-                            width: tileWidth,
-                            child: _buildMemberCard(
-                              _filteredMembers[i],
-                              i,
-                              isMobile: false,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
+                return _buildMemberWrap(members, availableWidth);
               },
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildMemberWrap(List<Member> members, double availableWidth) {
+    const double minTileWidth = 280.0;
+    const double maxTileWidth = 360.0;
+    const double spacing = 20.0;
+
+    int columnCount = math.max(1, (availableWidth / (minTileWidth + spacing)).floor());
+    columnCount = math.min(columnCount, 4);
+    double tileWidth = (availableWidth - spacing * (columnCount - 1)) / columnCount;
+    tileWidth = tileWidth.clamp(minTileWidth, maxTileWidth).toDouble();
+
+    final effectiveColumns = math.min(columnCount, members.length);
+    final wrapWidth = effectiveColumns <= 1
+        ? tileWidth
+        : math.min(
+            availableWidth,
+            effectiveColumns * tileWidth + spacing * (effectiveColumns - 1),
+          );
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SizedBox(
+        width: wrapWidth,
+        child: Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          alignment: WrapAlignment.start,
+          children: [
+            for (int i = 0; i < members.length; i++)
+              SizedBox(
+                width: tileWidth,
+                child: _buildMemberCard(
+                  members[i],
+                  i,
+                  isMobile: false,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAgedOutMembersPanel(ThemeData theme) {
+    return Card(
+      elevation: 1,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          key: const PageStorageKey<String>('aged-out-members-tile'),
+          initiallyExpanded: _showAgedOutMembers,
+          onExpansionChanged: (expanded) {
+            setState(() {
+              _showAgedOutMembers = expanded;
+            });
+          },
+          title: Text(
+            'Aged-Out Members (${_agedOutMembers.length})',
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            'Members older than $_maxAllowedAge are hidden from the main list.',
+            style: theme.textTheme.bodySmall,
+          ),
+          children: [
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  if (width < 600) {
+                    return Column(
+                      children: [
+                        for (int i = 0; i < _agedOutMembers.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 12),
+                          _buildMemberCard(_agedOutMembers[i], i, isMobile: true),
+                        ],
+                      ],
+                    );
+                  }
+                  return _buildMemberWrap(_agedOutMembers, width);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1551,7 +1666,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
       title: 'Filter by Congressional District',
       options: _districts,
       currentValue: _selectedDistrict,
-      labelBuilder: (value) => 'District ${_formatDistrict(value) ?? value}',
+      labelBuilder: (value) => _formatDistrict(value) ?? value,
       onSelected: (value) => _updateFilters(() => _selectedDistrict = value),
     );
   }
@@ -1565,15 +1680,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  void _showChapterStatusFilter() {
-    _showSingleChoiceDialog(
-      title: 'Filter by Chapter Status',
-      options: _chapterStatuses,
-      currentValue: _selectedChapterStatus,
-      onSelected: (value) => _updateFilters(() => _selectedChapterStatus = value),
-    );
-  }
-
   void _showCommunityFilter() {
     _showSingleChoiceDialog(
       title: 'Filter by Community Type',
@@ -1583,12 +1689,64 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  void _showChapterPositionFilter() {
-    _showSingleChoiceDialog(
-      title: 'Filter by Chapter Position',
-      options: _chapterPositions,
-      currentValue: _selectedChapterPosition,
-      onSelected: (value) => _updateFilters(() => _selectedChapterPosition = value),
+  void _showLeadershipFilter() {
+    final tempSelected = List<String>.from(_selectedLeadershipChapters ?? []);
+    tempSelected.retainWhere(_leadershipChapterOptions.contains);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Filter by Chapter Leadership'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: StatefulBuilder(
+            builder: (context, setDialogState) => ListView(
+              shrinkWrap: true,
+              children: _leadershipChapterOptions.map((chapter) {
+                final isSelected = tempSelected.contains(chapter);
+                return CheckboxListTile(
+                  title: Text(chapter),
+                  value: isSelected,
+                  onChanged: (checked) {
+                    setDialogState(() {
+                      if (checked == true) {
+                        if (!tempSelected.contains(chapter)) {
+                          tempSelected.add(chapter);
+                        }
+                      } else {
+                        tempSelected.remove(chapter);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _updateFilters(() => _selectedLeadershipChapters = null);
+            },
+            child: const Text('Clear'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _updateFilters(
+                () => _selectedLeadershipChapters =
+                    tempSelected.isEmpty ? null : List<String>.from(tempSelected),
+              );
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
     );
   }
 

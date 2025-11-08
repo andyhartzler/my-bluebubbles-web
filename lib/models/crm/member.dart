@@ -247,6 +247,31 @@ class Member {
     return normalized.toList();
   }
 
+  static bool? coerceBool(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized.isEmpty) return null;
+      switch (normalized) {
+        case 'true':
+        case 't':
+        case 'yes':
+        case 'y':
+        case '1':
+          return true;
+        case 'false':
+        case 'f':
+        case 'no':
+        case 'n':
+        case '0':
+          return false;
+      }
+    }
+    return null;
+  }
+
 
   /// Attempt to pull a human readable value out of loosely formatted JSON blobs.
   static String? _extractCommonValue(String source) {
@@ -482,6 +507,13 @@ class Member {
   /// Whether the member has at least one stored profile photo reference.
   bool get hasProfilePhoto => profilePhotos.isNotEmpty;
 
+  /// Convenience getter for executive flag used by downstream UI.
+  bool get isExecutive => executive;
+
+  /// Whether we have any structured internal information available.
+  bool get hasInternalMemberInfo =>
+      internalMemberInfo != null && internalMemberInfo!.isNotEmpty;
+
   /// Best-effort public URL for the member's primary profile photo.
   String? get primaryProfilePhotoUrl {
     final primary = profilePhotos.firstWhereOrNull((photo) => photo.isPrimary) ??
@@ -554,6 +586,10 @@ class Member {
     String? chapterPosition,
     DateTime? dateElected,
     DateTime? termExpiration,
+    bool? executive,
+    String? executiveTitle,
+    String? executiveRole,
+    MemberInternalInfo? internalMemberInfo,
     List<MemberProfilePhoto>? profilePhotos,
     bool? executiveCommittee,
     String? executiveTitle,
@@ -620,6 +656,10 @@ class Member {
       chapterPosition: chapterPosition ?? this.chapterPosition,
       dateElected: dateElected ?? this.dateElected,
       termExpiration: termExpiration ?? this.termExpiration,
+      executive: executive ?? this.executive,
+      executiveTitle: executiveTitle ?? this.executiveTitle,
+      executiveRole: executiveRole ?? this.executiveRole,
+      internalMemberInfo: internalMemberInfo ?? this.internalMemberInfo,
       profilePhotos: profilePhotos ?? this.profilePhotos,
       executiveCommittee: executiveCommittee ?? this.executiveCommittee,
       executiveTitle: executiveTitle ?? this.executiveTitle,
@@ -641,6 +681,127 @@ class Member {
     }
 
     return null;
+  }
+}
+
+class MemberInternalInfo {
+  MemberInternalInfo._(Map<String, dynamic> data)
+      : _data = Map<String, dynamic>.unmodifiable(data);
+
+  final Map<String, dynamic> _data;
+
+  factory MemberInternalInfo._fromMap(Map<dynamic, dynamic> raw) {
+    final normalized = <String, dynamic>{};
+    raw.forEach((key, value) {
+      final keyString = key.toString().trim();
+      if (keyString.isEmpty) return;
+      final normalizedValue = _normalizeValue(value);
+      if (normalizedValue != null) {
+        normalized[keyString] = normalizedValue;
+      }
+    });
+    return MemberInternalInfo._(normalized);
+  }
+
+  static MemberInternalInfo? tryParse(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is MemberInternalInfo) return raw;
+
+    if (raw is Map) {
+      if (raw.isEmpty) return null;
+      return MemberInternalInfo._fromMap(raw);
+    }
+
+    if (raw is Iterable) {
+      final normalizedList = raw
+          .map(_normalizeValue)
+          .where((element) => element != null)
+          .cast<dynamic>()
+          .toList();
+      if (normalizedList.isEmpty) return null;
+      return MemberInternalInfo._({'items': normalizedList});
+    }
+
+    if (raw is String) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) return null;
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map) {
+          if (decoded.isEmpty) return null;
+          return MemberInternalInfo._fromMap(decoded);
+        }
+        if (decoded is Iterable) {
+          final normalizedList = decoded
+              .map(_normalizeValue)
+              .where((element) => element != null)
+              .cast<dynamic>()
+              .toList();
+          if (normalizedList.isEmpty) return null;
+          return MemberInternalInfo._({'items': normalizedList});
+        }
+      } catch (_) {
+        // Fallback to treating the string as free-form text value.
+      }
+
+      final normalizedValue = _normalizeValue(trimmed);
+      if (normalizedValue == null) return null;
+      return MemberInternalInfo._({'value': normalizedValue});
+    }
+
+    final normalizedValue = _normalizeValue(raw);
+    if (normalizedValue == null) return null;
+    return MemberInternalInfo._({'value': normalizedValue});
+  }
+
+  Map<String, dynamic> toJson() => Map<String, dynamic>.from(_data);
+
+  bool get isEmpty => _data.isEmpty;
+
+  bool get isNotEmpty => _data.isNotEmpty;
+
+  dynamic operator [](String key) => _data[key];
+
+  static dynamic _normalizeValue(dynamic value) {
+    if (value == null) return null;
+
+    if (value is bool) return value;
+    if (value is num) return value;
+    if (value is DateTime) return value.toIso8601String();
+
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+      final boolCandidate = Member.coerceBool(trimmed);
+      if (boolCandidate != null) return boolCandidate;
+      final normalized = Member._normalizeText(trimmed);
+      return normalized ?? trimmed;
+    }
+
+    if (value is Map) {
+      final nested = <String, dynamic>{};
+      value.forEach((key, nestedValue) {
+        final keyString = key.toString().trim();
+        if (keyString.isEmpty) return;
+        final normalizedNested = _normalizeValue(nestedValue);
+        if (normalizedNested != null) {
+          nested[keyString] = normalizedNested;
+        }
+      });
+      return nested.isEmpty ? null : nested;
+    }
+
+    if (value is Iterable) {
+      final list = value
+          .map(_normalizeValue)
+          .where((element) => element != null)
+          .cast<dynamic>()
+          .toList();
+      return list.isEmpty ? null : list;
+    }
+
+    final normalized = Member._normalizeText(value);
+    return normalized ?? value.toString();
   }
 }
 
