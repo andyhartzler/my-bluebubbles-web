@@ -709,8 +709,9 @@ class CRMMessageService {
     if (photoLines != null) {
       lines.addAll(photoLines);
 
-      final hasEmbeddedPhoto =
-          photoLines.isNotEmpty && photoLines.first.startsWith('PHOTO;TYPE=PNG;VALUE=URI:');
+      final hasEmbeddedPhoto = photoLines.isNotEmpty &&
+          (photoLines.first.startsWith('PHOTO;ENCODING=b;TYPE=PNG:') ||
+              photoLines.first.startsWith('PHOTO;TYPE=PNG;VALUE=URI:'));
       Logger.debug(
         'CRM contact card photo line added (data URI: $hasEmbeddedPhoto)',
         tag: 'CRMMessageService',
@@ -735,14 +736,64 @@ class CRMMessageService {
   }
 
   Future<List<String>?> _buildPhotoLines() async {
+    const assetPath = 'assets/icon/contact-photo.png';
+
     try {
-      final data = await rootBundle.load('assets/icon/contact-photo.png');
+      final data = await rootBundle.load(assetPath);
       final encoded = base64Encode(data.buffer.asUint8List());
-      final line = 'PHOTO;TYPE=PNG;VALUE=URI:data:image/png;base64,$encoded';
+      final line = 'PHOTO;ENCODING=b;TYPE=PNG:$encoded';
       return _foldVCardLine(line);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      Logger.warn(
+        'Failed to load CRM contact photo from $assetPath. Attempting Supabase fallback.',
+        error: error,
+        trace: stackTrace,
+      );
+
+      final fallbackUrl = _buildPhotoFallbackUrl();
+      if (fallbackUrl == null) {
+        return null;
+      }
+
+      Logger.debug(
+        'Using Supabase fallback contact photo URL: $fallbackUrl',
+        tag: 'CRMMessageService',
+      );
+
+      final line = 'PHOTO;TYPE=PNG;VALUE=URI:$fallbackUrl';
+      return _foldVCardLine(line);
+    }
+  }
+
+  String? _buildPhotoFallbackUrl() {
+    final supabaseUrl = CRMConfig.supabaseUrl;
+    if (supabaseUrl.isEmpty) {
       return null;
     }
+
+    final parsed = Uri.tryParse(supabaseUrl);
+    if (parsed == null || parsed.host.isEmpty) {
+      return null;
+    }
+
+    final origin = Uri(
+      scheme: parsed.scheme.isEmpty ? 'https' : parsed.scheme,
+      host: parsed.host,
+      port: parsed.hasPort ? parsed.port : null,
+    );
+
+    final resolved = origin.replace(
+      pathSegments: const [
+        'storage',
+        'v1',
+        'object',
+        'public',
+        'crm-assets',
+        'contact-photo.png',
+      ],
+    );
+
+    return resolved.toString();
   }
 
   List<String> _foldVCardLine(String line) {
