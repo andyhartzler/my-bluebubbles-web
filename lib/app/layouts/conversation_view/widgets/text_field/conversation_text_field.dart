@@ -878,10 +878,18 @@ class TextFieldComponentState extends State<TextFieldComponent> {
   bool _sendInProgress = false;
   bool _enterSendInProgress = false;
   bool _enterKeyPressed = false;
+  bool _keyboardSendLocked = false;
   Timer? _enterSendResetTimer;
+  Timer? _keyboardSendUnlockTimer;
   static const Duration _enterSendGuardTimeout = Duration(seconds: 10);
+  static const Duration _keyboardSendUnlockDelay = Duration(milliseconds: 300);
 
   Future<void> _sendWithGuard({String? effect}) async {
+    if (_keyboardSendLocked) return;
+    await _performSend(effect: effect);
+  }
+
+  Future<void> _performSend({String? effect}) async {
     if (_sendInProgress) return;
 
     _sendInProgress = true;
@@ -915,6 +923,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     // dispose of the ValueNotifier when the state is disposed
     isRecordingNotifier.dispose();
     _enterSendResetTimer?.cancel();
+    _keyboardSendUnlockTimer?.cancel();
     super.dispose();
   }
 
@@ -1196,6 +1205,7 @@ class TextFieldComponentState extends State<TextFieldComponent> {
 
     if (isChatCreator && isEnterWithoutShift && ev is KeyUpEvent) {
       _enterKeyPressed = false;
+      _releaseKeyboardSendLock();
       _resetEnterSendGuard();
       return KeyEventResult.handled;
     }
@@ -1234,8 +1244,10 @@ class TextFieldComponentState extends State<TextFieldComponent> {
         _enterSendResetTimer?.cancel();
         _enterSendResetTimer = Timer(_enterSendGuardTimeout, () => _resetEnterSendGuard(force: true));
 
+        _lockKeyboardSend();
+
         try {
-          final sendFuture = _sendWithGuard();
+          final sendFuture = _performSend();
           unawaited(sendFuture.then((_) {
             _onEnterSendPipelineFinished();
           }, onError: (error, stackTrace) {
@@ -1438,5 +1450,20 @@ class TextFieldComponentState extends State<TextFieldComponent> {
     _enterSendResetTimer = null;
     _enterSendInProgress = false;
     _enterKeyPressed = false;
+  }
+
+  void _lockKeyboardSend() {
+    _keyboardSendLocked = true;
+    _keyboardSendUnlockTimer?.cancel();
+    _keyboardSendUnlockTimer = Timer(_keyboardSendUnlockDelay, _releaseKeyboardSendLock);
+  }
+
+  void _releaseKeyboardSendLock() {
+    if (!_keyboardSendLocked && _keyboardSendUnlockTimer == null) {
+      return;
+    }
+    _keyboardSendUnlockTimer?.cancel();
+    _keyboardSendUnlockTimer = null;
+    _keyboardSendLocked = false;
   }
 }
