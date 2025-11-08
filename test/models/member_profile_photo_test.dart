@@ -126,4 +126,23 @@ void main() {
       'https://example.supabase.co/storage/v1/object/public/member-photos/1ab98a1f-fd21-410a-929e-847570452693-instagram.jpeg',
     );
   });
+
+  test('parseList converts keyed string map entries into photos', () {
+    final payload = {
+      'instagram': '1ab98a1f-fd21-410a-929e-847570452693-instagram.jpeg',
+      'headshot': 'headshots/member.jpeg',
+    };
+
+    final photos = MemberProfilePhoto.parseList(payload);
+
+    expect(photos, hasLength(2));
+    expect(
+      photos.first.publicUrl,
+      'https://example.supabase.co/storage/v1/object/public/member-photos/1ab98a1f-fd21-410a-929e-847570452693-instagram.jpeg',
+    );
+    expect(
+      photos.last.publicUrl,
+      'https://example.supabase.co/storage/v1/object/public/member-photos/headshots/member.jpeg',
+    );
+  });
 }
