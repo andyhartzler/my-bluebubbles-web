@@ -332,7 +332,66 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return primaryMembers;
   }
 
+  static const Map<String, int> _executiveRoleOrder = {
+    'president': 0,
+    'vice president': 1,
+    'chief of staff': 2,
+    'executive director': 3,
+    'deputy executive director': 4,
+    'national press secretary': 5,
+    'national communications director': 6,
+    'national organizing director': 7,
+    'national outreach director': 8,
+    'national programming director': 9,
+    'national membership director': 10,
+    'co chair organizing': 11,
+    'co chair communications': 12,
+    'co chair development': 13,
+    'co chair membership': 14,
+    'co chair community engagement': 15,
+    'co chair finance': 16,
+    'co chair fundraising': 17,
+    'co chair political affairs': 18,
+  };
+
+  String _normalizeExecutiveRole(String? role) {
+    if (role == null) return '';
+    final normalized = role
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .split(' ')
+        .where((part) => part.isNotEmpty && part != 'of');
+    return normalized.join(' ');
+  }
+
   int _compareMembers(Member a, Member b) {
+    final aIsExecutive = a.executiveCommittee;
+    final bIsExecutive = b.executiveCommittee;
+
+    if (aIsExecutive && bIsExecutive) {
+      final aRoleRaw = a.executiveRoleDisplay;
+      final bRoleRaw = b.executiveRoleDisplay;
+      final aRoleKey = _normalizeExecutiveRole(aRoleRaw);
+      final bRoleKey = _normalizeExecutiveRole(bRoleRaw);
+
+      final defaultRank = _executiveRoleOrder.length;
+      final aRank = _executiveRoleOrder[aRoleKey] ?? defaultRank;
+      final bRank = _executiveRoleOrder[bRoleKey] ?? defaultRank;
+
+      if (aRank != bRank) {
+        return aRank.compareTo(bRank);
+      }
+
+      if (aRoleRaw != null && bRoleRaw != null) {
+        final roleCompare = aRoleRaw.toLowerCase().compareTo(bRoleRaw.toLowerCase());
+        if (roleCompare != 0) {
+          return roleCompare;
+        }
+      } else if (aRoleRaw != null || bRoleRaw != null) {
+        return bRoleRaw == null ? -1 : 1;
+      }
+    }
+
     final aHasPhoto = a.hasProfilePhoto;
     final bHasPhoto = b.hasProfilePhoto;
     if (aHasPhoto != bHasPhoto) {
