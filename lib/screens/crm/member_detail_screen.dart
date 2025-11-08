@@ -124,6 +124,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final result = await file_picker.FilePicker.platform.pickFiles(
       allowMultiple: true,
       withData: true,
+      withReadStream: true,
     );
 
     if (result == null || result.files.isEmpty) {
@@ -550,6 +551,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       type: file_picker.FileType.custom,
       allowedExtensions: const ['png', 'jpg', 'jpeg', 'heic', 'heif', 'webp'],
       withData: true,
+      withReadStream: true,
     );
 
     if (result == null || result.files.isEmpty) {
