@@ -140,9 +140,19 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       additions.add(platformFile);
     }
 
-    if (additions.isEmpty) return;
+    if (additions.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _reportComposerError =
+            'We couldn\'t read the selected files. Please try again or choose different files.';
+      });
+      return;
+    }
+
+    if (!mounted) return;
 
     setState(() {
+      _reportComposerError = null;
       final existingNames = _pendingReportFiles.map((file) => file.name.toLowerCase()).toSet();
       final merged = [..._pendingReportFiles];
       for (final file in additions) {

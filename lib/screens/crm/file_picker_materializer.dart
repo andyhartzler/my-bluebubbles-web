@@ -30,7 +30,7 @@ Future<PlatformFile?> materializePickedPlatformFile(
 
 Future<Uint8List?> _readFileBytes(file_picker.PlatformFile file) async {
   final xFile = file.xFile;
-  if (xFile != null && (!kIsWeb || file.bytes != null)) {
+  if (xFile != null) {
     try {
       final bytes = await xFile.readAsBytes();
       if (bytes.isNotEmpty) {
