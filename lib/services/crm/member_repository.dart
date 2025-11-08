@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 
@@ -18,6 +19,8 @@ class MemberRepository {
   final CRMSupabaseService _supabase = CRMSupabaseService();
 
   bool get _isReady => _supabase.isInitialized;
+
+  static const String _documentsBucket = 'member-documents';
 
   SupabaseClient get _readClient =>
       _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
@@ -628,6 +631,108 @@ class MemberRepository {
     }
   }
 
+  Future<Member?> saveInternalReportEntry({
+    required Member member,
+    required MemberInternalReportEntry entry,
+    List<PlatformFile> newFiles = const [],
+    bool replaceExistingAttachments = false,
+  }) async {
+    if (!_isReady) return null;
+
+    final uploads = <MemberInternalReportAttachment>[];
+    try {
+      for (final file in newFiles) {
+        uploads.add(await _uploadInternalReportFile(member: member, file: file));
+      }
+    } catch (error) {
+      for (final attachment in uploads) {
+        await _safeRemoveAttachment(attachment);
+      }
+      rethrow;
+    }
+
+    final existingAttachments = replaceExistingAttachments
+        ? <MemberInternalReportAttachment>[]
+        : entry.attachments
+            .where((attachment) =>
+                !attachment.isLocalPlaceholder && attachment.path.trim().isNotEmpty)
+            .toList();
+
+    final attachments = <MemberInternalReportAttachment>[...existingAttachments, ...uploads];
+    final description = entry.description?.trim();
+    final resolvedId = entry.id.isEmpty ? MemberInternalReportEntry.generateId() : entry.id;
+    final createdAt = entry.createdAt;
+    final now = DateTime.now().toUtc();
+
+    final attachmentsChanged = replaceExistingAttachments || newFiles.isNotEmpty;
+    final descriptionChanged = description != entry.description;
+    final resolvedType = attachmentsChanged || descriptionChanged ? null : entry.type;
+
+    final updatedEntry = MemberInternalReportEntry(
+      id: resolvedId,
+      type: resolvedType,
+      description: description,
+      attachments: attachments,
+      metadata: entry.metadata,
+      createdAt: createdAt,
+      updatedAt: now,
+    );
+
+    final updatedEntries = <MemberInternalReportEntry>[];
+    var replaced = false;
+    for (final existing in member.internalInfo.reports) {
+      if (existing.id == resolvedId) {
+        updatedEntries.add(updatedEntry);
+        replaced = true;
+      } else {
+        updatedEntries.add(existing);
+      }
+    }
+    if (!replaced) {
+      updatedEntries.insert(0, updatedEntry);
+    }
+
+    final updatedInfo = member.internalInfo.copyWith(reports: updatedEntries);
+
+    try {
+      final updated = await updateMemberFields(member.id, {
+        'internal_member_info': updatedInfo.toJson(),
+      });
+      return updated ?? member.copyWith(internalInfo: updatedInfo);
+    } catch (error) {
+      for (final attachment in uploads) {
+        await _safeRemoveAttachment(attachment);
+      }
+      rethrow;
+    }
+  }
+
+  Future<Member?> deleteInternalReportEntry({
+    required Member member,
+    required String entryId,
+  }) async {
+    if (!_isReady) return null;
+
+    final existing = member.internalInfo.reports.firstWhereOrNull((entry) => entry.id == entryId);
+    if (existing == null) {
+      return member;
+    }
+
+    final remaining =
+        member.internalInfo.reports.where((entry) => entry.id != entryId).toList();
+    final updatedInfo = member.internalInfo.copyWith(reports: remaining);
+
+    try {
+      final updated = await updateMemberFields(member.id, {
+        'internal_member_info': updatedInfo.toJson(),
+      });
+      await _removeInternalReportAttachments(existing.attachments);
+      return updated ?? member.copyWith(internalInfo: updatedInfo);
+    } catch (error) {
+      rethrow;
+    }
+  }
+
   Future<Uint8List> _resolveFileBytes(PlatformFile file) async {
     if (file.bytes != null) {
       return file.bytes!;
@@ -648,6 +753,50 @@ class MemberRepository {
     }
     final safe = trimmed.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
     return safe.replaceAll(RegExp(r'_+'), '_');
+  }
+
+  Future<MemberInternalReportAttachment> _uploadInternalReportFile({
+    required Member member,
+    required PlatformFile file,
+  }) async {
+    final bytes = await _resolveFileBytes(file);
+    final now = DateTime.now().toUtc();
+    final sanitizedName = _sanitizeFileName(file.name);
+    final path = '${member.id}/$sanitizedName-${now.millisecondsSinceEpoch}';
+    final contentType = mime(file.name) ?? 'application/octet-stream';
+
+    await _writeClient.storage.from(_documentsBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+
+    return MemberInternalReportAttachment(
+      bucket: _documentsBucket,
+      path: path,
+      filename: file.name,
+      contentType: contentType,
+      size: bytes.length,
+      uploadedAt: now,
+    );
+  }
+
+  Future<void> _removeInternalReportAttachments(
+    List<MemberInternalReportAttachment> attachments,
+  ) async {
+    for (final attachment in attachments) {
+      await _safeRemoveAttachment(attachment);
+    }
+  }
+
+  Future<void> _safeRemoveAttachment(MemberInternalReportAttachment attachment) async {
+    final path = attachment.path.trim();
+    if (path.isEmpty) return;
+    try {
+      await _writeClient.storage
+          .from(attachment.bucket.isEmpty ? _documentsBucket : attachment.bucket)
+          .remove([path]);
+    } catch (_) {}
   }
 
   /// Search members by name or phone

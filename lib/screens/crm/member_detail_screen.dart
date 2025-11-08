@@ -42,6 +42,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
   late Member _member;
   final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _reportNotesController = TextEditingController();
   bool _editingNotes = false;
   bool _sendingIntro = false;
   bool _loadingAttendance = false;
@@ -49,6 +50,13 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   String? _attendanceError;
   List<MeetingAttendance> _meetingAttendance = [];
   bool _uploadingPhoto = false;
+  bool _savingReportEntry = false;
+  List<PlatformFile> _pendingReportFiles = [];
+  final Set<String> _updatingReportIds = <String>{};
+  final Set<String> _deletingReportIds = <String>{};
+  String? _reportComposerError;
+
+  static const String _reportsBucket = 'member-documents';
 
   bool get _crmReady => _supabaseService.isInitialized;
 
@@ -81,6 +89,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   @override
   void dispose() {
     _notesController.dispose();
+    _reportNotesController.dispose();
     super.dispose();
   }
 
@@ -103,6 +112,316 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving notes: $e')),
+      );
+    }
+  }
+
+  Future<void> _pickReportFiles() async {
+    if (!_crmReady || _savingReportEntry) return;
+
+    final result = await file_picker.FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+
+    final additions = <PlatformFile>[];
+    for (final file in result.files) {
+      if ((file.bytes == null || file.bytes!.isEmpty) && (file.path == null || file.path!.isEmpty)) {
+        continue;
+      }
+      final platformFile = PlatformFile(
+        path: file.path,
+        name: file.name,
+        size: file.size,
+        bytes: file.bytes,
+      );
+      additions.add(platformFile);
+    }
+
+    if (additions.isEmpty) return;
+
+    setState(() {
+      final existingNames = _pendingReportFiles.map((file) => file.name.toLowerCase()).toSet();
+      final merged = [..._pendingReportFiles];
+      for (final file in additions) {
+        if (!existingNames.contains(file.name.toLowerCase())) {
+          merged.add(file);
+          existingNames.add(file.name.toLowerCase());
+        }
+      }
+      _pendingReportFiles = merged;
+    });
+  }
+
+  void _removePendingReportFile(PlatformFile file) {
+    if (_savingReportEntry) return;
+    setState(() {
+      _pendingReportFiles =
+          _pendingReportFiles.where((element) => element != file).toList(growable: false);
+    });
+  }
+
+  void _clearReportComposer() {
+    _reportNotesController.clear();
+    setState(() {
+      _pendingReportFiles = [];
+      _reportComposerError = null;
+    });
+  }
+
+  Future<void> _saveReportEntry() async {
+    if (!_crmReady || _savingReportEntry) return;
+
+    final description = _reportNotesController.text.trim();
+    if (description.isEmpty && _pendingReportFiles.isEmpty) {
+      setState(() {
+        _reportComposerError = 'Add a note or choose at least one attachment.';
+      });
+      return;
+    }
+
+    final baseline = _member;
+    final now = DateTime.now();
+    final placeholderId = MemberInternalReportEntry.generateId();
+    final placeholder = MemberInternalReportEntry(
+      id: placeholderId,
+      description: description.isEmpty ? null : description,
+      attachments: _pendingReportFiles
+          .map(
+            (file) => MemberInternalReportAttachment(
+              bucket: _reportsBucket,
+              path: 'pending/${file.name}',
+              filename: file.name,
+              size: file.size,
+              uploadedAt: now,
+              isLocalPlaceholder: true,
+            ),
+          )
+          .toList(),
+      createdAt: now,
+      updatedAt: now,
+      isPending: true,
+    );
+
+    setState(() {
+      _reportComposerError = null;
+      _savingReportEntry = true;
+      _member = _member.copyWith(
+        internalInfo: _member.internalInfo.copyWith(
+          reports: [placeholder, ..._member.internalInfo.reports],
+        ),
+      );
+    });
+
+    try {
+      final entryForRepo = MemberInternalReportEntry(
+        id: placeholderId,
+        description: description.isEmpty ? null : description,
+        createdAt: now,
+      );
+      final updated = await _memberRepo.saveInternalReportEntry(
+        member: baseline,
+        entry: entryForRepo,
+        newFiles: _pendingReportFiles,
+      );
+
+      if (!mounted) return;
+
+      if (updated != null) {
+        setState(() {
+          _member = updated;
+        });
+        _memberLookup.cacheMember(updated);
+        _clearReportComposer();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Internal report saved')),
+        );
+      } else {
+        setState(() {
+          _member = baseline;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to save report entry')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _member = baseline;
+        _reportComposerError = 'Failed to save report: $error';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving report: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _savingReportEntry = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _editReportEntry(MemberInternalReportEntry entry) async {
+    if (!_crmReady || _updatingReportIds.contains(entry.id)) return;
+
+    final controller = TextEditingController(text: entry.description ?? '');
+    try {
+      final result = await showDialog<String?>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Update report notes'),
+            content: TextField(
+              controller: controller,
+              maxLines: 5,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Update internal notes for this report',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, controller.text.trim()),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (result == null) return;
+
+      final trimmed = result.trim();
+      final updatedDescription = trimmed.isEmpty ? null : trimmed;
+      final baseline = _member;
+      final pendingEntry = entry.copyWith(
+        description: updatedDescription,
+        updatedAt: DateTime.now(),
+        isPending: true,
+      );
+
+      setState(() {
+        _updatingReportIds.add(entry.id);
+        _member = _member.copyWith(
+          internalInfo: _member.internalInfo.copyWith(
+            reports: _member.internalInfo.reports
+                .map((item) => item.id == entry.id ? pendingEntry : item)
+                .toList(),
+          ),
+        );
+      });
+
+      try {
+        final updated = await _memberRepo.saveInternalReportEntry(
+          member: baseline,
+          entry: entry.copyWith(description: updatedDescription),
+        );
+        if (!mounted) return;
+        if (updated != null) {
+          setState(() {
+            _updatingReportIds.remove(entry.id);
+            _member = updated;
+          });
+          _memberLookup.cacheMember(updated);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Report updated')),
+          );
+        } else {
+          setState(() {
+            _updatingReportIds.remove(entry.id);
+            _member = baseline;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to update report entry')),
+          );
+        }
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          _updatingReportIds.remove(entry.id);
+          _member = baseline;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating report: $error')),
+        );
+      }
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _deleteReportEntry(MemberInternalReportEntry entry) async {
+    if (!_crmReady || _deletingReportIds.contains(entry.id)) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete report'),
+        content: const Text('This will remove the report and any attachments from storage.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final baseline = _member;
+    setState(() {
+      _deletingReportIds.add(entry.id);
+      _member = _member.copyWith(
+        internalInfo: _member.internalInfo.copyWith(
+          reports: _member.internalInfo.reports
+              .where((item) => item.id != entry.id)
+              .toList(),
+        ),
+      );
+    });
+
+    try {
+      final updated = await _memberRepo.deleteInternalReportEntry(
+        member: baseline,
+        entryId: entry.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _deletingReportIds.remove(entry.id);
+        if (updated != null) {
+          _member = updated;
+        }
+      });
+      if (updated != null) {
+        _memberLookup.cacheMember(updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Report deleted')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _deletingReportIds.remove(entry.id);
+        _member = baseline;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting report: $error')),
       );
     }
   }
@@ -561,9 +880,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               }
               final notesSection =
                   notesChildren.isEmpty ? null : _buildSection('Notes', notesChildren);
+              final internalReportsSection = _buildInternalReportsSection();
 
               final allSections = <Widget>[
                 ...sections,
+                if (internalReportsSection != null) internalReportsSection,
                 if (notesSection != null) notesSection,
                 if (metadataSection != null) metadataSection,
               ];
@@ -878,6 +1199,273 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       ),
       child: content,
     );
+  }
+
+  Widget? _buildInternalReportsSection() {
+    if (!_crmReady) return null;
+
+    final reports = _member.internalInfo.reports;
+    final children = <Widget>[
+      _buildReportComposer(),
+    ];
+
+    if (reports.isEmpty) {
+      children.add(const SizedBox(height: 12));
+      children.add(
+        const Text('No internal reports yet. Add a note or upload supporting documents.'),
+      );
+    } else {
+      children.add(const SizedBox(height: 16));
+      for (final entry in reports) {
+        children.add(_buildReportEntryTile(entry));
+      }
+    }
+
+    return _buildSection('Internal Reports', children);
+  }
+
+  Widget _buildReportComposer() {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _reportNotesController,
+          maxLines: 5,
+          decoration: InputDecoration(
+            hintText: 'Add internal notes about this member...',
+            border: const OutlineInputBorder(),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: theme.colorScheme.primary),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_pendingReportFiles.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _pendingReportFiles
+                  .map(
+                    (file) => Chip(
+                      label: Text(file.name),
+                      onDeleted: _savingReportEntry
+                          ? null
+                          : () => _removePendingReportFile(file),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton.icon(
+              onPressed: _savingReportEntry ? null : _pickReportFiles,
+              icon: const Icon(Icons.attach_file),
+              label: const Text('Add Files'),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: _savingReportEntry ? null : _saveReportEntry,
+              icon: _savingReportEntry
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(_savingReportEntry ? 'Saving...' : 'Save Report'),
+            ),
+          ],
+        ),
+        if (_reportComposerError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _reportComposerError!,
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildReportEntryTile(MemberInternalReportEntry entry) {
+    final attachments = entry.attachments;
+    final timestamp = entry.updatedAt ?? entry.createdAt;
+    final typeLabel = (entry.type ?? (entry.hasAttachments ? 'file' : 'note')).toUpperCase();
+    final isUpdating = _updatingReportIds.contains(entry.id) || entry.isPending;
+    final isDeleting = _deletingReportIds.contains(entry.id);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.2)),
+        color: Theme.of(context).cardColor.withOpacity(0.95),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      typeLabel,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    if (timestamp != null)
+                      Text(
+                        _formatReportTimestamp(timestamp),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                      ),
+                  ],
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: isUpdating
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.edit_outlined),
+                    tooltip: 'Edit report notes',
+                    onPressed: (isUpdating || isDeleting) ? null : () => _editReportEntry(entry),
+                  ),
+                  IconButton(
+                    icon: isDeleting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline),
+                    tooltip: 'Delete report',
+                    onPressed: (isDeleting || isUpdating) ? null : () => _deleteReportEntry(entry),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if ((entry.description ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(entry.description!),
+          ],
+          if (attachments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: attachments
+                  .map(
+                    (attachment) => OutlinedButton.icon(
+                      onPressed: attachment.isLocalPlaceholder
+                          ? null
+                          : () => _openAttachment(attachment),
+                      icon: Icon(_attachmentIcon(attachment)),
+                      label: Text(attachment.filename ?? attachment.path.split('/').last),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          if (entry.isPending) ...[
+            const SizedBox(height: 12),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openAttachment(MemberInternalReportAttachment attachment) async {
+    final url = attachment.publicUrl;
+    if (url == null || url.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Attachment is not available yet.')),
+      );
+      return;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Invalid attachment URL: $url')),
+      );
+      return;
+    }
+
+    await _openLink(uri);
+  }
+
+  IconData _attachmentIcon(MemberInternalReportAttachment attachment) {
+    final contentType = attachment.contentType?.toLowerCase() ?? '';
+    final name = (attachment.filename ?? attachment.path).toLowerCase();
+
+    if (contentType.startsWith('image/') ||
+        name.endsWith('.png') ||
+        name.endsWith('.jpg') ||
+        name.endsWith('.jpeg') ||
+        name.endsWith('.webp') ||
+        name.endsWith('.gif') ||
+        name.endsWith('.heic') ||
+        name.endsWith('.heif')) {
+      return Icons.image_outlined;
+    }
+    if (contentType.startsWith('video/') ||
+        name.endsWith('.mp4') ||
+        name.endsWith('.mov') ||
+        name.endsWith('.avi')) {
+      return Icons.movie_outlined;
+    }
+    if (contentType.contains('pdf') || name.endsWith('.pdf')) {
+      return Icons.picture_as_pdf_outlined;
+    }
+    if (contentType.contains('sheet') ||
+        name.endsWith('.xls') ||
+        name.endsWith('.xlsx') ||
+        name.endsWith('.csv')) {
+      return Icons.table_chart_outlined;
+    }
+    if (contentType.contains('presentation') ||
+        name.endsWith('.ppt') ||
+        name.endsWith('.pptx')) {
+      return Icons.slideshow_outlined;
+    }
+    return Icons.insert_drive_file_outlined;
+  }
+
+  String _formatReportTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    }
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} minute${difference.inMinutes == 1 ? '' : 's'} ago';
+    }
+    if (difference.inHours < 24) {
+      return '${difference.inHours} hour${difference.inHours == 1 ? '' : 's'} ago';
+    }
+    if (difference.inDays < 7) {
+      return '${difference.inDays} day${difference.inDays == 1 ? '' : 's'} ago';
+    }
+    return '${timestamp.month}/${timestamp.day}/${timestamp.year}';
   }
 
   Widget _buildSection(String title, List<Widget> children) {

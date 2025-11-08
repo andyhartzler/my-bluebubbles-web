@@ -68,6 +68,7 @@ class Member {
   final DateTime? dateElected;
   final DateTime? termExpiration;
   final List<MemberProfilePhoto> profilePhotos;
+  final MemberInternalInfo internalInfo;
 
   Member({
     required this.id,
@@ -131,7 +132,9 @@ class Member {
     this.dateElected,
     this.termExpiration,
     List<MemberProfilePhoto> profilePhotos = const [],
-  }) : profilePhotos = List<MemberProfilePhoto>.unmodifiable(profilePhotos);
+    MemberInternalInfo internalInfo = const MemberInternalInfo(),
+  }) : profilePhotos = List<MemberProfilePhoto>.unmodifiable(profilePhotos),
+       internalInfo = internalInfo;
 
   /// Helper used to normalize free-form Supabase fields that may be stored as
   /// raw strings, JSON objects, or Airtable-style maps.
@@ -379,6 +382,7 @@ class Member {
           ? DateTime.tryParse(json['term_expiration'] as String)
           : null,
       profilePhotos: MemberProfilePhoto.parseList(json['profile_pictures']),
+      internalInfo: MemberInternalInfo.fromJson(json['internal_member_info']),
     );
   }
 
@@ -446,6 +450,7 @@ class Member {
       'date_elected': dateElected?.toIso8601String().split('T').first,
       'term_expiration': termExpiration?.toIso8601String().split('T').first,
       'profile_pictures': profilePhotos.map((photo) => photo.toJson()).toList(),
+      'internal_member_info': internalInfo.toJson(),
     };
   }
 
@@ -543,6 +548,7 @@ class Member {
     DateTime? dateElected,
     DateTime? termExpiration,
     List<MemberProfilePhoto>? profilePhotos,
+    MemberInternalInfo? internalInfo,
   }) {
     return Member(
       id: id ?? this.id,
@@ -606,6 +612,7 @@ class Member {
       dateElected: dateElected ?? this.dateElected,
       termExpiration: termExpiration ?? this.termExpiration,
       profilePhotos: profilePhotos ?? this.profilePhotos,
+      internalInfo: internalInfo ?? this.internalInfo,
     );
   }
 
@@ -1048,6 +1055,380 @@ class MemberProfilePhoto {
     if (value is DateTime) return value;
     if (value is String && value.isNotEmpty) {
       return DateTime.tryParse(value);
+    }
+    return null;
+  }
+}
+
+class MemberInternalInfo {
+  final List<MemberInternalReportEntry> reports;
+
+  const MemberInternalInfo({List<MemberInternalReportEntry> reports = const []})
+      : reports = List<MemberInternalReportEntry>.unmodifiable(reports);
+
+  bool get hasReports => reports.isNotEmpty;
+
+  MemberInternalInfo copyWith({List<MemberInternalReportEntry>? reports}) {
+    return MemberInternalInfo(
+      reports: reports ?? this.reports,
+    );
+  }
+
+  factory MemberInternalInfo.fromJson(dynamic raw) {
+    if (raw == null) {
+      return const MemberInternalInfo();
+    }
+
+    dynamic payload = raw;
+    if (raw is String) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) {
+        return const MemberInternalInfo();
+      }
+      try {
+        payload = jsonDecode(trimmed);
+      } catch (_) {
+        return const MemberInternalInfo();
+      }
+    }
+
+    List<dynamic> rawEntries;
+    if (payload is List) {
+      rawEntries = payload;
+    } else if (payload is Map) {
+      final map = payload.map((key, value) => MapEntry(key.toString(), value));
+      final dynamic reportsValue =
+          map['reports'] ?? map['entries'] ?? map['data'] ?? map['items'];
+      if (reportsValue is List) {
+        rawEntries = reportsValue;
+      } else if (reportsValue == null && map.isNotEmpty) {
+        rawEntries = map.values.whereType<List>().firstOrNull ?? const [];
+      } else {
+        rawEntries = const [];
+      }
+    } else {
+      rawEntries = const [];
+    }
+
+    final entries = <MemberInternalReportEntry>[];
+    for (final item in rawEntries) {
+      try {
+        entries.add(MemberInternalReportEntry.fromJson(item));
+      } catch (_) {}
+    }
+
+    return MemberInternalInfo(reports: entries);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'reports': reports.map((entry) => entry.toJson()).toList(),
+    };
+  }
+}
+
+class MemberInternalReportEntry {
+  final String id;
+  final String? type;
+  final String? description;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final List<MemberInternalReportAttachment> attachments;
+  final Map<String, dynamic>? metadata;
+  final bool isPending;
+
+  MemberInternalReportEntry({
+    required this.id,
+    String? type,
+    this.description,
+    DateTime? createdAt,
+    this.updatedAt,
+    List<MemberInternalReportAttachment> attachments = const [],
+    this.metadata,
+    this.isPending = false,
+  })  : type = (type ?? '').isEmpty ? _inferType(description, attachments) : type,
+        createdAt = createdAt ?? DateTime.now(),
+        attachments = List<MemberInternalReportAttachment>.unmodifiable(attachments);
+
+  static String generateId() => 'report-${DateTime.now().microsecondsSinceEpoch}';
+
+  bool get hasAttachments => attachments.isNotEmpty;
+
+  MemberInternalReportEntry copyWith({
+    String? id,
+    String? type,
+    String? description,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    List<MemberInternalReportAttachment>? attachments,
+    Map<String, dynamic>? metadata,
+    bool? isPending,
+  }) {
+    final updatedAttachments = attachments ?? this.attachments;
+    final shouldInferType = type == null && attachments != null;
+    return MemberInternalReportEntry(
+      id: id ?? this.id,
+      type: shouldInferType ? null : (type ?? this.type),
+      description: description ?? this.description,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      attachments: updatedAttachments,
+      metadata: metadata ?? this.metadata,
+      isPending: isPending ?? this.isPending,
+    );
+  }
+
+  factory MemberInternalReportEntry.fromJson(dynamic raw) {
+    if (raw == null) {
+      throw const FormatException('Cannot parse null report entry');
+    }
+
+    if (raw is String) {
+      try {
+        final decoded = jsonDecode(raw);
+        return MemberInternalReportEntry.fromJson(decoded);
+      } catch (_) {
+        return MemberInternalReportEntry(
+          id: generateId(),
+          description: raw,
+        );
+      }
+    }
+
+    if (raw is Map) {
+      final map = raw.map((key, value) => MapEntry(key.toString(), value));
+      final dynamic attachmentsValue =
+          map['attachments'] ?? map['files'] ?? map['documents'] ?? map['assets'];
+      final attachments = <MemberInternalReportAttachment>[];
+      if (attachmentsValue is List) {
+        for (final item in attachmentsValue) {
+          try {
+            attachments.add(MemberInternalReportAttachment.fromJson(item));
+          } catch (_) {}
+        }
+      }
+
+      DateTime? createdAt = _coerceDate(map['created_at'] ?? map['createdAt']);
+      createdAt ??= _coerceDate(map['timestamp']);
+
+      return MemberInternalReportEntry(
+        id: (map['id'] ?? map['entry_id'] ?? map['uuid'] ?? generateId()).toString(),
+        type: _coerceString(map['type']),
+        description: _coerceString(
+              map['description'] ?? map['text'] ?? map['notes'] ?? map['body'],
+            ) ??
+            (attachments.isEmpty ? null : ''),
+        createdAt: createdAt,
+        updatedAt: _coerceDate(map['updated_at'] ?? map['updatedAt']),
+        attachments: attachments,
+        metadata: map['metadata'] is Map
+            ? Map<String, dynamic>.from(map['metadata'] as Map)
+            : null,
+      );
+    }
+
+    throw FormatException('Unsupported report entry payload: ${raw.runtimeType}');
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      if (type != null && type!.isNotEmpty) 'type': type,
+      if (description != null) ...{
+        'description': description,
+        'notes': description,
+      },
+      'created_at': createdAt.toIso8601String(),
+      if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+      'attachments': attachments.map((attachment) => attachment.toJson()).toList(),
+      if (metadata != null) 'metadata': metadata,
+    };
+  }
+
+  static String? _coerceString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+    return value.toString();
+  }
+
+  static DateTime? _coerceDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
+  }
+
+  static String? _inferType(String? description, List<MemberInternalReportAttachment> attachments) {
+    if (attachments.isNotEmpty) {
+      final first = attachments.first;
+      final contentType = first.contentType ?? '';
+      if (contentType.startsWith('image/')) {
+        return 'image';
+      }
+      if (contentType.startsWith('video/')) {
+        return 'video';
+      }
+      if (contentType.startsWith('application/')) {
+        return 'document';
+      }
+      if (contentType.startsWith('text/')) {
+        return 'document';
+      }
+      return 'file';
+    }
+
+    if (description != null && description.trim().isNotEmpty) {
+      return 'note';
+    }
+
+    return null;
+  }
+}
+
+class MemberInternalReportAttachment {
+  final String bucket;
+  final String path;
+  final String? filename;
+  final String? contentType;
+  final int? size;
+  final DateTime? uploadedAt;
+  final Map<String, dynamic>? metadata;
+  final bool isLocalPlaceholder;
+
+  const MemberInternalReportAttachment({
+    required this.bucket,
+    required this.path,
+    this.filename,
+    this.contentType,
+    this.size,
+    this.uploadedAt,
+    this.metadata,
+    this.isLocalPlaceholder = false,
+  });
+
+  MemberInternalReportAttachment copyWith({
+    String? bucket,
+    String? path,
+    String? filename,
+    String? contentType,
+    int? size,
+    DateTime? uploadedAt,
+    Map<String, dynamic>? metadata,
+    bool? isLocalPlaceholder,
+  }) {
+    return MemberInternalReportAttachment(
+      bucket: bucket ?? this.bucket,
+      path: path ?? this.path,
+      filename: filename ?? this.filename,
+      contentType: contentType ?? this.contentType,
+      size: size ?? this.size,
+      uploadedAt: uploadedAt ?? this.uploadedAt,
+      metadata: metadata ?? this.metadata,
+      isLocalPlaceholder: isLocalPlaceholder ?? this.isLocalPlaceholder,
+    );
+  }
+
+  factory MemberInternalReportAttachment.fromJson(dynamic raw) {
+    if (raw == null) {
+      throw const FormatException('Cannot parse null attachment');
+    }
+
+    if (raw is String) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) {
+        throw const FormatException('Empty attachment path');
+      }
+      return MemberInternalReportAttachment(
+        bucket: 'member-documents',
+        path: trimmed,
+        filename: trimmed.split('/').last,
+      );
+    }
+
+    if (raw is Map) {
+      final map = raw.map((key, value) => MapEntry(key.toString(), value));
+      final String bucket = (map['bucket'] ?? map['bucket_id'] ?? 'member-documents').toString();
+      final String? filename =
+          map['filename']?.toString() ?? map['file_name']?.toString() ?? map['name']?.toString();
+      String? path = map['path']?.toString() ?? map['storage_path']?.toString();
+      path ??= map['public_path']?.toString() ?? map['publicUrl']?.toString();
+
+      if (path == null || path.isEmpty) {
+        if (filename != null) {
+          path = filename;
+        } else {
+          throw const FormatException('Attachment missing path');
+        }
+      }
+
+      return MemberInternalReportAttachment(
+        bucket: bucket,
+        path: path,
+        filename: filename,
+        contentType: map['content_type']?.toString() ?? map['mime_type']?.toString(),
+        size: _coerceSize(map['size'] ?? map['byte_size']),
+        uploadedAt: MemberInternalReportEntry._coerceDate(map['uploaded_at'] ?? map['created_at']),
+        metadata: map['metadata'] is Map
+            ? Map<String, dynamic>.from(map['metadata'] as Map)
+            : null,
+      );
+    }
+
+    throw FormatException('Unsupported attachment payload: ${raw.runtimeType}');
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'bucket': bucket,
+      'path': path,
+      if (filename != null) 'filename': filename,
+      if (contentType != null) 'content_type': contentType,
+      if (size != null) 'size': size,
+      if (uploadedAt != null) 'uploaded_at': uploadedAt!.toIso8601String(),
+      if (metadata != null) 'metadata': metadata,
+    };
+  }
+
+  String? get publicUrl {
+    final normalized = MemberProfilePhoto._normalizePath(path, bucket: bucket);
+    if (normalized == null) return null;
+    if (normalized.hasScheme) {
+      return normalized.toString();
+    }
+
+    final supabaseUrl = CRMConfig.supabaseUrl;
+    if (supabaseUrl.isEmpty) {
+      return normalized.toString();
+    }
+
+    final baseUri = Uri.tryParse(supabaseUrl);
+    if (baseUri == null || baseUri.host.isEmpty) {
+      return normalized.toString();
+    }
+
+    final resolved = baseUri.replace(
+      path: normalized.path,
+      query: normalized.hasQuery ? normalized.query : null,
+      fragment: normalized.fragment.isEmpty ? null : normalized.fragment,
+    );
+
+    return resolved.toString();
+  }
+
+  static int? _coerceSize(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.round();
+    if (value is String && value.isNotEmpty) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) {
+        return parsed;
+      }
     }
     return null;
   }
