@@ -332,27 +332,37 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return primaryMembers;
   }
 
-  static const Map<String, int> _executiveRoleOrder = {
-    'president': 0,
-    'vice president': 1,
-    'chief of staff': 2,
-    'executive director': 3,
-    'deputy executive director': 4,
-    'national press secretary': 5,
-    'national communications director': 6,
-    'national organizing director': 7,
-    'national outreach director': 8,
-    'national programming director': 9,
-    'national membership director': 10,
-    'co chair organizing': 11,
-    'co chair communications': 12,
-    'co chair development': 13,
-    'co chair membership': 14,
-    'co chair community engagement': 15,
-    'co chair finance': 16,
-    'co chair fundraising': 17,
-    'co chair political affairs': 18,
-  };
+  static const List<String> _executiveRoleOrder = [
+    'president',
+    'vice president',
+    'chief of staff',
+    'executive director',
+    'deputy executive director',
+    'national press secretary',
+    'national communications director',
+    'national organizing director',
+    'national outreach director',
+    'national programming director',
+    'national membership director',
+    'young democrats of america representative',
+    'young democrats of america representative',
+    'congressional district 1 representative',
+    'congressional district 2 representative',
+    'congressional district 3 representative',
+    'congressional district 4 representative',
+    'congressional district 5 representative',
+    'congressional district 6 representative',
+    'congressional district 7 representative',
+    'congressional district 8 representative',
+    'co chair communications',
+    'co chair community engagement',
+    'co chair development',
+    'co chair finance',
+    'co chair fundraising',
+    'co chair membership',
+    'co chair organizing',
+    'co chair political affairs',
+  ];
 
   String _normalizeExecutiveRole(String? role) {
     if (role == null) return '';
@@ -360,7 +370,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
         .split(' ')
-        .where((part) => part.isNotEmpty && part != 'of');
+        .where((part) => part.isNotEmpty);
     return normalized.join(' ');
   }
 
@@ -375,8 +385,10 @@ class _MembersListScreenState extends State<MembersListScreen> {
       final bRoleKey = _normalizeExecutiveRole(bRoleRaw);
 
       final defaultRank = _executiveRoleOrder.length;
-      final aRank = _executiveRoleOrder[aRoleKey] ?? defaultRank;
-      final bRank = _executiveRoleOrder[bRoleKey] ?? defaultRank;
+      final aRankIndex = _executiveRoleOrder.indexOf(aRoleKey);
+      final bRankIndex = _executiveRoleOrder.indexOf(bRoleKey);
+      final aRank = aRankIndex == -1 ? defaultRank : aRankIndex;
+      final bRank = bRankIndex == -1 ? defaultRank : bRankIndex;
 
       if (aRank != bRank) {
         return aRank.compareTo(bRank);
