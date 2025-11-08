@@ -55,6 +55,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final Set<String> _updatingReportIds = <String>{};
   final Set<String> _deletingReportIds = <String>{};
   String? _reportComposerError;
+  bool _refreshingMember = false;
 
   static const String _reportsBucket = 'member-documents';
 
