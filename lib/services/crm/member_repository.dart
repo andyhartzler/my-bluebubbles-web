@@ -565,7 +565,40 @@ class MemberRepository {
   Future<Member?> updateMemberFields(String memberId, Map<String, dynamic> updates) async {
     if (!_isReady || updates.isEmpty) return null;
 
-    final payload = Map<String, dynamic>.from(updates);
+    final payload = <String, dynamic>{};
+    updates.forEach((key, value) {
+      if (key == 'executive') {
+        payload[key] = Member.coerceBool(value) ?? false;
+        return;
+      }
+
+      if (key == 'executive_title' || key == 'executive_role') {
+        payload[key] = Member.normalizeText(value);
+        return;
+      }
+
+      if (key == 'internal_member_info') {
+        if (value is MemberInternalInfo) {
+          payload[key] = value.toJson();
+        } else if (value is Map<String, dynamic>) {
+          payload[key] = value;
+        } else if (value is Map) {
+          payload[key] =
+              value.map((dynamic mapKey, dynamic mapValue) => MapEntry(mapKey.toString(), mapValue));
+        } else {
+          final parsed = MemberInternalInfo.tryParse(value);
+          payload[key] = parsed?.toJson();
+        }
+        return;
+      }
+
+      if (value is MemberInternalInfo) {
+        payload[key] = value.toJson();
+        return;
+      }
+
+      payload[key] = value;
+    });
 
     try {
       final response = await _writeClient
