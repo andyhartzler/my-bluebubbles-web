@@ -33,6 +33,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   List<Member> _members = [];
   List<Member> _filteredMembers = [];
+  List<Member> _agedOutMembers = [];
   List<Chapter> _chapters = [];
   List<Chapter> _filteredChapters = [];
 
@@ -41,6 +42,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   String _searchQuery = '';
   late int _activeView;
   bool _filtersExpandedOnMobile = false;
+  bool _showAgedOutMembers = false;
 
   // Filter state
   String? _selectedCounty;
@@ -68,6 +70,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
   int? _availableMaxAge;
 
   static const List<Color> _memberCardGradient = [Color(0xFF0F4C75), Color(0xFF3282B8)];
+  static const int _minAllowedAge = 14;
+  static const int _maxAllowedAge = 36;
 
   @override
   void initState() {
@@ -165,6 +169,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _leaderCountByChapter = _computeLeaderCounts(members);
         _deriveAgeBounds(members);
         _filteredMembers = _computeFilteredMembers();
+        if (_agedOutMembers.isEmpty) {
+          _showAgedOutMembers = false;
+        }
         _filteredChapters = _computeFilteredChapters();
         _loading = false;
       });
@@ -189,14 +196,22 @@ class _MembersListScreenState extends State<MembersListScreen> {
       return;
     }
 
-    _availableMinAge = ages.first;
-    _availableMaxAge = ages.last;
+    int clampAge(int value) => value.clamp(_minAllowedAge, _maxAllowedAge).toInt();
 
-    if (_minAgeFilter != null && _availableMinAge != null && _minAgeFilter! < _availableMinAge!) {
-      _minAgeFilter = _availableMinAge;
+    final constrainedMin = clampAge(ages.first);
+    final constrainedMax = clampAge(ages.last);
+
+    _availableMinAge = constrainedMin;
+    _availableMaxAge = constrainedMax;
+
+    if (_minAgeFilter != null && _minAgeFilter! < _minAllowedAge) {
+      _minAgeFilter = _minAllowedAge;
     }
-    if (_maxAgeFilter != null && _availableMaxAge != null && _maxAgeFilter! > _availableMaxAge!) {
-      _maxAgeFilter = _availableMaxAge;
+    if (_minAgeFilter != null && _minAgeFilter! < constrainedMin) {
+      _minAgeFilter = constrainedMin;
+    }
+    if (_maxAgeFilter != null && _maxAgeFilter! > constrainedMax) {
+      _maxAgeFilter = constrainedMax;
     }
   }
 
@@ -215,6 +230,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
     setState(() {
       updater();
       _filteredMembers = _computeFilteredMembers();
+      if (_agedOutMembers.isEmpty) {
+        _showAgedOutMembers = false;
+      }
       _filteredChapters = _computeFilteredChapters();
     });
   }
@@ -230,21 +248,25 @@ class _MembersListScreenState extends State<MembersListScreen> {
             .toSet()
         : const <String>{};
 
-    final filtered = _members.where((member) {
+    final primaryMembers = <Member>[];
+    final agedOutMembers = <Member>[];
+
+    for (final member in _members) {
       if (query.isNotEmpty && !_matchesMemberQuery(member, query)) {
-        return false;
+        continue;
       }
 
       if (_selectedCounty != null && !_equalsIgnoreCase(member.county, _selectedCounty)) {
-        return false;
+        continue;
       }
 
-      if (_selectedDistrict != null && !_equalsIgnoreCase(member.congressionalDistrict, _selectedDistrict)) {
-        return false;
+      if (_selectedDistrict != null &&
+          !_equalsIgnoreCase(member.congressionalDistrict, _selectedDistrict)) {
+        continue;
       }
 
       if (_selectedChapter != null && !_equalsIgnoreCase(member.chapterName, _selectedChapter)) {
-        return false;
+        continue;
       }
 
       if (_selectedCommunityType != null && !_equalsIgnoreCase(member.communityType, _selectedCommunityType)) {
@@ -260,49 +282,61 @@ class _MembersListScreenState extends State<MembersListScreen> {
       }
 
       if (_selectedCommittees != null && _selectedCommittees!.isNotEmpty) {
-        if (member.committee == null) return false;
+        if (member.committee == null) continue;
         final normalizedCommittees = member.committee!
             .map(_normalizeKey)
             .whereType<String>()
             .toSet();
+        bool missingCommittee = false;
         for (final committee in _selectedCommittees!) {
           final normalized = _normalizeKey(committee);
           if (normalized == null || !normalizedCommittees.contains(normalized)) {
-            return false;
+            missingCommittee = true;
+            break;
           }
         }
+        if (missingCommittee) continue;
       }
 
       if (_registeredVoterFilter != null) {
         final isRegistered = member.registeredVoter == true;
-        if (_registeredVoterFilter == 'registered' && !isRegistered) return false;
-        if (_registeredVoterFilter == 'not_registered' && isRegistered) return false;
+        if (_registeredVoterFilter == 'registered' && !isRegistered) continue;
+        if (_registeredVoterFilter == 'not_registered' && isRegistered) continue;
       }
 
       if (_contactFilter != null) {
-        if (_contactFilter == 'contactable' && member.optOut) return false;
-        if (_contactFilter == 'opted_out' && !member.optOut) return false;
+        if (_contactFilter == 'contactable' && member.optOut) continue;
+        if (_contactFilter == 'opted_out' && !member.optOut) continue;
       }
 
+      final age = member.age;
       if (_minAgeFilter != null || _maxAgeFilter != null) {
-        final age = member.age;
-        if (age == null) return false;
-        if (_minAgeFilter != null && age < _minAgeFilter!) return false;
-        if (_maxAgeFilter != null && age > _maxAgeFilter!) return false;
+        if (age == null) continue;
+        if (_minAgeFilter != null && age < _minAgeFilter!) continue;
+        if (_maxAgeFilter != null && age > _maxAgeFilter!) continue;
       }
 
-      return true;
-    }).toList()
-      ..sort((a, b) {
-        final aHasPhoto = a.hasProfilePhoto;
-        final bHasPhoto = b.hasProfilePhoto;
-        if (aHasPhoto != bHasPhoto) {
-          return aHasPhoto ? -1 : 1;
-        }
-        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-      });
+      if (age != null && age > _maxAllowedAge) {
+        agedOutMembers.add(member);
+      } else {
+        primaryMembers.add(member);
+      }
+    }
 
-    return filtered;
+    primaryMembers.sort(_compareMembers);
+    agedOutMembers.sort(_compareMembers);
+    _agedOutMembers = agedOutMembers;
+
+    return primaryMembers;
+  }
+
+  int _compareMembers(Member a, Member b) {
+    final aHasPhoto = a.hasProfilePhoto;
+    final bHasPhoto = b.hasProfilePhoto;
+    if (aHasPhoto != bHasPhoto) {
+      return aHasPhoto ? -1 : 1;
+    }
+    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
   }
 
   List<Chapter> _computeFilteredChapters() {
@@ -470,6 +504,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final theme = Theme.of(context);
     final showingChapters = _showingChapters;
 
+    final visibleMembersCount = _filteredMembers.length;
+    final totalMembersCount = visibleMembersCount + _agedOutMembers.length;
+
     final slivers = <Widget>[
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -485,14 +522,19 @@ class _MembersListScreenState extends State<MembersListScreen> {
           child: Text(
             showingChapters
                 ? 'Showing ${_filteredChapters.length} of ${_chapters.length} chapters'
-                : 'Showing ${_filteredMembers.length} of ${_members.length} members',
+                : 'Showing $visibleMembersCount of $totalMembersCount members',
             style: theme.textTheme.labelMedium,
           ),
         ),
       ),
       const SliverToBoxAdapter(child: SizedBox(height: 8)),
-      showingChapters ? _buildChaptersSliver(theme) : _buildMembersSliver(theme),
     ];
+
+    if (showingChapters) {
+      slivers.add(_buildChaptersSliver(theme));
+    } else {
+      slivers.addAll(_buildMembersSlivers(theme));
+    }
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -705,33 +747,65 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return result;
   }
 
-  Widget _buildMembersSliver(ThemeData theme) {
-    if (_filteredMembers.isEmpty) {
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 96),
-                _buildEmptyMembersState(theme),
-              ],
+  List<Widget> _buildMembersSlivers(ThemeData theme) {
+    final hasAgedOutMembers = _agedOutMembers.isNotEmpty;
+    final hasPrimaryMembers = _filteredMembers.isNotEmpty;
+
+    if (!hasPrimaryMembers && !hasAgedOutMembers) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 96),
+                  _buildEmptyMembersState(theme),
+                ],
+              ),
             ),
           ),
+        ),
+      ];
+    }
+
+    final slivers = <Widget>[];
+
+    if (hasPrimaryMembers) {
+      final bottomPadding = hasAgedOutMembers ? 16.0 : 32.0;
+      slivers.add(_buildMemberCollectionSliver(_filteredMembers, bottomPadding: bottomPadding));
+    } else {
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          sliver: SliverToBoxAdapter(child: _buildEmptyMembersState(theme)),
         ),
       );
     }
 
+    if (hasAgedOutMembers) {
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+          sliver: SliverToBoxAdapter(child: _buildAgedOutMembersPanel(theme)),
+        ),
+      );
+    }
+
+    return slivers;
+  }
+
+  Widget _buildMemberCollectionSliver(List<Member> members, {double bottomPadding = 32}) {
     return SliverLayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.crossAxisExtent;
         if (width < 600) {
-          final itemCount = _filteredMembers.length * 2 - 1;
+          final itemCount = members.length * 2 - 1;
           return SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
@@ -740,7 +814,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
                   }
                   final itemIndex = index ~/ 2;
                   return _buildMemberCard(
-                    _filteredMembers[itemIndex],
+                    members[itemIndex],
                     itemIndex,
                     isMobile: true,
                   );
@@ -751,56 +825,111 @@ class _MembersListScreenState extends State<MembersListScreen> {
           );
         }
 
+        final horizontalPadding = width < 900 ? 16.0 : 24.0;
         return SliverPadding(
-          padding: EdgeInsets.fromLTRB(width < 900 ? 16 : 24, 0, width < 900 ? 16 : 24, 32),
+          padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, bottomPadding),
           sliver: SliverToBoxAdapter(
             child: LayoutBuilder(
               builder: (context, boxConstraints) {
                 final availableWidth = boxConstraints.maxWidth;
-                const minTileWidth = 280.0;
-                const maxTileWidth = 360.0;
-                const spacing = 20.0;
-
-                int columnCount = math.max(1, (availableWidth / (minTileWidth + spacing)).floor());
-                columnCount = math.min(columnCount, 4);
-                double tileWidth = (availableWidth - spacing * (columnCount - 1)) / columnCount;
-                tileWidth = tileWidth.clamp(minTileWidth, maxTileWidth).toDouble();
-
-                final effectiveColumns = math.min(columnCount, _filteredMembers.length);
-                final wrapWidth = effectiveColumns <= 1
-                    ? tileWidth
-                    : math.min(
-                        availableWidth,
-                        effectiveColumns * tileWidth + spacing * (effectiveColumns - 1),
-                      );
-
-                return Align(
-                  alignment: Alignment.topCenter,
-                  child: SizedBox(
-                    width: wrapWidth,
-                    child: Wrap(
-                      spacing: spacing,
-                      runSpacing: spacing,
-                      alignment: WrapAlignment.start,
-                      children: [
-                        for (int i = 0; i < _filteredMembers.length; i++)
-                          SizedBox(
-                            width: tileWidth,
-                            child: _buildMemberCard(
-                              _filteredMembers[i],
-                              i,
-                              isMobile: false,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
+                return _buildMemberWrap(members, availableWidth);
               },
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildMemberWrap(List<Member> members, double availableWidth) {
+    const double minTileWidth = 280.0;
+    const double maxTileWidth = 360.0;
+    const double spacing = 20.0;
+
+    int columnCount = math.max(1, (availableWidth / (minTileWidth + spacing)).floor());
+    columnCount = math.min(columnCount, 4);
+    double tileWidth = (availableWidth - spacing * (columnCount - 1)) / columnCount;
+    tileWidth = tileWidth.clamp(minTileWidth, maxTileWidth).toDouble();
+
+    final effectiveColumns = math.min(columnCount, members.length);
+    final wrapWidth = effectiveColumns <= 1
+        ? tileWidth
+        : math.min(
+            availableWidth,
+            effectiveColumns * tileWidth + spacing * (effectiveColumns - 1),
+          );
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SizedBox(
+        width: wrapWidth,
+        child: Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          alignment: WrapAlignment.start,
+          children: [
+            for (int i = 0; i < members.length; i++)
+              SizedBox(
+                width: tileWidth,
+                child: _buildMemberCard(
+                  members[i],
+                  i,
+                  isMobile: false,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAgedOutMembersPanel(ThemeData theme) {
+    return Card(
+      elevation: 1,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          key: const PageStorageKey<String>('aged-out-members-tile'),
+          initiallyExpanded: _showAgedOutMembers,
+          onExpansionChanged: (expanded) {
+            setState(() {
+              _showAgedOutMembers = expanded;
+            });
+          },
+          title: Text(
+            'Aged-Out Members (${_agedOutMembers.length})',
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            'Members older than $_maxAllowedAge are hidden from the main list.',
+            style: theme.textTheme.bodySmall,
+          ),
+          children: [
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  if (width < 600) {
+                    return Column(
+                      children: [
+                        for (int i = 0; i < _agedOutMembers.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 12),
+                          _buildMemberCard(_agedOutMembers[i], i, isMobile: true),
+                        ],
+                      ],
+                    );
+                  }
+                  return _buildMemberWrap(_agedOutMembers, width);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
