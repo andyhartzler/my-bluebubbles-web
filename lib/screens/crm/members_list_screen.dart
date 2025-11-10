@@ -34,8 +34,13 @@ class MembersListScreen extends StatefulWidget {
 class _ExecutiveRoleCandidate {
   final String raw;
   final String normalized;
+  final String? displayLabel;
 
-  const _ExecutiveRoleCandidate({required this.raw, required this.normalized});
+  const _ExecutiveRoleCandidate({
+    required this.raw,
+    required this.normalized,
+    this.displayLabel,
+  });
 }
 
 class _ExecutiveRoleResolution {
@@ -609,39 +614,57 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   static _ExecutiveRoleResolution _resolveExecutiveRole(Member member) {
-    final shortRole = member.executiveRoleShort?.trim();
-    final longRole = member.executiveRole?.trim();
-
-    final candidateLabels = <String>[];
-    if (shortRole != null && shortRole.isNotEmpty) {
-      candidateLabels.add(shortRole);
+    String? _trimmed(String? value) {
+      if (value == null) return null;
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : trimmed;
     }
 
-    if (shortRole != null &&
-        shortRole.isNotEmpty &&
-        longRole != null &&
-        longRole.isNotEmpty) {
-      final combined = '$shortRole / $longRole';
-      candidateLabels.add(combined);
-
-      if (shortRole.toLowerCase() != longRole.toLowerCase()) {
-        candidateLabels.add('$longRole / $shortRole');
-      }
-    }
-
-    if (longRole != null && longRole.isNotEmpty) {
-      candidateLabels.add(longRole);
-    }
+    final shortRole = _trimmed(member.executiveRoleShort);
+    final longRole = _trimmed(member.executiveRole);
+    final title = _trimmed(member.executiveTitle);
 
     final seenLabels = <String>{};
     final candidates = <_ExecutiveRoleCandidate>[];
 
-    for (final raw in candidateLabels) {
-      final lower = raw.toLowerCase();
-      if (!seenLabels.add(lower)) continue;
-      final normalized = _normalizeExecutiveRole(raw);
-      candidates.add(_ExecutiveRoleCandidate(raw: raw, normalized: normalized));
+    void addCandidate(String? value, {String? displayLabel}) {
+      final trimmed = _trimmed(value);
+      if (trimmed == null) return;
+      final lower = trimmed.toLowerCase();
+      if (!seenLabels.add(lower)) return;
+      final normalized = _normalizeExecutiveRole(trimmed);
+      candidates.add(
+        _ExecutiveRoleCandidate(
+          raw: trimmed,
+          normalized: normalized,
+          displayLabel: displayLabel,
+        ),
+      );
     }
+
+    addCandidate(title);
+
+    if (title != null && shortRole != null) {
+      addCandidate('$title / $shortRole', displayLabel: title);
+      addCandidate('$shortRole / $title', displayLabel: title);
+    }
+
+    if (title != null && longRole != null) {
+      addCandidate('$title / $longRole', displayLabel: title);
+      addCandidate('$longRole / $title', displayLabel: title);
+    }
+
+    addCandidate(shortRole);
+
+    if (shortRole != null && longRole != null) {
+      addCandidate('$shortRole / $longRole');
+
+      if (shortRole.toLowerCase() != longRole.toLowerCase()) {
+        addCandidate('$longRole / $shortRole');
+      }
+    }
+
+    addCandidate(longRole);
 
     if (candidates.isEmpty) {
       return const _ExecutiveRoleResolution(normalized: '', displayLabel: null);
@@ -652,7 +675,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
           _executiveRoleOrder.contains(candidate.normalized)) {
         return _ExecutiveRoleResolution(
           normalized: candidate.normalized,
-          displayLabel: candidate.raw,
+          displayLabel: candidate.displayLabel ?? candidate.raw,
         );
       }
     }
@@ -661,12 +684,13 @@ class _MembersListScreenState extends State<MembersListScreen> {
       if (candidate.normalized.isNotEmpty) {
         return _ExecutiveRoleResolution(
           normalized: candidate.normalized,
-          displayLabel: candidate.raw,
+          displayLabel: candidate.displayLabel ?? candidate.raw,
         );
       }
     }
 
-    final fallback = candidates.first.raw;
+    final fallbackCandidate = candidates.first;
+    final fallback = fallbackCandidate.displayLabel ?? fallbackCandidate.raw;
     return _ExecutiveRoleResolution(
       normalized: '',
       displayLabel: fallback.isEmpty ? null : fallback,
