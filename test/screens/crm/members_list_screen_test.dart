@@ -1,6 +1,9 @@
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 Member _execMember(
   String id,
@@ -143,5 +146,20 @@ void main() {
       members.map((member) => member.name).toList(),
       ['Paula President', 'Vince Vice', 'Daria District'],
     );
+  });
+
+  testWidgets('Embedded layout shows disabled refresh control when CRM unavailable', (tester) async {
+    final supabaseService = CRMSupabaseService();
+    supabaseService.debugSetInitialized(false);
+
+    await tester.pumpWidget(const MaterialApp(home: MembersListScreen(embed: true)));
+    await tester.pump();
+
+    final refreshButtonFinder = find.widgetWithIcon(IconButton, Icons.refresh);
+    expect(refreshButtonFinder, findsOneWidget);
+
+    final iconButton = tester.widget<IconButton>(refreshButtonFinder);
+    expect(iconButton.onPressed, isNull);
+    expect(iconButton.tooltip, 'Refresh');
   });
 }
