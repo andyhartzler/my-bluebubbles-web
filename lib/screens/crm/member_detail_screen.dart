@@ -849,7 +849,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         maxLines: 8,
                         decoration: const InputDecoration(
                           labelText: 'Message',
-                          hintText: 'Hello {{firstName}},\n\nWelcome to the team!',
+                          hintText: 'Type your message…',
                           border: OutlineInputBorder(),
                           alignLabelWithHint: true,
                         ),
