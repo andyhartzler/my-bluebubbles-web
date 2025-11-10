@@ -20,9 +20,18 @@ import 'member_detail_screen.dart';
 class MembersListScreen extends StatefulWidget {
   final bool embed;
   final bool showChaptersOnly;
+  final MemberRepository? memberRepository;
+  final ChapterRepository? chapterRepository;
+  final int pageSize;
 
-  const MembersListScreen({Key? key, this.embed = false, this.showChaptersOnly = false})
-      : super(key: key);
+  const MembersListScreen({
+    Key? key,
+    this.embed = false,
+    this.showChaptersOnly = false,
+    this.memberRepository,
+    this.chapterRepository,
+    this.pageSize = 50,
+  }) : super(key: key);
 
   @visibleForTesting
   static int Function(Member, Member) compareMembersForTesting({
@@ -58,8 +67,8 @@ class _ExecutiveRoleResolution {
 }
 
 class _MembersListScreenState extends State<MembersListScreen> {
-  final MemberRepository _memberRepo = MemberRepository();
-  final ChapterRepository _chapterRepository = ChapterRepository();
+  late final MemberRepository _memberRepo;
+  late final ChapterRepository _chapterRepository;
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
 
   List<Member> _members = [];
@@ -75,6 +84,20 @@ class _MembersListScreenState extends State<MembersListScreen> {
   late int _activeView;
   bool _filtersExpandedOnMobile = false;
   bool _showAgedOutMembers = false;
+
+  late final ScrollController _scrollController;
+  late final int _pageSize;
+  bool _isLoadingPage = false;
+  bool _hasMoreMembers = true;
+  int? _totalAvailableMembers;
+
+  Future<List<String>>? _countiesFuture;
+  Future<List<String>>? _districtsFuture;
+  Future<List<String>>? _committeesFuture;
+  Future<Map<String, int>>? _chapterCountsFuture;
+  Future<Map<String, int>>? _leadershipCountsFuture;
+  Future<List<Chapter>>? _chaptersFuture;
+  Future<AgeBounds>? _ageBoundsFuture;
 
   // Filter state
   String? _selectedCounty;
@@ -107,9 +130,13 @@ class _MembersListScreenState extends State<MembersListScreen> {
   @override
   void initState() {
     super.initState();
+    _memberRepo = widget.memberRepository ?? MemberRepository();
+    _chapterRepository = widget.chapterRepository ?? ChapterRepository();
+    _pageSize = widget.pageSize;
+    _scrollController = ScrollController()..addListener(_handleScroll);
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
     _activeView = widget.showChaptersOnly ? 1 : 0;
-    _loadData();
+    _loadData(refreshMetadata: true, includeMetadata: true);
   }
 
   @override
@@ -120,93 +147,326 @@ class _MembersListScreenState extends State<MembersListScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   bool get _showingChapters => widget.showChaptersOnly || _activeView == 1;
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool refreshMetadata = false, bool includeMetadata = true}) async {
     if (!_crmReady) {
       setState(() {
         _loading = false;
+        _members = [];
+        _filteredMembers = [];
+        _agedOutMembers = [];
       });
       return;
     }
 
-    setState(() => _loading = true);
+    if (refreshMetadata) {
+      _invalidateMetadataCaches();
+    }
+
+    setState(() {
+      _loading = true;
+      _hasMoreMembers = true;
+      _totalAvailableMembers = null;
+      _members = [];
+      _filteredMembers = [];
+      _agedOutMembers = [];
+    });
+
+    Future<void>? metadataFuture;
+    if (includeMetadata) {
+      metadataFuture = _loadMetadata(refresh: refreshMetadata);
+    }
+
+    await _fetchMembersPage(reset: true, requestTotalCount: true);
+
+    if (metadataFuture != null) {
+      await metadataFuture;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _loading = false;
+    });
+  }
+
+  void _invalidateMetadataCaches() {
+    _countiesFuture = null;
+    _districtsFuture = null;
+    _committeesFuture = null;
+    _chapterCountsFuture = null;
+    _leadershipCountsFuture = null;
+    _chaptersFuture = null;
+    _ageBoundsFuture = null;
+  }
+
+  Future<List<String>> _fetchCounties({bool refresh = false}) {
+    if (refresh || _countiesFuture == null) {
+      _countiesFuture = _memberRepo.getUniqueCounties();
+    }
+    return _countiesFuture!;
+  }
+
+  Future<List<String>> _fetchDistricts({bool refresh = false}) {
+    if (refresh || _districtsFuture == null) {
+      _districtsFuture = _memberRepo.getUniqueCongressionalDistricts();
+    }
+    return _districtsFuture!;
+  }
+
+  Future<List<String>> _fetchCommittees({bool refresh = false}) {
+    if (refresh || _committeesFuture == null) {
+      _committeesFuture = _memberRepo.getUniqueCommittees();
+    }
+    return _committeesFuture!;
+  }
+
+  Future<Map<String, int>> _fetchChapterCounts({bool refresh = false}) {
+    if (refresh || _chapterCountsFuture == null) {
+      _chapterCountsFuture = _memberRepo.getChapterCounts();
+    }
+    return _chapterCountsFuture!;
+  }
+
+  Future<Map<String, int>> _fetchLeadershipCounts({bool refresh = false}) {
+    if (refresh || _leadershipCountsFuture == null) {
+      _leadershipCountsFuture = _memberRepo.getLeadershipCountsByChapter();
+    }
+    return _leadershipCountsFuture!;
+  }
+
+  Future<List<Chapter>> _fetchChapters({bool refresh = false}) {
+    if (refresh || _chaptersFuture == null) {
+      _chaptersFuture = _chapterRepository.getAllChapters();
+    }
+    return _chaptersFuture!;
+  }
+
+  Future<AgeBounds> _fetchAgeBounds({bool refresh = false}) {
+    if (refresh || _ageBoundsFuture == null) {
+      _ageBoundsFuture = _memberRepo.getAgeBounds();
+    }
+    return _ageBoundsFuture!;
+  }
+
+  Future<void> _loadMetadata({bool refresh = false}) async {
+    if (!_crmReady) return;
 
     try {
-      final results = await Future.wait([
-        _memberRepo.getAllMembers(),
-        _memberRepo.getUniqueCounties(),
-        _memberRepo.getUniqueCongressionalDistricts(),
-        _memberRepo.getUniqueCommittees(),
-        _memberRepo.getChapterCounts(),
-        _chapterRepository.getAllChapters(),
+      final results = await Future.wait<dynamic>([
+        _fetchCounties(refresh: refresh),
+        _fetchDistricts(refresh: refresh),
+        _fetchCommittees(refresh: refresh),
+        _fetchChapterCounts(refresh: refresh),
+        _fetchLeadershipCounts(refresh: refresh),
+        _fetchChapters(refresh: refresh),
+        _fetchAgeBounds(refresh: refresh),
       ]);
 
       if (!mounted) return;
 
-      final members = results[0] as List<Member>;
-      final counties = results[1] as List<String>;
-      final districts = results[2] as List<String>;
-      final committees = results[3] as List<String>;
-      final rawChapterCounts = Map<String, int>.from(results[4] as Map);
+      final counties = List<String>.from(results[0] as List<String>);
+      final districts = List<String>.from(results[1] as List<String>);
+      final committees = List<String>.from(results[2] as List<String>);
+      final rawChapterCounts = Map<String, int>.from(results[3] as Map);
+      final rawLeadershipCounts = Map<String, int>.from(results[4] as Map);
       final chapters = results[5] as List<Chapter>;
+      final ageBounds = results[6] as AgeBounds;
 
       final normalizedChapterCounts = <String, int>{};
+      final normalizedLeadershipCounts = <String, int>{};
       final chapterNameMap = <String, String>{};
+
       rawChapterCounts.forEach((key, value) {
         final cleaned = _cleanValue(key);
         if (cleaned == null) return;
-        final normalized = _normalizeKey(cleaned)!;
+        final normalized = _normalizeKey(cleaned);
+        if (normalized == null) return;
         normalizedChapterCounts[normalized] = value;
         chapterNameMap[normalized] = cleaned;
+      });
+
+      rawLeadershipCounts.forEach((key, value) {
+        final cleaned = _cleanValue(key);
+        if (cleaned == null) return;
+        final normalized = _normalizeKey(cleaned);
+        if (normalized == null) return;
+        normalizedLeadershipCounts[normalized] = value;
+        chapterNameMap.putIfAbsent(normalized, () => cleaned);
       });
 
       for (final chapter in chapters) {
         final cleaned = _cleanValue(chapter.chapterName);
         if (cleaned == null) continue;
-        chapterNameMap[_normalizeKey(cleaned)!] = cleaned;
+        final normalized = _normalizeKey(cleaned);
+        if (normalized == null) continue;
+        chapterNameMap[normalized] = cleaned;
       }
 
-      final chapterNames = chapterNameMap.values.toList()
+      final chapterNames = chapterNameMap.values.toSet().toList()
         ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-      final leadershipChapters = members
-          .where((member) => _cleanValue(member.chapterPosition) != null)
-          .map((member) => _cleanValue(member.chapterName))
+      final leadershipChapterOptions = normalizedLeadershipCounts.keys
+          .map((key) => chapterNameMap[key])
           .whereType<String>()
           .toSet()
           .toList()
         ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
       setState(() {
-        _members = members;
         _counties = counties;
         _districts = districts;
         _committees = committees;
         _chapters = chapters;
         _chaptersByKey = _buildChapterLookup(chapters);
         _chapterNames = chapterNames;
-        _leadershipChapterOptions = leadershipChapters;
+        _leadershipChapterOptions = leadershipChapterOptions;
         _memberCountByChapter = normalizedChapterCounts;
-        _leaderCountByChapter = _computeLeaderCounts(members);
-        _deriveAgeBounds(members);
-        _filteredMembers = _computeFilteredMembers();
-        if (_agedOutMembers.isEmpty) {
-          _showAgedOutMembers = false;
+        _leaderCountByChapter = normalizedLeadershipCounts;
+        if (ageBounds.min != null) {
+          final clampedMin = ageBounds.min!.clamp(_minAllowedAge, _maxAllowedAge).toInt();
+          _availableMinAge = clampedMin;
+          if (_minAgeFilter != null && _minAgeFilter! < clampedMin) {
+            _minAgeFilter = clampedMin;
+          }
+        }
+        if (ageBounds.max != null) {
+          final clampedMax = ageBounds.max!.clamp(_minAllowedAge, _maxAllowedAge).toInt();
+          _availableMaxAge = clampedMax;
+          if (_maxAgeFilter != null && _maxAgeFilter! > clampedMax) {
+            _maxAgeFilter = clampedMax;
+          }
         }
         _filteredChapters = _computeFilteredChapters();
-        _loading = false;
       });
     } catch (e) {
-      print('❌ Error loading members: $e');
       if (!mounted) return;
-
-      setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading members: $e')),
+        SnackBar(content: Text('Error loading CRM metadata: $e')),
       );
     }
   }
+
+  Future<void> _fetchMembersPage({bool reset = false, bool requestTotalCount = false}) async {
+    if (!_crmReady) return;
+    if (_isLoadingPage) return;
+
+    final currentOffset = reset ? 0 : _members.length;
+
+    setState(() {
+      _isLoadingPage = true;
+      if (reset) {
+        _members = [];
+        _filteredMembers = [];
+        _agedOutMembers = [];
+        _hasMoreMembers = true;
+        if (requestTotalCount) {
+          _totalAvailableMembers = null;
+        }
+      }
+    });
+
+    try {
+      final result = await _memberRepo.getAllMembers(
+        county: _selectedCounty,
+        congressionalDistrict: _selectedDistrict,
+        committees: _selectedCommittees,
+        chapterName: _selectedChapter,
+        minAge: _minAgeFilter,
+        maxAge: _maxAgeFilter,
+        optedOut: _resolveOptedOutFilter(),
+        registeredVoter: _resolveRegisteredFilter(),
+        searchQuery: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+        limit: _pageSize,
+        offset: currentOffset,
+        fetchTotalCount: requestTotalCount,
+        columns: MemberRepository.listingColumns,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        if (reset) {
+          _members = List<Member>.from(result.members);
+        } else {
+          _members.addAll(result.members);
+        }
+
+        if (result.totalCount != null) {
+          _totalAvailableMembers = result.totalCount;
+          _hasMoreMembers = currentOffset + result.members.length < result.totalCount!;
+        } else {
+          if (reset && _totalAvailableMembers == null) {
+            _totalAvailableMembers = _members.length;
+          }
+          _hasMoreMembers = result.members.length == _pageSize;
+        }
+
+        _rebuildFilters();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading members: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingPage = false;
+      });
+    }
+  }
+
+  void _rebuildFilters() {
+    final filtered = _computeFilteredMembers();
+    _filteredMembers = filtered;
+    if (_agedOutMembers.isEmpty) {
+      _showAgedOutMembers = false;
+    }
+    _filteredChapters = _computeFilteredChapters();
+
+    if ((_availableMinAge == null || _availableMaxAge == null) && _members.isNotEmpty) {
+      _deriveAgeBounds(_members);
+    }
+  }
+
+  bool? _resolveOptedOutFilter() {
+    if (_contactFilter == 'contactable') return false;
+    if (_contactFilter == 'opted_out') return true;
+    return null;
+  }
+
+  bool? _resolveRegisteredFilter() {
+    if (_registeredVoterFilter == 'registered') return true;
+    if (_registeredVoterFilter == 'not_registered') return false;
+    return null;
+  }
+
+  Future<void> _refreshAll() => _loadData(refreshMetadata: true, includeMetadata: true);
+
+  Future<void> _reloadMembersOnly() => _loadData(includeMetadata: false);
+
+  void _handleScroll() {
+    if (_showingChapters) return;
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (!position.hasPixels || !position.hasContentDimensions) return;
+    final threshold = position.maxScrollExtent - 400;
+    if (position.pixels >= threshold && !_isLoadingPage && _hasMoreMembers && !_loading) {
+      _fetchMembersPage();
+    }
+  }
+
+  @visibleForTesting
+  Future<void> fetchNextPageForTesting() => _fetchMembersPage();
 
   void _deriveAgeBounds(List<Member> members) {
     final ages = members.map((member) => member.age).whereType<int>().toList()..sort();
@@ -237,26 +497,15 @@ class _MembersListScreenState extends State<MembersListScreen> {
     }
   }
 
-  Map<String, int> _computeLeaderCounts(List<Member> members) {
-    final counts = <String, int>{};
-    for (final member in members) {
-      final chapterKey = _normalizeKey(member.chapterName);
-      final position = _cleanValue(member.chapterPosition);
-      if (chapterKey == null || position == null) continue;
-      counts[chapterKey] = (counts[chapterKey] ?? 0) + 1;
-    }
-    return counts;
-  }
-
   void _updateFilters(void Function() updater) {
     setState(() {
       updater();
-      _filteredMembers = _computeFilteredMembers();
-      if (_agedOutMembers.isEmpty) {
-        _showAgedOutMembers = false;
-      }
       _filteredChapters = _computeFilteredChapters();
     });
+
+    if (_crmReady) {
+      _reloadMembersOnly();
+    }
   }
 
   List<Member> _computeFilteredMembers() {
@@ -933,7 +1182,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _crmReady ? _loadData : null,
+            onPressed: _crmReady ? () => _refreshAll() : null,
             tooltip: 'Refresh',
           ),
           if (CRMConfig.bulkMessagingEnabled)
@@ -978,7 +1227,11 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final showingChapters = _showingChapters;
 
     final visibleMembersCount = _filteredMembers.length;
-    final totalMembersCount = visibleMembersCount + _agedOutMembers.length;
+    final fetchedCount = visibleMembersCount + _agedOutMembers.length;
+    final knownTotalMembers = _totalAvailableMembers ?? fetchedCount;
+    final membersLabel = _totalAvailableMembers != null
+        ? 'Showing $visibleMembersCount of $knownTotalMembers members'
+        : 'Showing $visibleMembersCount members';
 
     final slivers = <Widget>[
       SliverPadding(
@@ -995,7 +1248,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
           child: Text(
             showingChapters
                 ? 'Showing ${_filteredChapters.length} of ${_chapters.length} chapters'
-                : 'Showing $visibleMembersCount of $totalMembersCount members',
+                : membersLabel,
             style: theme.textTheme.labelMedium,
           ),
         ),
@@ -1010,8 +1263,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadData,
+      onRefresh: _refreshAll,
       child: CustomScrollView(
+        controller: _scrollController,
         key: const PageStorageKey<String>('members-scroll-view'),
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         slivers: slivers,
@@ -1050,7 +1304,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         const SizedBox(width: 8),
         IconButton(
           icon: const Icon(Icons.refresh),
-          onPressed: _crmReady ? _loadData : null,
+          onPressed: _crmReady ? () => _refreshAll() : null,
           tooltip: 'Refresh',
         ),
       ],
@@ -1274,6 +1528,28 @@ class _MembersListScreenState extends State<MembersListScreen> {
           sliver: SliverToBoxAdapter(child: _buildAgedOutMembersPanel(theme)),
         ),
       );
+    }
+
+    if (!_loading) {
+      if (_isLoadingPage) {
+        slivers.add(
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
+        );
+      } else if (!_hasMoreMembers && (_members.isNotEmpty || _agedOutMembers.isNotEmpty)) {
+        slivers.add(
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: Text('All members loaded')),
+            ),
+          ),
+        );
+      }
     }
 
     return slivers;

@@ -55,7 +55,7 @@ class CRMMessageService {
     if (!_isReady) return [];
 
     try {
-      var members = await _memberRepo.getAllMembers(
+      final result = await _memberRepo.getAllMembers(
         county: filter.county,
         congressionalDistrict: filter.congressionalDistrict,
         committees: filter.committees,
@@ -67,6 +67,8 @@ class CRMMessageService {
         maxAge: filter.maxAge,
         optedOut: filter.excludeOptedOut ? false : null,
       );
+
+      var members = result.members;
 
       if (filter.excludeRecentlyContacted) {
         final threshold = DateTime.now().subtract(
