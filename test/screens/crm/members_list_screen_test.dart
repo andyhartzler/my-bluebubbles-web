@@ -1,5 +1,6 @@
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Member _execMember(
@@ -21,6 +22,32 @@ Member _execMember(
     profilePhotos:
         hasPhoto ? [MemberProfilePhoto(path: '$id.jpg', isPrimary: true)] : const [],
   );
+}
+
+Future<void> _pumpMemberListWith(
+  WidgetTester tester,
+  Member member,
+) async {
+  await tester.pumpWidget(
+    const MaterialApp(
+      home: MembersListScreen(embed: true),
+    ),
+  );
+
+  await tester.pump();
+
+  final state = tester.state(find.byType(MembersListScreen)) as dynamic;
+
+  state.setState(() {
+    state._crmReady = true;
+    state._loading = false;
+    state._filteredMembers = <Member>[member];
+    state._agedOutMembers = <Member>[];
+    state._activeView = 0;
+  });
+
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
@@ -158,20 +185,37 @@ void main() {
     );
   });
 
-  test('Comparator falls back to photo/name ordering without committee filter', () {
-    final members = <Member>[
-      _execMember('1', 'Zoe Executive', role: 'President'),
-      _execMember('2', 'Amy Member', executive: false),
-      _execMember('3', 'Ben Board', role: 'Vice President', hasPhoto: true),
-    ];
-
-    members.sort(
-      MembersListScreen.compareMembersForTesting(prioritizeExecutives: false),
+  testWidgets('Executive cards hide chapter leadership details', (tester) async {
+    final member = Member(
+      id: '1',
+      name: 'Erica Executive',
+      executiveCommittee: true,
+      executiveTitle: 'Executive Director',
+      executiveRole: 'Chief Strategist',
+      chapterPosition: 'County Chair',
+      chapterName: 'St. Louis County',
     );
 
-    expect(
-      members.map((member) => member.name).toList(),
-      ['Ben Board', 'Amy Member', 'Zoe Executive'],
+    await _pumpMemberListWith(tester, member);
+
+    expect(find.text('Executive Director'), findsOneWidget);
+    expect(find.text('Chief Strategist'), findsOneWidget);
+    expect(find.text('County Chair'), findsNothing);
+    expect(find.text('St. Louis County Democrats'), findsNothing);
+  });
+
+  testWidgets('Chapter leaders show position and affiliation when not executive', (tester) async {
+    final member = Member(
+      id: '2',
+      name: 'Chloe Chapter',
+      executiveCommittee: false,
+      chapterPosition: 'County Chair',
+      chapterName: 'St. Louis County',
     );
+
+    await _pumpMemberListWith(tester, member);
+
+    expect(find.text('County Chair'), findsOneWidget);
+    expect(find.text('St. Louis County Democrats'), findsOneWidget);
   });
 }

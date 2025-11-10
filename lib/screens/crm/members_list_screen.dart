@@ -1849,7 +1849,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
                       ),
                   ],
                 ),
-                if (chapterPosition != null) ...[
+                if (!isExecutive && chapterPosition != null) ...[
                   const SizedBox(height: 6),
                   Text(
                     chapterPosition,
