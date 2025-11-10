@@ -89,10 +89,8 @@ class MemberRepository {
 
     try {
       final selection = _resolveColumnSelection(columns);
-      var query = _readClient.from('members').select(selection);
-
-      query = _applyMemberFilters(
-        query,
+      final baseQuery = _applyMemberFilters(
+        _readClient.from('members').select(selection),
         county: county,
         congressionalDistrict: congressionalDistrict,
         committees: committees,
@@ -107,7 +105,8 @@ class MemberRepository {
         searchQuery: searchQuery,
       );
 
-      query = query.order('name', ascending: true).order('id', ascending: true);
+      var query =
+          baseQuery.order('name', ascending: true).order('id', ascending: true);
 
       if (limit != null && limit > 0) {
         query = query.limit(limit);
@@ -143,8 +142,8 @@ class MemberRepository {
     return selection.join(',');
   }
 
-  PostgrestFilterBuilder<dynamic> _applyMemberFilters(
-    PostgrestFilterBuilder<dynamic> query, {
+  PostgrestFilterBuilder<T> _applyMemberFilters<T>(
+    PostgrestFilterBuilder<T> query, {
     String? county,
     String? congressionalDistrict,
     List<String>? committees,
@@ -195,7 +194,7 @@ class MemberRepository {
     }
 
     if (minAge != null || maxAge != null) {
-      query = _applyAgeFilters(query, minAge: minAge, maxAge: maxAge);
+      query = _applyAgeFilters<T>(query, minAge: minAge, maxAge: maxAge);
     }
 
     final trimmedQuery = searchQuery?.trim();
@@ -222,8 +221,8 @@ class MemberRepository {
     return query;
   }
 
-  PostgrestFilterBuilder<dynamic> _applyAgeFilters(
-    PostgrestFilterBuilder<dynamic> query, {
+  PostgrestFilterBuilder<T> _applyAgeFilters<T>(
+    PostgrestFilterBuilder<T> query, {
     int? minAge,
     int? maxAge,
   }) {
