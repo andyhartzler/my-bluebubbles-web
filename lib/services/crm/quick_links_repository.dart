@@ -96,6 +96,7 @@ class QuickLinksRepository {
     required String category,
     String? description,
     String? externalUrl,
+    String? iconUrl,
     PlatformFile? file,
     Duration signedUrlTTL = const Duration(hours: 6),
   }) async {
@@ -108,6 +109,7 @@ class QuickLinksRepository {
       category: category,
       description: description,
       externalUrl: externalUrl,
+      iconUrl: iconUrl,
     );
 
     final upload = file != null
@@ -130,6 +132,7 @@ class QuickLinksRepository {
     String? category,
     String? description,
     String? externalUrl,
+    String? iconUrl,
     PlatformFile? file,
     bool removeExistingFile = false,
     Duration signedUrlTTL = const Duration(hours: 6),
@@ -145,7 +148,8 @@ class QuickLinksRepository {
       title: title ?? link.title,
       category: category ?? link.category,
       description: description ?? link.description,
-      externalUrl: externalUrl ?? link.externalUrl,
+      externalUrl: externalUrl,
+      iconUrl: iconUrl,
     );
 
     final updates = <String, dynamic>{
@@ -337,6 +341,7 @@ class QuickLinksRepository {
     required String category,
     String? description,
     String? externalUrl,
+    String? iconUrl,
   }) {
     final sanitizedTitle = title.trim();
     final sanitizedCategory = category.trim();
@@ -352,12 +357,34 @@ class QuickLinksRepository {
       normalizedUrl = externalUrl.trim();
     }
 
+    final bool includeExternalUrl = externalUrl != null;
+
+    String? normalizedIconUrl;
+    if (iconUrl != null) {
+      final trimmed = iconUrl.trim();
+      if (trimmed.isNotEmpty) {
+        normalizedIconUrl = trimmed;
+      }
+    }
+
+    final bool includeIconUrl = iconUrl != null;
+
     return {
       'title': sanitizedTitle,
       'category': sanitizedCategory,
       'description': description?.trim(),
       'external_url': normalizedUrl,
-    }..removeWhere((key, value) => value == null || (value is String && value.isEmpty));
+      'icon_url': normalizedIconUrl,
+    }
+      ..removeWhere((key, value) {
+        if (key == 'external_url' && includeExternalUrl) {
+          return false;
+        }
+        if (key == 'icon_url' && includeIconUrl) {
+          return false;
+        }
+        return value == null || (value is String && value.isEmpty);
+      });
   }
 
   Map<String, dynamic> _clearStorageMetadata() {

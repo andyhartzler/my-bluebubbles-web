@@ -152,11 +152,16 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
       return;
     }
 
-    final uri = Uri.tryParse(url);
-    if (uri == null || (!uri.hasScheme && !uri.isScheme('file'))) {
-      final resolved = Uri.tryParse('https://$url');
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) {
+      _showMessage(errorLabel ?? 'Unable to open link: $trimmed');
+      return;
+    }
+
+    if (!uri.hasScheme && !uri.isScheme('file')) {
+      final resolved = Uri.tryParse('https://$trimmed');
       if (resolved == null) {
-        _showMessage('Unable to open link: $url');
+        _showMessage(errorLabel ?? 'Unable to open link: $trimmed');
         return;
       }
       await launchUrl(resolved, mode: LaunchMode.externalApplication);
@@ -212,6 +217,7 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         category: result.category,
         description: result.description,
         externalUrl: result.externalUrl,
+        iconUrl: result.iconUrl,
         file: result.file,
         removeExistingFile: result.removeFile && result.file == null,
       );
@@ -237,6 +243,7 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         category: result.category,
         description: result.description,
         externalUrl: result.externalUrl,
+        iconUrl: result.iconUrl,
         file: result.file,
       );
       if (!mounted) return;
@@ -291,6 +298,23 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
       });
       _showMessage('Removed stored file for "${link.title}"');
     });
+  }
+
+  void _handleMenuAction(_QuickLinkMenuAction action, QuickLink link) {
+    switch (action) {
+      case _QuickLinkMenuAction.upload:
+        _uploadToLink(link);
+        break;
+      case _QuickLinkMenuAction.edit:
+        _manageLink(link);
+        break;
+      case _QuickLinkMenuAction.removeFile:
+        _removeFile(link);
+        break;
+      case _QuickLinkMenuAction.delete:
+        _manageLink(link, startInDeleteMode: true);
+        break;
+    }
   }
 
   @override
@@ -696,6 +720,12 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: _QuickLinkIconAvatar(link: link, size: 44),
+                ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Text(
                     link.title,
@@ -899,6 +929,7 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
   late final TextEditingController _categoryController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _urlController;
+  late final TextEditingController _iconController;
   PlatformFile? _selectedFile;
   bool _removeFile = false;
   bool _delete = false;
@@ -912,6 +943,7 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
     _categoryController = TextEditingController(text: existing?.category ?? '');
     _descriptionController = TextEditingController(text: existing?.description ?? '');
     _urlController = TextEditingController(text: existing?.externalUrl ?? '');
+    _iconController = TextEditingController(text: existing?.iconUrl ?? '');
     _delete = widget.startInDeleteMode;
     _removeFile = widget.startInDeleteMode;
   }
@@ -922,6 +954,7 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
     _categoryController.dispose();
     _descriptionController.dispose();
     _urlController.dispose();
+    _iconController.dispose();
     super.dispose();
   }
 
@@ -966,6 +999,7 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
         externalUrl: _urlController.text.trim().isEmpty
             ? null
             : _urlController.text.trim(),
+        iconUrl: _iconController.text.trim(),
         file: _selectedFile,
         removeFile: _removeFile,
         delete: _delete,
@@ -1019,6 +1053,22 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
               TextFormField(
                 controller: _urlController,
                 decoration: const InputDecoration(labelText: 'External URL'),
+                keyboardType: TextInputType.url,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return null;
+                  }
+                  final uri = Uri.tryParse(value.trim());
+                  if (uri == null || (!uri.hasScheme && !uri.host.contains('.'))) {
+                    return 'Enter a valid URL including https://';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _iconController,
+                decoration: const InputDecoration(labelText: 'Icon URL'),
                 keyboardType: TextInputType.url,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -1100,6 +1150,7 @@ class _QuickLinkFormResult {
     required this.category,
     required this.description,
     required this.externalUrl,
+    required this.iconUrl,
     this.file,
     this.removeFile = false,
     this.delete = false,
@@ -1109,6 +1160,7 @@ class _QuickLinkFormResult {
   final String category;
   final String? description;
   final String? externalUrl;
+  final String? iconUrl;
   final PlatformFile? file;
   final bool removeFile;
   final bool delete;
