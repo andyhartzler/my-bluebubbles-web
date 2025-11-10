@@ -805,8 +805,8 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                   onUploadFile: _uploadToLink,
                   onRemoveFile: _removeFile,
                 ),
-              ),
-            ],
+              ],
+            ),
             if (link.hasStorageReference) ...[
               const SizedBox(height: 8),
               Text(
@@ -816,31 +816,6 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                 ),
               ),
             ],
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                if (url != null)
-                  _QuickLinkActionButton(
-                    label: 'Open link',
-                    icon: Icons.open_in_new,
-                    onPressed: () => _openLink(link),
-                  ),
-                if (url != null)
-                  _QuickLinkActionButton(
-                    label: 'Copy link',
-                    icon: Icons.copy,
-                    onPressed: () => _copyLink(link),
-                  ),
-                if (pdfUri != null)
-                  _QuickLinkActionButton(
-                    label: 'View PDF',
-                    icon: Icons.picture_as_pdf_outlined,
-                    onPressed: () => _openUri(pdfUri),
-                  ),
-              ],
-            ),
             if (description != null && description.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(description, style: theme.textTheme.bodyMedium),
@@ -851,15 +826,6 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                 notes,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onBackground.withOpacity(0.7),
-                ),
-              ),
-            ],
-            if (link.hasStorageReference) ...[
-              const SizedBox(height: 8),
-              Text(
-                link.fileName ?? link.storagePath!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.primary,
                 ),
               ),
             ],
