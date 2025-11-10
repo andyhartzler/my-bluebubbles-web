@@ -101,12 +101,14 @@ void main() {
             'storage_bucket': 'quick-access-files',
             'storage_path': 'docs/zeta.pdf',
             'file_name': 'zeta.pdf',
+            'icon_url': 'https://example.com/icons/zeta.png',
           },
           {
             'id': 'a',
             'title': 'Alpha Site',
             'category': 'Links',
             'external_url': 'https://alpha.example',
+            'icon_url': 'https://example.com/icons/alpha.png',
           },
         ],
         fixedSignedUrl: 'https://signed.example/docs/zeta.pdf',
@@ -132,6 +134,7 @@ void main() {
         category: 'Documents',
         description: 'Latest internal report',
         externalUrl: 'https://example.com/report',
+        iconUrl: ' https://example.com/icon.png ',
         file: file,
         signedUrlTTL: const Duration(minutes: 5),
       );
@@ -145,6 +148,8 @@ void main() {
       expect(link.storagePath, expectedPathPrefix);
       expect(link.signedUrl, isNotEmpty);
       expect(link.fileSize, bytes.length);
+      expect(repo.lastInsertPayload?['icon_url'], 'https://example.com/icon.png');
+      expect(link.iconUrl, 'https://example.com/icon.png');
     });
 
     test('updateQuickLink replaces stored file and clears metadata when requested', () async {
@@ -161,6 +166,7 @@ void main() {
         updatedAt: DateTime.utc(2024),
         description: 'Old script',
         externalUrl: null,
+        iconUrl: 'https://example.com/icons/script.png',
       );
 
       final repo = _FakeQuickLinksRepository(
@@ -184,6 +190,28 @@ void main() {
       expect(repo.lastUploadedPath, endsWith('New_Script.docx'));
       expect(updated.fileName, 'New Script.docx');
       expect(updated.signedUrl, isNotNull);
+    });
+
+    test('updateQuickLink can clear icon URL when empty string is provided', () async {
+      final existing = QuickLink(
+        id: 'link-3',
+        title: 'Volunteer Hub',
+        category: 'Links',
+        externalUrl: 'https://volunteer.example',
+        iconUrl: 'https://example.com/icons/volunteer.png',
+      );
+
+      final repo = _FakeQuickLinksRepository(
+        initialRows: [existing.toJson()],
+      )..debugOverrideClients(isInitialized: true);
+
+      final updated = await repo.updateQuickLink(
+        existing,
+        iconUrl: '',
+      );
+
+      expect(repo.lastUpdatePayload?['icon_url'], isNull);
+      expect(updated.iconUrl, isNull);
     });
 
     test('deleteQuickLink removes storage reference first', () async {
