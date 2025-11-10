@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -24,8 +25,14 @@ class MembersListScreen extends StatefulWidget {
       : super(key: key);
 
   @visibleForTesting
-  static int compareMembersForTesting(Member a, Member b) =>
-      _MembersListScreenState._compareMembers(a, b);
+  static int Function(Member, Member) compareMembersForTesting({
+    required bool prioritizeExecutives,
+  }) =>
+      (a, b) => _MembersListScreenState._compareMembers(
+            a,
+            b,
+            prioritizeExecutives: prioritizeExecutives,
+          );
 
   @override
   State<MembersListScreen> createState() => _MembersListScreenState();
@@ -74,7 +81,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
   String? _selectedDistrict;
   List<String>? _selectedCommittees;
   String? _selectedChapter;
-  String? _selectedCommunityType;
   List<String>? _selectedLeadershipChapters;
   String? _registeredVoterFilter;
   String? _contactFilter;
@@ -86,7 +92,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
   List<String> _districts = [];
   List<String> _committees = [];
   List<String> _chapterNames = [];
-  List<String> _communityTypes = [];
   List<String> _leadershipChapterOptions = [];
 
   Map<String, int> _memberCountByChapter = {};
@@ -134,7 +139,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _memberRepo.getUniqueCongressionalDistricts(),
         _memberRepo.getUniqueCommittees(),
         _memberRepo.getChapterCounts(),
-        _memberRepo.getCommunityTypeCounts(),
         _chapterRepository.getAllChapters(),
       ]);
 
@@ -145,8 +149,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
       final districts = results[2] as List<String>;
       final committees = results[3] as List<String>;
       final rawChapterCounts = Map<String, int>.from(results[4] as Map);
-      final communityCounts = Map<String, int>.from(results[5] as Map);
-      final chapters = results[6] as List<Chapter>;
+      final chapters = results[5] as List<Chapter>;
 
       final normalizedChapterCounts = <String, int>{};
       final chapterNameMap = <String, String>{};
@@ -167,13 +170,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
       final chapterNames = chapterNameMap.values.toList()
         ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-      final communityTypes = communityCounts.keys
-          .map(_cleanValue)
-          .whereType<String>()
-          .toSet()
-          .toList()
-        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
       final leadershipChapters = members
           .where((member) => _cleanValue(member.chapterPosition) != null)
           .map((member) => _cleanValue(member.chapterName))
@@ -190,7 +186,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _chapters = chapters;
         _chaptersByKey = _buildChapterLookup(chapters);
         _chapterNames = chapterNames;
-        _communityTypes = communityTypes;
         _leadershipChapterOptions = leadershipChapters;
         _memberCountByChapter = normalizedChapterCounts;
         _leaderCountByChapter = _computeLeaderCounts(members);
@@ -275,6 +270,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
             .toSet()
         : const <String>{};
 
+    final committeeFilterActive =
+        _selectedCommittees != null && _selectedCommittees!.isNotEmpty;
+
     final primaryMembers = <Member>[];
     final agedOutMembers = <Member>[];
 
@@ -293,11 +291,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
       }
 
       if (_selectedChapter != null && !_equalsIgnoreCase(member.chapterName, _selectedChapter)) {
-        continue;
-      }
-
-      if (_selectedCommunityType != null &&
-          !_equalsIgnoreCase(member.communityType, _selectedCommunityType)) {
         continue;
       }
 
@@ -351,8 +344,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
       }
     }
 
-    primaryMembers.sort(_compareMembers);
-    agedOutMembers.sort(_compareMembers);
+    final comparator = (Member a, Member b) => _compareMembers(
+          a,
+          b,
+          prioritizeExecutives: committeeFilterActive,
+        );
+
+    primaryMembers.sort(comparator);
+    agedOutMembers.sort(comparator);
     _agedOutMembers = agedOutMembers;
 
     return primaryMembers;
@@ -557,7 +556,22 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return primary;
   }
 
-  static int _compareMembers(Member a, Member b) {
+  static int _compareMembers(
+    Member a,
+    Member b, {
+    bool prioritizeExecutives = true,
+  }) {
+    if (prioritizeExecutives) {
+      final executiveComparison = _compareByExecutivePriority(a, b);
+      if (executiveComparison != null) {
+        return executiveComparison;
+      }
+    }
+
+    return _compareByPhotoThenName(a, b);
+  }
+
+  static int? _compareByExecutivePriority(Member a, Member b) {
     final aIsExecutive = _isExecutiveMember(a);
     final bIsExecutive = _isExecutiveMember(b);
 
@@ -593,6 +607,10 @@ class _MembersListScreenState extends State<MembersListScreen> {
       }
     }
 
+    return null;
+  }
+
+  static int _compareByPhotoThenName(Member a, Member b) {
     final aHasPhoto = a.hasProfilePhoto;
     final bHasPhoto = b.hasProfilePhoto;
     if (aHasPhoto != bHasPhoto) {
@@ -867,7 +885,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
       _selectedDistrict = null;
       _selectedCommittees = null;
       _selectedChapter = null;
-      _selectedCommunityType = null;
       _selectedLeadershipChapters = null;
       _registeredVoterFilter = null;
       _contactFilter = null;
@@ -1046,7 +1063,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _selectedDistrict != null ||
         _selectedChapter != null ||
         (_selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty) ||
-        _selectedCommunityType != null ||
         _registeredVoterFilter != null ||
         _contactFilter != null ||
         _minAgeFilter != null ||
@@ -1082,12 +1098,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
         selected: _selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty,
         onTap: _showLeadershipFilter,
         icon: Icons.emoji_events_outlined,
-      ),
-      _buildFilterChip(
-        label: _selectedCommunityType ?? 'Community',
-        selected: _selectedCommunityType != null,
-        onTap: _showCommunityFilter,
-        icon: Icons.apartment,
       ),
       _buildFilterChip(
         label: _selectedCommittees == null || _selectedCommittees!.isEmpty
@@ -1199,7 +1209,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
     if (_selectedDistrict != null) count++;
     if (_selectedChapter != null) count++;
     if (_selectedLeadershipChapters != null && _selectedLeadershipChapters!.isNotEmpty) count++;
-    if (_selectedCommunityType != null) count++;
     if (_registeredVoterFilter != null) count++;
     if (_contactFilter != null) count++;
     if (_minAgeFilter != null || _maxAgeFilter != null) count++;
@@ -1857,7 +1866,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
                       ),
                   ],
                 ),
-                if (chapterPosition != null) ...[
+                if (!isExecutive && chapterPosition != null) ...[
                   const SizedBox(height: 6),
                   Text(
                     chapterPosition,
@@ -2027,16 +2036,24 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
     Widget content;
     if (photoUrl != null && photoUrl.isNotEmpty) {
+      final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+      final cacheSize = math.max(1, (size * devicePixelRatio).round());
+
       content = ClipOval(
-        child: Image.network(
-          photoUrl,
+        child: CachedNetworkImage(
+          imageUrl: photoUrl,
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => buildFallback(),
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Center(
+          memCacheWidth: cacheSize,
+          memCacheHeight: cacheSize,
+          fadeInDuration: const Duration(milliseconds: 200),
+          fadeOutDuration: const Duration(milliseconds: 200),
+          placeholder: (context, url) => Container(
+            width: size,
+            height: size,
+            color: Colors.black.withOpacity(0.1),
+            child: Center(
               child: SizedBox(
                 width: size * 0.4,
                 height: size * 0.4,
@@ -2045,8 +2062,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
                 ),
               ),
-            );
-          },
+            ),
+          ),
+          errorWidget: (context, url, error) => buildFallback(),
         ),
       );
     } else {
@@ -2191,15 +2209,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
       options: _chapterNames,
       currentValue: _selectedChapter,
       onSelected: (value) => _updateFilters(() => _selectedChapter = value),
-    );
-  }
-
-  void _showCommunityFilter() {
-    _showSingleChoiceDialog(
-      title: 'Filter by Community Type',
-      options: _communityTypes,
-      currentValue: _selectedCommunityType,
-      onSelected: (value) => _updateFilters(() => _selectedCommunityType = value),
     );
   }
 

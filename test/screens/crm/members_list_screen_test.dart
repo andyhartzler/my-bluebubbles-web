@@ -12,6 +12,7 @@ Member _execMember(
   String? roleShort,
   String? executiveTitle,
   bool executive = true,
+  bool hasPhoto = false,
 }) {
   return Member(
     id: id,
@@ -20,7 +21,35 @@ Member _execMember(
     executiveTitle: executiveTitle,
     executiveRole: role,
     executiveRoleShort: roleShort,
+    profilePhotos:
+        hasPhoto ? [MemberProfilePhoto(path: '$id.jpg', isPrimary: true)] : const [],
   );
+}
+
+Future<void> _pumpMemberListWith(
+  WidgetTester tester,
+  Member member,
+) async {
+  await tester.pumpWidget(
+    const MaterialApp(
+      home: MembersListScreen(embed: true),
+    ),
+  );
+
+  await tester.pump();
+
+  final state = tester.state(find.byType(MembersListScreen)) as dynamic;
+
+  state.setState(() {
+    state._crmReady = true;
+    state._loading = false;
+    state._filteredMembers = <Member>[member];
+    state._agedOutMembers = <Member>[];
+    state._activeView = 0;
+  });
+
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
@@ -54,7 +83,9 @@ void main() {
       _execMember('26', 'Eddie Executive Director', role: 'Executive Director'),
     ];
 
-    members.sort(MembersListScreen.compareMembersForTesting);
+    members.sort(
+      MembersListScreen.compareMembersForTesting(prioritizeExecutives: true),
+    );
 
     expect(
       members.map((member) => member.name).toList(),
@@ -96,7 +127,9 @@ void main() {
       _execMember('3', 'Dina District 3', role: 'Third Congressional District', roleShort: 'Representative'),
     ];
 
-    members.sort(MembersListScreen.compareMembersForTesting);
+    members.sort(
+      MembersListScreen.compareMembersForTesting(prioritizeExecutives: true),
+    );
 
     expect(
       members.map((member) => member.name).toList(),
@@ -110,7 +143,9 @@ void main() {
       _execMember('2', 'Paula President', role: 'President', executive: false),
     ];
 
-    members.sort(MembersListScreen.compareMembersForTesting);
+    members.sort(
+      MembersListScreen.compareMembersForTesting(prioritizeExecutives: true),
+    );
 
     expect(
       members.map((member) => member.name).toList(),
@@ -125,7 +160,9 @@ void main() {
       _execMember('3', 'Polly Political', role: 'Political Affairs Committee', roleShort: 'Chair'),
     ];
 
-    members.sort(MembersListScreen.compareMembersForTesting);
+    members.sort(
+      MembersListScreen.compareMembersForTesting(prioritizeExecutives: true),
+    );
 
     expect(
       members.map((member) => member.name).toList(),
@@ -140,7 +177,9 @@ void main() {
       _execMember('3', 'Vince Vice', executiveTitle: 'Vice President'),
     ];
 
-    members.sort(MembersListScreen.compareMembersForTesting);
+    members.sort(
+      MembersListScreen.compareMembersForTesting(prioritizeExecutives: true),
+    );
 
     expect(
       members.map((member) => member.name).toList(),
