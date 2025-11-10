@@ -62,4 +62,7 @@ class CRMConfig {
   /// Rate limiting configuration for bulk messaging workflows.
   static const int messagesPerMinute = 30;
   static const Duration messageDelay = Duration(seconds: 2);
+
+  /// Default sender mailbox used for CRM-driven email flows.
+  static const String defaultSenderEmail = 'info@moyoungdemocrats.org';
 }

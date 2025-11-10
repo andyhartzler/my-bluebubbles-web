@@ -82,10 +82,13 @@ class CRMEmailService {
   Future<CRMEmailResult> sendEmail({
     required List<String> to,
     required String subject,
-    required String htmlBody,
+    String? htmlBody,
+    String? textBody,
+    String? fromEmail,
+    String? fromName,
+    String? replyTo,
     List<String>? cc,
     List<String>? bcc,
-    String? textBody,
     Map<String, dynamic>? variables,
     List<CRMEmailAttachment> attachments = const [],
   }) async {
@@ -99,15 +102,20 @@ class CRMEmailService {
       throw CRMEmailException('Email subject is required.');
     }
 
-    final trimmedHtml = htmlBody.trim();
-    if (trimmedHtml.isEmpty) {
-      throw CRMEmailException('HTML body is required.');
+    final trimmedHtml = htmlBody?.trim() ?? '';
+    final trimmedText = textBody?.trim() ?? '';
+
+    if (trimmedHtml.isEmpty && trimmedText.isEmpty) {
+      throw CRMEmailException('Email body is required. Provide HTML or plain text.');
     }
+
+    final resolvedHtml =
+        trimmedHtml.isNotEmpty ? trimmedHtml : _convertPlainTextToHtml(trimmedText);
 
     final payload = <String, dynamic>{
       'to': recipients.length == 1 ? recipients.first : recipients,
       'subject': trimmedSubject,
-      'htmlBody': trimmedHtml,
+      'htmlBody': resolvedHtml,
     };
 
     final ccList = _sanitizeEmails(cc);
@@ -122,6 +130,21 @@ class CRMEmailService {
 
     if (textBody != null && textBody.trim().isNotEmpty) {
       payload['textBody'] = textBody.trim();
+    }
+
+    final singleFromEmail = _sanitizeSingleEmail(fromEmail);
+    if (singleFromEmail != null) {
+      payload['fromEmail'] = singleFromEmail;
+    }
+
+    final trimmedFromName = fromName?.trim() ?? '';
+    if (trimmedFromName.isNotEmpty) {
+      payload['fromName'] = trimmedFromName;
+    }
+
+    final singleReplyTo = _sanitizeSingleEmail(replyTo);
+    if (singleReplyTo != null) {
+      payload['replyTo'] = singleReplyTo;
     }
 
     if (variables != null && variables.isNotEmpty) {
@@ -181,10 +204,13 @@ class CRMEmailService {
   Future<CRMEmailResult> sendEmailToMembers({
     required List<Member> members,
     required String subject,
-    required String htmlBody,
+    String? htmlBody,
+    String? textBody,
+    String? fromEmail,
+    String? fromName,
+    String? replyTo,
     List<String>? cc,
     List<String>? bcc,
-    String? textBody,
     Map<String, dynamic>? variables,
     List<CRMEmailAttachment> attachments = const [],
   }) async {
@@ -203,9 +229,12 @@ class CRMEmailService {
       to: memberEmails,
       subject: subject,
       htmlBody: htmlBody,
+      textBody: textBody,
+      fromEmail: fromEmail,
+      fromName: fromName,
+      replyTo: replyTo,
       cc: cc,
       bcc: bcc,
-      textBody: textBody,
       variables: variables,
       attachments: attachments,
     );
@@ -269,5 +298,19 @@ class CRMEmailService {
       }
     }
     return emails;
+  }
+
+  String? _sanitizeSingleEmail(String? value) {
+    final sanitized = _sanitizeEmails(value == null ? null : [value]);
+    return sanitized.isEmpty ? null : sanitized.first;
+  }
+
+  String _convertPlainTextToHtml(String text) {
+    final escaped = const HtmlEscape().convert(text);
+    final paragraphs = escaped.split(RegExp(r'\n{2,}'));
+    return paragraphs
+        .map((paragraph) =>
+            '<p>${paragraph.replaceAll('\n', '<br>')}</p>')
+        .join();
   }
 }
