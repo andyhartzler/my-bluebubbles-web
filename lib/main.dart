@@ -24,6 +24,7 @@ import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
@@ -760,6 +761,16 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       ),
     );
 
+    final newEmailButton = ElevatedButton.icon(
+      onPressed: () => _openNewEmail(context),
+      icon: const Icon(Icons.email_outlined),
+      label: const Text('New Email'),
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
+    );
+
     final searchButton = Tooltip(
       message: crmReady ? 'Search CRM' : 'Search available when CRM is connected',
       child: IconButton(
@@ -795,6 +806,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           final navChildren = [
             ...navButtons,
             newMessageButton,
+            newEmailButton,
             searchButton,
             settingsButton,
           ];
@@ -1033,6 +1045,12 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   ),
                   buildItem(
                     order: 7,
+                    icon: Icons.email_outlined,
+                    label: 'New Email',
+                    onActivate: () => _openNewEmail(parentContext),
+                  ),
+                  buildItem(
+                    order: 8,
                     icon: Icons.settings_outlined,
                     label: 'Settings',
                     onActivate: () => Actions.invoke(parentContext, const OpenSettingsIntent()),
@@ -1127,6 +1145,21 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
         builder: (context) => TitleBarWrapper(child: const BulkMessageScreen()),
+      ),
+    );
+  }
+
+  void _openNewEmail(BuildContext context) {
+    if (!CRMConfig.crmEnabled || !CRMSupabaseService().isInitialized) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('CRM Supabase is not configured.')),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(child: const BulkEmailScreen()),
       ),
     );
   }
