@@ -28,7 +28,8 @@ function ensure_flutter() {
 
 ensure_flutter
 
-export PATH="$FLUTTER_ROOT/bin:$PATH"
+export PATH="$FLUTTER_ROOT/bin:$FLUTTER_ROOT/bin/cache/dart-sdk/bin:$PATH"
+command -v flutter >/dev/null || { echo "Flutter SDK missing"; exit 1; }
 
 function write_flutter_env() {
   local env_file=".env"
