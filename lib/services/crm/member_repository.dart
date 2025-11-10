@@ -89,10 +89,8 @@ class MemberRepository {
 
     try {
       final selection = _resolveColumnSelection(columns);
-      var query = _readClient.from('members').select(selection);
-
-      query = _applyMemberFilters(
-        query,
+      final baseQuery = _applyMemberFilters(
+        _readClient.from('members').select(selection),
         county: county,
         congressionalDistrict: congressionalDistrict,
         committees: committees,
@@ -107,27 +105,40 @@ class MemberRepository {
         searchQuery: searchQuery,
       );
 
-      query = query.order('name', ascending: true).order('id', ascending: true);
+      var query =
+          baseQuery.order('name', ascending: true).order('id', ascending: true);
 
-      if (limit != null && limit > 0) {
-        query = query.limit(limit);
-      }
+      final hasLimit = limit != null && limit > 0;
+      final hasOffset = offset != null && offset > 0;
+      final limitValue = hasLimit ? limit! : null;
+      final offsetValue = hasOffset ? offset! : null;
+      final applyOffsetInMemory = hasOffset && !hasLimit;
 
-      if (offset != null && offset > 0) {
-        query = query.offset(offset);
+      if (hasLimit && hasOffset) {
+        final start = offsetValue!;
+        final end = start + limitValue! - 1;
+        query = query.range(start, end);
+      } else if (hasLimit) {
+        query = query.limit(limitValue!);
       }
 
       if (fetchTotalCount) {
         final response = await query.count(CountOption.exact);
         final data = _coerceList(response.data);
-        final members = _mapMembers(data);
+        var members = _mapMembers(data);
+        if (applyOffsetInMemory && offsetValue != null) {
+          members = members.skip(offsetValue).toList();
+        }
         final totalCount = response.count ?? members.length;
         return MemberFetchResult(members: members, totalCount: totalCount);
       }
 
       final data = await query;
       final list = _coerceList(data);
-      final members = _mapMembers(list);
+      var members = _mapMembers(list);
+      if (applyOffsetInMemory && offsetValue != null) {
+        members = members.skip(offsetValue).toList();
+      }
       return MemberFetchResult(members: members);
     } catch (e) {
       print('❌ Error fetching members: $e');
@@ -143,8 +154,8 @@ class MemberRepository {
     return selection.join(',');
   }
 
-  PostgrestFilterBuilder<dynamic> _applyMemberFilters(
-    PostgrestFilterBuilder<dynamic> query, {
+  PostgrestFilterBuilder<T> _applyMemberFilters<T>(
+    PostgrestFilterBuilder<T> query, {
     String? county,
     String? congressionalDistrict,
     List<String>? committees,
@@ -195,7 +206,7 @@ class MemberRepository {
     }
 
     if (minAge != null || maxAge != null) {
-      query = _applyAgeFilters(query, minAge: minAge, maxAge: maxAge);
+      query = _applyAgeFilters<T>(query, minAge: minAge, maxAge: maxAge);
     }
 
     final trimmedQuery = searchQuery?.trim();
@@ -222,8 +233,8 @@ class MemberRepository {
     return query;
   }
 
-  PostgrestFilterBuilder<dynamic> _applyAgeFilters(
-    PostgrestFilterBuilder<dynamic> query, {
+  PostgrestFilterBuilder<T> _applyAgeFilters<T>(
+    PostgrestFilterBuilder<T> query, {
     int? minAge,
     int? maxAge,
   }) {
