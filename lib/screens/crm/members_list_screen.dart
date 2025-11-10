@@ -8,10 +8,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/services/crm/chapter_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
+import 'bulk_email_screen.dart';
 import 'bulk_message_screen.dart';
 import 'chapter_detail_screen.dart';
 import 'member_detail_screen.dart';
@@ -155,6 +157,18 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   bool get _showingChapters => widget.showChaptersOnly || _activeView == 1;
+
+  MessageFilter _buildCurrentMessageFilter() {
+    return MessageFilter(
+      county: _selectedCounty,
+      congressionalDistrict: _selectedDistrict,
+      committees: _selectedCommittees,
+      chapterName: _selectedChapter,
+      minAge: _minAgeFilter,
+      maxAge: _maxAgeFilter,
+      excludeOptedOut: _contactFilter == 'opted_out' ? false : true,
+    );
+  }
 
   Future<void> _loadData({bool refreshMetadata = false, bool includeMetadata = true}) async {
     if (!_crmReady) {
@@ -1185,6 +1199,22 @@ class _MembersListScreenState extends State<MembersListScreen> {
             onPressed: _crmReady ? () => _refreshAll() : null,
             tooltip: 'Refresh',
           ),
+          if (CRMConfig.bulkMessagingEnabled)
+            IconButton(
+              icon: const Icon(Icons.email_outlined),
+              onPressed: _crmReady
+                  ? () {
+                      final filter = _buildCurrentMessageFilter();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BulkEmailScreen(initialFilter: filter),
+                        ),
+                      );
+                    }
+                  : null,
+              tooltip: 'Bulk Email',
+            ),
           if (CRMConfig.bulkMessagingEnabled)
             IconButton(
               icon: const Icon(Icons.message),

@@ -7,6 +7,7 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/editors/member_edit_sheet.dart';
+import 'package:bluebubbles/services/crm/crm_email_service.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
@@ -40,6 +41,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final MemberRepository _memberRepo = MemberRepository();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
   final CRMMessageService _messageService = CRMMessageService.instance;
+  final CRMEmailService _emailService = CRMEmailService.instance;
   final MeetingRepository _meetingRepository = MeetingRepository();
   final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
   late Member _member;
@@ -47,6 +49,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final TextEditingController _reportNotesController = TextEditingController();
   bool _editingNotes = false;
   bool _sendingIntro = false;
+  bool _sendingEmail = false;
   bool _loadingAttendance = false;
   bool _hasLoadedAttendance = false;
   String? _attendanceError;
@@ -62,6 +65,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   static const String _reportsBucket = 'member-documents';
 
   bool get _crmReady => _supabaseService.isInitialized;
+
+  bool get _hasEmailRecipient {
+    final email = _member.preferredEmail;
+    return email != null && email.trim().isNotEmpty;
+  }
 
   static const Map<String, List<Color>> _sectionPalette = {
     'Contact Information': [Color(0xFF0052D4), Color(0xFF65C7F7)],
@@ -675,6 +683,192 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
   }
 
+  Future<void> _composeEmail() async {
+    final email = _member.preferredEmail?.trim();
+    if (email == null || email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No email address available')),
+      );
+      return;
+    }
+
+    final subjectController = TextEditingController();
+    final htmlController = TextEditingController();
+    final textController = TextEditingController();
+
+    String? errorMessage;
+    bool sending = false;
+
+    bool? result;
+    try {
+      result = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              void updateState() => setDialogState(() {});
+
+              Future<void> submit() async {
+                final subject = subjectController.text.trim();
+                final htmlBody = htmlController.text.trim();
+                final textBody = textController.text.trim();
+
+                if (subject.isEmpty || htmlBody.isEmpty || sending) {
+                  return;
+                }
+
+                setDialogState(() {
+                  sending = true;
+                  errorMessage = null;
+                });
+                setState(() => _sendingEmail = true);
+
+                try {
+                  await _emailService.sendEmail(
+                    to: [email],
+                    subject: subject,
+                    htmlBody: htmlBody,
+                    textBody: textBody.isEmpty ? null : textBody,
+                  );
+                  if (context.mounted) {
+                    Navigator.of(context).pop(true);
+                  }
+                } catch (error) {
+                  final message = error is CRMEmailException
+                      ? error.message
+                      : 'Failed to send email: $error';
+                  if (context.mounted) {
+                    setDialogState(() {
+                      sending = false;
+                      errorMessage = message;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(message)),
+                    );
+                  }
+                } finally {
+                  if (mounted) {
+                    setState(() => _sendingEmail = false);
+                  } else {
+                    _sendingEmail = false;
+                  }
+                }
+              }
+
+              final canSend = !sending &&
+                  subjectController.text.trim().isNotEmpty &&
+                  htmlController.text.trim().isNotEmpty;
+
+              return AlertDialog(
+                title: const Text('Compose Email'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'To: $email',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Theme.of(context).hintColor),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        key: const ValueKey('crm_email_subject_field'),
+                        controller: subjectController,
+                        decoration: const InputDecoration(
+                          labelText: 'Subject',
+                          border: OutlineInputBorder(),
+                        ),
+                        autofocus: true,
+                        onChanged: (_) => updateState(),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        key: const ValueKey('crm_email_html_field'),
+                        controller: htmlController,
+                        maxLines: 8,
+                        decoration: const InputDecoration(
+                          labelText: 'HTML Body',
+                          hintText: '<p>Welcome to the team!</p>',
+                          border: OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                        ),
+                        onChanged: (_) => updateState(),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        key: const ValueKey('crm_email_text_field'),
+                        controller: textController,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Plain-text fallback (optional)',
+                          border: OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      if (errorMessage != null) ...[
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            errorMessage!,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: Theme.of(context).colorScheme.error),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: sending
+                        ? null
+                        : () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: canSend ? submit : null,
+                    child: sending
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2.2),
+                          )
+                        : const Text('Send Email'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      subjectController.dispose();
+      htmlController.dispose();
+      textController.dispose();
+    }
+
+    if (result == true) {
+      await _memberRepo.updateLastContacted(_member.id);
+      if (!mounted) return;
+      final now = DateTime.now();
+      final updated = _member.copyWith(lastContacted: now);
+      setState(() => _member = updated);
+      _memberLookup.cacheMember(updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Email sent to ${_member.name}')),
+      );
+    }
+  }
+
   Future<void> _sendIntro() async {
     if (!_crmReady || !_member.canContact || _sendingIntro) return;
 
@@ -775,6 +969,23 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             icon: const Icon(Icons.message),
             onPressed: _member.canContact ? _startChat : null,
             tooltip: 'Start Chat',
+          ),
+          IconButton(
+            icon: _sendingEmail
+                ? SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  )
+                : const Icon(Icons.email_outlined),
+            onPressed:
+                !_crmReady || _sendingEmail || !_hasEmailRecipient ? null : _composeEmail,
+            tooltip: 'Send Email',
           ),
           IconButton(
             icon: const Icon(Icons.auto_awesome),
