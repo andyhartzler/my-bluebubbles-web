@@ -64,7 +64,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Documents'), findsOneWidget);
+      expect(find.text('Misc Documents'), findsOneWidget);
       expect(find.text('Guides'), findsOneWidget);
       expect(find.text('Member Roster'), findsOneWidget);
       expect(find.text('Field Script'), findsOneWidget);

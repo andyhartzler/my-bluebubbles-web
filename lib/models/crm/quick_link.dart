@@ -11,6 +11,7 @@ class QuickLink {
     this.iconUrl,
     this.storageBucket,
     this.storagePath,
+    this.storageUrl,
     this.fileName,
     this.contentType,
     this.fileSize,
@@ -45,6 +46,7 @@ class QuickLink {
       iconUrl: json['icon_url']?.toString(),
       storageBucket: json['storage_bucket']?.toString(),
       storagePath: json['storage_path']?.toString(),
+      storageUrl: json['storage_url']?.toString(),
       fileName: json['file_name']?.toString(),
       contentType: json['content_type']?.toString(),
       fileSize: _parseInt(json['file_size']),
@@ -66,6 +68,7 @@ class QuickLink {
   final String? iconUrl;
   final String? storageBucket;
   final String? storagePath;
+  final String? storageUrl;
   final String? fileName;
   final String? contentType;
   final int? fileSize;
@@ -90,6 +93,9 @@ class QuickLink {
     if (hasExternalUrl) {
       return externalUrl!.trim();
     }
+    if ((storageUrl ?? '').trim().isNotEmpty) {
+      return storageUrl!.trim();
+    }
     if ((signedUrl ?? '').isNotEmpty) {
       return signedUrl;
     }
@@ -105,6 +111,7 @@ class QuickLink {
     String? iconUrl,
     String? storageBucket,
     String? storagePath,
+    String? storageUrl,
     String? fileName,
     String? contentType,
     int? fileSize,
@@ -126,6 +133,7 @@ class QuickLink {
       iconUrl: iconUrl ?? this.iconUrl,
       storageBucket: clearStorage ? null : storageBucket ?? this.storageBucket,
       storagePath: clearStorage ? null : storagePath ?? this.storagePath,
+      storageUrl: clearStorage ? null : storageUrl ?? this.storageUrl,
       fileName: clearStorage ? null : fileName ?? this.fileName,
       contentType: clearStorage ? null : contentType ?? this.contentType,
       fileSize: clearStorage ? null : fileSize ?? this.fileSize,
@@ -149,6 +157,7 @@ class QuickLink {
       if (iconUrl != null) 'icon_url': iconUrl,
       if (storageBucket != null) 'storage_bucket': storageBucket,
       if (storagePath != null) 'storage_path': storagePath,
+      if (storageUrl != null) 'storage_url': storageUrl,
       if (fileName != null) 'file_name': fileName,
       if (contentType != null) 'content_type': contentType,
       if (fileSize != null) 'file_size': fileSize,
