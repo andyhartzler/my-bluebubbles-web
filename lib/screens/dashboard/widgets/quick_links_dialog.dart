@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -563,49 +565,63 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         children: [
           _buildSectionHeader('Social Media', theme),
           const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final entry in links.asMap().entries)
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      right: entry.key == links.length - 1 ? 0 : 16,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const spacing = 16.0;
+              final maxWidth = constraints.maxWidth.isFinite
+                  ? constraints.maxWidth
+                  : 600.0;
+              const desiredTileWidth = 160.0;
+              final columns = math.max(
+                1,
+                ((maxWidth + spacing) / (desiredTileWidth + spacing)).floor(),
+              );
+              final rawTileWidth =
+                  (maxWidth - (columns - 1) * spacing) / columns;
+              final tileWidth = math.min(
+                maxWidth,
+                math.max(120.0, rawTileWidth),
+              );
+
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  for (final link in links)
+                    SizedBox(
+                      width: tileWidth,
+                      child: _buildSocialLinkTile(link),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Tooltip(
-                          message: entry.value.title,
-                          child: InkWell(
-                            onTap: () => _openLink(entry.value),
-                            onLongPress: () => _manageLink(entry.value),
-                            onSecondaryTap: () => _manageLink(entry.value),
-                            borderRadius: BorderRadius.circular(32),
-                            child: _buildLinkAvatar(entry.value, size: 56),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        TextButton.icon(
-                          style: TextButton.styleFrom(
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          onPressed: entry.value.resolvedUrl == null
-                              ? null
-                              : () => _copyLink(entry.value),
-                          icon: const Icon(Icons.copy, size: 18),
-                          label: const Text('Copy link'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
+                ],
+              );
+            },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSocialLinkTile(QuickLink link) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Tooltip(
+          message: link.title,
+          child: InkWell(
+            onTap: () => _openLink(link),
+            onLongPress: () => _manageLink(link),
+            onSecondaryTap: () => _manageLink(link),
+            borderRadius: BorderRadius.circular(32),
+            child: _buildLinkAvatar(link, size: 56),
+          ),
+        ),
+        const SizedBox(height: 6),
+        _QuickLinkCopyIconButton(
+          onPressed:
+              link.resolvedUrl == null ? null : () => _copyLink(link),
+        ),
+      ],
     );
   }
 
@@ -725,10 +741,8 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'Copy link',
+          _QuickLinkCopyIconButton(
             onPressed: url == null ? null : () => _copyLink(link),
-            icon: const Icon(Icons.copy),
           ),
           _QuickLinkOverflowMenu(
             link: link,
@@ -887,9 +901,7 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                     onPressed: () => _openLink(link),
                   ),
                 if (url != null)
-                  _QuickLinkActionButton(
-                    label: 'Copy link',
-                    icon: Icons.copy,
+                  _QuickLinkCopyIconButton(
                     onPressed: () => _copyLink(link),
                   ),
                 if (pdfUri != null)
@@ -939,6 +951,29 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
 
     return Uri.tryParse(
       'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/quick-access-files/$overridePath',
+    );
+  }
+}
+
+class _QuickLinkCopyIconButton extends StatelessWidget {
+  const _QuickLinkCopyIconButton({
+    this.onPressed,
+    this.tooltip = 'Copy link',
+  });
+
+  final VoidCallback? onPressed;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.filledTonal(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: const Icon(Icons.copy),
+      style: IconButton.styleFrom(
+        padding: const EdgeInsets.all(12),
+        minimumSize: const Size(44, 44),
+      ),
     );
   }
 }
