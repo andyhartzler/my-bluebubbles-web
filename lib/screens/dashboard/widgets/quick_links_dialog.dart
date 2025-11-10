@@ -117,6 +117,11 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   }
 
   Uri? _resolvePublicFileUri(QuickLink link) {
+    final directUrl = link.storageUrl?.trim();
+    if (directUrl != null && directUrl.isNotEmpty) {
+      return Uri.tryParse(directUrl);
+    }
+
     if (!link.hasStorageReference) {
       return null;
     }
@@ -456,25 +461,40 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
       );
     }
 
+    int sortByOrder(QuickLink a, QuickLink b) {
+      final orderCompare = (a.sortOrder ?? 1 << 20).compareTo(b.sortOrder ?? 1 << 20);
+      if (orderCompare != 0) {
+        return orderCompare;
+      }
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    }
+
     final socialMedia = _links
         .where((link) {
           final normalized = link.normalizedCategory;
           return normalized == 'social_media' || normalized == 'social media';
         })
-        .toList();
+        .toList()
+      ..sort(sortByOrder);
     final websites = _links
         .where((link) => const {'website', 'websites'}.contains(link.normalizedCategory))
-        .toList();
-    final documents = _links
-        .where((link) =>
-            const {'documents', 'document', 'governing_documents'}
-                .contains(link.normalizedCategory))
-        .toList();
+        .toList()
+      ..sort(sortByOrder);
+    final governingDocuments = _links
+        .where((link) => link.normalizedCategory == 'governing_documents')
+        .toList()
+      ..sort(sortByOrder);
+    final miscDocuments = _links
+        .where((link) => const {'documents', 'document'}
+            .contains(link.normalizedCategory))
+        .toList()
+      ..sort(sortByOrder);
 
     final handledIds = <String>{
       ...socialMedia.map((link) => link.id),
       ...websites.map((link) => link.id),
-      ...documents.map((link) => link.id),
+      ...governingDocuments.map((link) => link.id),
+      ...miscDocuments.map((link) => link.id),
     };
 
     final remaining = _links
@@ -507,8 +527,18 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
             _buildSocialMediaSection(socialMedia, theme),
           if (websites.isNotEmpty)
             _buildWebsitesSection(websites, theme),
-          if (documents.isNotEmpty)
-            _buildDocumentsSection(documents, theme),
+          if (governingDocuments.isNotEmpty)
+            _buildDocumentsSection(
+              governingDocuments,
+              theme,
+              title: 'Governing Documents',
+            ),
+          if (miscDocuments.isNotEmpty)
+            _buildDocumentsSection(
+              miscDocuments,
+              theme,
+              title: 'Misc Documents',
+            ),
           for (final entry in otherSections)
             _buildGenericSection(entry.key, entry.value, theme),
         ],
@@ -533,17 +563,18 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         children: [
           _buildSectionHeader('Social Media', theme),
           const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final entry in links.asMap().entries) ...[
-                  if (entry.key > 0) const SizedBox(width: 24),
-                  SizedBox(
-                    width: 160,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final entry in links.asMap().entries)
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: entry.key == links.length - 1 ? 0 : 16,
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         Tooltip(
                           message: entry.value.title,
@@ -557,6 +588,10 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                         ),
                         const SizedBox(height: 6),
                         TextButton.icon(
+                          style: TextButton.styleFrom(
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          ),
                           onPressed: entry.value.resolvedUrl == null
                               ? null
                               : () => _copyLink(entry.value),
@@ -566,9 +601,8 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                       ],
                     ),
                   ),
-                ],
-              ],
-            ),
+                ),
+            ],
           ),
         ],
       ),
@@ -583,9 +617,9 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
       case 'forms':
         return 'Forms';
       case 'documents':
-        return 'Documents';
+        return 'Misc Documents';
       case 'document':
-        return 'Documents';
+        return 'Misc Documents';
       case 'governing_documents':
         return 'Governing Documents';
       case 'websites':
@@ -623,13 +657,17 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
     );
   }
 
-  Widget _buildDocumentsSection(List<QuickLink> links, ThemeData theme) {
+  Widget _buildDocumentsSection(
+    List<QuickLink> links,
+    ThemeData theme, {
+    String title = 'Governing Documents',
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader('Governing Documents', theme),
+          _buildSectionHeader(title, theme),
           const SizedBox(height: 12),
           ...links.map((link) => _buildDocumentRow(link, theme)),
         ],
@@ -1057,9 +1095,9 @@ class _QuickLinkFormDialog extends StatefulWidget {
 }
 
 class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
-  static const _categoryOptions = <_CategoryOption>[
+  static const _baseCategoryOptions = <_CategoryOption>[
     _CategoryOption(value: 'forms', label: 'Forms'),
-    _CategoryOption(value: 'documents', label: 'Documents'),
+    _CategoryOption(value: 'documents', label: 'Misc Documents'),
     _CategoryOption(value: 'websites', label: 'Websites'),
     _CategoryOption(value: 'social_media', label: 'Social Media'),
     _CategoryOption(value: 'other', label: 'Other'),
@@ -1075,6 +1113,20 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
   String? _selectedCategory;
 
   QuickLink? get existing => widget.existing;
+
+  List<_CategoryOption> get _categoryOptions {
+    if (existing?.normalizedCategory == 'governing_documents') {
+      return const [
+        _CategoryOption(value: 'forms', label: 'Forms'),
+        _CategoryOption(value: 'governing_documents', label: 'Governing Documents'),
+        _CategoryOption(value: 'documents', label: 'Misc Documents'),
+        _CategoryOption(value: 'websites', label: 'Websites'),
+        _CategoryOption(value: 'social_media', label: 'Social Media'),
+        _CategoryOption(value: 'other', label: 'Other'),
+      ];
+    }
+    return _baseCategoryOptions;
+  }
 
   @override
   void initState() {
@@ -1144,8 +1196,11 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
     final normalized = raw.trim().toLowerCase();
     if (normalized.isEmpty) return null;
     if (normalized == 'forms') return 'forms';
-    if (normalized == 'documents' || normalized == 'document' || normalized == 'governing_documents') {
+    if (normalized == 'documents' || normalized == 'document') {
       return 'documents';
+    }
+    if (normalized == 'governing_documents') {
+      return 'governing_documents';
     }
     if (normalized == 'websites' || normalized == 'website') return 'websites';
     if (normalized == 'social_media' || normalized == 'social media') {

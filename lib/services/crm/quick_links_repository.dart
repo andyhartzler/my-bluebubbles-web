@@ -6,6 +6,7 @@ import 'package:postgrest/postgrest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:universal_io/io.dart' as io;
 
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/quick_link.dart';
 
@@ -293,9 +294,12 @@ class QuickLinksRepository {
       contentType,
     );
 
+    final publicUrl = _buildPublicUrl(storageBucket, path);
+
     return {
       'storage_bucket': storageBucket,
       'storage_path': path,
+      if (publicUrl != null) 'storage_url': publicUrl,
       'file_name': file.name,
       'content_type': contentType,
       'file_size': bytes.length,
@@ -391,11 +395,49 @@ class QuickLinksRepository {
     return {
       'storage_bucket': null,
       'storage_path': null,
+      'storage_url': null,
       'file_name': null,
       'content_type': null,
       'file_size': null,
       'last_uploaded_at': null,
     };
+  }
+
+  String? _buildPublicUrl(String bucket, String path) {
+    try {
+      final url = _writeClient.storage.from(bucket).getPublicUrl(path);
+      if (url.isNotEmpty) {
+        return url;
+      }
+    } catch (_) {}
+
+    final supabaseUrl = CRMConfig.supabaseUrl;
+    if (supabaseUrl.isEmpty) {
+      return null;
+    }
+
+    final baseUri = Uri.tryParse(supabaseUrl);
+    if (baseUri == null) {
+      return null;
+    }
+
+    final segments = <String>[
+      ...baseUri.pathSegments.where((segment) => segment.isNotEmpty),
+      'storage',
+      'v1',
+      'object',
+      'public',
+      bucket,
+      ...path.split('/').where((segment) => segment.isNotEmpty),
+    ];
+
+    return Uri(
+      scheme: baseUri.scheme,
+      userInfo: baseUri.userInfo,
+      host: baseUri.host,
+      port: baseUri.hasPort ? baseUri.port : null,
+      pathSegments: segments,
+    ).toString();
   }
 
   Future<Uint8List> _resolveFileBytes(PlatformFile file) async {
