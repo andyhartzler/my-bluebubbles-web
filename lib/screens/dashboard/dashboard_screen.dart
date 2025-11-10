@@ -11,8 +11,10 @@ import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
+import 'package:bluebubbles/services/crm/quick_links_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/screens/dashboard/widgets/quick_links_dialog.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -24,6 +26,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final MemberRepository _memberRepo = MemberRepository();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
+  final QuickLinksRepository _quickLinksRepo = QuickLinksRepository();
 
   _DashboardData? _data;
   bool _loading = true;
@@ -77,6 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final weeklyMessages = await _fetchMessageCount(
         after: DateTime.now().subtract(const Duration(days: 7)),
       );
+      final quickLinksCount = await _quickLinksRepo.countQuickLinks();
 
       setState(() {
         _data = _DashboardData(
@@ -87,6 +91,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           chatCount: chatCount,
           totalMessages: totalMessages,
           weeklyMessages: weeklyMessages,
+          quickLinksCount: quickLinksCount,
           counties: counties,
           districts: districts,
           committees: committees,
@@ -161,6 +166,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openQuickLinks(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => QuickLinksDialog(repository: _quickLinksRepo),
+    );
+    if (mounted) {
+      _load();
+    }
   }
 
   @override
@@ -320,14 +335,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onTap: (context) => _openMembersList(context),
       ),
       _StatCardData(
-        title: 'Opted Out',
-        value: data.optedOutMembers,
-        icon: Icons.block,
-        description: 'Respecting preferences',
-        colors: [Colors.redAccent.shade200, Colors.redAccent.shade400],
-        actionLabel: 'Review opt outs',
-        semanticsLabel: '${data.optedOutMembers} opted out members',
-        onTap: (context) => _openMembersList(context),
+        title: 'Quick Links',
+        value: data.quickLinksCount,
+        icon: Icons.link,
+        description: 'Shared resources ready to launch',
+        colors: [theme.colorScheme.primaryContainer, theme.colorScheme.primary],
+        actionLabel: 'Open quick links',
+        semanticsLabel: '${data.quickLinksCount} quick links available',
+        onTap: (context) => _openQuickLinks(context),
       ),
       _StatCardData(
         title: 'Active Conversations',
@@ -1065,6 +1080,7 @@ class _DashboardData {
   final int chatCount;
   final int totalMessages;
   final int weeklyMessages;
+  final int quickLinksCount;
   final Map<String, int> counties;
   final Map<String, int> districts;
   final Map<String, int> committees;
@@ -1093,6 +1109,7 @@ class _DashboardData {
     required this.chatCount,
     required this.totalMessages,
     required this.weeklyMessages,
+    required this.quickLinksCount,
     required this.counties,
     required this.districts,
     required this.committees,
@@ -1122,6 +1139,7 @@ class _DashboardData {
         chatCount = 0,
         totalMessages = 0,
         weeklyMessages = 0,
+        quickLinksCount = 0,
         counties = const {},
         districts = const {},
         committees = const {},
