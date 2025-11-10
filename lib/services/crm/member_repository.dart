@@ -51,7 +51,7 @@ class MemberRepository {
     'executive_committee',
     'executive_title',
     'executive_role',
-    'executive_role_short:executive_role_small',
+    'executive_role_short',
     'profile_pictures',
     'last_contacted',
     'date_joined',
