@@ -1,5 +1,6 @@
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Member _execMember(
@@ -18,6 +19,32 @@ Member _execMember(
     executiveRole: role,
     executiveRoleShort: roleShort,
   );
+}
+
+Future<void> _pumpMemberListWith(
+  WidgetTester tester,
+  Member member,
+) async {
+  await tester.pumpWidget(
+    const MaterialApp(
+      home: MembersListScreen(embed: true),
+    ),
+  );
+
+  await tester.pump();
+
+  final state = tester.state(find.byType(MembersListScreen)) as dynamic;
+
+  state.setState(() {
+    state._crmReady = true;
+    state._loading = false;
+    state._filteredMembers = <Member>[member];
+    state._agedOutMembers = <Member>[];
+    state._activeView = 0;
+  });
+
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
@@ -143,5 +170,39 @@ void main() {
       members.map((member) => member.name).toList(),
       ['Paula President', 'Vince Vice', 'Daria District'],
     );
+  });
+
+  testWidgets('Executive cards hide chapter leadership details', (tester) async {
+    final member = Member(
+      id: '1',
+      name: 'Erica Executive',
+      executiveCommittee: true,
+      executiveTitle: 'Executive Director',
+      executiveRole: 'Chief Strategist',
+      chapterPosition: 'County Chair',
+      chapterName: 'St. Louis County',
+    );
+
+    await _pumpMemberListWith(tester, member);
+
+    expect(find.text('Executive Director'), findsOneWidget);
+    expect(find.text('Chief Strategist'), findsOneWidget);
+    expect(find.text('County Chair'), findsNothing);
+    expect(find.text('St. Louis County Democrats'), findsNothing);
+  });
+
+  testWidgets('Chapter leaders show position and affiliation when not executive', (tester) async {
+    final member = Member(
+      id: '2',
+      name: 'Chloe Chapter',
+      executiveCommittee: false,
+      chapterPosition: 'County Chair',
+      chapterName: 'St. Louis County',
+    );
+
+    await _pumpMemberListWith(tester, member);
+
+    expect(find.text('County Chair'), findsOneWidget);
+    expect(find.text('St. Louis County Democrats'), findsOneWidget);
   });
 }
