@@ -2,6 +2,8 @@ import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/database/global/platform_file.dart';
@@ -94,18 +96,23 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
     );
   }
 
-  Future<void> _openLink(QuickLink link) async {
-    final url = link.resolvedUrl;
-    if (url == null || url.isEmpty) {
-      _showMessage('No URL available for this quick link.');
+  Future<void> _launchUrlString(String url, {String? errorLabel}) async {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) {
+      _showMessage(errorLabel ?? 'Unable to open link: $url');
       return;
     }
 
-    final uri = Uri.tryParse(url);
-    if (uri == null || (!uri.hasScheme && !uri.isScheme('file'))) {
-      final resolved = Uri.tryParse('https://$url');
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) {
+      _showMessage(errorLabel ?? 'Unable to open link: $trimmed');
+      return;
+    }
+
+    if (!uri.hasScheme && !uri.isScheme('file')) {
+      final resolved = Uri.tryParse('https://$trimmed');
       if (resolved == null) {
-        _showMessage('Unable to open link: $url');
+        _showMessage(errorLabel ?? 'Unable to open link: $trimmed');
         return;
       }
       await launchUrl(resolved, mode: LaunchMode.externalApplication);
@@ -113,6 +120,81 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
     }
 
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openLink(QuickLink link) async {
+    final url = link.resolvedUrl;
+    if (url == null || url.isEmpty) {
+      _showMessage('No URL available for this quick link.');
+      return;
+    }
+
+    await _launchUrlString(url);
+  }
+
+  Future<void> _openExternalLink(QuickLink link) async {
+    final url = link.externalUrl;
+    if (url == null || url.trim().isEmpty) {
+      _showMessage('No external URL available for this quick link.');
+      return;
+    }
+
+    await _launchUrlString(url, errorLabel: 'Unable to open external link');
+  }
+
+  Future<void> _openStoredFile(QuickLink link) async {
+    final storageUrl = _resolveStorageUrl(link);
+    if (storageUrl == null) {
+      _showMessage('No stored file is available for this quick link.');
+      return;
+    }
+
+    await _launchUrlString(storageUrl, errorLabel: 'Unable to open stored file');
+  }
+
+  Future<void> _copyLink(QuickLink link) async {
+    final url = link.resolvedUrl ?? _resolveStorageUrl(link);
+    if (url == null || url.isEmpty) {
+      _showMessage('No link available to copy for "${link.title}".');
+      return;
+    }
+
+    try {
+      await Clipboard.setData(ClipboardData(text: url));
+      _showMessage('Copied link for "${link.title}"');
+    } catch (error) {
+      _showMessage('Failed to copy link: $error');
+    }
+  }
+
+  String? _resolveStorageUrl(QuickLink link) {
+    final signed = link.signedUrl?.trim();
+    if (signed != null && signed.isNotEmpty) {
+      return signed;
+    }
+    if (!link.hasStorageReference || (link.storagePath ?? '').isEmpty) {
+      return null;
+    }
+
+    final path = link.storagePath!.trim();
+    final bucket = link.storageBucket ?? QuickLinksRepository.storageBucket;
+    try {
+      final client = Supabase.instance.client;
+      final base = Uri.parse(client.supabaseUrl);
+      final segments = [
+        ...base.pathSegments.where((segment) => segment.isNotEmpty),
+        'storage',
+        'v1',
+        'object',
+        'public',
+        bucket,
+        ...path.split('/').where((segment) => segment.isNotEmpty),
+      ];
+      final uri = base.replace(pathSegments: segments);
+      return uri.toString();
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _uploadToLink(QuickLink link) async {
@@ -259,6 +341,23 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
     });
   }
 
+  void _handleMenuAction(_QuickLinkMenuAction action, QuickLink link) {
+    switch (action) {
+      case _QuickLinkMenuAction.upload:
+        _uploadToLink(link);
+        break;
+      case _QuickLinkMenuAction.edit:
+        _manageLink(link);
+        break;
+      case _QuickLinkMenuAction.removeFile:
+        _removeFile(link);
+        break;
+      case _QuickLinkMenuAction.delete:
+        _manageLink(link, startInDeleteMode: true);
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -399,9 +498,10 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
             category: entry.key,
             links: entry.value,
             onOpen: _openLink,
-            onUpload: _uploadToLink,
-            onManage: _manageLink,
-            onRemoveFile: _removeFile,
+            onMenuAction: _handleMenuAction,
+            onCopy: _copyLink,
+            onOpenExternal: _openExternalLink,
+            onOpenStorage: _openStoredFile,
           );
         },
       ),
@@ -414,41 +514,341 @@ class _QuickLinkCategorySection extends StatelessWidget {
     required this.category,
     required this.links,
     required this.onOpen,
-    required this.onUpload,
-    required this.onManage,
-    required this.onRemoveFile,
+    required this.onMenuAction,
+    this.onCopy,
+    this.onOpenExternal,
+    this.onOpenStorage,
   });
 
   final String category;
   final List<QuickLink> links;
   final ValueChanged<QuickLink> onOpen;
-  final ValueChanged<QuickLink> onUpload;
-  final QuickLinkManageCallback onManage;
-  final ValueChanged<QuickLink> onRemoveFile;
+  final void Function(_QuickLinkMenuAction, QuickLink) onMenuAction;
+  final ValueChanged<QuickLink>? onCopy;
+  final ValueChanged<QuickLink>? onOpenExternal;
+  final ValueChanged<QuickLink>? onOpenStorage;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final normalized =
+        category.trim().toLowerCase().replaceAll(RegExp(r'[\s-]+'), '_');
+    final displayTitle = normalized == 'documents' ? 'Governing Documents' : category;
+
+    final List<Widget> content;
+    switch (normalized) {
+      case 'social_media':
+        content = [
+          _SocialMediaLinksRow(
+            links: links,
+            onOpen: onOpen,
+            onMenuAction: onMenuAction,
+          ),
+        ];
+        break;
+      case 'websites':
+        content = links
+            .map(
+              (link) => _WebsiteLinkTile(
+                link: link,
+                onOpen: onOpen,
+                onCopy: onCopy,
+                onMenuAction: onMenuAction,
+              ),
+            )
+            .toList();
+        break;
+      case 'documents':
+        content = links
+            .map(
+              (link) => _DocumentLinkTile(
+                link: link,
+                onOpenExternal: onOpenExternal,
+                onOpenStorage: onOpenStorage,
+                onMenuAction: onMenuAction,
+              ),
+            )
+            .toList();
+        break;
+      default:
+        content = links
+            .map(
+              (link) => _QuickLinkTile(
+                link: link,
+                onOpen: onOpen,
+                onMenuAction: onMenuAction,
+              ),
+            )
+            .toList();
+        break;
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            category,
+            displayTitle,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 12),
-          ...links.map((link) => _QuickLinkTile(
-                link: link,
-                onOpen: onOpen,
-                onUpload: onUpload,
-                onManage: onManage,
-                onRemoveFile: onRemoveFile,
-              )),
+          ...content,
         ],
+      ),
+    );
+  }
+}
+
+class _SocialMediaLinksRow extends StatelessWidget {
+  const _SocialMediaLinksRow({
+    required this.links,
+    required this.onOpen,
+    required this.onMenuAction,
+  });
+
+  final List<QuickLink> links;
+  final ValueChanged<QuickLink> onOpen;
+  final void Function(_QuickLinkMenuAction, QuickLink) onMenuAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (int i = 0; i < links.length; i++)
+            Padding(
+              padding: EdgeInsets.only(right: i == links.length - 1 ? 0 : 12),
+              child: _SocialMediaLinkButton(
+                link: links[i],
+                onOpen: onOpen,
+                onMenuAction: onMenuAction,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SocialMediaLinkButton extends StatelessWidget {
+  const _SocialMediaLinkButton({
+    required this.link,
+    required this.onOpen,
+    required this.onMenuAction,
+  });
+
+  final QuickLink link;
+  final ValueChanged<QuickLink> onOpen;
+  final void Function(_QuickLinkMenuAction, QuickLink) onMenuAction;
+
+  bool get _hasUrl => (link.resolvedUrl ?? '').isNotEmpty;
+
+  Future<void> _showContextMenu(BuildContext context, Offset position) async {
+    final size = MediaQuery.of(context).size;
+    final rect = RelativeRect.fromLTRB(
+      position.dx,
+      position.dy,
+      size.width - position.dx,
+      size.height - position.dy,
+    );
+
+    final action = await showMenu<_QuickLinkMenuAction>(
+      context: context,
+      position: rect,
+      items: _buildQuickLinkMenuItems(link),
+    );
+    if (action != null) {
+      onMenuAction(action, link);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onLongPressStart: (details) => _showContextMenu(context, details.globalPosition),
+      onSecondaryTapDown: (details) =>
+          _showContextMenu(context, details.globalPosition),
+      child: Tooltip(
+        message: link.title,
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: _hasUrl ? () => onOpen(link) : null,
+            child: Ink(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(shape: BoxShape.circle),
+              child: _QuickLinkIconAvatar(link: link, size: 56),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WebsiteLinkTile extends StatelessWidget {
+  const _WebsiteLinkTile({
+    required this.link,
+    required this.onOpen,
+    required this.onMenuAction,
+    this.onCopy,
+  });
+
+  final QuickLink link;
+  final ValueChanged<QuickLink> onOpen;
+  final void Function(_QuickLinkMenuAction, QuickLink) onMenuAction;
+  final ValueChanged<QuickLink>? onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasUrl = (link.resolvedUrl ?? '').isNotEmpty;
+    final titleStyle = hasUrl
+        ? theme.textTheme.titleMedium?.copyWith(
+            color: theme.colorScheme.primary,
+            decoration: TextDecoration.underline,
+            decorationColor: theme.colorScheme.primary,
+          )
+        : theme.textTheme.titleMedium;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        onTap: hasUrl ? () => onOpen(link) : null,
+        leading: SizedBox(
+          width: 40,
+          height: 40,
+          child: _QuickLinkIconAvatar(link: link, size: 40),
+        ),
+        title: Text(link.title, style: titleStyle),
+        subtitle: (link.description ?? '').isNotEmpty
+            ? Text(link.description!)
+            : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Copy link',
+              icon: const Icon(Icons.copy),
+              onPressed: hasUrl && onCopy != null ? () => onCopy!(link) : null,
+            ),
+            const SizedBox(width: 4),
+            _QuickLinkOverflowMenu(
+              link: link,
+              onSelected: onMenuAction,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DocumentLinkTile extends StatelessWidget {
+  const _DocumentLinkTile({
+    required this.link,
+    required this.onMenuAction,
+    this.onOpenExternal,
+    this.onOpenStorage,
+  });
+
+  final QuickLink link;
+  final void Function(_QuickLinkMenuAction, QuickLink) onMenuAction;
+  final ValueChanged<QuickLink>? onOpenExternal;
+  final ValueChanged<QuickLink>? onOpenStorage;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasExternal = link.hasExternalUrl;
+    final hasStored = link.hasStorageReference || (link.signedUrl ?? '').isNotEmpty;
+    final actions = <Widget>[
+      OutlinedButton.icon(
+        onPressed: hasExternal && onOpenExternal != null
+            ? () => onOpenExternal!(link)
+            : null,
+        icon: const Icon(Icons.open_in_new),
+        label: const Text('Open Drive'),
+      ),
+      FilledButton.icon(
+        onPressed:
+            hasStored && onOpenStorage != null ? () => onOpenStorage!(link) : null,
+        icon: const Icon(Icons.picture_as_pdf_outlined),
+        label: const Text('Open PDF'),
+      ),
+    ];
+
+    final description = link.description;
+    final fileLabel = link.fileName ?? link.storagePath;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: _QuickLinkIconAvatar(link: link, size: 44),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        link.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if ((description ?? '').isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            description!,
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
+                      if ((fileLabel ?? '').isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            fileLabel!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                _QuickLinkOverflowMenu(
+                  link: link,
+                  onSelected: onMenuAction,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: actions,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -458,21 +858,18 @@ class _QuickLinkTile extends StatelessWidget {
   const _QuickLinkTile({
     required this.link,
     required this.onOpen,
-    required this.onUpload,
-    required this.onManage,
-    required this.onRemoveFile,
+    required this.onMenuAction,
   });
 
   final QuickLink link;
   final ValueChanged<QuickLink> onOpen;
-  final ValueChanged<QuickLink> onUpload;
-  final QuickLinkManageCallback onManage;
-  final ValueChanged<QuickLink> onRemoveFile;
+  final void Function(_QuickLinkMenuAction, QuickLink) onMenuAction;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasUrl = link.resolvedUrl != null;
+    final hasUrl = (link.resolvedUrl ?? '').isNotEmpty;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -481,7 +878,17 @@ class _QuickLinkTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if ((link.iconUrl ?? '').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: _QuickLinkIconAvatar(link: link, size: 44),
+                    ),
+                  ),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,63 +920,20 @@ class _QuickLinkTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    TextButton.icon(
-                      onPressed: hasUrl ? () => onOpen(link) : null,
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text('Open'),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => onUpload(link),
-                      icon: const Icon(Icons.upload_file),
-                      label: const Text('Upload'),
-                    ),
-                    PopupMenuButton<_QuickLinkMenuAction>(
-                      tooltip: 'More actions',
-                      onSelected: (action) {
-                        switch (action) {
-                          case _QuickLinkMenuAction.edit:
-                            onManage(link);
-                            break;
-                          case _QuickLinkMenuAction.removeFile:
-                            onRemoveFile(link);
-                            break;
-                          case _QuickLinkMenuAction.delete:
-                            onManage(link, startInDeleteMode: true);
-                            break;
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: _QuickLinkMenuAction.edit,
-                          child: ListTile(
-                            leading: Icon(Icons.edit),
-                            title: Text('Edit details'),
-                          ),
-                        ),
-                        PopupMenuItem(
-                          enabled: link.hasStorageReference,
-                          value: _QuickLinkMenuAction.removeFile,
-                          child: const ListTile(
-                            leading: Icon(Icons.delete_outline),
-                            title: Text('Remove stored file'),
-                          ),
-                        ),
-                        const PopupMenuDivider(),
-                        const PopupMenuItem(
-                          value: _QuickLinkMenuAction.delete,
-                          child: ListTile(
-                            leading: Icon(Icons.delete_forever),
-                            title: Text('Delete quick link'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                _QuickLinkOverflowMenu(
+                  link: link,
+                  onSelected: onMenuAction,
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: hasUrl ? () => onOpen(link) : null,
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Open'),
+              ),
             ),
           ],
         ),
@@ -578,7 +942,106 @@ class _QuickLinkTile extends StatelessWidget {
   }
 }
 
-enum _QuickLinkMenuAction { edit, removeFile, delete }
+class _QuickLinkOverflowMenu extends StatelessWidget {
+  const _QuickLinkOverflowMenu({
+    required this.link,
+    required this.onSelected,
+  });
+
+  final QuickLink link;
+  final void Function(_QuickLinkMenuAction, QuickLink) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_QuickLinkMenuAction>(
+      tooltip: 'More actions',
+      onSelected: (action) => onSelected(action, link),
+      itemBuilder: (context) => _buildQuickLinkMenuItems(link),
+    );
+  }
+}
+
+class _QuickLinkIconAvatar extends StatelessWidget {
+  const _QuickLinkIconAvatar({
+    required this.link,
+    this.size = 32,
+  });
+
+  final QuickLink link;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final iconUrl = link.iconUrl?.trim();
+    final fallback = Container(
+      width: size,
+      height: size,
+      color: theme.colorScheme.surfaceVariant,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.link,
+        size: size * 0.5,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+
+    if (iconUrl != null && iconUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          iconUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallback,
+        ),
+      );
+    }
+
+    return ClipOval(child: fallback);
+  }
+}
+
+List<PopupMenuEntry<_QuickLinkMenuAction>> _buildQuickLinkMenuItems(QuickLink link) {
+  return [
+    PopupMenuItem(
+      value: _QuickLinkMenuAction.upload,
+      child: ListTile(
+        dense: true,
+        leading: const Icon(Icons.upload_file),
+        title: const Text('Upload file'),
+      ),
+    ),
+    PopupMenuItem(
+      value: _QuickLinkMenuAction.edit,
+      child: ListTile(
+        dense: true,
+        leading: const Icon(Icons.edit),
+        title: const Text('Edit details'),
+      ),
+    ),
+    PopupMenuItem(
+      enabled: link.hasStorageReference,
+      value: _QuickLinkMenuAction.removeFile,
+      child: ListTile(
+        dense: true,
+        leading: const Icon(Icons.delete_outline),
+        title: const Text('Remove stored file'),
+      ),
+    ),
+    const PopupMenuDivider(),
+    PopupMenuItem(
+      value: _QuickLinkMenuAction.delete,
+      child: ListTile(
+        dense: true,
+        leading: const Icon(Icons.delete_forever),
+        title: const Text('Delete quick link'),
+      ),
+    ),
+  ];
+}
+
+enum _QuickLinkMenuAction { upload, edit, removeFile, delete }
 
 class _QuickLinkFormDialog extends StatefulWidget {
   const _QuickLinkFormDialog({
