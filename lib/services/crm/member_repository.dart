@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart'
-    show CountOption, FetchOptions, PostgrestFilterBuilder, PostgrestResponse;
+    show CountOption, PostgrestFilterBuilder, PostgrestResponse;
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
@@ -89,11 +89,7 @@ class MemberRepository {
 
     try {
       final selection = _resolveColumnSelection(columns);
-      final fetchOptions =
-          fetchTotalCount ? const FetchOptions(count: CountOption.exact) : null;
-      var query = _readClient
-          .from('members')
-          .select(selection, fetchOptions: fetchOptions);
+      var query = _readClient.from('members').select(selection);
 
       query = _applyMemberFilters(
         query,
@@ -122,11 +118,11 @@ class MemberRepository {
       }
 
       if (fetchTotalCount) {
-        final PostgrestResponse response = await query.withCount();
-        final data = _coerceList(response);
+        final response = await query.count(CountOption.exact);
+        final data = _coerceList(response.data);
         final members = _mapMembers(data);
-        final total = response.count ?? ((offset ?? 0) + members.length);
-        return MemberFetchResult(members: members, totalCount: total);
+        final totalCount = response.count ?? members.length;
+        return MemberFetchResult(members: members, totalCount: totalCount);
       }
 
       final data = await query;
