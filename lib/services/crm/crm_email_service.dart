@@ -7,7 +7,7 @@ import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:mime_type/mime_type.dart';
+import 'package:mime/mime.dart';
 import 'package:universal_io/io.dart' as io;
 
 /// Exception thrown when the CRM email relay encounters an error.
