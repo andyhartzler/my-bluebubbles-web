@@ -1023,7 +1023,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final hint = _showingChapters
         ? 'Search chapters by name, contact, or status...'
         : 'Search by name, contact, chapter, or committee...';
-    return TextField(
+    final searchField = TextField(
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: const Icon(Icons.search),
@@ -1038,6 +1038,22 @@ class _MembersListScreenState extends State<MembersListScreen> {
         ),
       ),
       onChanged: (value) => _updateFilters(() => _searchQuery = value),
+    );
+
+    if (!widget.embed) {
+      return searchField;
+    }
+
+    return Row(
+      children: [
+        Expanded(child: searchField),
+        const SizedBox(width: 8),
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: _crmReady ? _loadData : null,
+          tooltip: 'Refresh',
+        ),
+      ],
     );
   }
 

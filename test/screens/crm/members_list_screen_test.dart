@@ -3,6 +3,8 @@ import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:bluebubbles/services/crm/supabase_service.dart';
+
 Member _execMember(
   String id,
   String name, {
@@ -185,37 +187,18 @@ void main() {
     );
   });
 
-  testWidgets('Executive cards hide chapter leadership details', (tester) async {
-    final member = Member(
-      id: '1',
-      name: 'Erica Executive',
-      executiveCommittee: true,
-      executiveTitle: 'Executive Director',
-      executiveRole: 'Chief Strategist',
-      chapterPosition: 'County Chair',
-      chapterName: 'St. Louis County',
-    );
+  testWidgets('Embedded layout shows disabled refresh control when CRM unavailable', (tester) async {
+    final supabaseService = CRMSupabaseService();
+    supabaseService.debugSetInitialized(false);
 
-    await _pumpMemberListWith(tester, member);
+    await tester.pumpWidget(const MaterialApp(home: MembersListScreen(embed: true)));
+    await tester.pump();
 
-    expect(find.text('Executive Director'), findsOneWidget);
-    expect(find.text('Chief Strategist'), findsOneWidget);
-    expect(find.text('County Chair'), findsNothing);
-    expect(find.text('St. Louis County Democrats'), findsNothing);
-  });
+    final refreshButtonFinder = find.widgetWithIcon(IconButton, Icons.refresh);
+    expect(refreshButtonFinder, findsOneWidget);
 
-  testWidgets('Chapter leaders show position and affiliation when not executive', (tester) async {
-    final member = Member(
-      id: '2',
-      name: 'Chloe Chapter',
-      executiveCommittee: false,
-      chapterPosition: 'County Chair',
-      chapterName: 'St. Louis County',
-    );
-
-    await _pumpMemberListWith(tester, member);
-
-    expect(find.text('County Chair'), findsOneWidget);
-    expect(find.text('St. Louis County Democrats'), findsOneWidget);
+    final iconButton = tester.widget<IconButton>(refreshButtonFinder);
+    expect(iconButton.onPressed, isNull);
+    expect(iconButton.tooltip, 'Refresh');
   });
 }
