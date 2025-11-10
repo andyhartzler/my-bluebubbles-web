@@ -108,25 +108,37 @@ class MemberRepository {
       var query =
           baseQuery.order('name', ascending: true).order('id', ascending: true);
 
-      if (limit != null && limit > 0) {
-        query = query.limit(limit);
-      }
+      final hasLimit = limit != null && limit > 0;
+      final hasOffset = offset != null && offset > 0;
+      final limitValue = hasLimit ? limit! : null;
+      final offsetValue = hasOffset ? offset! : null;
+      final applyOffsetInMemory = hasOffset && !hasLimit;
 
-      if (offset != null && offset > 0) {
-        query = query.offset(offset);
+      if (hasLimit && hasOffset) {
+        final start = offsetValue!;
+        final end = start + limitValue! - 1;
+        query = query.range(start, end);
+      } else if (hasLimit) {
+        query = query.limit(limitValue!);
       }
 
       if (fetchTotalCount) {
         final response = await query.count(CountOption.exact);
         final data = _coerceList(response.data);
-        final members = _mapMembers(data);
+        var members = _mapMembers(data);
+        if (applyOffsetInMemory && offsetValue != null) {
+          members = members.skip(offsetValue).toList();
+        }
         final totalCount = response.count ?? members.length;
         return MemberFetchResult(members: members, totalCount: totalCount);
       }
 
       final data = await query;
       final list = _coerceList(data);
-      final members = _mapMembers(list);
+      var members = _mapMembers(list);
+      if (applyOffsetInMemory && offsetValue != null) {
+        members = members.skip(offsetValue).toList();
+      }
       return MemberFetchResult(members: members);
     } catch (e) {
       print('❌ Error fetching members: $e');
