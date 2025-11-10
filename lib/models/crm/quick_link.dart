@@ -102,6 +102,7 @@ class QuickLink {
     String? signedUrl,
     DateTime? signedUrlExpiresAt,
     bool clearStorage = false,
+    bool clearIconUrl = false,
   }) {
     return QuickLink(
       id: id ?? this.id,
