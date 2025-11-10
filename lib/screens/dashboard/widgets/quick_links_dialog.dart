@@ -46,6 +46,10 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   static const _documentPdfOverrides = <String, String>{
     'constitution of the missouri young democrats':
         'Constitution%20of%20the%20Missouri%20Young%20Democrats.pdf',
+    'constitution':
+        'Constitution%20of%20the%20Missouri%20Young%20Democrats.pdf',
+    'constitutionofthemissouriyoungdemocrats':
+        'Constitution%20of%20the%20Missouri%20Young%20Democrats.pdf',
     'mocd bylaws': 'MOCD%20Bylaws.pdf',
     'mohsd bylaws': 'MOHSD%20Bylaws.pdf',
   };
@@ -527,37 +531,36 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         children: [
           _buildSectionHeader('Social Media', theme),
           const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final link in links)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Tooltip(
-                          message: link.title,
-                          child: InkWell(
-                            onTap: () => _openLink(link),
-                            onLongPress: () => _manageLink(link),
-                            onSecondaryTap: () => _manageLink(link),
-                            borderRadius: BorderRadius.circular(32),
-                            child: _buildLinkAvatar(link, size: 56),
-                          ),
+          Wrap(
+            spacing: 24,
+            runSpacing: 24,
+            children: [
+              for (final link in links)
+                SizedBox(
+                  width: 160,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Tooltip(
+                        message: link.title,
+                        child: InkWell(
+                          onTap: () => _openLink(link),
+                          onLongPress: () => _manageLink(link),
+                          onSecondaryTap: () => _manageLink(link),
+                          borderRadius: BorderRadius.circular(32),
+                          child: _buildLinkAvatar(link, size: 56),
                         ),
-                        const SizedBox(height: 6),
-                        TextButton.icon(
-                          onPressed: link.resolvedUrl == null ? null : () => _copyLink(link),
-                          icon: const Icon(Icons.copy, size: 18),
-                          label: const Text('Copy link'),
-                        ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextButton.icon(
+                        onPressed: link.resolvedUrl == null ? null : () => _copyLink(link),
+                        icon: const Icon(Icons.copy, size: 18),
+                        label: const Text('Copy link'),
+                      ),
+                    ],
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ],
       ),
@@ -868,9 +871,24 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
     }
 
     final normalizedTitle = link.title.trim().toLowerCase();
-    final overridePath = _documentPdfOverrides[normalizedTitle];
+    const constitutionPdfUrl =
+        'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/quick-access-files/Constitution%20of%20the%20Missouri%20Young%20Democrats.pdf';
+    if (normalizedTitle.contains('constitution') &&
+        normalizedTitle.contains('missouri') &&
+        normalizedTitle.contains('young') &&
+        normalizedTitle.contains('democrat')) {
+      return Uri.tryParse(constitutionPdfUrl);
+    }
+
+    final sanitizedTitle = normalizedTitle.replaceAll(RegExp(r'[^a-z0-9]+'), '');
+    final overridePath = _documentPdfOverrides[normalizedTitle] ??
+        _documentPdfOverrides[sanitizedTitle];
     if (overridePath == null) {
       return null;
+    }
+
+    if (overridePath.startsWith('http')) {
+      return Uri.tryParse(overridePath);
     }
 
     return Uri.tryParse(
