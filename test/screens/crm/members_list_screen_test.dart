@@ -7,12 +7,14 @@ Member _execMember(
   String name, {
   String? role,
   String? roleShort,
+  String? executiveTitle,
   bool executive = true,
 }) {
   return Member(
     id: id,
     name: name,
     executiveCommittee: executive,
+    executiveTitle: executiveTitle,
     executiveRole: role,
     executiveRoleShort: roleShort,
   );
@@ -125,6 +127,21 @@ void main() {
     expect(
       members.map((member) => member.name).toList(),
       ['Carla Communications', 'Colin Communications', 'Polly Political'],
+    );
+  });
+
+  test('Executive comparator prioritizes executive titles without role fields', () {
+    final members = <Member>[
+      _execMember('1', 'Daria District', role: 'District 3 Representative'),
+      _execMember('2', 'Paula President', executiveTitle: 'President'),
+      _execMember('3', 'Vince Vice', executiveTitle: 'Vice President'),
+    ];
+
+    members.sort(MembersListScreen.compareMembersForTesting);
+
+    expect(
+      members.map((member) => member.name).toList(),
+      ['Paula President', 'Vince Vice', 'Daria District'],
     );
   });
 }
