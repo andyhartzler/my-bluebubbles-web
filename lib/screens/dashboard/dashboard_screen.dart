@@ -432,12 +432,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       _StatCardData(
         title: 'Quick Links',
-        value: data.quickLinksCount,
+        value: null,
         icon: Icons.link,
-        description: 'Shared resources ready to launch',
+        description: 'Launch shared resources in a single tap',
         colors: [theme.colorScheme.primaryContainer, theme.colorScheme.primary],
         actionLabel: 'Open quick links',
-        semanticsLabel: '${data.quickLinksCount} quick links available',
+        semanticsLabel: 'Quick links card. Open shared resources.',
         onTap: (context) => _openQuickLinks(context),
       ),
       _StatCardData(
@@ -1286,7 +1286,7 @@ class _DashboardData {
 
 class _StatCardData {
   final String title;
-  final int value;
+  final int? value;
   final IconData icon;
   final String description;
   final List<Color> colors;
@@ -1325,7 +1325,8 @@ class _StatCard extends StatelessWidget {
 
     return Semantics(
       button: onTap != null,
-      label: semanticsLabel ?? '${data.value} ${data.title}',
+      label: semanticsLabel ??
+          (data.value != null ? '${data.value} ${data.title}' : data.title),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
@@ -1377,8 +1378,11 @@ class _StatCard extends StatelessWidget {
                     const SizedBox(height: 16),
                     Text(data.title, style: titleStyle),
                     const SizedBox(height: 8),
-                    Text(data.value.toString(), style: valueStyle),
-                    const SizedBox(height: 6),
+                    if (data.value != null) ...[
+                      Text(data.value.toString(), style: valueStyle),
+                      const SizedBox(height: 6),
+                    ] else
+                      const SizedBox(height: 4),
                     Text(data.description, style: bodyStyle),
                     const Spacer(),
                     if (onTap != null)
