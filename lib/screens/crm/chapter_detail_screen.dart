@@ -14,6 +14,7 @@ import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 
 import 'editors/chapter_edit_sheet.dart';
+import 'bulk_email_screen.dart';
 import 'bulk_message_screen.dart';
 import 'member_detail_screen.dart';
 
@@ -37,6 +38,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   List<ChapterDocument> _documents = [];
   late Chapter _chapter;
   bool _openingBulkMessage = false;
+  bool _openingBulkEmail = false;
   bool _sendingIntro = false;
   bool _uploadingDocument = false;
 
@@ -181,6 +183,42 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
         setState(() => _openingBulkMessage = false);
       } else {
         _openingBulkMessage = false;
+      }
+    }
+  }
+
+  Future<void> _handleEmailChapter() async {
+    if (!_crmReady || _openingBulkEmail) return;
+
+    final filter = MessageFilter(chapterName: _chapter.chapterName);
+    final hasMemberEmails = _members.any(
+      (member) => member.preferredEmail != null && member.preferredEmail!.trim().isNotEmpty,
+    );
+    final manualEmails = <String>[];
+
+    if (!hasMemberEmails) {
+      final fallback = _chapter.contactEmail?.trim();
+      if (fallback != null && fallback.isNotEmpty) {
+        manualEmails.add(fallback);
+      }
+    }
+
+    setState(() => _openingBulkEmail = true);
+
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BulkEmailScreen(
+            initialFilter: filter,
+            initialManualEmails: manualEmails.isEmpty ? null : manualEmails,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _openingBulkEmail = false);
+      } else {
+        _openingBulkEmail = false;
       }
     }
   }
@@ -606,6 +644,11 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                   icon: const Icon(Icons.sms_outlined),
                   label: const Text('Send Message to Chapter'),
                   onPressed: _openingBulkMessage ? null : _handleSendMessageToChapter,
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.email_outlined),
+                  label: const Text('Email Chapter'),
+                  onPressed: _openingBulkEmail ? null : _handleEmailChapter,
                 ),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.campaign_outlined),
