@@ -148,62 +148,6 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   Future<void> _openLink(QuickLink link, {String? errorLabel}) async {
     final url = link.resolvedUrl;
     if (url == null || url.isEmpty) {
-      _showMessage('No URL available to copy.');
-      return;
-    }
-    await Clipboard.setData(ClipboardData(text: url));
-    _showMessage('Copied link to clipboard.');
-  }
-
-  Uri? _resolvePublicFileUri(QuickLink link) {
-    if (!link.hasStorageReference) {
-      return null;
-    }
-
-    final supabaseUrl = CRMConfig.supabaseUrl;
-    if (supabaseUrl.isEmpty) {
-      return null;
-    }
-
-    final baseUri = Uri.tryParse(supabaseUrl);
-    final path = link.storagePath;
-    if (baseUri == null || path == null || path.isEmpty) {
-      return null;
-    }
-
-    final bucket = link.storageBucket ?? QuickLinksRepository.storageBucket;
-    final segments = <String>[
-      ...baseUri.pathSegments,
-      'storage',
-      'v1',
-      'object',
-      'public',
-      bucket,
-      ...path.split('/').where((segment) => segment.isNotEmpty),
-    ];
-
-    return Uri(
-      scheme: baseUri.scheme,
-      userInfo: baseUri.userInfo,
-      host: baseUri.host,
-      port: baseUri.hasPort ? baseUri.port : null,
-      pathSegments: segments,
-    );
-  }
-
-  Future<void> _openUri(Uri uri) async {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
-  Future<void> _openLink(QuickLink link, {String? errorLabel}) async {
-    final url = link.resolvedUrl;
-    if (url == null || url.isEmpty) {
-      _showMessage('No URL available for this quick link.');
-      return;
-    }
-
-    final trimmed = url.trim();
-    if (trimmed.isEmpty) {
       _showMessage('No URL available for this quick link.');
       return;
     }
@@ -805,8 +749,8 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                   onUploadFile: _uploadToLink,
                   onRemoveFile: _removeFile,
                 ),
-              ),
-            ],
+              ],
+            ),
             if (link.hasStorageReference) ...[
               const SizedBox(height: 8),
               Text(
@@ -816,31 +760,6 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                 ),
               ),
             ],
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                if (url != null)
-                  _QuickLinkActionButton(
-                    label: 'Open link',
-                    icon: Icons.open_in_new,
-                    onPressed: () => _openLink(link),
-                  ),
-                if (url != null)
-                  _QuickLinkActionButton(
-                    label: 'Copy link',
-                    icon: Icons.copy,
-                    onPressed: () => _copyLink(link),
-                  ),
-                if (pdfUri != null)
-                  _QuickLinkActionButton(
-                    label: 'View PDF',
-                    icon: Icons.picture_as_pdf_outlined,
-                    onPressed: () => _openUri(pdfUri),
-                  ),
-              ],
-            ),
             if (description != null && description.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(description, style: theme.textTheme.bodyMedium),
@@ -851,15 +770,6 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                 notes,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onBackground.withOpacity(0.7),
-                ),
-              ),
-            ],
-            if (link.hasStorageReference) ...[
-              const SizedBox(height: 8),
-              Text(
-                link.fileName ?? link.storagePath!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.primary,
                 ),
               ),
             ],
