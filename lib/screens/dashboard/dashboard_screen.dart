@@ -75,7 +75,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         memberStats['contactable'],
         totalMembers - optedOutMembers,
       );
-      final quickLinksCount = await _quickLinksRepo.countQuickLinks();
       final withPhoneMembers = _intOrFallback(
         memberStats['withPhone'] ?? memberStats['with_phone'],
         0,
@@ -117,7 +116,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           chatCount: chatCount,
           totalMessages: totalMessages,
           weeklyMessages: weeklyMessages,
-          quickLinksCount: quickLinksCount,
           counties: counties,
           districts: districts,
           committees: committees,
@@ -1175,7 +1173,6 @@ class _DashboardData {
   final int chatCount;
   final int totalMessages;
   final int weeklyMessages;
-  final int quickLinksCount;
   final Map<String, int> counties;
   final Map<String, int> districts;
   final Map<String, int> committees;
@@ -1204,7 +1201,6 @@ class _DashboardData {
     required this.chatCount,
     required this.totalMessages,
     required this.weeklyMessages,
-    required this.quickLinksCount,
     required this.counties,
     required this.districts,
     required this.committees,
@@ -1234,7 +1230,6 @@ class _DashboardData {
         chatCount = 0,
         totalMessages = 0,
         weeklyMessages = 0,
-        quickLinksCount = 0,
         counties = const {},
         districts = const {},
         committees = const {},
