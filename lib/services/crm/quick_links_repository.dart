@@ -60,11 +60,14 @@ class QuickLinksRepository {
     final rows = await fetchQuickLinkRows();
     final links = rows
         .map((raw) => QuickLink.fromJson(_ensureJsonMap(raw)))
+        .where((link) => link.isActive)
         .toList()
       ..sort((a, b) {
         final categoryCompare =
             a.displayCategory.toLowerCase().compareTo(b.displayCategory.toLowerCase());
         if (categoryCompare != 0) return categoryCompare;
+        final orderCompare = (a.sortOrder ?? 1 << 20).compareTo(b.sortOrder ?? 1 << 20);
+        if (orderCompare != 0) return orderCompare;
         return a.title.toLowerCase().compareTo(b.title.toLowerCase());
       });
 
@@ -80,6 +83,7 @@ class QuickLinksRepository {
       final PostgrestResponse response = await _readClient
           .from(quickLinksTable)
           .select('id')
+          .eq('is_active', true)
           .count(CountOption.exact);
       return response.count ?? 0;
     } catch (_) {
@@ -197,11 +201,10 @@ class QuickLinksRepository {
   Future<List<Map<String, dynamic>>> fetchQuickLinkRows() async {
     final result = await _readClient
         .from(quickLinksTable)
-        .select(
-          'id,title,category,description,external_url,icon_url,storage_bucket,storage_path,'
-          'file_name,content_type,file_size,created_at,updated_at,signed_url,signed_url_expires_at',
-        )
+        .select()
+        .eq('is_active', true)
         .order('category', ascending: true)
+        .order('sort_order', ascending: true, nullsFirst: true)
         .order('title', ascending: true);
 
     final data = _coerceJsonList(result);

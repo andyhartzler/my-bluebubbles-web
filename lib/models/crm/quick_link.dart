@@ -18,6 +18,9 @@ class QuickLink {
     this.updatedAt,
     this.signedUrl,
     this.signedUrlExpiresAt,
+    this.sortOrder,
+    this.isActive = true,
+    this.notes,
   });
 
   factory QuickLink.fromJson(Map<String, dynamic> json) {
@@ -49,6 +52,9 @@ class QuickLink {
       updatedAt: parseDate(updatedAtRaw),
       signedUrl: json['signed_url']?.toString(),
       signedUrlExpiresAt: parseDate(json['signed_url_expires_at']),
+      sortOrder: _parseInt(json['sort_order']),
+      isActive: _parseBool(json['is_active']),
+      notes: json['notes']?.toString(),
     );
   }
 
@@ -67,6 +73,9 @@ class QuickLink {
   final DateTime? updatedAt;
   final String? signedUrl;
   final DateTime? signedUrlExpiresAt;
+  final int? sortOrder;
+  final bool isActive;
+  final String? notes;
 
   bool get hasStorageReference => (storagePath ?? '').isNotEmpty;
 
@@ -74,6 +83,8 @@ class QuickLink {
 
   String get displayCategory =>
       category.trim().isEmpty ? 'Uncategorized' : category.trim();
+
+  String get normalizedCategory => category.trim().toLowerCase();
 
   String? get resolvedUrl {
     if (hasExternalUrl) {
@@ -102,7 +113,9 @@ class QuickLink {
     String? signedUrl,
     DateTime? signedUrlExpiresAt,
     bool clearStorage = false,
-    bool clearIconUrl = false,
+    int? sortOrder,
+    bool? isActive,
+    String? notes,
   }) {
     return QuickLink(
       id: id ?? this.id,
@@ -120,6 +133,9 @@ class QuickLink {
       updatedAt: updatedAt ?? this.updatedAt,
       signedUrl: signedUrl ?? this.signedUrl,
       signedUrlExpiresAt: signedUrlExpiresAt ?? this.signedUrlExpiresAt,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isActive: isActive ?? this.isActive,
+      notes: notes ?? this.notes,
     );
   }
 
@@ -141,6 +157,9 @@ class QuickLink {
       if (signedUrl != null) 'signed_url': signedUrl,
       if (signedUrlExpiresAt != null)
         'signed_url_expires_at': signedUrlExpiresAt!.toIso8601String(),
+      if (sortOrder != null) 'sort_order': sortOrder,
+      'is_active': isActive,
+      if (notes != null) 'notes': notes,
     };
   }
 
@@ -152,5 +171,17 @@ class QuickLink {
       return int.tryParse(value);
     }
     return null;
+  }
+
+  static bool _parseBool(dynamic value) {
+    if (value == null) return true;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized.isEmpty) return true;
+      return normalized == 'true' || normalized == '1' || normalized == 't';
+    }
+    return true;
   }
 }

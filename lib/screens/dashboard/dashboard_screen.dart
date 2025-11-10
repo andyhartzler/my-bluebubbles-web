@@ -432,12 +432,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       _StatCardData(
         title: 'Quick Links',
-        value: null,
         icon: Icons.link,
-        description: 'Launch shared resources in a single tap',
+        description: 'Launch shared resources and governing documents',
         colors: [theme.colorScheme.primaryContainer, theme.colorScheme.primary],
         actionLabel: 'Open quick links',
-        semanticsLabel: 'Quick links card. Open shared resources.',
+        semanticsLabel: 'Open quick links',
         onTap: (context) => _openQuickLinks(context),
       ),
       _StatCardData(
@@ -1296,7 +1295,7 @@ class _StatCardData {
 
   _StatCardData({
     required this.title,
-    required this.value,
+    this.value,
     required this.icon,
     required this.description,
     required this.colors,
@@ -1377,12 +1376,12 @@ class _StatCard extends StatelessWidget {
                     Icon(data.icon, color: theme.colorScheme.onPrimary, size: isCompact ? 24 : 28),
                     const SizedBox(height: 16),
                     Text(data.title, style: titleStyle),
-                    const SizedBox(height: 8),
                     if (data.value != null) ...[
-                      Text(data.value.toString(), style: valueStyle),
+                      const SizedBox(height: 8),
+                      Text(data.value!.toString(), style: valueStyle),
                       const SizedBox(height: 6),
                     ] else
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 12),
                     Text(data.description, style: bodyStyle),
                     const Spacer(),
                     if (onTap != null)
