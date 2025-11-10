@@ -54,40 +54,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      final memberStats = await _memberRepo.getMemberStats();
-      final counties = await _memberRepo.getCountyCounts();
-      final districts = await _memberRepo.getDistrictCounts();
-      final committees = await _memberRepo.getCommitteeCounts();
-      final highSchools = await _memberRepo.getHighSchoolCounts();
-      final colleges = await _memberRepo.getCollegeCounts();
-      final chapters = await _memberRepo.getChapterCounts();
-      final chapterStatuses = await _memberRepo.getChapterStatusCounts();
-      final graduationYears = await _memberRepo.getGraduationYearCounts();
-      final pronouns = await _memberRepo.getPronounCounts();
-      final genders = await _memberRepo.getGenderIdentityCounts();
-      final races = await _memberRepo.getRaceCounts();
-      final languages = await _memberRepo.getLanguageCounts();
-      final communityTypes = await _memberRepo.getCommunityTypeCounts();
-      final industries = await _memberRepo.getIndustryCounts();
-      final educationLevels = await _memberRepo.getEducationLevelCounts();
-      final registeredVoters = await _memberRepo.getRegisteredVoterCounts();
-      final sexualOrientations = await _memberRepo.getSexualOrientationCounts();
-      final ageBuckets = await _memberRepo.getAgeBucketCounts();
-      final recentMembers = await _memberRepo.getRecentMembers(limit: 6);
+      final weeklySince = DateTime.now().subtract(const Duration(days: 7));
+      final results = await Future.wait<dynamic>([
+        _memberRepo.fetchDashboardMetrics(),
+        _fetchChatCount(),
+        _fetchMessageCount(),
+        _fetchMessageCount(after: weeklySince),
+      ]);
 
-      final chatCount = await _fetchChatCount();
-      final totalMessages = await _fetchMessageCount();
-      final weeklyMessages = await _fetchMessageCount(
-        after: DateTime.now().subtract(const Duration(days: 7)),
+      final metrics = (results[0] as Map<String, dynamic>?) ?? <String, dynamic>{};
+      final fallbackChatCount = (results[1] as int?) ?? 0;
+      final fallbackTotalMessages = (results[2] as int?) ?? 0;
+      final fallbackWeeklyMessages = (results[3] as int?) ?? 0;
+
+      final memberStats = (metrics['memberStats'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+      final totalMembers = _intOrFallback(memberStats['total'], 0);
+      final optedOutMembers =
+          _intOrFallback(memberStats['optedOut'] ?? memberStats['opted_out'], 0);
+      final contactableMembers = _intOrFallback(
+        memberStats['contactable'],
+        totalMembers - optedOutMembers,
       );
       final quickLinksCount = await _quickLinksRepo.countQuickLinks();
+      final withPhoneMembers = _intOrFallback(
+        memberStats['withPhone'] ?? memberStats['with_phone'],
+        0,
+      );
+
+      final chatCount = _intOrFallback(metrics['chatCount'], fallbackChatCount);
+      final totalMessages =
+          _intOrFallback(metrics['totalMessages'], fallbackTotalMessages);
+      final weeklyMessages =
+          _intOrFallback(metrics['weeklyMessages'], fallbackWeeklyMessages);
+
+      final counties = _toCountMap(metrics['counties']);
+      final districts = _toCountMap(metrics['districts']);
+      final committees = _toCountMap(metrics['committees']);
+      final highSchools = _toCountMap(metrics['highSchools']);
+      final colleges = _toCountMap(metrics['colleges']);
+      final chapters = _toCountMap(metrics['chapters']);
+      final chapterStatuses = _toCountMap(metrics['chapterStatuses']);
+      final graduationYears = _toCountMap(metrics['graduationYears']);
+      final pronouns = _toCountMap(metrics['pronouns']);
+      final genders = _toCountMap(metrics['genders']);
+      final races = _toCountMap(metrics['races']);
+      final languages = _toCountMap(metrics['languages']);
+      final communityTypes = _toCountMap(metrics['communityTypes']);
+      final industries = _toCountMap(metrics['industries']);
+      final educationLevels = _toCountMap(metrics['educationLevels']);
+      final registeredVoters = _toCountMap(metrics['registeredVoters']);
+      final sexualOrientations = _toCountMap(metrics['sexualOrientations']);
+      final ageBuckets = _toCountMap(metrics['ageBuckets']);
+      final recentMembers =
+          _toMemberList(metrics['recentMembers'] ?? metrics['recent_members']);
 
       setState(() {
         _data = _DashboardData(
-          totalMembers: memberStats['total'] as int? ?? 0,
-          contactableMembers: memberStats['contactable'] as int? ?? 0,
-          optedOutMembers: memberStats['optedOut'] as int? ?? 0,
-          withPhoneMembers: memberStats['withPhone'] as int? ?? 0,
+          totalMembers: totalMembers,
+          contactableMembers: contactableMembers,
+          optedOutMembers: optedOutMembers,
+          withPhoneMembers: withPhoneMembers,
           chatCount: chatCount,
           totalMessages: totalMessages,
           weeklyMessages: weeklyMessages,
@@ -138,6 +164,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (_) {
       return 0;
     }
+  }
+
+  int? _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  int _intOrFallback(dynamic value, int fallback) {
+    final parsed = _parseInt(value);
+    return parsed ?? fallback;
+  }
+
+  Map<String, int> _toCountMap(dynamic value) {
+    if (value is Map<String, int>) {
+      return Map<String, int>.from(value);
+    }
+    if (value is Map) {
+      final result = <String, int>{};
+      value.forEach((key, dynamic count) {
+        final label = key == null ? '' : key.toString();
+        final parsed = _parseInt(count);
+        if (label.isEmpty || parsed == null) return;
+        result[label] = parsed;
+      });
+      return result;
+    }
+    if (value is Iterable) {
+      final result = <String, int>{};
+      for (final entry in value) {
+        if (entry is Map<String, dynamic>) {
+          final label = entry['label'] ?? entry['key'] ?? entry['name'] ?? entry['value'];
+          final parsed = _parseInt(entry['count'] ?? entry['total'] ?? entry['members']);
+          if (label == null) continue;
+          final cleaned = label.toString().trim();
+          if (cleaned.isEmpty || parsed == null) continue;
+          result[cleaned] = parsed;
+        }
+      }
+      return result;
+    }
+    return <String, int>{};
+  }
+
+  List<Member> _toMemberList(dynamic value) {
+    if (value is List<Member>) {
+      return List<Member>.from(value);
+    }
+    if (value is Iterable) {
+      final members = <Member>[];
+      for (final item in value) {
+        if (item is Member) {
+          members.add(item);
+          continue;
+        }
+        Map<String, dynamic>? json;
+        if (item is Map<String, dynamic>) {
+          json = item;
+        } else if (item is Map) {
+          json = item.map((key, dynamic val) => MapEntry(key.toString(), val));
+        }
+        if (json == null) continue;
+        try {
+          members.add(Member.fromJson(json));
+        } catch (_) {}
+      }
+      return members;
+    }
+    return <Member>[];
   }
 
   void _openMembersList(BuildContext context, {bool showChaptersOnly = false}) {
