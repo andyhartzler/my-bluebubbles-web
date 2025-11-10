@@ -43,6 +43,13 @@ class QuickLinksPanel extends StatefulWidget {
 }
 
 class _QuickLinksPanelState extends State<QuickLinksPanel> {
+  static const _documentPdfOverrides = <String, String>{
+    'constitution of the missouri young democrats':
+        'Constitution%20of%20the%20Missouri%20Young%20Democrats.pdf',
+    'mocd bylaws': 'MOCD%20Bylaws.pdf',
+    'mohsd bylaws': 'MOHSD%20Bylaws.pdf',
+  };
+
   bool _loading = true;
   bool _processing = false;
   String? _error;
@@ -218,7 +225,6 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         category: result.category,
         description: result.description,
         externalUrl: result.externalUrl,
-        iconUrl: result.iconUrl,
         file: result.file,
         removeExistingFile: result.removeFile && result.file == null,
       );
@@ -244,7 +250,6 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         category: result.category,
         description: result.description,
         externalUrl: result.externalUrl,
-        iconUrl: result.iconUrl,
         file: result.file,
       );
       if (!mounted) return;
@@ -365,7 +370,7 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                   FilledButton.icon(
                     onPressed: _processing ? null : _createLink,
                     icon: const Icon(Icons.add),
-                    label: const Text('New Quick Link'),
+                    label: const Text('Add Resource'),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
@@ -446,7 +451,10 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
     }
 
     final socialMedia = _links
-        .where((link) => link.normalizedCategory == 'social_media')
+        .where((link) {
+          final normalized = link.normalizedCategory;
+          return normalized == 'social_media' || normalized == 'social media';
+        })
         .toList();
     final websites = _links
         .where((link) => const {'website', 'websites'}.contains(link.normalizedCategory))
@@ -469,7 +477,8 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
 
     final groupedOthers = <String, List<QuickLink>>{};
     for (final link in remaining) {
-      groupedOthers.putIfAbsent(link.displayCategory, () => []).add(link);
+      final label = _formatCategoryLabel(link.displayCategory);
+      groupedOthers.putIfAbsent(label, () => []).add(link);
     }
 
     final otherSections = groupedOthers.entries.toList()
@@ -532,16 +541,17 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
                           message: link.title,
                           child: InkWell(
                             onTap: () => _openLink(link),
+                            onLongPress: () => _manageLink(link),
+                            onSecondaryTap: () => _manageLink(link),
                             borderRadius: BorderRadius.circular(32),
                             child: _buildLinkAvatar(link, size: 56),
                           ),
                         ),
                         const SizedBox(height: 6),
-                        _QuickLinkOverflowMenu(
-                          link: link,
-                          onManage: _manageLink,
-                          onUploadFile: _uploadToLink,
-                          onRemoveFile: _removeFile,
+                        TextButton.icon(
+                          onPressed: link.resolvedUrl == null ? null : () => _copyLink(link),
+                          icon: const Icon(Icons.copy, size: 18),
+                          label: const Text('Copy link'),
                         ),
                       ],
                     ),
@@ -552,6 +562,40 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         ],
       ),
     );
+  }
+
+  String _formatCategoryLabel(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return 'Uncategorized';
+    final normalized = trimmed.toLowerCase();
+    switch (normalized) {
+      case 'forms':
+        return 'Forms';
+      case 'documents':
+        return 'Documents';
+      case 'document':
+        return 'Documents';
+      case 'governing_documents':
+        return 'Governing Documents';
+      case 'websites':
+        return 'Websites';
+      case 'website':
+        return 'Websites';
+      case 'social_media':
+      case 'social media':
+        return 'Social Media';
+      case 'other':
+        return 'Other';
+    }
+
+    if (normalized.contains('_')) {
+      return normalized
+          .split('_')
+          .map((part) => part.isEmpty ? part : part[0].toUpperCase() + part.substring(1))
+          .join(' ');
+    }
+
+    return trimmed;
   }
 
   Widget _buildWebsitesSection(List<QuickLink> links, ThemeData theme) {
@@ -649,7 +693,7 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   }
 
   Widget _buildDocumentRow(QuickLink link, ThemeData theme) {
-    final pdfUri = _resolvePublicFileUri(link);
+    final pdfUri = _resolveDocumentPdfUri(link);
     final hasDriveLink = (link.externalUrl ?? '').trim().isNotEmpty;
     final description = link.description?.trim();
 
@@ -816,6 +860,23 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   Widget _buildLinkAvatar(QuickLink link, {double size = 48}) {
     return _QuickLinkIconAvatar(link: link, size: size);
   }
+
+  Uri? _resolveDocumentPdfUri(QuickLink link) {
+    final storageUri = _resolvePublicFileUri(link);
+    if (storageUri != null) {
+      return storageUri;
+    }
+
+    final normalizedTitle = link.title.trim().toLowerCase();
+    final overridePath = _documentPdfOverrides[normalizedTitle];
+    if (overridePath == null) {
+      return null;
+    }
+
+    return Uri.tryParse(
+      'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/quick-access-files/$overridePath',
+    );
+  }
 }
 
 class _QuickLinkActionButton extends StatelessWidget {
@@ -970,15 +1031,22 @@ class _QuickLinkFormDialog extends StatefulWidget {
 }
 
 class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
+  static const _categoryOptions = <_CategoryOption>[
+    _CategoryOption(value: 'forms', label: 'Forms'),
+    _CategoryOption(value: 'documents', label: 'Documents'),
+    _CategoryOption(value: 'websites', label: 'Websites'),
+    _CategoryOption(value: 'social_media', label: 'Social Media'),
+    _CategoryOption(value: 'other', label: 'Other'),
+  ];
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleController;
-  late final TextEditingController _categoryController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _urlController;
-  late final TextEditingController _iconController;
   PlatformFile? _selectedFile;
   bool _removeFile = false;
   bool _delete = false;
+  String? _selectedCategory;
 
   QuickLink? get existing => widget.existing;
 
@@ -986,10 +1054,9 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: existing?.title ?? '');
-    _categoryController = TextEditingController(text: existing?.category ?? '');
     _descriptionController = TextEditingController(text: existing?.description ?? '');
     _urlController = TextEditingController(text: existing?.externalUrl ?? '');
-    _iconController = TextEditingController(text: existing?.iconUrl ?? '');
+    _selectedCategory = _normalizeCategoryValue(existing?.category);
     _delete = widget.startInDeleteMode;
     _removeFile = widget.startInDeleteMode;
   }
@@ -997,10 +1064,8 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
   @override
   void dispose() {
     _titleController.dispose();
-    _categoryController.dispose();
     _descriptionController.dispose();
     _urlController.dispose();
-    _iconController.dispose();
     super.dispose();
   }
 
@@ -1021,7 +1086,9 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
   void _clearFile() {
     setState(() {
       _selectedFile = null;
-      _removeFile = true;
+      if (existing?.hasStorageReference != true) {
+        _removeFile = false;
+      }
     });
   }
 
@@ -1031,6 +1098,35 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
     });
   }
 
+  void _markStoredFileForRemoval() {
+    setState(() {
+      _removeFile = true;
+      _selectedFile = null;
+    });
+  }
+
+  void _undoStoredFileRemoval() {
+    setState(() {
+      _removeFile = false;
+    });
+  }
+
+  String? _normalizeCategoryValue(String? raw) {
+    if (raw == null) return null;
+    final normalized = raw.trim().toLowerCase();
+    if (normalized.isEmpty) return null;
+    if (normalized == 'forms') return 'forms';
+    if (normalized == 'documents' || normalized == 'document' || normalized == 'governing_documents') {
+      return 'documents';
+    }
+    if (normalized == 'websites' || normalized == 'website') return 'websites';
+    if (normalized == 'social_media' || normalized == 'social media') {
+      return 'social_media';
+    }
+    if (normalized == 'other') return 'other';
+    return null;
+  }
+
   void _submit() {
     final form = _formKey.currentState;
     if (form == null) return;
@@ -1038,14 +1134,13 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
     Navigator.of(context).pop(
       _QuickLinkFormResult(
         title: _titleController.text.trim(),
-        category: _categoryController.text.trim(),
+        category: _selectedCategory!,
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
         externalUrl: _urlController.text.trim().isEmpty
             ? null
             : _urlController.text.trim(),
-        iconUrl: _iconController.text.trim(),
         file: _selectedFile,
         removeFile: _removeFile,
         delete: _delete,
@@ -1057,7 +1152,7 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AlertDialog(
-      title: Text(existing == null ? 'New Quick Link' : 'Edit Quick Link'),
+      title: Text(existing == null ? 'Add Resource' : 'Edit Resource'),
       content: SizedBox(
         width: 480,
         child: Form(
@@ -1077,10 +1172,23 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
                 },
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _categoryController,
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
                 decoration: const InputDecoration(labelText: 'Category *'),
-                textInputAction: TextInputAction.next,
+                hint: const Text('Select a category'),
+                items: _categoryOptions
+                    .map(
+                      (option) => DropdownMenuItem(
+                        value: option.value,
+                        child: Text(option.label),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedCategory = value;
+                  });
+                },
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Category is required';
@@ -1111,56 +1219,78 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
                   return null;
                 },
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _iconController,
-                decoration: const InputDecoration(labelText: 'Icon URL'),
-                keyboardType: TextInputType.url,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return null;
-                  }
-                  final uri = Uri.tryParse(value.trim());
-                  if (uri == null || (!uri.hasScheme && !uri.host.contains('.'))) {
-                    return 'Enter a valid URL including https://';
-                  }
-                  return null;
-                },
-              ),
               const SizedBox(height: 16),
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_selectedFile != null)
-                          Text('Selected: ${_selectedFile!.name}'),
-                        if (_selectedFile == null && existing?.hasStorageReference == true)
-                          Text(
-                            'Current file: ${existing!.fileName ?? existing!.storagePath}',
-                            style: theme.textTheme.bodyMedium,
+                  if (_selectedFile != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          Chip(
+                            label: Text(_selectedFile!.name),
+                            onDeleted: _clearFile,
                           ),
-                        if (_removeFile && existing?.hasStorageReference == true)
-                          Text(
-                            'Stored file will be removed',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.error,
+                        ],
+                      ),
+                    )
+                  else if (existing?.hasStorageReference == true && !_removeFile)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          Chip(
+                            label: Text(existing!.fileName ?? existing!.storagePath!),
+                            deleteIcon: const Icon(Icons.close),
+                            onDeleted: _markStoredFileForRemoval,
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_removeFile && existing?.hasStorageReference == true)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Stored file will be removed',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.error,
+                              ),
                             ),
                           ),
-                      ],
+                          TextButton(
+                            onPressed: _undoStoredFileRemoval,
+                            child: const Text('Keep file'),
+                          ),
+                        ],
+                      ),
                     ),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: _pickFile,
+                        icon: const Icon(Icons.upload_file),
+                        label: Text(_selectedFile != null ? 'Replace File' : 'Attach File'),
+                      ),
+                      if (_selectedFile != null)
+                        TextButton(
+                          onPressed: _clearFile,
+                          child: const Text('Remove Selection'),
+                        )
+                      else if (existing?.hasStorageReference == true && !_removeFile)
+                        TextButton(
+                          onPressed: _markStoredFileForRemoval,
+                          child: const Text('Remove Stored File'),
+                        ),
+                    ],
                   ),
-                  TextButton.icon(
-                    onPressed: _pickFile,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Attach File'),
-                  ),
-                  if (_selectedFile != null || existing?.hasStorageReference == true)
-                    TextButton(
-                      onPressed: _clearFile,
-                      child: const Text('Remove File'),
-                    ),
                 ],
               ),
               if (existing != null)
@@ -1196,7 +1326,6 @@ class _QuickLinkFormResult {
     required this.category,
     required this.description,
     required this.externalUrl,
-    required this.iconUrl,
     this.file,
     this.removeFile = false,
     this.delete = false,
@@ -1206,8 +1335,14 @@ class _QuickLinkFormResult {
   final String category;
   final String? description;
   final String? externalUrl;
-  final String? iconUrl;
   final PlatformFile? file;
   final bool removeFile;
   final bool delete;
+}
+
+class _CategoryOption {
+  const _CategoryOption({required this.value, required this.label});
+
+  final String value;
+  final String label;
 }
