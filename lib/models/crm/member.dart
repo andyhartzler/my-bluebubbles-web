@@ -166,6 +166,25 @@ class Member {
     return _formatDistrictString(secondPass);
   }
 
+  /// Normalize a county name for display and filtering by stripping a trailing
+  /// "county" token (case-insensitive) and trimming the result.
+  static String? normalizeCountyLabel(dynamic value) {
+    final normalized = normalizeText(value);
+    if (normalized == null) return null;
+
+    final trimmed = normalized.trim();
+    if (trimmed.isEmpty) return null;
+
+    final withoutSuffix = trimmed
+        .replaceFirst(RegExp(r'\s*county\$', caseSensitive: false), '')
+        .trim();
+    if (withoutSuffix.isEmpty) {
+      return null;
+    }
+
+    return withoutSuffix;
+  }
+
   /// Format a district value for display, ensuring we only show a single CD-
   /// prefix when the value is numeric.
   static String? formatDistrictLabel(String? value) {

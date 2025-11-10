@@ -385,7 +385,7 @@ class MemberRepository {
           .not('county', 'is', null);
 
       final counties = (response as List<dynamic>)
-          .map((item) => Member.normalizeText(item['county']))
+          .map((item) => Member.normalizeCountyLabel(item['county']))
           .whereType<String>()
           .map((value) => value.trim())
           .where((value) => value.isNotEmpty)
@@ -400,7 +400,8 @@ class MemberRepository {
     }
   }
 
-  Future<Map<String, int>> getCountyCounts() => _aggregateTextField('county');
+  Future<Map<String, int>> getCountyCounts() =>
+      _aggregateTextField('county', normalize: Member.normalizeCountyLabel);
 
   Future<Map<String, int>> getDistrictCounts() => _aggregateTextField(
         'congressional_district',
