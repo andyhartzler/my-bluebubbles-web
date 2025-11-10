@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/member.dart';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:universal_io/io.dart' as io;
+
+import 'supabase_service.dart';
 
 /// Exception thrown when the CRM email relay encounters an error.
 class CRMEmailException implements Exception {
@@ -61,20 +61,6 @@ class CRMEmailService {
   static final CRMEmailService instance = CRMEmailService._internal();
 
   factory CRMEmailService() => instance;
-
-  static const String _endpoint =
-      'https://faajpcarasilbfndzkmd.supabase.co/functions/v1/send-email';
-
-  http.Client? _client;
-
-  http.Client get _httpClient => _client ??= http.Client();
-
-  /// Replaces the internal HTTP client. Intended for testing.
-  @visibleForTesting
-  void debugSetClient(http.Client? client) {
-    _client?.close();
-    _client = client;
-  }
 
   /// Sends an email to the provided recipients. Throws a
   /// [CRMEmailException] when validation fails or the HTTP request
@@ -155,45 +141,64 @@ class CRMEmailService {
       payload['attachments'] = attachments.map((a) => a.toJson()).toList();
     }
 
-    final authToken = _resolveAuthToken();
-    if (authToken == null) {
+    final supabaseService = CRMSupabaseService();
+    if (!supabaseService.isInitialized) {
+      try {
+        await supabaseService.initialize();
+      } catch (error) {
+        throw CRMEmailException(
+          'Failed to initialize CRM Supabase service: $error',
+          cause: error,
+        );
+      }
+    }
+
+    if (!supabaseService.isInitialized) {
       throw CRMEmailException(
         'Supabase credentials are not configured for the CRM email relay.',
       );
     }
 
-    final response = await _httpClient.post(
-      Uri.parse(_endpoint),
-      headers: {
-        'Authorization': 'Bearer $authToken',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(payload),
-    );
-
-    final statusCode = response.statusCode;
-    Map<String, dynamic>? data;
-    if (response.body.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map<String, dynamic>) {
-          data = decoded;
-        }
-      } catch (_) {
-        // Ignore parsing errors – response may not be JSON on failure.
-      }
+    FunctionResponse response;
+    try {
+      response = await supabaseService.privilegedClient.functions.invoke(
+        'send-email',
+        body: payload,
+      );
+    } on FunctionsException catch (error) {
+      throw CRMEmailException(
+        error.message ?? 'Failed to send email via Supabase function.',
+        cause: error,
+      );
+    } on ClientException catch (error) {
+      throw CRMEmailException(
+        error.message ?? 'Failed to send email via Supabase function.',
+        cause: error,
+      );
     }
 
-    if (statusCode >= 200 && statusCode < 300) {
+    final statusCode = response.status;
+    Map<String, dynamic>? data;
+    final rawData = response.data;
+    if (rawData is Map) {
+      data = rawData.map<String, dynamic>(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+    }
+
+    if (statusCode == 200) {
       return CRMEmailResult(success: true, statusCode: statusCode, data: data);
     }
 
-    final message = data != null
-        ? (data['error'] ?? data['message'] ?? response.body)
-        : response.body;
+    final dynamic messageSource =
+        data != null ? (data['error'] ?? data['message'] ?? rawData) : rawData;
+    final String? messageString = messageSource is String
+        ? messageSource
+        : messageSource?.toString();
+
     throw CRMEmailException(
-      message is String && message.isNotEmpty
-          ? message
+      messageString != null && messageString.isNotEmpty
+          ? messageString
           : 'Failed to send email (HTTP $statusCode).',
     );
   }
@@ -269,18 +274,6 @@ class CRMEmailService {
       mimeType: mimeType,
       content: base64Encode(bytes),
     );
-  }
-
-  String? _resolveAuthToken() {
-    final serviceRole = CRMConfig.supabaseServiceRoleKey;
-    if (serviceRole.isNotEmpty) {
-      return serviceRole;
-    }
-    final anonKey = CRMConfig.supabaseAnonKey;
-    if (anonKey.isNotEmpty) {
-      return anonKey;
-    }
-    return null;
   }
 
   List<String> _sanitizeEmails(List<String>? values) {
