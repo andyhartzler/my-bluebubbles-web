@@ -24,8 +24,14 @@ class MembersListScreen extends StatefulWidget {
       : super(key: key);
 
   @visibleForTesting
-  static int compareMembersForTesting(Member a, Member b) =>
-      _MembersListScreenState._compareMembers(a, b);
+  static int Function(Member, Member) compareMembersForTesting({
+    required bool prioritizeExecutives,
+  }) =>
+      (a, b) => _MembersListScreenState._compareMembers(
+            a,
+            b,
+            prioritizeExecutives: prioritizeExecutives,
+          );
 
   @override
   State<MembersListScreen> createState() => _MembersListScreenState();
@@ -275,6 +281,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
             .toSet()
         : const <String>{};
 
+    final committeeFilterActive =
+        _selectedCommittees != null && _selectedCommittees!.isNotEmpty;
+
     final primaryMembers = <Member>[];
     final agedOutMembers = <Member>[];
 
@@ -351,8 +360,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
       }
     }
 
-    primaryMembers.sort(_compareMembers);
-    agedOutMembers.sort(_compareMembers);
+    final comparator = (Member a, Member b) => _compareMembers(
+          a,
+          b,
+          prioritizeExecutives: committeeFilterActive,
+        );
+
+    primaryMembers.sort(comparator);
+    agedOutMembers.sort(comparator);
     _agedOutMembers = agedOutMembers;
 
     return primaryMembers;
@@ -557,7 +572,22 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return primary;
   }
 
-  static int _compareMembers(Member a, Member b) {
+  static int _compareMembers(
+    Member a,
+    Member b, {
+    bool prioritizeExecutives = true,
+  }) {
+    if (prioritizeExecutives) {
+      final executiveComparison = _compareByExecutivePriority(a, b);
+      if (executiveComparison != null) {
+        return executiveComparison;
+      }
+    }
+
+    return _compareByPhotoThenName(a, b);
+  }
+
+  static int? _compareByExecutivePriority(Member a, Member b) {
     final aIsExecutive = _isExecutiveMember(a);
     final bIsExecutive = _isExecutiveMember(b);
 
@@ -593,6 +623,10 @@ class _MembersListScreenState extends State<MembersListScreen> {
       }
     }
 
+    return null;
+  }
+
+  static int _compareByPhotoThenName(Member a, Member b) {
     final aHasPhoto = a.hasProfilePhoto;
     final bHasPhoto = b.hasProfilePhoto;
     if (aHasPhoto != bHasPhoto) {
