@@ -185,7 +185,9 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
 
   Future<PlatformFile?> _pickFile() async {
     try {
-      final result = await file_picker.FilePicker.platform.pickFiles(withData: !kIsWeb);
+      final result = await file_picker.FilePicker.platform.pickFiles(
+        withData: true,
+      );
       if (result == null || result.files.isEmpty) {
         return null;
       }
@@ -1088,7 +1090,9 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
   }
 
   Future<void> _pickFile() async {
-    final file = await file_picker.FilePicker.platform.pickFiles(withData: !kIsWeb);
+    final file = await file_picker.FilePicker.platform.pickFiles(
+      withData: true,
+    );
     if (file == null || file.files.isEmpty) return;
     final materialized = await materializePickedPlatformFile(
       file.files.single,

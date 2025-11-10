@@ -24,6 +24,7 @@ Future<PlatformFile?> materializePickedPlatformFile(
   file_picker.PlatformFile file,
   {file_picker.FilePickerResult? source,}
 ) async {
+  final resolvedPath = kIsWeb ? null : _resolveFallbackPath(file, source: source);
   Uint8List? resolvedBytes = file.bytes;
   Object? hydrationError;
   StackTrace? hydrationTrace;
@@ -58,7 +59,7 @@ Future<PlatformFile?> materializePickedPlatformFile(
   }
 
   if ((resolvedBytes == null || resolvedBytes.isEmpty) &&
-      (file.path == null || file.path!.isEmpty)) {
+      (resolvedPath == null || resolvedPath.isEmpty)) {
     final message =
         'Failed to hydrate picked file "${file.name}". No bytes or fallback path available.';
     if (hydrationError != null) {
@@ -74,7 +75,7 @@ Future<PlatformFile?> materializePickedPlatformFile(
   }
 
   return PlatformFile(
-    path: kIsWeb ? null : file.path,
+    path: resolvedPath,
     name: file.name,
     size: resolvedBytes?.length ?? file.size,
     bytes: resolvedBytes,
@@ -272,4 +273,31 @@ Uint8List? _decodeDataUri(String? uriString) {
   } catch (_) {
     return null;
   }
+}
+
+String? _resolveFallbackPath(
+  file_picker.PlatformFile file, {
+  file_picker.FilePickerResult? source,
+}) {
+  final path = file.path;
+  if (path != null && path.isNotEmpty) {
+    return path;
+  }
+
+  if (source == null) {
+    return null;
+  }
+
+  for (final candidate in _collectCandidates(file, source: source)) {
+    if (identical(candidate, file)) {
+      continue;
+    }
+    final candidatePath = candidate.path;
+    if (candidatePath == null || candidatePath.isEmpty) {
+      continue;
+    }
+    return candidatePath;
+  }
+
+  return null;
 }
