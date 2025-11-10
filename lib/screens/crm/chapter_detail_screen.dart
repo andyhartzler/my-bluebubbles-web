@@ -59,14 +59,18 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
 
     try {
       final results = await Future.wait([
-        _memberRepository.getAllMembers(chapterName: _chapter.chapterName),
+        _memberRepository.getAllMembers(
+          chapterName: _chapter.chapterName,
+          columns: MemberRepository.listingColumns,
+        ),
         _chapterRepository.getDocumentsForChapter(_chapter.chapterName),
       ]);
 
       if (!mounted) return;
 
-      final members = (results[0] as List<Member>)
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      final membersResult = results[0] as MemberFetchResult;
+      final members = membersResult.members
+          ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       final documents = results[1] as List<ChapterDocument>;
 
       setState(() {

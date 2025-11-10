@@ -3,7 +3,8 @@ import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
+import 'package:postgrest/postgrest.dart'
+    show CountOption, FetchOptions, PostgrestFilterBuilder, PostgrestResponse;
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
@@ -23,13 +24,44 @@ class MemberRepository {
 
   static const String _documentsBucket = 'member-documents';
 
+  static const List<String> listingColumns = [
+    'id',
+    'created_at',
+    'name',
+    'email',
+    'school_email',
+    'phone',
+    'phone_e164',
+    'county',
+    'congressional_district',
+    'committee',
+    'chapter_name',
+    'chapter_position',
+    'school_name',
+    'current_chapter_member',
+    'registered_voter',
+    'opt_out',
+    'date_of_birth',
+    'community_type',
+    'notes',
+    'executive_committee',
+    'executive_title',
+    'executive_role',
+    'executive_role_short',
+    'profile_pictures',
+    'last_contacted',
+    'date_joined',
+    'intro_sent_at',
+  ];
+
   SupabaseClient get _readClient =>
       _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
 
   SupabaseClient get _writeClient => _supabase.privilegedClient;
 
+
   /// Get all members (with optional filters)
-  Future<List<Member>> getAllMembers({
+  Future<MemberFetchResult> getAllMembers({
     String? county,
     String? congressionalDistrict,
     List<String>? committees,
@@ -40,66 +72,235 @@ class MemberRepository {
     int? minAge,
     int? maxAge,
     bool? optedOut,
+    bool? registeredVoter,
+    String? searchQuery,
+    int? limit,
+    int? offset,
+    bool fetchTotalCount = false,
+    List<String>? columns,
   }) async {
-    if (!_isReady) return [];
+    if (!_isReady) {
+      return const MemberFetchResult(members: []);
+    }
 
     try {
-      var query = _readClient.from('members').select();
+      final selection = _resolveColumnSelection(columns);
+      var query = _readClient.from('members').select(
+            selection,
+            FetchOptions(count: fetchTotalCount ? CountOption.exact : CountOption.none),
+          );
 
-      if (county != null && county.isNotEmpty) {
-        query = query.eq('county', county);
+      query = _applyMemberFilters(
+        query,
+        county: county,
+        congressionalDistrict: congressionalDistrict,
+        committees: committees,
+        highSchool: highSchool,
+        college: college,
+        chapterName: chapterName,
+        chapterStatus: chapterStatus,
+        minAge: minAge,
+        maxAge: maxAge,
+        optedOut: optedOut,
+        registeredVoter: registeredVoter,
+        searchQuery: searchQuery,
+      );
+
+      query = query.order('name', ascending: true).order('id', ascending: true);
+
+      if (limit != null && limit > 0) {
+        query = query.limit(limit);
       }
 
-      if (congressionalDistrict != null && congressionalDistrict.isNotEmpty) {
-        query = query.eq('congressional_district', congressionalDistrict);
+      if (offset != null && offset > 0) {
+        query = query.offset(offset);
       }
 
-      if (committees != null && committees.isNotEmpty) {
-        query = query.overlaps('committee', committees);
+      if (fetchTotalCount) {
+        final PostgrestResponse response = await query.withCount();
+        final data = _coerceList(response);
+        final members = _mapMembers(data);
+        final total = response.count ?? ((offset ?? 0) + members.length);
+        return MemberFetchResult(members: members, totalCount: total);
       }
 
-      if (highSchool != null && highSchool.isNotEmpty) {
-        query = query.eq('high_school', highSchool);
-      }
-
-      if (college != null && college.isNotEmpty) {
-        query = query.eq('college', college);
-      }
-
-      if (chapterName != null && chapterName.isNotEmpty) {
-        query = query.eq('chapter_name', chapterName);
-      }
-
-      if (chapterStatus != null && chapterStatus.isNotEmpty) {
-        query = query.eq('current_chapter_member', chapterStatus);
-      }
-
-      if (optedOut != null) {
-        query = query.eq('opt_out', optedOut);
-      }
-
-      final response = await query;
-      final data = response as List<dynamic>;
-
-      List<Member> members = data
-          .map((json) => Member.fromJson(json as Map<String, dynamic>))
-          .toList();
-
-      if (minAge != null || maxAge != null) {
-        members = members.where((member) {
-          final age = member.age;
-          if (age == null) return false;
-          if (minAge != null && age < minAge) return false;
-          if (maxAge != null && age > maxAge) return false;
-          return true;
-        }).toList();
-      }
-
-      return members;
+      final data = await query;
+      final list = _coerceList(data);
+      final members = _mapMembers(list);
+      return MemberFetchResult(members: members);
     } catch (e) {
       print('❌ Error fetching members: $e');
       rethrow;
     }
+  }
+
+  String _resolveColumnSelection(List<String>? columns) {
+    final selection = columns?.where((column) => column.trim().isNotEmpty).toList();
+    if (selection == null || selection.isEmpty) {
+      return '*';
+    }
+    return selection.join(',');
+  }
+
+  PostgrestFilterBuilder<dynamic> _applyMemberFilters(
+    PostgrestFilterBuilder<dynamic> query, {
+    String? county,
+    String? congressionalDistrict,
+    List<String>? committees,
+    String? highSchool,
+    String? college,
+    String? chapterName,
+    String? chapterStatus,
+    int? minAge,
+    int? maxAge,
+    bool? optedOut,
+    bool? registeredVoter,
+    String? searchQuery,
+  }) {
+    if (county != null && county.isNotEmpty) {
+      query = query.eq('county', county);
+    }
+
+    if (congressionalDistrict != null && congressionalDistrict.isNotEmpty) {
+      query = query.eq('congressional_district', congressionalDistrict);
+    }
+
+    if (committees != null && committees.isNotEmpty) {
+      query = query.overlaps('committee', committees);
+    }
+
+    if (highSchool != null && highSchool.isNotEmpty) {
+      query = query.eq('high_school', highSchool);
+    }
+
+    if (college != null && college.isNotEmpty) {
+      query = query.eq('college', college);
+    }
+
+    if (chapterName != null && chapterName.isNotEmpty) {
+      query = query.eq('chapter_name', chapterName);
+    }
+
+    if (chapterStatus != null && chapterStatus.isNotEmpty) {
+      query = query.eq('current_chapter_member', chapterStatus);
+    }
+
+    if (optedOut != null) {
+      query = query.eq('opt_out', optedOut);
+    }
+
+    if (registeredVoter != null) {
+      query = query.eq('registered_voter', registeredVoter);
+    }
+
+    if (minAge != null || maxAge != null) {
+      query = _applyAgeFilters(query, minAge: minAge, maxAge: maxAge);
+    }
+
+    final trimmedQuery = searchQuery?.trim();
+    if (trimmedQuery != null && trimmedQuery.isNotEmpty) {
+      final sanitized = _escapeFilterValue(_escapeLikePattern(trimmedQuery));
+      final pattern = '%$sanitized%';
+      final clauses = [
+        'name.ilike.$pattern',
+        'phone.ilike.$pattern',
+        'phone_e164.ilike.$pattern',
+        'email.ilike.$pattern',
+        'school_email.ilike.$pattern',
+        'county.ilike.$pattern',
+        'congressional_district.ilike.$pattern',
+        'chapter_name.ilike.$pattern',
+        'chapter_position.ilike.$pattern',
+        'community_type.ilike.$pattern',
+        'current_chapter_member.ilike.$pattern',
+        'notes.ilike.$pattern',
+      ];
+      query = query.or(clauses.join(','));
+    }
+
+    return query;
+  }
+
+  PostgrestFilterBuilder<dynamic> _applyAgeFilters(
+    PostgrestFilterBuilder<dynamic> query, {
+    int? minAge,
+    int? maxAge,
+  }) {
+    final now = DateTime.now();
+
+    if (minAge != null && minAge > 0) {
+      final cutoff = _birthdateForAge(minAge, reference: now);
+      query = query.lte('date_of_birth', _formatDateOnly(cutoff));
+    }
+
+    if (maxAge != null && maxAge >= 0) {
+      final earliest = _birthdateForAge(maxAge + 1, reference: now).add(const Duration(days: 1));
+      query = query.gte('date_of_birth', _formatDateOnly(earliest));
+    }
+
+    return query;
+  }
+
+  String _formatDateOnly(DateTime date) => date.toIso8601String().split('T').first;
+
+  DateTime _birthdateForAge(int age, {DateTime? reference}) {
+    final base = reference ?? DateTime.now();
+    final targetYear = base.year - age;
+    final targetMonth = base.month;
+    final targetDay = base.day;
+    final lastDayOfMonth = DateTime(targetYear, targetMonth + 1, 0).day;
+    final safeDay = targetDay > lastDayOfMonth ? lastDayOfMonth : targetDay;
+    return DateTime(targetYear, targetMonth, safeDay);
+  }
+
+  int? _calculateAge(DateTime dob, {DateTime? reference}) {
+    final now = reference ?? DateTime.now();
+    var age = now.year - dob.year;
+    if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
+    return age >= 0 ? age : null;
+  }
+
+  String _escapeLikePattern(String value) {
+    return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
+  }
+
+  String _escapeFilterValue(String value) {
+    return value
+        .replaceAll('\\', '\\\\')
+        .replaceAll(',', '\\,')
+        .replaceAll('(', '\\(')
+        .replaceAll(')', '\\)');
+  }
+
+  List<dynamic> _coerceList(dynamic response) {
+    if (response is PostgrestResponse) {
+      return _coerceList(response.data);
+    }
+    if (response is List<dynamic>) {
+      return response;
+    }
+    if (response is List) {
+      return response.cast<dynamic>();
+    }
+    if (response == null) {
+      return const [];
+    }
+    throw FormatException('Unexpected response type: ${response.runtimeType}');
+  }
+
+  List<Member> _mapMembers(List<dynamic> data) {
+    final members = <Member>[];
+    for (final item in data) {
+      if (item is Map<String, dynamic>) {
+        members.add(Member.fromJson(item));
+      } else if (item is Map) {
+        final mapped = item.map((key, dynamic value) => MapEntry(key.toString(), value));
+        members.add(Member.fromJson(mapped));
+      }
+    }
+    return members;
   }
 
   /// Get member by ID
@@ -230,6 +431,63 @@ class MemberRepository {
     } catch (e) {
       print('❌ Error aggregating committee counts: $e');
       return {};
+    }
+  }
+
+  Future<Map<String, int>> getLeadershipCountsByChapter() async {
+    if (!_isReady) return {};
+
+    try {
+      final response = await _readClient
+          .from('members')
+          .select('chapter_name, chapter_position')
+          .not('chapter_position', 'is', null);
+
+      final counts = <String, int>{};
+      for (final item in response as List<dynamic>) {
+        final chapter = Member.normalizeText(item['chapter_name']);
+        final position = Member.normalizeText(item['chapter_position']);
+        if (chapter == null || position == null) continue;
+        final trimmed = chapter.trim();
+        if (trimmed.isEmpty) continue;
+        counts[trimmed] = (counts[trimmed] ?? 0) + 1;
+      }
+
+      return _sortCounts(counts);
+    } catch (e) {
+      print('❌ Error aggregating leadership counts: $e');
+      return {};
+    }
+  }
+
+  Future<AgeBounds> getAgeBounds() async {
+    if (!_isReady) return const AgeBounds();
+
+    try {
+      final response = await _readClient.from('members').select('date_of_birth');
+      int? minAge;
+      int? maxAge;
+      final now = DateTime.now();
+
+      for (final item in response as List<dynamic>) {
+        final raw = item['date_of_birth'];
+        if (raw is! String || raw.isEmpty) continue;
+        final parsed = DateTime.tryParse(raw);
+        if (parsed == null) continue;
+        final age = _calculateAge(parsed, reference: now);
+        if (age == null) continue;
+        if (minAge == null || age < minAge) {
+          minAge = age;
+        }
+        if (maxAge == null || age > maxAge) {
+          maxAge = age;
+        }
+      }
+
+      return AgeBounds(min: minAge, max: maxAge);
+    } catch (e) {
+      print('❌ Error computing age bounds: $e');
+      return const AgeBounds();
     }
   }
 
@@ -1028,6 +1286,20 @@ class MemberRepository {
       };
     }
   }
+}
+
+class MemberFetchResult {
+  final List<Member> members;
+  final int? totalCount;
+
+  const MemberFetchResult({required this.members, this.totalCount});
+}
+
+class AgeBounds {
+  final int? min;
+  final int? max;
+
+  const AgeBounds({this.min, this.max});
 }
 
 Map<String, dynamic>? _coerceJsonMap(dynamic value) {
