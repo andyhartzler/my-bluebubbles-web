@@ -1075,7 +1075,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
               maxLines: 10,
               decoration: const InputDecoration(
                 labelText: 'Message',
-                hintText: 'Hello {{firstName}},\n\nThank you for...',
+                hintText: 'Type your message…',
                 border: OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
