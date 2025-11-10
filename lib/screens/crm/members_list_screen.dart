@@ -124,6 +124,22 @@ class _MembersListScreenState extends State<MembersListScreen> {
   int? _availableMinAge;
   int? _availableMaxAge;
 
+  bool get _hasActiveFilters {
+    if (_searchQuery.trim().isNotEmpty) return true;
+    if ((_selectedCounty ?? '').isNotEmpty) return true;
+    if ((_selectedDistrict ?? '').isNotEmpty) return true;
+    if ((_selectedChapter ?? '').isNotEmpty) return true;
+    if (_selectedCommittees?.isNotEmpty ?? false) return true;
+    if (_selectedLeadershipChapters?.isNotEmpty ?? false) return true;
+    if (_registeredVoterFilter != null) return true;
+    if (_contactFilter != null) return true;
+    if (_minAgeFilter != null) return true;
+    if (_maxAgeFilter != null) return true;
+    return false;
+  }
+
+  bool get _shouldUsePaging => !_hasActiveFilters;
+
   static const List<Color> _memberCardGradient = [Color(0xFF0F4C75), Color(0xFF3282B8)];
   static const Color _executiveAccentColor = Color(0xFFFDB813);
   static const int _minAllowedAge = 14;
@@ -373,11 +389,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
     if (!_crmReady) return;
     if (_isLoadingPage) return;
 
-    final currentOffset = reset ? 0 : _members.length;
+    final shouldUsePaging = _shouldUsePaging;
+    final currentOffset = !shouldUsePaging || reset ? 0 : _members.length;
 
     setState(() {
       _isLoadingPage = true;
-      if (reset) {
+      if (reset || !shouldUsePaging) {
         _members = [];
         _filteredMembers = [];
         _agedOutMembers = [];
@@ -399,29 +416,35 @@ class _MembersListScreenState extends State<MembersListScreen> {
         optedOut: _resolveOptedOutFilter(),
         registeredVoter: _resolveRegisteredFilter(),
         searchQuery: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
-        limit: _pageSize,
-        offset: currentOffset,
-        fetchTotalCount: requestTotalCount,
+        limit: shouldUsePaging ? _pageSize : null,
+        offset: shouldUsePaging ? currentOffset : null,
+        fetchTotalCount: requestTotalCount || !shouldUsePaging,
+        fetchAll: !shouldUsePaging,
         columns: MemberRepository.listingColumns,
       );
 
       if (!mounted) return;
 
       setState(() {
-        if (reset) {
+        if (!shouldUsePaging || reset) {
           _members = List<Member>.from(result.members);
         } else {
           _members.addAll(result.members);
         }
 
-        if (result.totalCount != null) {
-          _totalAvailableMembers = result.totalCount;
-          _hasMoreMembers = currentOffset + result.members.length < result.totalCount!;
+        if (!shouldUsePaging) {
+          _totalAvailableMembers = result.totalCount ?? _members.length;
+          _hasMoreMembers = false;
         } else {
-          if (reset && _totalAvailableMembers == null) {
-            _totalAvailableMembers = _members.length;
+          if (result.totalCount != null) {
+            _totalAvailableMembers = result.totalCount;
+            _hasMoreMembers = currentOffset + result.members.length < result.totalCount!;
+          } else {
+            if (reset || _totalAvailableMembers == null) {
+              _totalAvailableMembers = _members.length;
+            }
+            _hasMoreMembers = result.members.length == _pageSize;
           }
-          _hasMoreMembers = result.members.length == _pageSize;
         }
 
         _rebuildFilters();
@@ -470,6 +493,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   void _handleScroll() {
     if (_showingChapters) return;
+    if (!_shouldUsePaging) return;
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
     if (!position.hasPixels || !position.hasContentDimensions) return;
@@ -480,7 +504,10 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   @visibleForTesting
-  Future<void> fetchNextPageForTesting() => _fetchMembersPage();
+  Future<void> fetchNextPageForTesting() {
+    if (!_shouldUsePaging) return Future.value();
+    return _fetchMembersPage();
+  }
 
   void _deriveAgeBounds(List<Member> members) {
     final ages = members.map((member) => member.age).whereType<int>().toList()..sort();
