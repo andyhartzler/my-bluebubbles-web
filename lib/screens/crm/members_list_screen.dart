@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -2011,16 +2012,24 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
     Widget content;
     if (photoUrl != null && photoUrl.isNotEmpty) {
+      final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+      final cacheSize = math.max(1, (size * devicePixelRatio).round());
+
       content = ClipOval(
-        child: Image.network(
-          photoUrl,
+        child: CachedNetworkImage(
+          imageUrl: photoUrl,
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => buildFallback(),
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Center(
+          memCacheWidth: cacheSize,
+          memCacheHeight: cacheSize,
+          fadeInDuration: const Duration(milliseconds: 200),
+          fadeOutDuration: const Duration(milliseconds: 200),
+          placeholder: (context, url) => Container(
+            width: size,
+            height: size,
+            color: Colors.black.withOpacity(0.1),
+            child: Center(
               child: SizedBox(
                 width: size * 0.4,
                 height: size * 0.4,
@@ -2029,8 +2038,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
                 ),
               ),
-            );
-          },
+            ),
+          ),
+          errorWidget: (context, url, error) => buildFallback(),
         ),
       );
     } else {
