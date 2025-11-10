@@ -80,6 +80,7 @@ class MemberRepository {
     int? limit,
     int? offset,
     bool fetchTotalCount = false,
+    bool fetchAll = false,
     List<String>? columns,
   }) async {
     if (!_isReady) {
@@ -107,8 +108,8 @@ class MemberRepository {
       var query =
           baseQuery.order('name', ascending: true).order('id', ascending: true);
 
-      final hasLimit = limit != null && limit > 0;
-      final hasOffset = offset != null && offset > 0;
+      final hasLimit = !fetchAll && limit != null && limit > 0;
+      final hasOffset = !fetchAll && offset != null && offset > 0;
       final limitValue = hasLimit ? limit! : null;
       final offsetValue = hasOffset ? offset! : null;
       final applyOffsetInMemory = hasOffset && !hasLimit;
