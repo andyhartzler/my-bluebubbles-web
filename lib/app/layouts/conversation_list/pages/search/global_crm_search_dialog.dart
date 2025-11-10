@@ -131,10 +131,22 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bool isDark = theme.brightness == Brightness.dark;
+    final Color overlayBase = isDark ? Colors.black : const Color(0xFF273351);
+
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-      child: Container(
-        color: Colors.black.withOpacity(0.35),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              overlayBase.withOpacity(isDark ? 0.45 : 0.25),
+              overlayBase.withOpacity(isDark ? 0.25 : 0.08),
+            ],
+          ),
+        ),
         child: SafeArea(
           child: Shortcuts(
             shortcuts: <LogicalKeySet, Intent>{
