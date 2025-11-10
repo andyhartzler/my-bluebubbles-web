@@ -165,14 +165,17 @@ class CRMEmailService {
         'send-email',
         body: payload,
       );
-    } on FunctionsException catch (error) {
+    } on SupabaseException catch (error) {
+      final message = error.message;
       throw CRMEmailException(
-        error.message ?? 'Failed to send email via Supabase function.',
+        message.isNotEmpty
+            ? message
+            : 'Failed to send email via Supabase function.',
         cause: error,
       );
-    } on ClientException catch (error) {
+    } catch (error) {
       throw CRMEmailException(
-        error.message ?? 'Failed to send email via Supabase function.',
+        'Failed to send email via Supabase function: $error',
         cause: error,
       );
     }
