@@ -48,15 +48,26 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
 
   final TextEditingController _subjectController = TextEditingController();
-  final TextEditingController _htmlController = TextEditingController();
-  final TextEditingController _textController = TextEditingController();
+  final TextEditingController _bodyController = TextEditingController();
+  final TextEditingController _fromNameController = TextEditingController();
+  final TextEditingController _replyToController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _manualEmailController = TextEditingController();
+  final TextEditingController _ccSearchController = TextEditingController();
+  final TextEditingController _ccManualEmailController = TextEditingController();
+  final TextEditingController _bccSearchController = TextEditingController();
+  final TextEditingController _bccManualEmailController = TextEditingController();
 
   final List<Member> _selectedMembers = [];
   final List<Member> _searchResults = [];
+  final List<Member> _ccMembers = [];
+  final List<Member> _bccMembers = [];
+  final List<Member> _ccSearchResults = [];
+  final List<Member> _bccSearchResults = [];
   final List<PlatformFile> _attachments = [];
   final List<String> _manualEmails = [];
+  final List<String> _ccManualEmails = [];
+  final List<String> _bccManualEmails = [];
 
   MessageFilter _filter = MessageFilter();
   _RecipientMode _mode = _RecipientMode.manual;
@@ -64,6 +75,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   bool _loadingPreview = false;
   bool _sending = false;
   bool _searching = false;
+  bool _searchingCc = false;
+  bool _searchingBcc = false;
   String? _errorMessage;
 
   List<Member> _previewMembers = [];
@@ -72,6 +85,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   int _missingEmailCount = 0;
 
   Timer? _searchDebounce;
+  Timer? _ccSearchDebounce;
+  Timer? _bccSearchDebounce;
 
   List<String> _counties = [];
   List<String> _districts = [];
@@ -101,6 +116,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       }
     }
     _searchController.addListener(_onSearchChanged);
+    _ccSearchController.addListener(_onCcSearchChanged);
+    _bccSearchController.addListener(_onBccSearchChanged);
     if (_crmReady) {
       _loadFilterOptions();
       _updatePreview();
@@ -110,12 +127,21 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   @override
   void dispose() {
     _subjectController.dispose();
-    _htmlController.dispose();
-    _textController.dispose();
+    _bodyController.dispose();
+    _fromNameController.dispose();
+    _replyToController.dispose();
     _searchController.removeListener(_onSearchChanged);
+    _ccSearchController.removeListener(_onCcSearchChanged);
+    _bccSearchController.removeListener(_onBccSearchChanged);
     _searchController.dispose();
+    _ccSearchController.dispose();
+    _bccSearchController.dispose();
     _manualEmailController.dispose();
+    _ccManualEmailController.dispose();
+    _bccManualEmailController.dispose();
     _searchDebounce?.cancel();
+    _ccSearchDebounce?.cancel();
+    _bccSearchDebounce?.cancel();
     super.dispose();
   }
 
@@ -126,7 +152,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       !_sending &&
       _hasRecipients &&
       _subjectController.text.trim().isNotEmpty &&
-      _htmlController.text.trim().isNotEmpty;
+      _bodyController.text.trim().isNotEmpty;
 
   Future<void> _loadFilterOptions() async {
     final results = await Future.wait([
@@ -294,12 +320,108 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     });
   }
 
+  void _onCcSearchChanged() {
+    _ccSearchDebounce?.cancel();
+    final query = _ccSearchController.text.trim();
+    if (query.length < 2) {
+      setState(() {
+        _ccSearchResults.clear();
+        _searchingCc = false;
+      });
+      return;
+    }
+
+    _ccSearchDebounce = Timer(const Duration(milliseconds: 300), () async {
+      setState(() => _searchingCc = true);
+      try {
+        final results = await _memberRepo.searchMembers(query);
+        if (!mounted) return;
+        setState(() {
+          _ccSearchResults
+            ..clear()
+            ..addAll(results
+                .where((member) => _normalizeEmail(member.preferredEmail) != null)
+                .where((member) => !_selectedMembers.any((m) => m.id == member.id)));
+          _searchingCc = false;
+        });
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          _ccSearchResults.clear();
+          _searchingCc = false;
+        });
+      }
+    });
+  }
+
+  void _onBccSearchChanged() {
+    _bccSearchDebounce?.cancel();
+    final query = _bccSearchController.text.trim();
+    if (query.length < 2) {
+      setState(() {
+        _bccSearchResults.clear();
+        _searchingBcc = false;
+      });
+      return;
+    }
+
+    _bccSearchDebounce = Timer(const Duration(milliseconds: 300), () async {
+      setState(() => _searchingBcc = true);
+      try {
+        final results = await _memberRepo.searchMembers(query);
+        if (!mounted) return;
+        setState(() {
+          _bccSearchResults
+            ..clear()
+            ..addAll(results
+                .where((member) => _normalizeEmail(member.preferredEmail) != null)
+                .where((member) => !_selectedMembers.any((m) => m.id == member.id)));
+          _searchingBcc = false;
+        });
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          _bccSearchResults.clear();
+          _searchingBcc = false;
+        });
+      }
+    });
+  }
+
   String? _normalizeEmail(String? value) {
     if (value == null) return null;
     final trimmed = value.trim();
     if (trimmed.isEmpty) return null;
     if (!trimmed.contains('@')) return null;
     return trimmed;
+  }
+
+  bool _emailAlreadyTargeted(String lowerCaseEmail) {
+    bool matchesMemberEmail(Member member) {
+      final email = member.preferredEmail;
+      if (email == null) return false;
+      return email.trim().toLowerCase() == lowerCaseEmail;
+    }
+
+    if (_manualEmails.any((value) => value.toLowerCase() == lowerCaseEmail)) {
+      return true;
+    }
+    if (_ccManualEmails.any((value) => value.toLowerCase() == lowerCaseEmail)) {
+      return true;
+    }
+    if (_bccManualEmails.any((value) => value.toLowerCase() == lowerCaseEmail)) {
+      return true;
+    }
+    if (_selectedMembers.any(matchesMemberEmail)) {
+      return true;
+    }
+    if (_ccMembers.any(matchesMemberEmail)) {
+      return true;
+    }
+    if (_bccMembers.any(matchesMemberEmail)) {
+      return true;
+    }
+    return false;
   }
 
   void _toggleMemberSelection(Member member) {
@@ -327,6 +449,78 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       _selectedMembers.removeWhere((m) => m.id == member.id);
     });
     _updatePreview();
+  }
+
+  void _toggleCcMember(Member member) {
+    final existingIndex = _ccMembers.indexWhere((m) => m.id == member.id);
+    if (existingIndex >= 0) {
+      setState(() {
+        _ccMembers.removeAt(existingIndex);
+      });
+      return;
+    }
+
+    final email = _normalizeEmail(member.preferredEmail);
+    if (email == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${member.name} does not have an email address.')),
+      );
+      return;
+    }
+
+    final lower = email.toLowerCase();
+    if (_emailAlreadyTargeted(lower)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That email address is already selected.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _ccMembers.add(member);
+    });
+  }
+
+  void _removeCcMember(Member member) {
+    setState(() {
+      _ccMembers.removeWhere((m) => m.id == member.id);
+    });
+  }
+
+  void _toggleBccMember(Member member) {
+    final existingIndex = _bccMembers.indexWhere((m) => m.id == member.id);
+    if (existingIndex >= 0) {
+      setState(() {
+        _bccMembers.removeAt(existingIndex);
+      });
+      return;
+    }
+
+    final email = _normalizeEmail(member.preferredEmail);
+    if (email == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${member.name} does not have an email address.')),
+      );
+      return;
+    }
+
+    final lower = email.toLowerCase();
+    if (_emailAlreadyTargeted(lower)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That email address is already selected.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _bccMembers.add(member);
+    });
+  }
+
+  void _removeBccMember(Member member) {
+    setState(() {
+      _bccMembers.removeWhere((m) => m.id == member.id);
+    });
   }
 
   Future<void> _pickAttachments() async {
@@ -392,12 +586,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       return;
     }
 
-    final normalized = email.toLowerCase();
-    final existingManual = _manualEmails.any((value) => value.toLowerCase() == normalized);
-    final existingMember = _selectedMembers.any((member) =>
-        member.preferredEmail != null && member.preferredEmail!.trim().toLowerCase() == normalized);
-
-    if (existingManual || existingMember) {
+    final lower = email.toLowerCase();
+    if (_emailAlreadyTargeted(lower)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('That email is already in the recipient list.')),
       );
@@ -418,12 +608,73 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     _updatePreview();
   }
 
+  void _addManualCcEmail() {
+    if (_sending) return;
+    final email = _normalizeEmail(_ccManualEmailController.text);
+    if (email == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid email address before adding.')),
+      );
+      return;
+    }
+
+    final lower = email.toLowerCase();
+    if (_emailAlreadyTargeted(lower)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That email is already in the recipient list.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _ccManualEmails.add(email);
+      _ccManualEmailController.clear();
+    });
+  }
+
+  void _removeManualCcEmail(String email) {
+    setState(() {
+      _ccManualEmails.remove(email);
+    });
+  }
+
+  void _addManualBccEmail() {
+    if (_sending) return;
+    final email = _normalizeEmail(_bccManualEmailController.text);
+    if (email == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid email address before adding.')),
+      );
+      return;
+    }
+
+    final lower = email.toLowerCase();
+    if (_emailAlreadyTargeted(lower)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That email is already in the recipient list.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _bccManualEmails.add(email);
+      _bccManualEmailController.clear();
+    });
+  }
+
+  void _removeManualBccEmail(String email) {
+    setState(() {
+      _bccManualEmails.remove(email);
+    });
+  }
+
   Future<void> _sendEmail() async {
     if (!_canSendEmail) return;
 
     final subject = _subjectController.text.trim();
-    final htmlBody = _htmlController.text.trim();
-    final textBody = _textController.text.trim();
+    final body = _bodyController.text.trim();
+    final fromName = _fromNameController.text.trim();
+    final replyTo = _replyToController.text.trim();
 
     setState(() {
       _sending = true;
@@ -452,12 +703,22 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       await _emailService.sendEmail(
         to: recipients.emails,
         subject: subject,
-        htmlBody: htmlBody,
-        textBody: textBody.isEmpty ? null : textBody,
+        textBody: body,
+        fromEmail: CRMConfig.defaultSenderEmail,
+        fromName: fromName.isEmpty ? null : fromName,
+        replyTo: replyTo.isEmpty ? null : replyTo,
+        cc: recipients.ccEmails.isEmpty ? null : recipients.ccEmails,
+        bcc: recipients.bccEmails.isEmpty ? null : recipients.bccEmails,
         attachments: attachments,
       );
 
-      for (final member in recipients.members) {
+      final Map<String, Member> contactedMembers = {
+        for (final member in recipients.members) member.id: member,
+        for (final member in recipients.ccMembers) member.id: member,
+        for (final member in recipients.bccMembers) member.id: member,
+      };
+
+      for (final member in contactedMembers.values) {
         await _memberRepo.updateLastContacted(member.id);
       }
 
@@ -468,8 +729,14 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         _sending = false;
       });
 
+      final totalCount =
+          recipients.emails.length + recipients.ccEmails.length + recipients.bccEmails.length;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Email sent to ${recipients.emails.length} recipient${recipients.emails.length == 1 ? '' : 's'}')),
+        SnackBar(
+          content: Text(
+            'Email sent to $totalCount recipient${totalCount == 1 ? '' : 's'}',
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
@@ -485,19 +752,64 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     }
   }
 
-  Future<({List<Member> members, List<String> emails})> _resolveRecipients() async {
+  Future<({
+    List<Member> members,
+    List<String> emails,
+    List<Member> ccMembers,
+    List<String> ccEmails,
+    List<Member> bccMembers,
+    List<String> bccEmails,
+  })> _resolveRecipients() async {
     final LinkedHashMap<String, Member> members = LinkedHashMap();
     final LinkedHashMap<String, String> emailMap = LinkedHashMap();
+    final LinkedHashMap<String, Member> ccMemberMap = LinkedHashMap();
+    final LinkedHashMap<String, String> ccEmailMap = LinkedHashMap();
+    final LinkedHashMap<String, Member> bccMemberMap = LinkedHashMap();
+    final LinkedHashMap<String, String> bccEmailMap = LinkedHashMap();
 
-    void addEmail(String email) {
+    void addEmail(LinkedHashMap<String, String> map, String email) {
       final lower = email.toLowerCase();
-      emailMap[lower] = email;
+      map[lower] = email;
+    }
+
+    void addPrimaryEmail(String email) {
+      addEmail(emailMap, email);
+    }
+
+    void addCcEmail(String email) {
+      final lower = email.toLowerCase();
+      if (emailMap.containsKey(lower) || ccEmailMap.containsKey(lower)) {
+        return;
+      }
+      addEmail(ccEmailMap, email);
+    }
+
+    void addBccEmail(String email) {
+      final lower = email.toLowerCase();
+      if (emailMap.containsKey(lower) || ccEmailMap.containsKey(lower) || bccEmailMap.containsKey(lower)) {
+        return;
+      }
+      addEmail(bccEmailMap, email);
     }
 
     for (final manual in _manualEmails) {
       final normalized = _normalizeEmail(manual);
       if (normalized != null) {
-        addEmail(normalized);
+        addPrimaryEmail(normalized);
+      }
+    }
+
+    for (final manual in _ccManualEmails) {
+      final normalized = _normalizeEmail(manual);
+      if (normalized != null) {
+        addCcEmail(normalized);
+      }
+    }
+
+    for (final manual in _bccManualEmails) {
+      final normalized = _normalizeEmail(manual);
+      if (normalized != null) {
+        addBccEmail(normalized);
       }
     }
 
@@ -510,7 +822,33 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         return;
       }
       members[member.id] = member;
-      addEmail(email);
+      addPrimaryEmail(email);
+    }
+
+    void addCcMember(Member member) {
+      final email = _normalizeEmail(member.preferredEmail);
+      if (email == null) {
+        return;
+      }
+      final lower = email.toLowerCase();
+      if (emailMap.containsKey(lower) || ccEmailMap.containsKey(lower)) {
+        return;
+      }
+      ccMemberMap[member.id] = member;
+      addCcEmail(email);
+    }
+
+    void addBccMember(Member member) {
+      final email = _normalizeEmail(member.preferredEmail);
+      if (email == null) {
+        return;
+      }
+      final lower = email.toLowerCase();
+      if (emailMap.containsKey(lower) || ccEmailMap.containsKey(lower) || bccEmailMap.containsKey(lower)) {
+        return;
+      }
+      bccMemberMap[member.id] = member;
+      addBccEmail(email);
     }
 
     if (_filter.hasActiveFilters) {
@@ -544,9 +882,22 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       addMember(member);
     }
 
-    final allEmails = emailMap.values.toList(growable: false);
+    for (final member in _ccMembers) {
+      addCcMember(member);
+    }
 
-    return (members: members.values.toList(growable: false), emails: allEmails);
+    for (final member in _bccMembers) {
+      addBccMember(member);
+    }
+
+    return (
+      members: members.values.toList(growable: false),
+      emails: emailMap.values.toList(growable: false),
+      ccMembers: ccMemberMap.values.toList(growable: false),
+      ccEmails: ccEmailMap.values.toList(growable: false),
+      bccMembers: bccMemberMap.values.toList(growable: false),
+      bccEmails: bccEmailMap.values.toList(growable: false),
+    );
   }
 
   void _setMode(_RecipientMode mode) {
@@ -587,6 +938,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
                       children: [
                         _buildComposeCard(),
                         const SizedBox(height: 16),
+                        _buildCarbonCopyCard(),
+                        const SizedBox(height: 16),
                         _buildPreviewCard(),
                       ],
                     ),
@@ -613,6 +966,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
                         padding: const EdgeInsets.all(16),
                         children: [
                           _buildComposeCard(),
+                          const SizedBox(height: 16),
+                          _buildCarbonCopyCard(),
                           const SizedBox(height: 16),
                           _buildPreviewCard(),
                           const SizedBox(height: 16),
@@ -670,7 +1025,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
-                  'Select recipients to enable the compose form. Subject and HTML body are required.',
+                  'Select recipients to enable the compose form. Subject and message body are required.',
                 ),
               ),
             if (!_hasRecipients) const SizedBox(height: 12),
@@ -684,28 +1039,47 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'From: ${CRMConfig.defaultSenderEmail} (default sender)',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Theme.of(context).hintColor),
+              ),
+            ),
+            const SizedBox(height: 12),
             TextField(
-              controller: _htmlController,
+              controller: _fromNameController,
               enabled: _hasRecipients && !_sending,
-              maxLines: 8,
               decoration: const InputDecoration(
-                labelText: 'HTML Body',
-                hintText: '<p>Hello {{firstName}},</p>',
+                labelText: 'From Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _replyToController,
+              enabled: _hasRecipients && !_sending,
+              decoration: const InputDecoration(
+                labelText: 'Reply-To Email (optional)',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _bodyController,
+              enabled: _hasRecipients && !_sending,
+              maxLines: 10,
+              decoration: const InputDecoration(
+                labelText: 'Message',
+                hintText: 'Hello {{firstName}},\n\nThank you for...',
                 border: OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
               onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _textController,
-              enabled: _hasRecipients && !_sending,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Plain-text fallback (optional)',
-                border: OutlineInputBorder(),
-                alignLabelWithHint: true,
-              ),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -729,6 +1103,177 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCarbonCopyCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'CC / BCC',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Optionally copy additional members or contacts on this email.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Theme.of(context).hintColor),
+            ),
+            const SizedBox(height: 16),
+            _buildCopySection(
+              label: 'CC',
+              members: _ccMembers,
+              manualEmails: _ccManualEmails,
+              searchController: _ccSearchController,
+              searching: _searchingCc,
+              searchResults: _ccSearchResults,
+              onToggleMember: _toggleCcMember,
+              onRemoveMember: _removeCcMember,
+              manualController: _ccManualEmailController,
+              onAddManual: _addManualCcEmail,
+              onRemoveManual: _removeManualCcEmail,
+            ),
+            const SizedBox(height: 24),
+            _buildCopySection(
+              label: 'BCC',
+              members: _bccMembers,
+              manualEmails: _bccManualEmails,
+              searchController: _bccSearchController,
+              searching: _searchingBcc,
+              searchResults: _bccSearchResults,
+              onToggleMember: _toggleBccMember,
+              onRemoveMember: _removeBccMember,
+              manualController: _bccManualEmailController,
+              onAddManual: _addManualBccEmail,
+              onRemoveManual: _removeManualBccEmail,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCopySection({
+    required String label,
+    required List<Member> members,
+    required List<String> manualEmails,
+    required TextEditingController searchController,
+    required bool searching,
+    required List<Member> searchResults,
+    required ValueChanged<Member> onToggleMember,
+    required ValueChanged<Member> onRemoveMember,
+    required TextEditingController manualController,
+    required VoidCallback onAddManual,
+    required ValueChanged<String> onRemoveManual,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label Recipients',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 12),
+        if (members.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: members
+                .map(
+                  (member) => InputChip(
+                    label: Text(member.name),
+                    avatar: const Icon(Icons.person, size: 18),
+                    onDeleted: _sending ? null : () => onRemoveMember(member),
+                  ),
+                )
+                .toList(),
+          ),
+        if (members.isNotEmpty && manualEmails.isNotEmpty) const SizedBox(height: 8),
+        if (manualEmails.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: manualEmails
+                .map(
+                  (email) => InputChip(
+                    label: Text(email),
+                    avatar: const Icon(Icons.alternate_email, size: 18),
+                    onDeleted: _sending ? null : () => onRemoveManual(email),
+                  ),
+                )
+                .toList(),
+          ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: searchController,
+          enabled: !_sending,
+          decoration: InputDecoration(
+            labelText: 'Search members to add to $label',
+            suffixIcon: searching
+                ? const Padding(
+                    padding: EdgeInsets.all(12.0),
+                    child: SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    ),
+                  )
+                : const Icon(Icons.search),
+          ),
+        ),
+        if (searchResults.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 220),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: searchResults.length,
+              itemBuilder: (context, index) {
+                final member = searchResults[index];
+                final selected = members.any((m) => m.id == member.id);
+                final email = _normalizeEmail(member.preferredEmail);
+                return ListTile(
+                  title: Text(member.name),
+                  subtitle: Text(email ?? 'No email on record'),
+                  trailing: Icon(
+                    selected ? Icons.check_circle : Icons.add_circle_outline,
+                    color: selected ? Theme.of(context).colorScheme.primary : null,
+                  ),
+                  onTap: _sending ? null : () => onToggleMember(member),
+                );
+              },
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: manualController,
+                enabled: !_sending,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'Add email to $label',
+                  border: const OutlineInputBorder(),
+                ),
+                onSubmitted: (_) => onAddManual(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton(
+              onPressed: _sending ? null : onAddManual,
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

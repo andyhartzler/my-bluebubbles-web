@@ -1,6 +1,7 @@
 import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -693,11 +694,30 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
 
     final subjectController = TextEditingController();
-    final htmlController = TextEditingController();
-    final textController = TextEditingController();
+    final bodyController = TextEditingController();
+    final fromNameController = TextEditingController();
+    final replyToController = TextEditingController();
+    final ccController = TextEditingController();
+    final bccController = TextEditingController();
 
     String? errorMessage;
     bool sending = false;
+
+    List<String> parseEmails(String value) {
+      final seen = <String>{};
+      final result = <String>[];
+      for (final part in value.split(RegExp(r'[\s,;]+'))) {
+        final trimmed = part.trim();
+        if (trimmed.isEmpty || !trimmed.contains('@')) {
+          continue;
+        }
+        final lower = trimmed.toLowerCase();
+        if (seen.add(lower)) {
+          result.add(trimmed);
+        }
+      }
+      return result;
+    }
 
     bool? result;
     try {
@@ -711,10 +731,13 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
               Future<void> submit() async {
                 final subject = subjectController.text.trim();
-                final htmlBody = htmlController.text.trim();
-                final textBody = textController.text.trim();
+                final body = bodyController.text.trim();
+                final fromName = fromNameController.text.trim();
+                final replyTo = replyToController.text.trim();
+                final ccList = parseEmails(ccController.text);
+                final bccList = parseEmails(bccController.text);
 
-                if (subject.isEmpty || htmlBody.isEmpty || sending) {
+                if (subject.isEmpty || body.isEmpty || sending) {
                   return;
                 }
 
@@ -728,8 +751,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   await _emailService.sendEmail(
                     to: [email],
                     subject: subject,
-                    htmlBody: htmlBody,
-                    textBody: textBody.isEmpty ? null : textBody,
+                    textBody: body,
+                    fromEmail: CRMConfig.defaultSenderEmail,
+                    fromName: fromName.isEmpty ? null : fromName,
+                    replyTo: replyTo.isEmpty ? null : replyTo,
+                    cc: ccList.isEmpty ? null : ccList,
+                    bcc: bccList.isEmpty ? null : bccList,
                   );
                   if (context.mounted) {
                     Navigator.of(context).pop(true);
@@ -758,7 +785,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
               final canSend = !sending &&
                   subjectController.text.trim().isNotEmpty &&
-                  htmlController.text.trim().isNotEmpty;
+                  bodyController.text.trim().isNotEmpty;
 
               return AlertDialog(
                 title: const Text('Compose Email'),
@@ -788,13 +815,41 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         onChanged: (_) => updateState(),
                       ),
                       const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'From: ${CRMConfig.defaultSenderEmail} (default sender)',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Theme.of(context).hintColor),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       TextField(
-                        key: const ValueKey('crm_email_html_field'),
-                        controller: htmlController,
+                        controller: fromNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'From Name',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: replyToController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Reply-To Email (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        key: const ValueKey('crm_email_body_field'),
+                        controller: bodyController,
                         maxLines: 8,
                         decoration: const InputDecoration(
-                          labelText: 'HTML Body',
-                          hintText: '<p>Welcome to the team!</p>',
+                          labelText: 'Message',
+                          hintText: 'Hello {{firstName}},\n\nWelcome to the team!',
                           border: OutlineInputBorder(),
                           alignLabelWithHint: true,
                         ),
@@ -802,13 +857,22 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                       TextField(
-                        key: const ValueKey('crm_email_text_field'),
-                        controller: textController,
-                        maxLines: 4,
+                        controller: ccController,
+                        maxLines: 2,
                         decoration: const InputDecoration(
-                          labelText: 'Plain-text fallback (optional)',
+                          labelText: 'CC (optional)',
+                          hintText: 'Separate multiple emails with commas or spaces',
                           border: OutlineInputBorder(),
-                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: bccController,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: 'BCC (optional)',
+                          hintText: 'Separate multiple emails with commas or spaces',
+                          border: OutlineInputBorder(),
                         ),
                       ),
                       if (errorMessage != null) ...[
@@ -852,8 +916,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       );
     } finally {
       subjectController.dispose();
-      htmlController.dispose();
-      textController.dispose();
+      bodyController.dispose();
+      fromNameController.dispose();
+      replyToController.dispose();
+      ccController.dispose();
+      bccController.dispose();
     }
 
     if (result == true) {
