@@ -406,8 +406,11 @@ class Member {
       executiveCommittee: _normalizeBool(json['executive_committee']) ?? false,
       executiveTitle: _normalizeText(json['executive_title']),
       executiveRole: _normalizeText(json['executive_role']),
-      executiveRoleShort:
-          _normalizeText(json['executive_role_short'] ?? json['executive_role_small']),
+      executiveRoleShort: _normalizeText(
+        json['executive_role_short'] ??
+            json['executive_role_small'] ??
+            json['executive_role'],
+      ),
       currentChapterMember: _normalizeText(json['current_chapter_member']),
       chapterName: _normalizeText(json['chapter_name']),
       graduationYear: _normalizeText(json['graduation_year']),
