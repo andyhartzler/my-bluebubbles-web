@@ -89,10 +89,11 @@ class MemberRepository {
 
     try {
       final selection = _resolveColumnSelection(columns);
-      var query = _readClient.from('members').select(
-            selection,
-            FetchOptions(count: fetchTotalCount ? CountOption.exact : CountOption.none),
-          );
+      final fetchOptions =
+          fetchTotalCount ? const FetchOptions(count: CountOption.exact) : null;
+      var query = _readClient
+          .from('members')
+          .select(selection, fetchOptions: fetchOptions);
 
       query = _applyMemberFilters(
         query,
