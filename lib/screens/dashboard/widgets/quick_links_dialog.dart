@@ -145,20 +145,21 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _openLink(QuickLink link) async {
+  Future<void> _openLink(QuickLink link, {String? errorLabel}) async {
     final url = link.resolvedUrl;
     if (url == null || url.isEmpty) {
       _showMessage('No URL available for this quick link.');
       return;
     }
 
-    final uri = Uri.tryParse(trimmed);
-    if (uri == null) {
-      _showMessage(errorLabel ?? 'Unable to open link: $trimmed');
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) {
+      _showMessage('No URL available for this quick link.');
       return;
     }
 
-    if (!uri.hasScheme && !uri.isScheme('file')) {
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || (!uri.hasScheme && !uri.isScheme('file'))) {
       final resolved = Uri.tryParse('https://$trimmed');
       if (resolved == null) {
         _showMessage(errorLabel ?? 'Unable to open link: $trimmed');
