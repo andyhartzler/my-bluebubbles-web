@@ -432,12 +432,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       _StatCardData(
         title: 'Quick Links',
-        value: data.quickLinksCount,
         icon: Icons.link,
-        description: 'Shared resources ready to launch',
+        description: 'Launch shared resources and governing documents',
         colors: [theme.colorScheme.primaryContainer, theme.colorScheme.primary],
         actionLabel: 'Open quick links',
-        semanticsLabel: '${data.quickLinksCount} quick links available',
+        semanticsLabel: 'Open quick links',
         onTap: (context) => _openQuickLinks(context),
       ),
       _StatCardData(
@@ -1286,7 +1285,7 @@ class _DashboardData {
 
 class _StatCardData {
   final String title;
-  final int value;
+  final int? value;
   final IconData icon;
   final String description;
   final List<Color> colors;
@@ -1296,7 +1295,7 @@ class _StatCardData {
 
   _StatCardData({
     required this.title,
-    required this.value,
+    this.value,
     required this.icon,
     required this.description,
     required this.colors,
@@ -1325,7 +1324,8 @@ class _StatCard extends StatelessWidget {
 
     return Semantics(
       button: onTap != null,
-      label: semanticsLabel ?? '${data.value} ${data.title}',
+      label: semanticsLabel ??
+          (data.value != null ? '${data.value} ${data.title}' : data.title),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
@@ -1376,9 +1376,12 @@ class _StatCard extends StatelessWidget {
                     Icon(data.icon, color: theme.colorScheme.onPrimary, size: isCompact ? 24 : 28),
                     const SizedBox(height: 16),
                     Text(data.title, style: titleStyle),
-                    const SizedBox(height: 8),
-                    Text(data.value.toString(), style: valueStyle),
-                    const SizedBox(height: 6),
+                    if (data.value != null) ...[
+                      const SizedBox(height: 8),
+                      Text(data.value!.toString(), style: valueStyle),
+                      const SizedBox(height: 6),
+                    ] else
+                      const SizedBox(height: 12),
                     Text(data.description, style: bodyStyle),
                     const Spacer(),
                     if (onTap != null)
