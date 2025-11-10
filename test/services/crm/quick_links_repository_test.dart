@@ -107,7 +107,7 @@ void main() {
             'id': 'a',
             'title': 'Alpha Site',
             'category': 'Links',
-            'external_url': 'https://alpha.example',
+            'url': 'https://alpha.example',
             'icon_url': 'https://example.com/icons/alpha.png',
           },
         ],

@@ -718,6 +718,11 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
     final pdfUri = _resolvePublicFileUri(link);
     final description = link.description?.trim();
     final notes = link.notes?.trim();
+    final VoidCallback? onIconTap = url != null
+        ? () => _openLink(link)
+        : pdfUri != null
+            ? () => _openUri(pdfUri!)
+            : null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -729,10 +734,14 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: _QuickLinkIconAvatar(link: link, size: 44),
+                InkWell(
+                  onTap: onIconTap,
+                  borderRadius: BorderRadius.circular(22),
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: _QuickLinkIconAvatar(link: link, size: 44),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(

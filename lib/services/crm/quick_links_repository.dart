@@ -357,7 +357,7 @@ class QuickLinksRepository {
       normalizedUrl = externalUrl.trim();
     }
 
-    final bool includeExternalUrl = externalUrl != null;
+    final bool includeUrl = externalUrl != null;
 
     String? normalizedIconUrl;
     if (iconUrl != null) {
@@ -373,11 +373,11 @@ class QuickLinksRepository {
       'title': sanitizedTitle,
       'category': sanitizedCategory,
       'description': description?.trim(),
-      'external_url': normalizedUrl,
+      'url': normalizedUrl,
       'icon_url': normalizedIconUrl,
     }
       ..removeWhere((key, value) {
-        if (key == 'external_url' && includeExternalUrl) {
+        if (key == 'url' && includeUrl) {
           return false;
         }
         if (key == 'icon_url' && includeIconUrl) {
