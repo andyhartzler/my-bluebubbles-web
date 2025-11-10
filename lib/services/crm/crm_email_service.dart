@@ -165,8 +165,8 @@ class CRMEmailService {
         'send-email',
         body: payload,
       );
-    } on SupabaseException catch (error) {
-      final message = error.message;
+    } on Exception catch (error) {
+      final message = error.toString();
       throw CRMEmailException(
         message.isNotEmpty
             ? message
