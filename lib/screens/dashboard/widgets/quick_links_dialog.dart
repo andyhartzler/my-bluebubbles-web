@@ -531,36 +531,42 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         children: [
           _buildSectionHeader('Social Media', theme),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 24,
-            runSpacing: 24,
-            children: [
-              for (final link in links)
-                SizedBox(
-                  width: 160,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Tooltip(
-                        message: link.title,
-                        child: InkWell(
-                          onTap: () => _openLink(link),
-                          onLongPress: () => _manageLink(link),
-                          onSecondaryTap: () => _manageLink(link),
-                          borderRadius: BorderRadius.circular(32),
-                          child: _buildLinkAvatar(link, size: 56),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final entry in links.asMap().entries) ...[
+                  if (entry.key > 0) const SizedBox(width: 24),
+                  SizedBox(
+                    width: 160,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Tooltip(
+                          message: entry.value.title,
+                          child: InkWell(
+                            onTap: () => _openLink(entry.value),
+                            onLongPress: () => _manageLink(entry.value),
+                            onSecondaryTap: () => _manageLink(entry.value),
+                            borderRadius: BorderRadius.circular(32),
+                            child: _buildLinkAvatar(entry.value, size: 56),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      TextButton.icon(
-                        onPressed: link.resolvedUrl == null ? null : () => _copyLink(link),
-                        icon: const Icon(Icons.copy, size: 18),
-                        label: const Text('Copy link'),
-                      ),
-                    ],
+                        const SizedBox(height: 6),
+                        TextButton.icon(
+                          onPressed: entry.value.resolvedUrl == null
+                              ? null
+                              : () => _copyLink(entry.value),
+                          icon: const Icon(Icons.copy, size: 18),
+                          label: const Text('Copy link'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-            ],
+                ],
+              ],
+            ),
           ),
         ],
       ),
