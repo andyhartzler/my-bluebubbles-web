@@ -110,7 +110,7 @@ class QuickLink {
       category: category ?? this.category,
       description: description ?? this.description,
       externalUrl: externalUrl ?? this.externalUrl,
-      iconUrl: clearIconUrl ? null : iconUrl ?? this.iconUrl,
+      iconUrl: iconUrl ?? this.iconUrl,
       storageBucket: clearStorage ? null : storageBucket ?? this.storageBucket,
       storagePath: clearStorage ? null : storagePath ?? this.storagePath,
       fileName: clearStorage ? null : fileName ?? this.fileName,
