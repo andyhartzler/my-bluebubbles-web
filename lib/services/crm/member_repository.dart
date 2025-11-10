@@ -22,6 +22,10 @@ class MemberRepository {
   bool get _isReady => _supabase.isInitialized;
 
   static const String _documentsBucket = 'member-documents';
+  static const List<String> _dashboardMetricsSources = [
+    'crm_dashboard_metrics',
+    'dashboard_metrics',
+  ];
 
   SupabaseClient get _readClient =>
       _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
@@ -368,6 +372,50 @@ class MemberRepository {
       print('❌ Error fetching recent members: $e');
       return [];
     }
+  }
+
+  Future<Map<String, dynamic>> fetchDashboardMetrics() async {
+    if (!_isReady) {
+      return _createEmptyDashboardMetrics();
+    }
+
+    Map<String, dynamic>? rawPayload;
+    Object? lastError;
+
+    for (final source in _dashboardMetricsSources) {
+      try {
+        final response = await _readClient.rpc(source);
+        rawPayload = _coerceJsonMap(response);
+        if (rawPayload != null && rawPayload.isNotEmpty) {
+          break;
+        }
+      } catch (error) {
+        lastError = error;
+      }
+
+      try {
+        final response = await _readClient.from(source).select().limit(1).maybeSingle();
+        rawPayload = _coerceJsonMap(response);
+        if (rawPayload != null && rawPayload.isNotEmpty) {
+          break;
+        }
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (rawPayload != null && rawPayload.isNotEmpty) {
+      final normalized = _normalizeDashboardMetrics(rawPayload);
+      if (normalized != null) {
+        return normalized;
+      }
+    }
+
+    if (lastError != null) {
+      print('⚠️ Falling back to local dashboard aggregation: $lastError');
+    }
+
+    return _buildFallbackDashboardMetrics();
   }
 
   /// Get all unique congressional districts (for filter UI)
@@ -1028,6 +1076,241 @@ class MemberRepository {
       };
     }
   }
+
+  Future<Map<String, dynamic>> _buildFallbackDashboardMetrics() async {
+    final metrics = _createEmptyDashboardMetrics();
+
+    if (!_isReady) {
+      return metrics;
+    }
+
+    try {
+      final results = await Future.wait<dynamic>([
+        getMemberStats(),
+        getCountyCounts(),
+        getDistrictCounts(),
+        getCommitteeCounts(),
+        getHighSchoolCounts(),
+        getCollegeCounts(),
+        getChapterCounts(),
+        getChapterStatusCounts(),
+        getGraduationYearCounts(),
+        getPronounCounts(),
+        getGenderIdentityCounts(),
+        getRaceCounts(),
+        getLanguageCounts(),
+        getCommunityTypeCounts(),
+        getIndustryCounts(),
+        getEducationLevelCounts(),
+        getRegisteredVoterCounts(),
+        getSexualOrientationCounts(),
+        getAgeBucketCounts(),
+        getRecentMembers(limit: 6),
+      ]);
+
+      return {
+        'memberStats': results[0] as Map<String, dynamic>,
+        'counties': results[1] as Map<String, int>,
+        'districts': results[2] as Map<String, int>,
+        'committees': results[3] as Map<String, int>,
+        'highSchools': results[4] as Map<String, int>,
+        'colleges': results[5] as Map<String, int>,
+        'chapters': results[6] as Map<String, int>,
+        'chapterStatuses': results[7] as Map<String, int>,
+        'graduationYears': results[8] as Map<String, int>,
+        'pronouns': results[9] as Map<String, int>,
+        'genders': results[10] as Map<String, int>,
+        'races': results[11] as Map<String, int>,
+        'languages': results[12] as Map<String, int>,
+        'communityTypes': results[13] as Map<String, int>,
+        'industries': results[14] as Map<String, int>,
+        'educationLevels': results[15] as Map<String, int>,
+        'registeredVoters': results[16] as Map<String, int>,
+        'sexualOrientations': results[17] as Map<String, int>,
+        'ageBuckets': results[18] as Map<String, int>,
+        'recentMembers': results[19] as List<Member>,
+        'chatCount': null,
+        'totalMessages': null,
+        'weeklyMessages': null,
+      };
+    } catch (error) {
+      print('❌ Error building fallback dashboard metrics: $error');
+      return metrics;
+    }
+  }
+}
+
+Map<String, dynamic> _createEmptyDashboardMetrics() => {
+      'memberStats': {'total': 0, 'optedOut': 0, 'contactable': 0, 'withPhone': 0},
+      'counties': <String, int>{},
+      'districts': <String, int>{},
+      'committees': <String, int>{},
+      'highSchools': <String, int>{},
+      'colleges': <String, int>{},
+      'chapters': <String, int>{},
+      'chapterStatuses': <String, int>{},
+      'graduationYears': <String, int>{},
+      'pronouns': <String, int>{},
+      'genders': <String, int>{},
+      'races': <String, int>{},
+      'languages': <String, int>{},
+      'communityTypes': <String, int>{},
+      'industries': <String, int>{},
+      'educationLevels': <String, int>{},
+      'registeredVoters': <String, int>{},
+      'sexualOrientations': <String, int>{},
+      'ageBuckets': <String, int>{},
+      'recentMembers': <Member>[],
+      'chatCount': null,
+      'totalMessages': null,
+      'weeklyMessages': null,
+    };
+
+Map<String, dynamic>? _normalizeDashboardMetrics(Map<String, dynamic>? raw) {
+  if (raw == null) return null;
+
+  final metrics = _createEmptyDashboardMetrics();
+  final normalizedRoot = Map<String, dynamic>.from(raw);
+  final countsContainer = _coerceJsonMap(raw['counts']);
+  if (countsContainer != null) {
+    normalizedRoot.addAll(countsContainer);
+  }
+
+  final memberStats =
+      _coerceJsonMap(raw['member_stats'] ?? raw['memberStats'] ?? raw['stats']);
+  if (memberStats != null && memberStats.isNotEmpty) {
+    metrics['memberStats'] = {
+      'total': _coerceInt(memberStats['total']) ?? 0,
+      'optedOut': _coerceInt(memberStats['optedOut'] ?? memberStats['opted_out']) ?? 0,
+      'contactable': _coerceInt(memberStats['contactable']) ??
+          ((_coerceInt(memberStats['total']) ?? 0) -
+              (_coerceInt(memberStats['optedOut'] ?? memberStats['opted_out']) ?? 0)),
+      'withPhone': _coerceInt(memberStats['withPhone'] ?? memberStats['with_phone']) ?? 0,
+    };
+  }
+
+  void assignCountsTo(String targetKey, List<String> keys) {
+    for (final key in keys) {
+      final value = normalizedRoot[key] ?? raw[key];
+      final map = _coerceCountsMap(value);
+      if (map != null && map.isNotEmpty) {
+        metrics[targetKey] = map;
+        return;
+      }
+    }
+  }
+
+  assignCountsTo('counties', const ['counties', 'county_counts']);
+  assignCountsTo('districts',
+      const ['districts', 'district_counts', 'congressionalDistricts', 'congressional_districts']);
+  assignCountsTo('committees', const ['committees', 'committee_counts']);
+  assignCountsTo('highSchools', const ['highSchools', 'high_schools', 'high_school_counts']);
+  assignCountsTo('colleges', const ['colleges', 'college_counts']);
+  assignCountsTo('chapters', const ['chapters', 'chapter_counts']);
+  assignCountsTo('chapterStatuses',
+      const ['chapterStatuses', 'chapter_statuses', 'chapter_status_counts']);
+  assignCountsTo('graduationYears',
+      const ['graduationYears', 'graduation_years', 'graduation_year_counts']);
+  assignCountsTo('pronouns', const ['pronouns', 'pronoun_counts']);
+  assignCountsTo('genders',
+      const ['genders', 'gender_counts', 'genderIdentities', 'gender_identities']);
+  assignCountsTo('races', const ['races', 'race_counts']);
+  assignCountsTo('languages', const ['languages', 'language_counts']);
+  assignCountsTo('communityTypes',
+      const ['communityTypes', 'community_types', 'community_type_counts']);
+  assignCountsTo('industries', const ['industries', 'industry_counts']);
+  assignCountsTo('educationLevels',
+      const ['educationLevels', 'education_levels', 'education_level_counts']);
+  assignCountsTo('registeredVoters',
+      const ['registeredVoters', 'registered_voters', 'registered_voter_counts']);
+  assignCountsTo('sexualOrientations',
+      const ['sexualOrientations', 'sexual_orientations', 'sexual_orientation_counts']);
+  assignCountsTo('ageBuckets', const ['ageBuckets', 'age_buckets', 'age_bucket_counts']);
+
+  final recentMembers = _coerceMemberList(raw['recent_members'] ?? raw['recentMembers']);
+  if (recentMembers != null) {
+    metrics['recentMembers'] = recentMembers;
+  }
+
+  final aggregatedChatCount = _coerceInt(raw['chat_count'] ?? raw['chatCount']);
+  if (aggregatedChatCount != null) {
+    metrics['chatCount'] = aggregatedChatCount;
+  }
+
+  final aggregatedTotalMessages =
+      _coerceInt(raw['total_messages'] ?? raw['totalMessages']);
+  if (aggregatedTotalMessages != null) {
+    metrics['totalMessages'] = aggregatedTotalMessages;
+  }
+
+  final aggregatedWeeklyMessages =
+      _coerceInt(raw['weekly_messages'] ?? raw['weeklyMessages']);
+  if (aggregatedWeeklyMessages != null) {
+    metrics['weeklyMessages'] = aggregatedWeeklyMessages;
+  }
+
+  return metrics;
+}
+
+Map<String, int>? _coerceCountsMap(dynamic value) {
+  if (value == null) return null;
+
+  if (value is Map) {
+    final result = <String, int>{};
+    value.forEach((key, dynamic rawValue) {
+      final count = _coerceInt(rawValue);
+      final label = key == null ? '' : key.toString();
+      if (label.isEmpty || count == null) return;
+      result[label] = count;
+    });
+    return result;
+  }
+
+  if (value is Iterable) {
+    final result = <String, int>{};
+    for (final entry in value) {
+      final map = _coerceJsonMap(entry);
+      if (map == null || map.isEmpty) continue;
+      final label = map['label'] ?? map['key'] ?? map['name'] ?? map['value'];
+      final count = _coerceInt(map['count'] ?? map['total'] ?? map['members']);
+      if (label == null) continue;
+      final labelText = label.toString().trim();
+      if (labelText.isEmpty || count == null) continue;
+      result[labelText] = count;
+    }
+    if (result.isNotEmpty) {
+      return result;
+    }
+  }
+
+  return null;
+}
+
+int? _coerceInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    return int.tryParse(value);
+  }
+  return null;
+}
+
+List<Member>? _coerceMemberList(dynamic value) {
+  if (value == null) return null;
+  if (value is Iterable) {
+    final members = <Member>[];
+    for (final item in value) {
+      final json = _coerceJsonMap(item);
+      if (json == null || json.isEmpty) continue;
+      try {
+        members.add(Member.fromJson(json));
+      } catch (error) {
+        print('⚠️ Skipping invalid member payload: $error');
+      }
+    }
+    return members;
+  }
+  return null;
 }
 
 Map<String, dynamic>? _coerceJsonMap(dynamic value) {
