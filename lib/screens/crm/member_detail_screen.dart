@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -697,26 +699,58 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final bodyController = TextEditingController();
     final fromNameController = TextEditingController();
     final replyToController = TextEditingController();
-    final ccController = TextEditingController();
-    final bccController = TextEditingController();
+    final ccSearchController = TextEditingController();
+    final ccManualEmailController = TextEditingController();
+    final bccSearchController = TextEditingController();
+    final bccManualEmailController = TextEditingController();
+
+    final List<Member> ccMembers = [];
+    final List<Member> bccMembers = [];
+    final List<Member> ccSearchResults = [];
+    final List<Member> bccSearchResults = [];
+    final List<String> ccManualEmails = [];
+    final List<String> bccManualEmails = [];
+    final List<PlatformFile> attachmentFiles = [];
+
+    Timer? ccSearchDebounce;
+    Timer? bccSearchDebounce;
+    bool searchingCc = false;
+    bool searchingBcc = false;
+    bool dialogOpen = true;
 
     String? errorMessage;
     bool sending = false;
 
-    List<String> parseEmails(String value) {
-      final seen = <String>{};
-      final result = <String>[];
-      for (final part in value.split(RegExp(r'[\s,;]+'))) {
-        final trimmed = part.trim();
-        if (trimmed.isEmpty || !trimmed.contains('@')) {
-          continue;
-        }
-        final lower = trimmed.toLowerCase();
-        if (seen.add(lower)) {
-          result.add(trimmed);
-        }
+    String? normalizeEmail(String? value) {
+      if (value == null) return null;
+      final trimmed = value.trim();
+      if (trimmed.isEmpty || !trimmed.contains('@')) {
+        return null;
       }
-      return result;
+      return trimmed;
+    }
+
+    final primaryEmailLower = email.toLowerCase();
+
+    bool emailAlreadyUsed(String lowerCaseEmail) {
+      if (lowerCaseEmail == primaryEmailLower) {
+        return true;
+      }
+
+      bool matchesMemberEmail(Member member) {
+        final normalized = normalizeEmail(member.preferredEmail);
+        return normalized != null && normalized.toLowerCase() == lowerCaseEmail;
+      }
+
+      if (ccMembers.any(matchesMemberEmail)) return true;
+      if (bccMembers.any(matchesMemberEmail)) return true;
+      if (ccManualEmails.any((email) => email.toLowerCase() == lowerCaseEmail)) {
+        return true;
+      }
+      if (bccManualEmails.any((email) => email.toLowerCase() == lowerCaseEmail)) {
+        return true;
+      }
+      return false;
     }
 
     bool? result;
@@ -729,13 +763,467 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             builder: (context, setDialogState) {
               void updateState() => setDialogState(() {});
 
+              void onCcSearchChanged(String value) {
+                ccSearchDebounce?.cancel();
+                final query = value.trim();
+                if (query.length < 2) {
+                  setDialogState(() {
+                    ccSearchResults.clear();
+                    searchingCc = false;
+                  });
+                  return;
+                }
+
+                ccSearchDebounce = Timer(const Duration(milliseconds: 300), () async {
+                  if (!dialogOpen || !mounted) return;
+                  setDialogState(() {
+                    searchingCc = true;
+                  });
+                  try {
+                    final results = await _memberRepo.searchMembers(query);
+                    if (!dialogOpen || !mounted) return;
+                    setDialogState(() {
+                      ccSearchResults
+                        ..clear()
+                        ..addAll(
+                          results.where(
+                            (member) {
+                              if (member.id == _member.id) return false;
+                              return normalizeEmail(member.preferredEmail) != null;
+                            },
+                          ),
+                        );
+                      searchingCc = false;
+                    });
+                  } catch (_) {
+                    if (!dialogOpen || !mounted) return;
+                    setDialogState(() {
+                      ccSearchResults.clear();
+                      searchingCc = false;
+                    });
+                  }
+                });
+              }
+
+              void onBccSearchChanged(String value) {
+                bccSearchDebounce?.cancel();
+                final query = value.trim();
+                if (query.length < 2) {
+                  setDialogState(() {
+                    bccSearchResults.clear();
+                    searchingBcc = false;
+                  });
+                  return;
+                }
+
+                bccSearchDebounce = Timer(const Duration(milliseconds: 300), () async {
+                  if (!dialogOpen || !mounted) return;
+                  setDialogState(() {
+                    searchingBcc = true;
+                  });
+                  try {
+                    final results = await _memberRepo.searchMembers(query);
+                    if (!dialogOpen || !mounted) return;
+                    setDialogState(() {
+                      bccSearchResults
+                        ..clear()
+                        ..addAll(
+                          results.where(
+                            (member) {
+                              if (member.id == _member.id) return false;
+                              return normalizeEmail(member.preferredEmail) != null;
+                            },
+                          ),
+                        );
+                      searchingBcc = false;
+                    });
+                  } catch (_) {
+                    if (!dialogOpen || !mounted) return;
+                    setDialogState(() {
+                      bccSearchResults.clear();
+                      searchingBcc = false;
+                    });
+                  }
+                });
+              }
+
+              void toggleCcMember(Member member) {
+                if (sending) return;
+                final alreadySelected =
+                    ccMembers.any((existing) => existing.id == member.id);
+                if (alreadySelected) {
+                  setDialogState(() {
+                    ccMembers.removeWhere((existing) => existing.id == member.id);
+                  });
+                  return;
+                }
+
+                final normalized = normalizeEmail(member.preferredEmail);
+                if (normalized == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Selected member does not have an email address.'),
+                    ),
+                  );
+                  return;
+                }
+                final lower = normalized.toLowerCase();
+                if (emailAlreadyUsed(lower)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('That email is already in the recipient list.'),
+                    ),
+                  );
+                  return;
+                }
+
+                setDialogState(() {
+                  ccMembers.add(member);
+                });
+              }
+
+              void toggleBccMember(Member member) {
+                if (sending) return;
+                final alreadySelected =
+                    bccMembers.any((existing) => existing.id == member.id);
+                if (alreadySelected) {
+                  setDialogState(() {
+                    bccMembers.removeWhere((existing) => existing.id == member.id);
+                  });
+                  return;
+                }
+
+                final normalized = normalizeEmail(member.preferredEmail);
+                if (normalized == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Selected member does not have an email address.'),
+                    ),
+                  );
+                  return;
+                }
+                final lower = normalized.toLowerCase();
+                if (emailAlreadyUsed(lower)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('That email is already in the recipient list.'),
+                    ),
+                  );
+                  return;
+                }
+
+                setDialogState(() {
+                  bccMembers.add(member);
+                });
+              }
+
+              void removeCcMember(Member member) {
+                if (sending) return;
+                setDialogState(() {
+                  ccMembers.removeWhere((existing) => existing.id == member.id);
+                });
+              }
+
+              void removeBccMember(Member member) {
+                if (sending) return;
+                setDialogState(() {
+                  bccMembers.removeWhere((existing) => existing.id == member.id);
+                });
+              }
+
+              void addManualCcEmail() {
+                if (sending) return;
+                final manual = normalizeEmail(ccManualEmailController.text);
+                if (manual == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Enter a valid email address before adding.'),
+                    ),
+                  );
+                  return;
+                }
+                final lower = manual.toLowerCase();
+                if (emailAlreadyUsed(lower)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('That email is already in the recipient list.'),
+                    ),
+                  );
+                  return;
+                }
+
+                setDialogState(() {
+                  ccManualEmails.add(manual);
+                  ccManualEmailController.clear();
+                });
+              }
+
+              void addManualBccEmail() {
+                if (sending) return;
+                final manual = normalizeEmail(bccManualEmailController.text);
+                if (manual == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Enter a valid email address before adding.'),
+                    ),
+                  );
+                  return;
+                }
+                final lower = manual.toLowerCase();
+                if (emailAlreadyUsed(lower)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('That email is already in the recipient list.'),
+                    ),
+                  );
+                  return;
+                }
+
+                setDialogState(() {
+                  bccManualEmails.add(manual);
+                  bccManualEmailController.clear();
+                });
+              }
+
+              void removeManualCcEmail(String value) {
+                if (sending) return;
+                setDialogState(() {
+                  ccManualEmails.remove(value);
+                });
+              }
+
+              void removeManualBccEmail(String value) {
+                if (sending) return;
+                setDialogState(() {
+                  bccManualEmails.remove(value);
+                });
+              }
+
+              Future<void> pickAttachments() async {
+                if (sending) return;
+                final result = await file_picker.FilePicker.platform.pickFiles(
+                  allowMultiple: true,
+                  withData: true,
+                  withReadStream: !kIsWeb,
+                );
+
+                if (result == null || result.files.isEmpty) {
+                  return;
+                }
+
+                final additions = <PlatformFile>[];
+                final failedHydrations = <String>[];
+
+                for (final file in result.files) {
+                  try {
+                    final platformFile =
+                        await materializePickedPlatformFile(file, source: result);
+                    if (platformFile == null) {
+                      failedHydrations.add(file.name);
+                      continue;
+                    }
+                    additions.add(platformFile);
+                  } catch (_) {
+                    failedHydrations.add(file.name);
+                  }
+                }
+
+                if (!dialogOpen || !mounted) return;
+
+                if (additions.isNotEmpty) {
+                  setDialogState(() {
+                    final existingNames =
+                        attachmentFiles.map((file) => file.name.toLowerCase()).toSet();
+                    for (final file in additions) {
+                      final lower = file.name.toLowerCase();
+                      if (existingNames.add(lower)) {
+                        attachmentFiles.add(file);
+                      }
+                    }
+                  });
+                }
+
+                if (failedHydrations.isNotEmpty && mounted) {
+                  final message = failedHydrations.length == 1
+                      ? 'We couldn\'t read "${failedHydrations.first}". Please try again or choose a different file.'
+                      : 'We couldn\'t read ${failedHydrations.length} files: ${failedHydrations.join(', ')}. Please try again or choose different files.';
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(message)),
+                  );
+                }
+              }
+
+              void removeAttachment(PlatformFile file) {
+                if (sending) return;
+                setDialogState(() {
+                  attachmentFiles.remove(file);
+                });
+              }
+
+              Widget buildCopySection({
+                required String label,
+                required TextEditingController searchController,
+                required TextEditingController manualController,
+                required List<Member> members,
+                required List<Member> searchResults,
+                required List<String> manualEmails,
+                required bool searching,
+                required void Function(String value) onSearchChanged,
+                required ValueChanged<Member> onToggleMember,
+                required ValueChanged<Member> onRemoveMember,
+                required VoidCallback onAddManual,
+                required ValueChanged<String> onRemoveManual,
+              }) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$label Recipients',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    if (members.isNotEmpty)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: members
+                            .map(
+                              (member) => InputChip(
+                                label: Text(member.name),
+                                avatar: const Icon(Icons.person, size: 18),
+                                onDeleted:
+                                    sending ? null : () => onRemoveMember(member),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    if (members.isNotEmpty && manualEmails.isNotEmpty)
+                      const SizedBox(height: 8),
+                    if (manualEmails.isNotEmpty)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: manualEmails
+                            .map(
+                              (value) => InputChip(
+                                label: Text(value),
+                                avatar:
+                                    const Icon(Icons.alternate_email, size: 18),
+                                onDeleted:
+                                    sending ? null : () => onRemoveManual(value),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: searchController,
+                      enabled: !sending,
+                      decoration: InputDecoration(
+                        labelText: 'Search members to add to $label',
+                        suffixIcon: searching
+                            ? const Padding(
+                                padding: EdgeInsets.all(12.0),
+                                child: SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                                ),
+                              )
+                            : const Icon(Icons.search),
+                      ),
+                      onChanged: onSearchChanged,
+                    ),
+                    if (searchResults.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 220),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: searchResults.length,
+                          itemBuilder: (context, index) {
+                            final member = searchResults[index];
+                            final email = normalizeEmail(member.preferredEmail);
+                            final selected =
+                                members.any((existing) => existing.id == member.id);
+                            return ListTile(
+                              title: Text(member.name),
+                              subtitle: Text(email ?? 'No email on record'),
+                              trailing: Icon(
+                                selected
+                                    ? Icons.check_circle
+                                    : Icons.add_circle_outline,
+                                color: selected
+                                    ? Theme.of(context).colorScheme.primary
+                                    : null,
+                              ),
+                              onTap: sending ? null : () => onToggleMember(member),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: manualController,
+                            enabled: !sending,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              labelText: 'Add email to $label',
+                              border: const OutlineInputBorder(),
+                            ),
+                            onSubmitted: (_) => onAddManual(),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: sending ? null : onAddManual,
+                          child: const Text('Add'),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              }
+
               Future<void> submit() async {
                 final subject = subjectController.text.trim();
                 final body = bodyController.text.trim();
                 final fromName = fromNameController.text.trim();
                 final replyTo = replyToController.text.trim();
-                final ccList = parseEmails(ccController.text);
-                final bccList = parseEmails(bccController.text);
+                final usedEmails = <String>{primaryEmailLower};
+                final ccList = <String>[];
+                final bccList = <String>[];
+
+                void addEmail(String? value, List<String> target) {
+                  final normalized = normalizeEmail(value);
+                  if (normalized == null) {
+                    return;
+                  }
+                  final lower = normalized.toLowerCase();
+                  if (usedEmails.add(lower)) {
+                    target.add(normalized);
+                  }
+                }
+
+                for (final member in ccMembers) {
+                  addEmail(member.preferredEmail, ccList);
+                }
+                for (final manual in ccManualEmails) {
+                  addEmail(manual, ccList);
+                }
+                for (final member in bccMembers) {
+                  addEmail(member.preferredEmail, bccList);
+                }
+                for (final manual in bccManualEmails) {
+                  addEmail(manual, bccList);
+                }
 
                 if (subject.isEmpty || body.isEmpty || sending) {
                   return;
@@ -748,6 +1236,15 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                 setState(() => _sendingEmail = true);
 
                 try {
+                  final attachments = <CRMEmailAttachment>[];
+                  for (final file in attachmentFiles) {
+                    final attachment =
+                        await _emailService.buildAttachmentFromPlatformFile(file);
+                    if (attachment != null) {
+                      attachments.add(attachment);
+                    }
+                  }
+
                   await _emailService.sendEmail(
                     to: [email],
                     subject: subject,
@@ -757,6 +1254,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                     replyTo: replyTo.isEmpty ? null : replyTo,
                     cc: ccList.isEmpty ? null : ccList,
                     bcc: bccList.isEmpty ? null : bccList,
+                    attachments: attachments,
                   );
                   if (context.mounted) {
                     Navigator.of(context).pop(true);
@@ -792,6 +1290,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                 content: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Align(
                         alignment: Alignment.centerLeft,
@@ -855,25 +1354,70 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         ),
                         onChanged: (_) => updateState(),
                       ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: ccController,
-                        maxLines: 2,
-                        decoration: const InputDecoration(
-                          labelText: 'CC (optional)',
-                          hintText: 'Separate multiple emails with commas or spaces',
-                          border: OutlineInputBorder(),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Attachments',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      if (attachmentFiles.isNotEmpty) ...[
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: attachmentFiles
+                              .map(
+                                (file) => InputChip(
+                                  label: Text(file.name),
+                                  avatar: const Icon(Icons.insert_drive_file, size: 18),
+                                  onDeleted: sending
+                                      ? null
+                                      : () => removeAttachment(file),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: sending ? null : pickAttachments,
+                          icon: const Icon(Icons.attach_file),
+                          label: const Text('Add attachments'),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: bccController,
-                        maxLines: 2,
-                        decoration: const InputDecoration(
-                          labelText: 'BCC (optional)',
-                          hintText: 'Separate multiple emails with commas or spaces',
-                          border: OutlineInputBorder(),
-                        ),
+                      const SizedBox(height: 24),
+                      buildCopySection(
+                        label: 'CC',
+                        searchController: ccSearchController,
+                        manualController: ccManualEmailController,
+                        members: ccMembers,
+                        searchResults: ccSearchResults,
+                        manualEmails: ccManualEmails,
+                        searching: searchingCc,
+                        onSearchChanged: onCcSearchChanged,
+                        onToggleMember: toggleCcMember,
+                        onRemoveMember: removeCcMember,
+                        onAddManual: addManualCcEmail,
+                        onRemoveManual: removeManualCcEmail,
+                      ),
+                      const SizedBox(height: 24),
+                      buildCopySection(
+                        label: 'BCC',
+                        searchController: bccSearchController,
+                        manualController: bccManualEmailController,
+                        members: bccMembers,
+                        searchResults: bccSearchResults,
+                        manualEmails: bccManualEmails,
+                        searching: searchingBcc,
+                        onSearchChanged: onBccSearchChanged,
+                        onToggleMember: toggleBccMember,
+                        onRemoveMember: removeBccMember,
+                        onAddManual: addManualBccEmail,
+                        onRemoveManual: removeManualBccEmail,
                       ),
                       if (errorMessage != null) ...[
                         const SizedBox(height: 12),
@@ -919,8 +1463,13 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       bodyController.dispose();
       fromNameController.dispose();
       replyToController.dispose();
-      ccController.dispose();
-      bccController.dispose();
+      ccSearchController.dispose();
+      ccManualEmailController.dispose();
+      bccSearchController.dispose();
+      bccManualEmailController.dispose();
+      dialogOpen = false;
+      ccSearchDebounce?.cancel();
+      bccSearchDebounce?.cancel();
     }
 
     if (result == true) {
