@@ -624,26 +624,29 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   }
 
   Widget _buildSocialLinkTile(QuickLink link) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Tooltip(
-          message: link.title,
-          child: InkWell(
+    return Tooltip(
+      message: link.title,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          InkWell(
             onTap: () => _openLink(link),
             onLongPress: () => _manageLink(link),
             onSecondaryTap: () => _manageLink(link),
             borderRadius: BorderRadius.circular(32),
             child: _buildLinkAvatar(link, size: 56),
           ),
-        ),
-        const SizedBox(height: 6),
-        _QuickLinkCopyIconButton(
-          onPressed:
-              link.resolvedUrl == null ? null : () => _copyLink(link),
-        ),
-      ],
+          Positioned(
+            top: -6,
+            left: -6,
+            child: _QuickLinkCopyIconButton(
+              onPressed:
+                  link.resolvedUrl == null ? null : () => _copyLink(link),
+              compact: true,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1045,20 +1048,27 @@ class _QuickLinkCopyIconButton extends StatelessWidget {
   const _QuickLinkCopyIconButton({
     this.onPressed,
     this.tooltip = 'Copy link',
+    this.compact = false,
   });
 
   final VoidCallback? onPressed;
   final String tooltip;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final padding = compact ? const EdgeInsets.all(8) : const EdgeInsets.all(12);
+    final minimumSize = compact ? const Size(40, 40) : const Size(44, 44);
+
     return IconButton.filledTonal(
       tooltip: tooltip,
       onPressed: onPressed,
-      icon: const Icon(Icons.copy),
+      icon: Icon(Icons.copy, size: compact ? 18 : null),
       style: IconButton.styleFrom(
-        padding: const EdgeInsets.all(12),
-        minimumSize: const Size(44, 44),
+        padding: padding,
+        minimumSize: minimumSize,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: compact ? VisualDensity.compact : null,
       ),
     );
   }
