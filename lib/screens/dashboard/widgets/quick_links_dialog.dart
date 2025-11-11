@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -558,6 +556,12 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   }
 
   Widget _buildSocialMediaSection(List<QuickLink> links, ThemeData theme) {
+    const crossAxisCount = 4;
+    const maxRows = 2;
+    const crossAxisSpacing = 16.0;
+    const mainAxisSpacing = 16.0;
+    final displayedLinks = links.take(crossAxisCount * maxRows).toList();
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Column(
@@ -565,36 +569,17 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         children: [
           _buildSectionHeader('Social Media', theme),
           const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const spacing = 16.0;
-              final maxWidth = constraints.maxWidth.isFinite
-                  ? constraints.maxWidth
-                  : 600.0;
-              const desiredTileWidth = 160.0;
-              final columns = math.max(
-                1,
-                ((maxWidth + spacing) / (desiredTileWidth + spacing)).floor(),
-              );
-              final rawTileWidth =
-                  (maxWidth - (columns - 1) * spacing) / columns;
-              final tileWidth = math.min(
-                maxWidth,
-                math.max(120.0, rawTileWidth),
-              );
-
-              return Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: [
-                  for (final link in links)
-                    SizedBox(
-                      width: tileWidth,
-                      child: _buildSocialLinkTile(link),
-                    ),
-                ],
-              );
-            },
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: crossAxisSpacing,
+            mainAxisSpacing: mainAxisSpacing,
+            childAspectRatio: 0.85,
+            children: [
+              for (final link in displayedLinks)
+                _buildSocialLinkTile(link),
+            ],
           ),
         ],
       ),
@@ -602,26 +587,29 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   }
 
   Widget _buildSocialLinkTile(QuickLink link) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Tooltip(
-          message: link.title,
-          child: InkWell(
-            onTap: () => _openLink(link),
-            onLongPress: () => _manageLink(link),
-            onSecondaryTap: () => _manageLink(link),
-            borderRadius: BorderRadius.circular(32),
-            child: _buildLinkAvatar(link, size: 56),
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Tooltip(
+            message: link.title,
+            child: InkWell(
+              onTap: () => _openLink(link),
+              onLongPress: () => _manageLink(link),
+              onSecondaryTap: () => _manageLink(link),
+              borderRadius: BorderRadius.circular(28),
+              child: _buildLinkAvatar(link, size: 52),
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
-        _QuickLinkCopyIconButton(
-          onPressed:
-              link.resolvedUrl == null ? null : () => _copyLink(link),
-        ),
-      ],
+          const SizedBox(height: 8),
+          _QuickLinkCopyIconButton(
+            onPressed:
+                link.resolvedUrl == null ? null : () => _copyLink(link),
+          ),
+        ],
+      ),
     );
   }
 
