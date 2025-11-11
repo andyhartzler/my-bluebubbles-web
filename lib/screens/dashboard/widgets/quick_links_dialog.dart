@@ -439,30 +439,6 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
       );
     }
 
-    if (_links.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.link_off, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              'No quick links yet',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Create your first quick link to share files and resources with the team.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onBackground.withOpacity(0.7),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     int sortByOrder(QuickLink a, QuickLink b) {
       final orderCompare = (a.sortOrder ?? 1 << 20).compareTo(b.sortOrder ?? 1 << 20);
       if (orderCompare != 0) {
@@ -535,12 +511,16 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
               theme,
               title: 'Governing Documents',
             ),
-          if (miscDocuments.isNotEmpty)
-            _buildDocumentsSection(
-              miscDocuments,
-              theme,
-              title: 'Misc Documents',
-            ),
+          _buildDocumentsSection(
+            miscDocuments,
+            theme,
+            title: 'Misc Documents',
+            emptyTitle: 'No misc documents yet',
+            emptyDescription:
+                'Keep shared forms, templates, and other helpful files handy for the team.',
+            emptyActionLabel: 'Create document link',
+            onCreateLink: _processing ? null : _createLink,
+          ),
           for (final entry in otherSections)
             _buildGenericSection(entry.key, entry.value, theme),
         ],
@@ -677,6 +657,11 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
     List<QuickLink> links,
     ThemeData theme, {
     String title = 'Governing Documents',
+    String emptyTitle = 'No documents yet',
+    String emptyDescription =
+        'Upload or link documents so everyone can reference the latest versions.',
+    String emptyActionLabel = 'Add document',
+    VoidCallback? onCreateLink,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
@@ -685,7 +670,66 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         children: [
           _buildSectionHeader(title, theme),
           const SizedBox(height: 12),
-          ...links.map((link) => _buildDocumentRow(link, theme)),
+          if (links.isEmpty)
+            _buildEmptyDocumentsPrompt(
+              theme,
+              title: emptyTitle,
+              message: emptyDescription,
+              actionLabel: emptyActionLabel,
+              onCreateLink: onCreateLink,
+            )
+          else
+            ...links.map((link) => _buildDocumentRow(link, theme)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyDocumentsPrompt(
+    ThemeData theme, {
+    required String title,
+    required String message,
+    required String actionLabel,
+    VoidCallback? onCreateLink,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surface,
+        border: Border.all(
+          color: theme.dividerColor.withOpacity(0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.description_outlined,
+            size: 36,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onBackground.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onCreateLink,
+            icon: const Icon(Icons.add),
+            label: Text(actionLabel),
+          ),
         ],
       ),
     );
