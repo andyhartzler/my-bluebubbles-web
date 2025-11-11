@@ -65,4 +65,9 @@ class CRMConfig {
 
   /// Default sender mailbox used for CRM-driven email flows.
   static const String defaultSenderEmail = 'info@moyoungdemocrats.org';
+
+  /// Default snippet appended to mail merge campaigns to respect opt-out laws.
+  static const String defaultEmailOptOutSnippet =
+      'We respect your inbox. If you no longer wish to receive updates, click '
+      '{{opt_out_url}} to unsubscribe.';
 }

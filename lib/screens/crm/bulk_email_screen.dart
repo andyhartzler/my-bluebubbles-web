@@ -57,6 +57,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   final TextEditingController _ccManualEmailController = TextEditingController();
   final TextEditingController _bccSearchController = TextEditingController();
   final TextEditingController _bccManualEmailController = TextEditingController();
+  final FocusNode _bodyFocusNode = FocusNode();
 
   final List<Member> _selectedMembers = [];
   final List<Member> _searchResults = [];
@@ -77,6 +78,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   bool _searching = false;
   bool _searchingCc = false;
   bool _searchingBcc = false;
+  bool _mailMergeEnabled = false;
   String? _errorMessage;
 
   List<Member> _previewMembers = [];
@@ -95,6 +97,35 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   List<String> _colleges = [];
   List<String> _chapters = [];
   List<String> _chapterStatuses = [];
+
+  static const List<_MergeFieldDefinition> _mergeFieldDefinitions = [
+    _MergeFieldDefinition(
+      token: '{{first_name}}',
+      label: 'First name',
+      description:
+          'Personalizes the greeting using the member\'s preferred first name when available.',
+    ),
+    _MergeFieldDefinition(
+      token: '{{full_name}}',
+      label: 'Full name',
+      description: 'Displays the member\'s full recorded name.',
+    ),
+    _MergeFieldDefinition(
+      token: '{{email}}',
+      label: 'Email',
+      description: 'Inserts the primary email address on record.',
+    ),
+    _MergeFieldDefinition(
+      token: '{{chapter_name}}',
+      label: 'Chapter',
+      description: 'Shows the chapter associated with the member, if any.',
+    ),
+    _MergeFieldDefinition(
+      token: '{{opt_out_url}}',
+      label: 'Opt-out link',
+      description: 'Adds the unique unsubscribe link required in merge mailings.',
+    ),
+  ];
 
   @override
   void initState() {
@@ -128,6 +159,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   void dispose() {
     _subjectController.dispose();
     _bodyController.dispose();
+    _bodyFocusNode.dispose();
     _fromNameController.dispose();
     _replyToController.dispose();
     _searchController.removeListener(_onSearchChanged);
@@ -675,6 +707,14 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     final body = _bodyController.text.trim();
     final fromName = _fromNameController.text.trim();
     final replyTo = _replyToController.text.trim();
+    final bool mailMergeEnabled = _mailMergeEnabled;
+    final Map<String, dynamic>? mergeVariables = mailMergeEnabled
+        ? {
+            'optOutSnippet': CRMConfig.defaultEmailOptOutSnippet,
+            'placeholders':
+                _mergeFieldDefinitions.map((definition) => definition.token).toList(),
+          }
+        : null;
 
     setState(() {
       _sending = true;
@@ -709,6 +749,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         replyTo: replyTo.isEmpty ? null : replyTo,
         cc: recipients.ccEmails.isEmpty ? null : recipients.ccEmails,
         bcc: recipients.bccEmails.isEmpty ? null : recipients.bccEmails,
+        mailMerge: mailMergeEnabled,
+        variables: mergeVariables,
         attachments: attachments,
       );
 
@@ -911,6 +953,34 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     _updatePreview();
   }
 
+  void _toggleMailMerge(bool enabled) {
+    if (_mailMergeEnabled == enabled) return;
+    setState(() {
+      _mailMergeEnabled = enabled;
+    });
+  }
+
+  void _insertMergeField(String token) {
+    if (_sending || !_mailMergeEnabled) return;
+
+    final text = _bodyController.text;
+    final selection = _bodyController.selection;
+    final start = selection.start >= 0 ? selection.start : text.length;
+    final end = selection.end >= 0 ? selection.end : text.length;
+    final newText = text.replaceRange(start, end, token);
+
+    setState(() {
+      _bodyController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: start + token.length),
+      );
+    });
+
+    if (!_bodyFocusNode.hasFocus) {
+      _bodyFocusNode.requestFocus();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1005,6 +1075,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   }
 
   Widget _buildComposeCard() {
+    final bool canEdit = _hasRecipients && !_sending;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -1031,7 +1103,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
             if (!_hasRecipients) const SizedBox(height: 12),
             TextField(
               controller: _subjectController,
-              enabled: _hasRecipients && !_sending,
+              enabled: canEdit,
               decoration: const InputDecoration(
                 labelText: 'Subject',
                 border: OutlineInputBorder(),
@@ -1046,13 +1118,13 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
-                    ?.copyWith(color: Theme.of(context).hintColor),
+                ?.copyWith(color: Theme.of(context).hintColor),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _fromNameController,
-              enabled: _hasRecipients && !_sending,
+              enabled: canEdit,
               decoration: const InputDecoration(
                 labelText: 'From Name',
                 border: OutlineInputBorder(),
@@ -1061,7 +1133,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _replyToController,
-              enabled: _hasRecipients && !_sending,
+              enabled: canEdit,
               decoration: const InputDecoration(
                 labelText: 'Reply-To Email (optional)',
                 border: OutlineInputBorder(),
@@ -1069,18 +1141,81 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 12),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: _mailMergeEnabled,
+              onChanged: canEdit ? _toggleMailMerge : null,
+              title: const Text('Mail merge'),
+              subtitle: const Text(
+                'Personalize each email with member data and automatically include the opt-out link.',
+              ),
+            ),
+            if (_mailMergeEnabled) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Available merge fields',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _mergeFieldDefinitions
+                    .map(
+                      (field) => Tooltip(
+                        message: field.description,
+                        child: ActionChip(
+                          avatar: const Icon(Icons.short_text, size: 18),
+                          label: Text(field.label),
+                          onPressed: canEdit ? () => _insertMergeField(field.token) : null,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
             TextField(
               controller: _bodyController,
-              enabled: _hasRecipients && !_sending,
+              focusNode: _bodyFocusNode,
+              enabled: canEdit,
               maxLines: 10,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Message',
-                hintText: 'Type your message…',
-                border: OutlineInputBorder(),
+                hintText: _mailMergeEnabled
+                    ? 'Type your message and insert merge fields such as {{first_name}}.'
+                    : 'Type your message…',
+                border: const OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
               onChanged: (_) => setState(() {}),
             ),
+            if (_mailMergeEnabled) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Opt-out snippet preview (added automatically)',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  CRMConfig.defaultEmailOptOutSnippet,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -1094,7 +1229,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
                   ),
                 ),
                 OutlinedButton.icon(
-                  onPressed: _hasRecipients && !_sending ? _pickAttachments : null,
+                  onPressed: canEdit ? _pickAttachments : null,
                   icon: const Icon(Icons.attach_file),
                   label: Text(_attachments.isEmpty ? 'Add attachments' : 'Add more attachments'),
                 ),
@@ -1611,4 +1746,16 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       ),
     );
   }
+}
+
+class _MergeFieldDefinition {
+  final String token;
+  final String label;
+  final String description;
+
+  const _MergeFieldDefinition({
+    required this.token,
+    required this.label,
+    required this.description,
+  });
 }
