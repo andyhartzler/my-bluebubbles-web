@@ -75,6 +75,7 @@ class CRMEmailService {
     String? replyTo,
     List<String>? cc,
     List<String>? bcc,
+    bool mailMerge = false,
     Map<String, dynamic>? variables,
     List<CRMEmailAttachment> attachments = const [],
   }) async {
@@ -131,6 +132,10 @@ class CRMEmailService {
     final singleReplyTo = _sanitizeSingleEmail(replyTo);
     if (singleReplyTo != null) {
       payload['replyTo'] = singleReplyTo;
+    }
+
+    if (mailMerge) {
+      payload['mailMerge'] = true;
     }
 
     if (variables != null && variables.isNotEmpty) {
@@ -219,6 +224,7 @@ class CRMEmailService {
     String? replyTo,
     List<String>? cc,
     List<String>? bcc,
+    bool mailMerge = false,
     Map<String, dynamic>? variables,
     List<CRMEmailAttachment> attachments = const [],
   }) async {
@@ -243,6 +249,7 @@ class CRMEmailService {
       replyTo: replyTo,
       cc: cc,
       bcc: bcc,
+      mailMerge: mailMerge,
       variables: variables,
       attachments: attachments,
     );
