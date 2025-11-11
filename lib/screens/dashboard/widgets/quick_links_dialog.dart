@@ -344,55 +344,97 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final width = MediaQuery.of(context).size.width;
+    final isCompact = width < 500;
+
+    Widget buildHeaderText(bool compact) {
+      return Column(
+        crossAxisAlignment:
+            compact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quick Links',
+            textAlign: compact ? TextAlign.center : TextAlign.start,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Launch shared resources, upload new files, and manage access.',
+            textAlign: compact ? TextAlign.center : TextAlign.start,
+            maxLines: compact ? 1 : null,
+            overflow: compact ? TextOverflow.ellipsis : null,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onBackground.withOpacity(0.7),
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget buildRefreshButton() {
+      return IconButton(
+        tooltip: 'Refresh',
+        onPressed: _loading ? null : _load,
+        icon: const Icon(Icons.refresh),
+      );
+    }
+
+    Widget buildAddResourceButton() {
+      return FilledButton.icon(
+        onPressed: _processing ? null : _createLink,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Resource'),
+      );
+    }
+
+    Widget buildCloseButton() {
+      return IconButton(
+        tooltip: 'Close',
+        onPressed: () => Navigator.of(context).maybePop(),
+        icon: const Icon(Icons.close),
+      );
+    }
+
     return ScaffoldMessenger(
       child: Material(
         color: theme.colorScheme.background,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                isCompact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              if (isCompact)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    buildHeaderText(true),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        Text(
-                          'Quick Links',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Launch shared resources, upload new files, and manage access. ',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onBackground.withOpacity(0.7),
-                          ),
-                        ),
+                        buildRefreshButton(),
+                        buildAddResourceButton(),
+                        buildCloseButton(),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Refresh',
-                    onPressed: _loading ? null : _load,
-                    icon: const Icon(Icons.refresh),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _processing ? null : _createLink,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Resource'),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(child: buildHeaderText(false)),
+                    buildRefreshButton(),
+                    const SizedBox(width: 8),
+                    buildAddResourceButton(),
+                    const SizedBox(width: 8),
+                    buildCloseButton(),
+                  ],
+                ),
               if (_processing) const SizedBox(height: 8),
               if (_processing) const LinearProgressIndicator(minHeight: 3),
               const SizedBox(height: 16),
