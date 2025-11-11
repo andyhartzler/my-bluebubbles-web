@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
@@ -48,7 +50,9 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
 
   final TextEditingController _subjectController = TextEditingController();
-  final TextEditingController _bodyController = TextEditingController();
+  late final quill.QuillController _bodyController;
+  final FocusNode _bodyFocusNode = FocusNode();
+  final ScrollController _bodyScrollController = ScrollController();
   final TextEditingController _fromNameController = TextEditingController();
   final TextEditingController _replyToController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
@@ -80,6 +84,12 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   bool _searchingBcc = false;
   bool _mailMergeEnabled = false;
   String? _errorMessage;
+
+  List<Map<String, dynamic>> _bodyDeltaJson = const <Map<String, dynamic>>[];
+  String _bodyHtml = '';
+  String _bodyPlainText = '';
+  final HtmlEscape _htmlTextEscape = const HtmlEscape();
+  final HtmlEscape _htmlAttributeEscape = const HtmlEscape(HtmlEscapeMode.attribute);
 
   List<Member> _previewMembers = [];
   List<String> _previewManualEmails = [];
@@ -130,6 +140,9 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   @override
   void initState() {
     super.initState();
+    _bodyController = quill.QuillController.basic();
+    _captureEditorState(triggerSetState: false);
+    _bodyController.addListener(_handleBodyChanged);
     _filter = widget.initialFilter ?? MessageFilter();
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
     if (_filter.chapterName != null && _filter.chapterName!.isNotEmpty) {
@@ -158,8 +171,10 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   @override
   void dispose() {
     _subjectController.dispose();
+    _bodyController.removeListener(_handleBodyChanged);
     _bodyController.dispose();
     _bodyFocusNode.dispose();
+    _bodyScrollController.dispose();
     _fromNameController.dispose();
     _replyToController.dispose();
     _searchController.removeListener(_onSearchChanged);
@@ -184,7 +199,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       !_sending &&
       _hasRecipients &&
       _subjectController.text.trim().isNotEmpty &&
-      _bodyController.text.trim().isNotEmpty;
+      _bodyPlainText.isNotEmpty;
 
   Future<void> _loadFilterOptions() async {
     final results = await Future.wait([
@@ -704,7 +719,6 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     if (!_canSendEmail) return;
 
     final subject = _subjectController.text.trim();
-    final body = _bodyController.text.trim();
     final fromName = _fromNameController.text.trim();
     final replyTo = _replyToController.text.trim();
     final bool mailMergeEnabled = _mailMergeEnabled;
@@ -715,6 +729,10 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
                 _mergeFieldDefinitions.map((definition) => definition.token).toList(),
           }
         : null;
+
+    _captureEditorState(triggerSetState: false);
+    final htmlBody = _bodyHtml.isNotEmpty ? _bodyHtml : null;
+    final textBody = _bodyPlainText.isNotEmpty ? _bodyPlainText : null;
 
     setState(() {
       _sending = true;
@@ -743,7 +761,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       await _emailService.sendEmail(
         to: recipients.emails,
         subject: subject,
-        textBody: body,
+        htmlBody: htmlBody,
+        textBody: textBody,
         fromEmail: CRMConfig.defaultSenderEmail,
         fromName: fromName.isEmpty ? null : fromName,
         replyTo: replyTo.isEmpty ? null : replyTo,
@@ -1141,81 +1160,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 12),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              value: _mailMergeEnabled,
-              onChanged: canEdit ? _toggleMailMerge : null,
-              title: const Text('Mail merge'),
-              subtitle: const Text(
-                'Personalize each email with member data and automatically include the opt-out link.',
-              ),
-            ),
-            if (_mailMergeEnabled) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Available merge fields',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _mergeFieldDefinitions
-                    .map(
-                      (field) => Tooltip(
-                        message: field.description,
-                        child: ActionChip(
-                          avatar: const Icon(Icons.short_text, size: 18),
-                          label: Text(field.label),
-                          onPressed: canEdit ? () => _insertMergeField(field.token) : null,
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 12),
-            ],
-            TextField(
-              controller: _bodyController,
-              focusNode: _bodyFocusNode,
-              enabled: canEdit,
-              maxLines: 10,
-              decoration: InputDecoration(
-                labelText: 'Message',
-                hintText: _mailMergeEnabled
-                    ? 'Type your message and insert merge fields such as {{first_name}}.'
-                    : 'Type your message…',
-                border: const OutlineInputBorder(),
-                alignLabelWithHint: true,
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-            if (_mailMergeEnabled) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Opt-out snippet preview (added automatically)',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  CRMConfig.defaultEmailOptOutSnippet,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            ],
+            _buildMessageEditor(),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -1239,6 +1184,355 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildMessageEditor() {
+    final theme = Theme.of(context);
+    final isEnabled = _hasRecipients && !_sending;
+
+    final toolbar = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: quill.QuillSimpleToolbar(
+        controller: _bodyController,
+        config: quill.QuillSimpleToolbarConfig(
+          multiRowsDisplay: false,
+          showDividers: false,
+          showFontFamily: false,
+          showFontSize: true,
+          showBoldButton: true,
+          showItalicButton: true,
+          showUnderLineButton: true,
+          showStrikeThrough: false,
+          showInlineCode: false,
+          showColorButton: false,
+          showBackgroundColorButton: false,
+          showClearFormat: false,
+          showAlignmentButtons: false,
+          showHeaderStyle: false,
+          showListNumbers: false,
+          showListBullets: false,
+          showListCheck: false,
+          showCodeBlock: false,
+          showQuote: false,
+          showIndent: false,
+          showSearchButton: false,
+          showSubscript: false,
+          showSuperscript: false,
+          showUndo: true,
+          showRedo: true,
+          showLink: true,
+          toolbarIconAlignment: WrapAlignment.start,
+          toolbarIconCrossAlignment: WrapCrossAlignment.center,
+          axis: Axis.horizontal,
+        ),
+      ),
+    );
+
+    final toolbarContainer = Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.dividerColor),
+        borderRadius: BorderRadius.circular(8),
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: toolbar,
+    );
+
+    final editor = Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      constraints: const BoxConstraints(minHeight: 200),
+      child: quill.QuillEditor(
+        controller: _bodyController,
+        focusNode: _bodyFocusNode,
+        scrollController: _bodyScrollController,
+        config: quill.QuillEditorConfig(
+          readOnly: !isEnabled,
+          scrollable: true,
+          expands: false,
+          padding: const EdgeInsets.all(12),
+          placeholder: 'Type your message…',
+          minHeight: 180,
+        ),
+      ),
+    );
+
+    final labelStyle =
+        theme.inputDecorationTheme.labelStyle ?? theme.textTheme.bodyMedium;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Message', style: labelStyle),
+        const SizedBox(height: 8),
+        Opacity(
+          opacity: isEnabled ? 1 : 0.5,
+          child: IgnorePointer(
+            ignoring: !isEnabled,
+            child: toolbarContainer,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Opacity(
+          opacity: isEnabled ? 1 : 0.5,
+          child: IgnorePointer(
+            ignoring: !isEnabled,
+            child: editor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _handleBodyChanged() {
+    _captureEditorState();
+  }
+
+  void _captureEditorState({bool triggerSetState = true}) {
+    final document = _bodyController.document;
+    final deltaOps = document.toDelta().toJson();
+    final deltaJson = deltaOps
+        .map<Map<String, dynamic>>(
+          (dynamic op) => Map<String, dynamic>.from(op as Map),
+        )
+        .toList(growable: false);
+    final plainText = document.toPlainText().trim();
+    final html = _generateHtmlFromDelta(deltaJson, plainText);
+
+    void updateValues() {
+      _bodyDeltaJson = deltaJson;
+      _bodyPlainText = plainText;
+      _bodyHtml = html;
+    }
+
+    if (triggerSetState) {
+      setState(updateValues);
+    } else {
+      updateValues();
+    }
+  }
+
+  String _generateHtmlFromDelta(
+    List<Map<String, dynamic>> deltaJson,
+    String plainText,
+  ) {
+    if (plainText.isEmpty && !_deltaContainsEmbeds(deltaJson)) {
+      return '';
+    }
+    return _deltaToHtml(deltaJson);
+  }
+
+  bool _deltaContainsEmbeds(List<Map<String, dynamic>> deltaJson) {
+    for (final operation in deltaJson) {
+      if (operation['insert'] is Map<String, dynamic>) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  String _deltaToHtml(List<Map<String, dynamic>> deltaJson) {
+    final buffer = StringBuffer();
+    final currentLine = <String>[];
+
+    void flushLine(Map<String, dynamic>? blockAttributes) {
+      final content = currentLine.join();
+      final hasVisibleContent =
+          currentLine.any((segment) => segment.trim().isNotEmpty);
+      final blockTag = _blockTagForAttributes(blockAttributes);
+      final inner = hasVisibleContent ? content : '<br>';
+      if (blockTag != null) {
+        buffer.write('<$blockTag>$inner</$blockTag>');
+      } else {
+        buffer.write('<p>$inner</p>');
+      }
+      currentLine.clear();
+    }
+
+    for (final operation in deltaJson) {
+      final insert = operation['insert'];
+      final rawAttributes =
+          (operation['attributes'] as Map?)?.cast<String, dynamic>();
+
+      if (insert is String) {
+        var remaining = insert;
+        while (true) {
+          final newlineIndex = remaining.indexOf('\n');
+          if (newlineIndex == -1) {
+            if (remaining.isNotEmpty) {
+              currentLine.add(
+                _applyInlineStyles(
+                  remaining,
+                  _extractInlineAttributes(rawAttributes),
+                ),
+              );
+            }
+            break;
+          }
+
+          final segment = remaining.substring(0, newlineIndex);
+          currentLine.add(
+            _applyInlineStyles(
+              segment,
+              _extractInlineAttributes(rawAttributes),
+            ),
+          );
+          flushLine(_extractBlockAttributes(rawAttributes));
+          remaining = remaining.substring(newlineIndex + 1);
+          if (remaining.isEmpty) {
+            break;
+          }
+        }
+      } else if (insert is Map<String, dynamic>) {
+        final embedHtml = _convertEmbedToHtml(insert, rawAttributes);
+        if (embedHtml != null) {
+          currentLine.add(embedHtml);
+        }
+      }
+    }
+
+    if (currentLine.isNotEmpty) {
+      flushLine(null);
+    }
+
+    return buffer.toString();
+  }
+
+  Map<String, dynamic>? _extractInlineAttributes(
+    Map<String, dynamic>? attributes,
+  ) {
+    if (attributes == null || attributes.isEmpty) {
+      return null;
+    }
+
+    const inlineKeys = {
+      'bold',
+      'italic',
+      'underline',
+      'strike',
+      'link',
+      'size',
+    };
+
+    final result = <String, dynamic>{};
+    for (final entry in attributes.entries) {
+      if (inlineKeys.contains(entry.key)) {
+        result[entry.key] = entry.value;
+      }
+    }
+
+    return result.isEmpty ? null : result;
+  }
+
+  Map<String, dynamic>? _extractBlockAttributes(
+    Map<String, dynamic>? attributes,
+  ) {
+    if (attributes == null || attributes.isEmpty) {
+      return null;
+    }
+
+    const blockKeys = {'header'};
+    final result = <String, dynamic>{};
+    for (final entry in attributes.entries) {
+      if (blockKeys.contains(entry.key)) {
+        result[entry.key] = entry.value;
+      }
+    }
+
+    return result.isEmpty ? null : result;
+  }
+
+  String? _blockTagForAttributes(Map<String, dynamic>? attributes) {
+    if (attributes == null) {
+      return null;
+    }
+
+    final header = attributes['header'];
+    if (header is int && header >= 1 && header <= 6) {
+      return 'h$header';
+    }
+
+    return null;
+  }
+
+  String _applyInlineStyles(
+    String text,
+    Map<String, dynamic>? attributes,
+  ) {
+    if (text.isEmpty) {
+      return '';
+    }
+
+    var styledText = _htmlTextEscape.convert(text);
+    if (attributes == null || attributes.isEmpty) {
+      return styledText;
+    }
+
+    final isBold = attributes['bold'] == true;
+    final isItalic = attributes['italic'] == true;
+    final isUnderline = attributes['underline'] == true;
+    final link = attributes['link'];
+    final fontSize = _fontSizeCssValue(attributes['size']);
+
+    if (isBold) {
+      styledText = '<strong>$styledText</strong>';
+    }
+    if (isItalic) {
+      styledText = '<em>$styledText</em>';
+    }
+    if (isUnderline) {
+      styledText = '<u>$styledText</u>';
+    }
+    if (fontSize != null) {
+      styledText = '<span style="font-size: $fontSize;">$styledText</span>';
+    }
+
+    if (link is String && link.isNotEmpty) {
+      final safeLink = _htmlAttributeEscape.convert(link);
+      styledText = '<a href="$safeLink">$styledText</a>';
+    }
+
+    return styledText;
+  }
+
+  String? _fontSizeCssValue(dynamic size) {
+    if (size is String) {
+      switch (size) {
+        case 'small':
+          return '0.75em';
+        case 'large':
+          return '1.5em';
+        case 'huge':
+          return '2em';
+        default:
+          final trimmed = size.trim();
+          if (trimmed.isEmpty) {
+            return null;
+          }
+          final unitPattern =
+              RegExp(r'^[0-9]+(\.[0-9]+)?(px|em|rem|%)$');
+          if (unitPattern.hasMatch(trimmed)) {
+            return trimmed;
+          }
+      }
+    } else if (size is num) {
+      return '${size}px';
+    }
+    return null;
+  }
+
+  String? _convertEmbedToHtml(
+    Map<String, dynamic> embed,
+    Map<String, dynamic>? _attributes,
+  ) {
+    final imageSource = embed['image'];
+    if (imageSource is String && imageSource.isNotEmpty) {
+      final safeSource = _htmlAttributeEscape.convert(imageSource);
+      return '<img src="$safeSource" />';
+    }
+    return null;
   }
 
   Widget _buildCarbonCopyCard() {
