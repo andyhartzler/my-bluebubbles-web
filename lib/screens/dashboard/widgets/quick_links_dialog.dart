@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -344,55 +342,97 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final width = MediaQuery.of(context).size.width;
+    final isCompact = width < 500;
+
+    Widget buildHeaderText(bool compact) {
+      return Column(
+        crossAxisAlignment:
+            compact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quick Links',
+            textAlign: compact ? TextAlign.center : TextAlign.start,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Launch shared resources, upload new files, and manage access.',
+            textAlign: compact ? TextAlign.center : TextAlign.start,
+            maxLines: compact ? 1 : null,
+            overflow: compact ? TextOverflow.ellipsis : null,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onBackground.withOpacity(0.7),
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget buildRefreshButton() {
+      return IconButton(
+        tooltip: 'Refresh',
+        onPressed: _loading ? null : _load,
+        icon: const Icon(Icons.refresh),
+      );
+    }
+
+    Widget buildAddResourceButton() {
+      return FilledButton.icon(
+        onPressed: _processing ? null : _createLink,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Resource'),
+      );
+    }
+
+    Widget buildCloseButton() {
+      return IconButton(
+        tooltip: 'Close',
+        onPressed: () => Navigator.of(context).maybePop(),
+        icon: const Icon(Icons.close),
+      );
+    }
+
     return ScaffoldMessenger(
       child: Material(
         color: theme.colorScheme.background,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                isCompact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              if (isCompact)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    buildHeaderText(true),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        Text(
-                          'Quick Links',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Launch shared resources, upload new files, and manage access. ',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onBackground.withOpacity(0.7),
-                          ),
-                        ),
+                        buildRefreshButton(),
+                        buildAddResourceButton(),
+                        buildCloseButton(),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Refresh',
-                    onPressed: _loading ? null : _load,
-                    icon: const Icon(Icons.refresh),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _processing ? null : _createLink,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Resource'),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(child: buildHeaderText(false)),
+                    buildRefreshButton(),
+                    const SizedBox(width: 8),
+                    buildAddResourceButton(),
+                    const SizedBox(width: 8),
+                    buildCloseButton(),
+                  ],
+                ),
               if (_processing) const SizedBox(height: 8),
               if (_processing) const LinearProgressIndicator(minHeight: 3),
               const SizedBox(height: 16),
@@ -433,30 +473,6 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
               onPressed: _load,
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_links.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.link_off, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              'No quick links yet',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Create your first quick link to share files and resources with the team.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onBackground.withOpacity(0.7),
-              ),
             ),
           ],
         ),
@@ -535,12 +551,16 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
               theme,
               title: 'Governing Documents',
             ),
-          if (miscDocuments.isNotEmpty)
-            _buildDocumentsSection(
-              miscDocuments,
-              theme,
-              title: 'Misc Documents',
-            ),
+          _buildDocumentsSection(
+            miscDocuments,
+            theme,
+            title: 'Misc Documents',
+            emptyTitle: 'No misc documents yet',
+            emptyDescription:
+                'Keep shared forms, templates, and other helpful files handy for the team.',
+            emptyActionLabel: 'Create document link',
+            onCreateLink: _processing ? null : _createLink,
+          ),
           for (final entry in otherSections)
             _buildGenericSection(entry.key, entry.value, theme),
         ],
@@ -558,6 +578,12 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   }
 
   Widget _buildSocialMediaSection(List<QuickLink> links, ThemeData theme) {
+    const crossAxisCount = 4;
+    const maxRows = 2;
+    const crossAxisSpacing = 16.0;
+    const mainAxisSpacing = 16.0;
+    final displayedLinks = links.take(crossAxisCount * maxRows).toList();
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Column(
@@ -565,36 +591,17 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         children: [
           _buildSectionHeader('Social Media', theme),
           const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const spacing = 16.0;
-              final maxWidth = constraints.maxWidth.isFinite
-                  ? constraints.maxWidth
-                  : 600.0;
-              const desiredTileWidth = 160.0;
-              final columns = math.max(
-                1,
-                ((maxWidth + spacing) / (desiredTileWidth + spacing)).floor(),
-              );
-              final rawTileWidth =
-                  (maxWidth - (columns - 1) * spacing) / columns;
-              final tileWidth = math.min(
-                maxWidth,
-                math.max(120.0, rawTileWidth),
-              );
-
-              return Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: [
-                  for (final link in links)
-                    SizedBox(
-                      width: tileWidth,
-                      child: _buildSocialLinkTile(link),
-                    ),
-                ],
-              );
-            },
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: crossAxisSpacing,
+            mainAxisSpacing: mainAxisSpacing,
+            childAspectRatio: 0.85,
+            children: [
+              for (final link in displayedLinks)
+                _buildSocialLinkTile(link),
+            ],
           ),
         ],
       ),
@@ -602,26 +609,29 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
   }
 
   Widget _buildSocialLinkTile(QuickLink link) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Tooltip(
-          message: link.title,
-          child: InkWell(
-            onTap: () => _openLink(link),
-            onLongPress: () => _manageLink(link),
-            onSecondaryTap: () => _manageLink(link),
-            borderRadius: BorderRadius.circular(32),
-            child: _buildLinkAvatar(link, size: 56),
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Tooltip(
+            message: link.title,
+            child: InkWell(
+              onTap: () => _openLink(link),
+              onLongPress: () => _manageLink(link),
+              onSecondaryTap: () => _manageLink(link),
+              borderRadius: BorderRadius.circular(28),
+              child: _buildLinkAvatar(link, size: 52),
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
-        _QuickLinkCopyIconButton(
-          onPressed:
-              link.resolvedUrl == null ? null : () => _copyLink(link),
-        ),
-      ],
+          const SizedBox(height: 8),
+          _QuickLinkCopyIconButton(
+            onPressed:
+                link.resolvedUrl == null ? null : () => _copyLink(link),
+          ),
+        ],
+      ),
     );
   }
 
@@ -677,6 +687,11 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
     List<QuickLink> links,
     ThemeData theme, {
     String title = 'Governing Documents',
+    String emptyTitle = 'No documents yet',
+    String emptyDescription =
+        'Upload or link documents so everyone can reference the latest versions.',
+    String emptyActionLabel = 'Add document',
+    VoidCallback? onCreateLink,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
@@ -685,7 +700,66 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         children: [
           _buildSectionHeader(title, theme),
           const SizedBox(height: 12),
-          ...links.map((link) => _buildDocumentRow(link, theme)),
+          if (links.isEmpty)
+            _buildEmptyDocumentsPrompt(
+              theme,
+              title: emptyTitle,
+              message: emptyDescription,
+              actionLabel: emptyActionLabel,
+              onCreateLink: onCreateLink,
+            )
+          else
+            ...links.map((link) => _buildDocumentRow(link, theme)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyDocumentsPrompt(
+    ThemeData theme, {
+    required String title,
+    required String message,
+    required String actionLabel,
+    VoidCallback? onCreateLink,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surface,
+        border: Border.all(
+          color: theme.dividerColor.withOpacity(0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.description_outlined,
+            size: 36,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onBackground.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onCreateLink,
+            icon: const Icon(Icons.add),
+            label: Text(actionLabel),
+          ),
         ],
       ),
     );
@@ -959,20 +1033,27 @@ class _QuickLinkCopyIconButton extends StatelessWidget {
   const _QuickLinkCopyIconButton({
     this.onPressed,
     this.tooltip = 'Copy link',
+    this.compact = false,
   });
 
   final VoidCallback? onPressed;
   final String tooltip;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final padding = compact ? const EdgeInsets.all(8) : const EdgeInsets.all(12);
+    final minimumSize = compact ? const Size(40, 40) : const Size(44, 44);
+
     return IconButton.filledTonal(
       tooltip: tooltip,
       onPressed: onPressed,
-      icon: const Icon(Icons.copy),
+      icon: Icon(Icons.copy, size: compact ? 18 : null),
       style: IconButton.styleFrom(
-        padding: const EdgeInsets.all(12),
-        minimumSize: const Size(44, 44),
+        padding: padding,
+        minimumSize: minimumSize,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: compact ? VisualDensity.compact : null,
       ),
     );
   }
