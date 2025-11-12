@@ -456,13 +456,13 @@ packages:
     source: hosted
     version: "2.7.0"
   csslib:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: csslib
-      sha256: "706b5707578e0c1b4b7550f64078f0a0f19dec3f50a178ffae7006b0a9ca58fb"
+      sha256: b36c7f7e24c0bdf1bf9a3da461c837d1de64b9f8beb190c9011d8c72a3dfd745
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.0"
+    version: "0.17.2"
   csv:
     dependency: transitive
     description:
