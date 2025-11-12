@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
@@ -299,23 +301,55 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     Future<({int status, dynamic data})> invoke(String name, {Map<String, dynamic>? body}) {
-      if (_functionInvokerOverride != null) {
-        return _functionInvokerOverride!(name, body: body);
+      Map<String, dynamic>? sanitizedBody;
+      if (body != null) {
+        sanitizedBody = Map<String, dynamic>.from(body)
+          ..removeWhere((_, value) => value == null);
       }
+
+      if (_functionInvokerOverride != null) {
+        return _functionInvokerOverride!(name, body: sanitizedBody);
+      }
+
       final SupabaseClient resolvedClient = client!;
+      final dynamic payload = sanitizedBody == null ? null : jsonEncode(sanitizedBody);
+      final Map<String, String>? headers = sanitizedBody == null
+          ? null
+          : const {'Content-Type': 'application/json'};
+
       return resolvedClient.functions
-          .invoke(name, body: body)
+          .invoke(name, body: payload, headers: headers)
           .then((response) => (status: response.status, data: response.data));
     }
 
     try {
-      final result = await invoke(
-        'get-member-emails',
-        body: <String, dynamic>{'memberId': memberId},
-      );
+      final trimmedMemberId = memberId.trim();
+      if (trimmedMemberId.isEmpty) {
+        _stateByMember[memberId] = EmailHistoryState(
+          isLoading: false,
+          hasLoaded: true,
+          entries: current.entries,
+          error: 'Member identifier is missing. Please refresh and try again.',
+        );
+        notifyListeners();
+        return;
+      }
+      final requestBody = <String, dynamic>{
+        'memberId': trimmedMemberId,
+        'member_id': trimmedMemberId,
+        'maxResults': 50,
+        'syncToDatabase': true,
+      };
+
+      final result = await invoke('get-member-emails', body: requestBody);
+
+      final normalizedData = _normalizeResponsePayload(result.data);
 
       if (result.status != 200) {
-        final errorMessage = _extractErrorMessage(result.data) ??
+        Logger.warn(
+          'Email history edge function returned ${result.status} for member $memberId: $normalizedData',
+        );
+        final errorMessage = _extractErrorMessage(normalizedData) ??
             'Failed to load email history (HTTP ${result.status}).';
 
         _stateByMember[memberId] = EmailHistoryState(
@@ -328,7 +362,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         return;
       }
 
-      final rawEntries = _extractEntries(result.data);
+      final rawEntries = _extractEntries(normalizedData);
       final entries = rawEntries.map(EmailHistoryEntry.fromMap).toList(growable: false);
 
       _stateByMember[memberId] = EmailHistoryState(
@@ -349,6 +383,7 @@ class EmailHistoryProvider extends ChangeNotifier {
   }
 
   String? _extractErrorMessage(dynamic data) {
+    data = _normalizeResponsePayload(data);
     if (data == null) {
       return null;
     }
@@ -384,6 +419,7 @@ class EmailHistoryProvider extends ChangeNotifier {
   }
 
   List<Map<String, dynamic>> _extractEntries(dynamic data) {
+    data = _normalizeResponsePayload(data);
     if (data == null) {
       return const <Map<String, dynamic>>[];
     }
@@ -432,6 +468,21 @@ class EmailHistoryProvider extends ChangeNotifier {
       ];
     }
     return const <Map<String, dynamic>>[];
+  }
+
+  dynamic _normalizeResponsePayload(dynamic data) {
+    if (data is String) {
+      final trimmed = data.trim();
+      if (trimmed.isEmpty) {
+        return data;
+      }
+      try {
+        return jsonDecode(trimmed);
+      } catch (_) {
+        return data;
+      }
+    }
+    return data;
   }
 
   Future<List<EmailMessage>> fetchThreadMessages({
