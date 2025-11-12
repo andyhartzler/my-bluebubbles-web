@@ -153,7 +153,7 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
             'This email is not registered in our system. If you believe this is an error, please contact info@moyoungdemocrats.org';
       } else if (message.contains('403') || message.contains('unexpected_failure')) {
         errorMessage =
-            'This email is not associated with a member of the executive committee of the Missouri Young Democrats. If this is a mistake, please be sure to use the email you used when you filled out our Interest Form. For further help, contact info@moyoungdemocrats.org';
+            'This email is not associated with a member of the Executive Committee of the Missouri Young Democrats. If this is a mistake, please be sure to use the email you used when you filled out our Interest Form. For further help, contact info@moyoungdemocrats.org';
       } else if (message.contains('not found in our system')) {
         errorMessage = message;
       } else if (message.contains('executive committee')) {
