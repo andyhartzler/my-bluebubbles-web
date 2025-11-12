@@ -449,6 +449,7 @@ class Main extends StatelessWidget {
           ),
         ),
         defaultTransition: Transition.cupertino,
+        ),
       ),
     );
   }
