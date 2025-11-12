@@ -26,27 +26,147 @@ class EmailHistoryEntry {
         if (trimmed.isEmpty) return null;
         return DateTime.tryParse(trimmed)?.toLocal();
       }
+      if (value is num) {
+        return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true).toLocal();
+      }
       return null;
     }
 
     List<String> parseRecipients(dynamic value) {
       if (value is List) {
-        return value.map((item) => item.toString()).where((item) => item.trim().isNotEmpty).toList();
+        return value
+            .map((item) => item.toString())
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList(growable: false);
       }
       if (value is String) {
-        if (value.trim().isEmpty) return const [];
-        return value.split(',').map((item) => item.trim()).where((item) => item.isNotEmpty).toList();
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) return const [];
+        return trimmed
+            .split(',')
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList(growable: false);
+      }
+      if (value is Map) {
+        final entries = <String>[];
+        for (final dynamic item in value.values) {
+          entries.addAll(parseRecipients(item));
+        }
+        return entries;
       }
       return const [];
     }
 
-    final String id = map['id']?.toString() ?? map.hashCode.toString();
-    final String subject = map['subject']?.toString().trim().isNotEmpty == true
-        ? map['subject'].toString().trim()
-        : 'No subject';
-    final String status = map['status']?.toString().trim().isNotEmpty == true
-        ? map['status'].toString().trim()
-        : 'unknown';
+    final normalized = map.map<String, dynamic>(
+      (key, value) => MapEntry(key.toString(), value),
+    );
+
+    List<String> resolveRecipients() {
+      final recipients = <String>{};
+      recipients.addAll(parseRecipients(
+        normalized['to_emails'] ??
+            normalized['to_addresses'] ??
+            normalized['to'] ??
+            (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['to'] : normalized['recipients']),
+      ));
+      return recipients.toList(growable: false);
+    }
+
+    List<String> resolveCc() {
+      final recipients = <String>{};
+      recipients.addAll(parseRecipients(
+        normalized['cc_emails'] ??
+            normalized['cc_addresses'] ??
+            normalized['cc'] ??
+            (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['cc'] : null),
+      ));
+      return recipients.toList(growable: false);
+    }
+
+    List<String> resolveBcc() {
+      final recipients = <String>{};
+      recipients.addAll(parseRecipients(
+        normalized['bcc_emails'] ??
+            normalized['bcc_addresses'] ??
+            normalized['bcc'] ??
+            (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['bcc'] : null),
+      ));
+      return recipients.toList(growable: false);
+    }
+
+    String resolveStatus() {
+      final candidates = <String?>[
+        normalized['status']?.toString(),
+        normalized['message_state']?.toString(),
+        normalized['direction']?.toString(),
+      ];
+      for (final candidate in candidates) {
+        if (candidate != null && candidate.trim().isNotEmpty) {
+          return candidate.trim();
+        }
+      }
+      return 'unknown';
+    }
+
+    String resolveSubject() {
+      final candidates = <String?>[
+        normalized['subject']?.toString(),
+        normalized['title']?.toString(),
+      ];
+      for (final candidate in candidates) {
+        if (candidate != null && candidate.trim().isNotEmpty) {
+          return candidate.trim();
+        }
+      }
+      return 'No subject';
+    }
+
+    String? resolvePreview() {
+      final candidates = <String?>[
+        normalized['preview_text']?.toString(),
+        normalized['snippet']?.toString(),
+        normalized['body_text']?.toString(),
+      ];
+      for (final candidate in candidates) {
+        if (candidate != null && candidate.trim().isNotEmpty) {
+          return candidate;
+        }
+      }
+      return null;
+    }
+
+    String? resolveError() {
+      final candidates = <String?>[
+        normalized['error_message']?.toString(),
+        normalized['error']?.toString(),
+        normalized['message']?.toString(),
+      ];
+      for (final candidate in candidates) {
+        if (candidate != null && candidate.trim().isNotEmpty) {
+          return candidate;
+        }
+      }
+      return null;
+    }
+
+    DateTime? resolveTimestamp() {
+      final candidates = <dynamic>[
+        normalized['sent_at'],
+        normalized['received_at'],
+        normalized['internal_date'],
+        normalized['created_at'],
+        normalized['updated_at'],
+      ];
+      for (final candidate in candidates) {
+        final parsed = parseDate(candidate);
+        if (parsed != null) return parsed;
+      }
+      return null;
+    }
+
+    final String id = normalized['id']?.toString() ?? map.hashCode.toString();
 
     return EmailHistoryEntry(
       id: id,
@@ -109,14 +229,20 @@ class EmailHistoryState {
   final String? error;
 }
 
+typedef _FunctionInvocation = Future<({int status, dynamic data})> Function(
+  String name, {
+  Map<String, dynamic>? body,
+});
+
 class EmailHistoryProvider extends ChangeNotifier {
   EmailHistoryProvider({
     CRMSupabaseService? supabaseService,
-    this.historyTable = 'crm_email_history',
-  }) : _supabaseService = supabaseService ?? CRMSupabaseService();
+    _FunctionInvocation? functionInvoker,
+  })  : _supabaseService = supabaseService ?? CRMSupabaseService(),
+        _functionInvokerOverride = functionInvoker;
 
   final CRMSupabaseService _supabaseService;
-  final String historyTable;
+  final _FunctionInvocation? _functionInvokerOverride;
   final Map<String, EmailHistoryState> _stateByMember = <String, EmailHistoryState>{};
 
   EmailHistoryState stateForMember(String memberId) {
@@ -145,33 +271,56 @@ class EmailHistoryProvider extends ChangeNotifier {
       return;
     }
 
-    SupabaseClient client;
-    try {
-      client = _supabaseService.privilegedClient;
-    } catch (error, stack) {
-      Logger.warn('Supabase client unavailable for email history: $error', trace: stack);
-      _stateByMember[memberId] = EmailHistoryState(
-        isLoading: false,
-        hasLoaded: true,
-        entries: const [],
-        error: 'Supabase client is not available.',
-      );
-      notifyListeners();
-      return;
+    SupabaseClient? client;
+    if (_functionInvokerOverride == null) {
+      try {
+        client = _supabaseService.privilegedClient;
+      } catch (error, stack) {
+        Logger.warn('Supabase client unavailable for email history: $error', trace: stack);
+        _stateByMember[memberId] = EmailHistoryState(
+          isLoading: false,
+          hasLoaded: true,
+          entries: const [],
+          error: 'Supabase client is not available.',
+        );
+        notifyListeners();
+        return;
+      }
+    }
+
+    Future<({int status, dynamic data})> invoke(String name, {Map<String, dynamic>? body}) {
+      if (_functionInvokerOverride != null) {
+        return _functionInvokerOverride!(name, body: body);
+      }
+      final SupabaseClient resolvedClient = client!;
+      return resolvedClient.functions
+          .invoke(name, body: body)
+          .then((response) => (status: response.status, data: response.data));
     }
 
     try {
-      final response = await client
-          .from(historyTable)
-          .select()
-          .eq('member_id', memberId)
-          .order('sent_at', ascending: false);
+      final result = await invoke(
+        'get-member-emails',
+        body: <String, dynamic>{'member_id': memberId},
+      );
 
-      final data = response is List
-          ? response.whereType<Map<String, dynamic>>().toList(growable: false)
-          : <Map<String, dynamic>>[];
+      if (result.status != 200) {
+        final errorMessage = _extractErrorMessage(result.data) ??
+            'Failed to load email history (HTTP ${result.status}).';
 
-      final entries = data.map(EmailHistoryEntry.fromMap).toList(growable: false);
+        _stateByMember[memberId] = EmailHistoryState(
+          isLoading: false,
+          hasLoaded: true,
+          entries: current.entries,
+          error: errorMessage,
+        );
+        notifyListeners();
+        return;
+      }
+
+      final rawEntries = _extractEntries(result.data);
+      final entries = rawEntries.map(EmailHistoryEntry.fromMap).toList(growable: false);
+
       _stateByMember[memberId] = EmailHistoryState(
         isLoading: false,
         hasLoaded: true,
