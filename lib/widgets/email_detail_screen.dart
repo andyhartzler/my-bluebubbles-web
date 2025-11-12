@@ -1,7 +1,8 @@
 import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/widgets/email_reply_dialog.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart' show Html, Style;
+import 'package:flutter_html/flutter_html.dart'
+    show Html, Style, Margins, HtmlPaddings, FontSize;
 import 'package:intl/intl.dart';
 
 class EmailDetailScreen extends StatefulWidget {
