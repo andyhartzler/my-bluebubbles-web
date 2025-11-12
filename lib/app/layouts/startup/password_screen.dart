@@ -20,7 +20,9 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
   static const String _redirectUrl = 'https://moyd.app/auth/callback';
 
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
   final FocusNode _emailFocusNode = FocusNode();
+  final FocusNode _codeFocusNode = FocusNode();
 
   StreamSubscription<AuthState>? _authSubscription;
   SupabaseClient? _client;
@@ -28,8 +30,11 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
   bool _isCheckingSession = true;
   bool _isAuthenticated = false;
   bool _isSending = false;
+  bool _isVerifyingCode = false;
+  bool _showCodeInput = false;
   String? _successMessage;
   String? _errorMessage;
+  String? _emailForCode;
 
   @override
   void initState() {
@@ -57,6 +62,9 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
               _isAuthenticated = true;
               _successMessage = null;
               _errorMessage = null;
+              _showCodeInput = false;
+              _codeController.clear();
+              _emailForCode = null;
             });
           }
           break;
@@ -64,6 +72,10 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
           setState(() {
             _isAuthenticated = false;
             _successMessage = null;
+            _showCodeInput = false;
+            _isVerifyingCode = false;
+            _codeController.clear();
+            _emailForCode = null;
           });
           break;
         default:
@@ -81,9 +93,14 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
 
     final errorParam = Get.parameters['error'] ?? Uri.base.queryParameters['error'];
 
+    _codeController.clear();
+
     setState(() {
       _isAuthenticated = hasSession;
       _isCheckingSession = false;
+      _showCodeInput = false;
+      _isVerifyingCode = false;
+      _emailForCode = null;
       if (!hasSession && errorParam != null) {
         _errorMessage = _mapErrorMessage(errorParam);
       }
@@ -102,7 +119,9 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
   void dispose() {
     _authSubscription?.cancel();
     _emailController.dispose();
+    _codeController.dispose();
     _emailFocusNode.dispose();
+    _codeFocusNode.dispose();
     super.dispose();
   }
 
@@ -141,6 +160,14 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
       if (!mounted) return;
       setState(() {
         _successMessage = 'Check your email';
+        _showCodeInput = true;
+        _emailForCode = email;
+        _codeController.clear();
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _showCodeInput) {
+          _codeFocusNode.requestFocus();
+        }
       });
     } on AuthException catch (error) {
       if (!mounted) return;
@@ -153,7 +180,7 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
             'This email is not registered in our system. If you believe this is an error, please contact info@moyoungdemocrats.org';
       } else if (message.contains('403') || message.contains('unexpected_failure')) {
         errorMessage =
-            'This email is not associated with a member of the Executive Committee of the Missouri Young Democrats. If this is a mistake, please be sure to use the email you used when you filled out our Interest Form. For further help, contact info@moyoungdemocrats.org';
+            'This email is not associated with a member of the executive committee of the Missouri Young Democrats. If this is a mistake, please be sure to use the email you used when you filled out our Interest Form. For further help, contact info@moyoungdemocrats.org';
       } else if (message.contains('not found in our system')) {
         errorMessage = message;
       } else if (message.contains('executive committee')) {
@@ -162,19 +189,129 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
         errorMessage = _mapErrorMessage(message);
       }
 
+    try {
+      await client.auth.signInWithOtp(
+        email: email,
+        emailRedirectTo: _redirectUrl,
+        shouldCreateUser: false,
+      );
+      if (!mounted) return;
       setState(() {
         _errorMessage = errorMessage;
+        _showCodeInput = false;
+        _emailForCode = null;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _errorMessage =
             'Something went wrong. Please try again or contact info@moyoungdemocrats.org for assistance.';
+        _showCodeInput = false;
+        _emailForCode = null;
       });
     } finally {
       if (!mounted) return;
       setState(() {
         _isSending = false;
+      });
+    }
+
+    if (normalized.contains('auth_failed') || normalized.contains('expired')) {
+      return 'That sign-in link was invalid or expired. Request a new link to continue.';
+    }
+
+    if (decoded.isEmpty) {
+      return 'Unable to send the sign-in link. Please try again.';
+    }
+
+    return decoded;
+  }
+
+  void _stripErrorQuery() {
+    if (!kIsWeb) return;
+    final uri = Uri.base;
+    if (!uri.queryParameters.containsKey('error')) return;
+    final params = Map<String, String>.from(uri.queryParameters);
+    params.remove('error');
+    final updated = uri.replace(queryParameters: params.isEmpty ? null : params);
+    html.window.history.replaceState(null, '', updated.toString());
+  }
+
+  Future<void> _verifyCode() async {
+    final client = _client;
+    if (client == null) {
+      setState(() {
+        _errorMessage = 'Authentication service is unavailable. Please try again later.';
+      });
+      return;
+    }
+
+    final code = _codeController.text.trim();
+    final email = _emailForCode ?? _emailController.text.trim();
+
+    if (email.isEmpty) {
+      setState(() {
+        _errorMessage = 'Email address is required.';
+        _successMessage = null;
+      });
+      return;
+    }
+
+    if (code.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter the 6-digit code from your email.';
+        _successMessage = null;
+      });
+      _codeFocusNode.requestFocus();
+      return;
+    }
+
+    if (code.length != 6) {
+      setState(() {
+        _errorMessage = 'The code must be 6 digits.';
+        _successMessage = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isVerifyingCode = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      await client.auth.verifyOtp(
+        email: email,
+        token: code,
+        type: OtpType.email,
+      );
+      if (!mounted) return;
+      setState(() {
+        _successMessage = 'Code verified! Signing you in...';
+      });
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      String errorMessage;
+
+      if (error.message.contains('expired') || error.message.contains('invalid')) {
+        errorMessage = 'This code has expired or is invalid. Please request a new code.';
+      } else {
+        errorMessage = 'Unable to verify code. Please try again or request a new code.';
+      }
+
+      setState(() {
+        _errorMessage = errorMessage;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Something went wrong. Please try again.';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isVerifyingCode = false;
       });
     }
   }
@@ -300,6 +437,7 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
                               autofillHints: const [AutofillHints.email],
                               keyboardType: TextInputType.emailAddress,
                               textInputAction: TextInputAction.send,
+                              enabled: !_showCodeInput,
                               onSubmitted: (_) => _sendMagicLink(),
                               onChanged: (_) {
                                 if (_errorMessage != null) {
@@ -309,6 +447,76 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
                                 }
                               },
                             ),
+                            if (_showCodeInput) ...[
+                              const SizedBox(height: 16),
+                              Text(
+                                'Enter the 6-digit code from your email:',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _codeController,
+                                focusNode: _codeFocusNode,
+                                decoration: InputDecoration(
+                                  labelText: '6-digit code',
+                                  hintText: '123456',
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  prefixIcon: const Icon(Icons.pin_outlined),
+                                  counterText: '',
+                                ),
+                                keyboardType: TextInputType.number,
+                                maxLength: 6,
+                                textInputAction: TextInputAction.done,
+                                enabled: !_isVerifyingCode,
+                                onSubmitted: (_) => _verifyCode(),
+                                onChanged: (_) {
+                                  if (_errorMessage != null) {
+                                    setState(() {
+                                      _errorMessage = null;
+                                    });
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                onPressed: _isVerifyingCode
+                                    ? null
+                                    : () {
+                                        FocusScope.of(context).unfocus();
+                                        _verifyCode();
+                                      },
+                                icon: _isVerifyingCode
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                                      )
+                                    : const Icon(Icons.check),
+                                label: Text(_isVerifyingCode ? 'Verifying...' : 'Verify Code'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF004AAD),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _showCodeInput = false;
+                                    _codeController.clear();
+                                    _emailForCode = null;
+                                    _errorMessage = null;
+                                    _successMessage = null;
+                                  });
+                                  _emailFocusNode.requestFocus();
+                                },
+                                child: const Text('← Back to email entry'),
+                              ),
+                            ],
                             const SizedBox(height: 16),
                             if (_errorMessage != null)
                               Container(
@@ -354,26 +562,30 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
                                   ],
                                 ),
                               ),
-                            const SizedBox(height: 16),
-                            FilledButton.icon(
-                              onPressed: _isSending ? null : () {
-                                FocusScope.of(context).unfocus();
-                                _sendMagicLink();
-                              },
-                              icon: _isSending
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                                    )
-                                  : const Icon(Icons.arrow_forward),
-                              label: Text(_isSending ? 'Sending...' : 'Send magic link'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF32A6DE),
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            if (!_showCodeInput) ...[
+                              const SizedBox(height: 16),
+                              FilledButton.icon(
+                                onPressed: _isSending
+                                    ? null
+                                    : () {
+                                        FocusScope.of(context).unfocus();
+                                        _sendMagicLink();
+                                      },
+                                icon: _isSending
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                                      )
+                                    : const Icon(Icons.arrow_forward),
+                                label: Text(_isSending ? 'Sending...' : 'Send magic link'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF32A6DE),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
                               ),
-                            ),
+                            ],
                             const SizedBox(height: 12),
                             Text(
                               'We’ll email you a secure sign-in link. Access is limited to the executive leadership team.',
