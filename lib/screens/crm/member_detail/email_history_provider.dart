@@ -167,18 +167,28 @@ class EmailHistoryEntry {
     }
 
     final String id = normalized['id']?.toString() ?? map.hashCode.toString();
+    final String resolvedSubject = resolveSubject();
+    final String resolvedStatus = resolveStatus();
+    final DateTime? resolvedTimestamp = resolveTimestamp();
+    final List<String> resolvedTo = resolveRecipients();
+    final List<String> resolvedCc = resolveCc();
+    final List<String> resolvedBcc = resolveBcc();
+    final String? resolvedPreview = resolvePreview();
+    final String? resolvedError = resolveError();
+    final String? resolvedThreadId =
+        normalized['thread_id']?.toString() ?? normalized['thread']?.toString();
 
     return EmailHistoryEntry(
       id: id,
-      subject: subject,
-      status: status,
-      sentAt: parseDate(map['sent_at'] ?? map['created_at']),
-      to: parseRecipients(map['to_emails'] ?? map['to'] ?? map['recipients']),
-      cc: parseRecipients(map['cc_emails'] ?? map['cc']),
-      bcc: parseRecipients(map['bcc_emails'] ?? map['bcc']),
-      threadId: map['thread_id']?.toString(),
-      previewText: map['preview_text']?.toString(),
-      errorMessage: map['error_message']?.toString(),
+      subject: resolvedSubject,
+      status: resolvedStatus,
+      sentAt: resolvedTimestamp,
+      to: resolvedTo,
+      cc: resolvedCc,
+      bcc: resolvedBcc,
+      threadId: resolvedThreadId,
+      previewText: resolvedPreview,
+      errorMessage: resolvedError,
     );
   }
 
@@ -336,6 +346,92 @@ class EmailHistoryProvider extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  String? _extractErrorMessage(dynamic data) {
+    if (data == null) {
+      return null;
+    }
+    if (data is String) {
+      final trimmed = data.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+    if (data is Map) {
+      final Map<String, dynamic> normalized = data.map<String, dynamic>(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+      for (final key in const ['error', 'message', 'detail', 'error_message']) {
+        final value = normalized[key];
+        if (value is String && value.trim().isNotEmpty) {
+          return value.trim();
+        }
+      }
+      final nested = normalized['data'];
+      if (nested != null && nested != data) {
+        return _extractErrorMessage(nested);
+      }
+      return null;
+    }
+    if (data is Iterable) {
+      for (final item in data) {
+        final extracted = _extractErrorMessage(item);
+        if (extracted != null) {
+          return extracted;
+        }
+      }
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> _extractEntries(dynamic data) {
+    if (data == null) {
+      return const <Map<String, dynamic>>[];
+    }
+    if (data is List) {
+      return _normalizeEntryList(data);
+    }
+    if (data is Map) {
+      final Map<String, dynamic> normalized = data.map<String, dynamic>(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+
+      for (final key in const ['entries', 'data', 'emails', 'messages', 'results']) {
+        final dynamic candidate = normalized[key];
+        final list = _normalizeEntryList(candidate);
+        if (list.isNotEmpty) {
+          return list;
+        }
+      }
+
+      final single = normalized['entry'];
+      final singleList = _normalizeEntryList(single);
+      if (singleList.isNotEmpty) {
+        return singleList;
+      }
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
+  List<Map<String, dynamic>> _normalizeEntryList(dynamic value) {
+    if (value is List) {
+      final result = <Map<String, dynamic>>[];
+      for (final item in value) {
+        if (item is Map) {
+          result.add(item.map<String, dynamic>(
+            (key, value) => MapEntry(key.toString(), value),
+          ));
+        }
+      }
+      return result;
+    }
+    if (value is Map) {
+      return <Map<String, dynamic>>[
+        value.map<String, dynamic>(
+          (key, value) => MapEntry(key.toString(), value),
+        ),
+      ];
+    }
+    return const <Map<String, dynamic>>[];
   }
 
   Future<List<EmailMessage>> fetchThreadMessages({
