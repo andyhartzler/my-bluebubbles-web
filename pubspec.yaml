@@ -74,7 +74,6 @@ dependencies:
   fl_chart: ^0.66.0
   flutter_image_compress: ^2.2.0
   flutter_improved_scrolling: ^0.0.3
-  flutter_html: ^2.2.1
   flutter_isolate:
     path: packages/flutter_isolate
   flutter_keyboard_visibility: ^6.0.0 # no desktop support
@@ -151,7 +150,6 @@ dependencies:
   pasteboard: ^0.3.0
   path: ^1.9.0
   path_provider: ^2.1.2 # no web support
-  provider: ^6.1.2
   pdf: ^3.10.8
   permission_handler:
     path: packages/permission_handler_stub
