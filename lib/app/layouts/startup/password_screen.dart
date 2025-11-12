@@ -135,10 +135,8 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
     try {
       await client.auth.signInWithOtp(
         email: email,
-        emailOtpParams: EmailOtpParams(
-          emailRedirectTo: _redirectUrl,
-          shouldCreateUser: false,
-        ),
+        emailRedirectTo: _redirectUrl,
+        shouldCreateUser: false,
       );
       if (!mounted) return;
       setState(() {
@@ -160,18 +158,6 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
         _isSending = false;
       });
     }
-
-    return decoded;
-  }
-
-  void _stripErrorQuery() {
-    if (!kIsWeb) return;
-    final uri = Uri.base;
-    if (!uri.queryParameters.containsKey('error')) return;
-    final params = Map<String, String>.from(uri.queryParameters);
-    params.remove('error');
-    final updated = uri.replace(queryParameters: params.isEmpty ? null : params);
-    html.window.history.replaceState(null, '', updated.toString());
   }
 
   String _mapErrorMessage(String raw) {
