@@ -144,13 +144,32 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
       });
     } on AuthException catch (error) {
       if (!mounted) return;
+
+      String errorMessage;
+
+      final message = error.message;
+      if (message.contains('Signups not allowed')) {
+        errorMessage =
+            'This email is not registered in our system. If you believe this is an error, please contact info@moyoungdemocrats.org';
+      } else if (message.contains('403') || message.contains('unexpected_failure')) {
+        errorMessage =
+            'This email is not associated with a member of the executive committee of the Missouri Young Democrats. If this is a mistake, please be sure to use the email you used when you filled out our Interest Form. For further help, contact info@moyoungdemocrats.org';
+      } else if (message.contains('not found in our system')) {
+        errorMessage = message;
+      } else if (message.contains('executive committee')) {
+        errorMessage = message;
+      } else {
+        errorMessage = _mapErrorMessage(message);
+      }
+
       setState(() {
-        _errorMessage = _mapErrorMessage(error.message);
+        _errorMessage = errorMessage;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Something went wrong. Please try again.';
+        _errorMessage =
+            'Something went wrong. Please try again or contact info@moyoungdemocrats.org for assistance.';
       });
     } finally {
       if (!mounted) return;
@@ -163,6 +182,24 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
   String _mapErrorMessage(String raw) {
     final decoded = Uri.decodeComponent(raw).trim();
     final normalized = decoded.toLowerCase();
+
+    if (normalized.contains('unexpected_failure') || normalized.contains('403')) {
+      return 'This email is not associated with a member of the executive committee of the Missouri Young Democrats. If this is a mistake, please be sure to use the email you used when you filled out our Interest Form. For further help, contact info@moyoungdemocrats.org';
+    }
+
+    if (normalized.contains('signups not allowed') ||
+        (normalized.contains('signup') && normalized.contains('not allowed'))) {
+      return 'This email is not registered in our system. If you believe this is an error, please contact info@moyoungdemocrats.org';
+    }
+
+    if (normalized.contains('not found in our system') || normalized.contains('email not found')) {
+      return 'This email is not registered as an executive committee member. For assistance, contact info@moyoungdemocrats.org';
+    }
+
+    if (normalized.contains('executive committee') ||
+        (normalized.contains('executive') && normalized.contains('only'))) {
+      return decoded;
+    }
 
     if (normalized.contains('unknown_member') || normalized.contains('member_not_found')) {
       return 'We couldn’t find your email in the Missouri Young Democrats roster.';
