@@ -433,8 +433,9 @@ class EmailHistoryProvider extends ChangeNotifier {
       final name = angleMatch.group(1)?.trim();
       final email = angleMatch.group(2)?.trim();
       if (email != null && email.isNotEmpty) {
-        final cleanedName =
-            name != null && name.isNotEmpty ? name.replaceAll(RegExp(r"^[\"']|[\"']$"), '').trim() : null;
+        final cleanedName = name != null && name.isNotEmpty
+            ? name.replaceAll(RegExp(r"""^["']|["']$"""), '').trim()
+            : null;
         return EmailParticipant(
           address: email,
           displayName: cleanedName?.isNotEmpty == true ? cleanedName : null,
@@ -446,10 +447,10 @@ class EmailHistoryProvider extends ChangeNotifier {
         RegExp(r'[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}', caseSensitive: false).firstMatch(raw);
     final email = emailMatch?.group(0)?.trim() ?? raw;
     final nameRemainder = emailMatch != null
-        ? raw
-            .replaceFirst(emailMatch.group(0)!, '')
-            .replaceAll(RegExp(r"^[\"']|[\"']$"), '')
-            .trim()
+          ? raw
+              .replaceFirst(emailMatch.group(0)!, '')
+              .replaceAll(RegExp(r"""^["']|["']$"""), '')
+              .trim()
         : null;
 
     return EmailParticipant(
