@@ -1,8 +1,10 @@
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/member_detail/email_history_provider.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 void main() {
   final supabaseService = CRMSupabaseService();
@@ -28,7 +30,10 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: MemberDetailScreen(member: member),
+        home: ChangeNotifierProvider(
+          create: (_) => EmailHistoryProvider(supabaseService: supabaseService),
+          child: MemberDetailScreen(member: member),
+        ),
       ),
     );
 
@@ -43,7 +48,10 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: MemberDetailScreen(member: member),
+        home: ChangeNotifierProvider(
+          create: (_) => EmailHistoryProvider(supabaseService: supabaseService),
+          child: MemberDetailScreen(member: member),
+        ),
       ),
     );
 

@@ -2,11 +2,13 @@ import 'dart:typed_data';
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
+import 'package:bluebubbles/screens/crm/member_detail/email_history_provider.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 class _FakeBrowserFilePicker extends file_picker.FilePicker {
   _FakeBrowserFilePicker(this._files);
@@ -42,9 +44,10 @@ void main() {
         (tester) async {
       final member = Member(id: 'member-1', name: 'Test Member');
 
-      CRMSupabaseService().debugSetInitialized(true);
+      final supabaseService = CRMSupabaseService();
+      supabaseService.debugSetInitialized(true);
       addTearDown(() {
-        CRMSupabaseService().debugSetInitialized(false);
+        supabaseService.debugSetInitialized(false);
       });
 
       final hydratedBytes = Uint8List.fromList([7, 8, 9]);
@@ -77,8 +80,11 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: MemberDetailScreen(member: member),
+          home: ChangeNotifierProvider(
+            create: (_) => EmailHistoryProvider(supabaseService: supabaseService),
+            child: Scaffold(
+              body: MemberDetailScreen(member: member),
+            ),
           ),
         ),
       );

@@ -8,6 +8,7 @@ import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
+import 'package:bluebubbles/screens/crm/member_detail/email_history_tab.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/editors/member_edit_sheet.dart';
 import 'package:bluebubbles/services/crm/crm_email_service.dart';
@@ -1628,372 +1629,397 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                 ),
               ),
             )
-          : () {
-              final theme = Theme.of(context);
-              final phoneDisplay = _cleanText(_member.phone);
-              final phoneE164 = _cleanText(_member.phoneE164);
-              final primaryPhone = phoneDisplay ?? phoneE164;
-              final phoneCopyValue = phoneE164 ?? phoneDisplay;
-              final email = _cleanText(_member.email);
-              final county = _cleanText(_member.county);
-              final addressParts = _buildAddressParts(
-                street: _member.address,
-                city: _member.city,
-                county: _member.county,
-                state: _member.state,
-              );
-              final addressDisplay =
-                  addressParts.isEmpty ? null : addressParts.join('\n');
-              final addressCopyValue =
-                  addressParts.isEmpty ? null : addressParts.join(', ');
-              final addressLink = _buildAppleMapsLink(addressParts);
-              final districtLabel = _formatDistrict(_member.congressionalDistrict);
-              final committees = (_member.committee != null && _member.committee!.isNotEmpty)
-                  ? _member.committeesString
-                  : null;
-              final notesValue = _cleanText(_member.notes);
-              final isExecutive = _member.executiveCommittee;
-              final executiveTitle =
-                  _cleanText(_member.executiveTitle) ?? (isExecutive ? 'Executive Committee' : null);
-              final executiveRole = _cleanText(_member.executiveRoleDisplay);
-              final chapterStatus = _cleanText(_member.currentChapterMember);
-              final chapterName = _cleanText(_member.chapterName);
-              final chapterPosition = _cleanText(_member.chapterPosition);
-              final graduationYear = _cleanText(_member.graduationYear);
-              final schoolEmail = _cleanText(_member.schoolEmail);
-              final dateElected = _member.dateElected;
-              final termExpiration = _member.termExpiration;
-              final college = _cleanText(_member.college);
-              final highSchool = _cleanText(_member.highSchool);
-              final legacySchool =
-                  (college == null && highSchool == null) ? _cleanText(_member.schoolName) : null;
-
-              final sections = <Widget?>[
-                _buildOptionalSection('Contact Information', [
-                  _copyRow('Phone', primaryPhone, copyValue: phoneCopyValue),
-                  _copyRow('Email', email),
-                  _copyRow('School Email', schoolEmail),
-                  _copyRow('Address', addressDisplay,
-                      copyValue: addressCopyValue, link: addressLink),
-                ]),
-                _buildOptionalSection('Chapter Involvement', [
-                  _infoRowOrNull('Current Chapter Member', chapterStatus),
-                  _infoRowOrNull('Chapter Name', chapterName),
-                  _infoRowOrNull('Chapter Position', chapterPosition),
-                  if (dateElected != null)
-                    _buildInfoRow('Date Elected', _formatDateOnly(dateElected)),
-                  if (termExpiration != null)
-                    _buildInfoRow('Term Expiration', _formatDateOnly(termExpiration)),
-                  _infoRowOrNull('Graduation Year', graduationYear),
-                ]),
-                _buildOptionalSection('Social Profiles', [
-                  _socialRow(_SocialPlatform.instagram, 'Instagram', _member.instagram),
-                  _socialRow(_SocialPlatform.tiktok, 'TikTok', _member.tiktok),
-                  _socialRow(_SocialPlatform.x, 'X (Twitter)', _member.x),
-                ]),
-                _buildOptionalSection('Political & Civic', [
-                  _infoRowOrNull('County', county),
-                  if (districtLabel != null) _buildInfoRow('Congressional District', districtLabel),
-                  if (committees != null) _buildInfoRow('Committees', committees),
-                  if (_member.registeredVoter != null)
-                    _buildInfoRow('Registered Voter', _member.registeredVoter! ? 'Yes' : 'No'),
-                  _infoRowOrNull('Political Experience', _member.politicalExperience),
-                  _infoRowOrNull('Current Involvement', _member.currentInvolvement),
-                ]),
-                _buildOptionalSection('Education & Employment', [
-                  _infoRowOrNull('Education Level', _member.educationLevel),
-                  _infoRowOrNull('In School', _member.inSchool),
-                  _infoRowOrNull('College', college),
-                  _infoRowOrNull('High School', highSchool),
-                  _infoRowOrNull('School (Legacy)', legacySchool),
-                  _infoRowOrNull('Employed', _member.employed),
-                  _infoRowOrNull('Industry', _member.industry),
-                  _infoRowOrNull('Leadership Experience', _member.leadershipExperience),
-                ]),
-                _buildOptionalSection('Personal Details', [
-                  if (_member.dateOfBirth != null)
-                    _buildInfoRow('Date of Birth', _formatDateOnly(_member.dateOfBirth!)),
-                  if (_member.age != null)
-                    _buildInfoRow('Age', '${_member.age} years old'),
-                  _infoRowOrNull('Pronouns', _member.preferredPronouns),
-                  _infoRowOrNull('Gender Identity', _member.genderIdentity),
-                  _infoRowOrNull('Race', _member.race),
-                  _infoRowOrNull('Sexual Orientation', _member.sexualOrientation),
-                  if (_member.hispanicLatino != null)
-                    _buildInfoRow('Hispanic/Latino', _member.hispanicLatino! ? 'Yes' : 'No'),
-                  _infoRowOrNull('Languages', _member.languages),
-                  _infoRowOrNull('Community Type', _member.communityType),
-                  _infoRowOrNull('Disability', _member.disability),
-                  _infoRowOrNull('Religion', _member.religion),
-                  _infoRowOrNull('Zodiac Sign', _member.zodiacSign),
-                ]),
-                _buildOptionalSection('Engagement & Interests', [
-                  _infoRowOrNull('Desire to Lead', _member.desireToLead),
-                  _infoRowOrNull('Hours per Week', _member.hoursPerWeek),
-                  _infoRowOrNull('Why Join', _member.whyJoin),
-                  _infoRowOrNull('Goals & Ambitions', _member.goalsAndAmbitions),
-                  _infoRowOrNull('Qualified Experience', _member.qualifiedExperience),
-                  _infoRowOrNull('Referral Source', _member.referralSource),
-                  _infoRowOrNull('Passionate Issues', _member.passionateIssues),
-                  _infoRowOrNull('Why Issues Matter', _member.whyIssuesMatter),
-                  _infoRowOrNull('Areas of Interest', _member.areasOfInterest),
-                  _infoRowOrNull('Accommodations', _member.accommodations),
-                ]),
-              ].whereType<Widget>().toList();
-
-              final metadataSection = _buildOptionalSection('CRM Metadata', [
-                _copyRow('Member ID', _member.id),
-                if (_member.lastContacted != null)
-                  _buildInfoRow('Last Contacted', _formatDate(_member.lastContacted!)),
-                if (_member.introSentAt != null)
-                  _buildInfoRow('Intro Sent', _formatDate(_member.introSentAt!)),
-                if (_member.dateJoined != null)
-                  _buildInfoRow('Date Joined', _formatDate(_member.dateJoined!)),
-                if (_member.createdAt != null)
-                  _buildInfoRow('Added to System', _formatDate(_member.createdAt!)),
-                _infoRowOrNull('Opt-Out Reason', _member.optOutReason),
-                if (_member.optOutDate != null)
-                  _buildInfoRow('Opt-Out Date', _formatDateOnly(_member.optOutDate!)),
-                if (_member.optInDate != null)
-                  _buildInfoRow('Opt-In Date', _formatDateOnly(_member.optInDate!)),
-              ]);
-
-              final notesChildren = <Widget>[];
-              if (!_editingNotes && notesValue == null) {
-                notesChildren.add(TextButton.icon(
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add notes'),
-                  onPressed: () => setState(() => _editingNotes = true),
-                ));
-              }
-              if (!_editingNotes && notesValue != null) {
-                notesChildren.add(Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(notesValue),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Edit'),
-                      onPressed: () => setState(() => _editingNotes = true),
+          : DefaultTabController(
+              length: 2,
+              child: Column(
+                children: [
+                  Material(
+                    elevation: 2,
+                    color: Theme.of(context).colorScheme.surface,
+                    child: TabBar(
+                      labelColor: Theme.of(context).colorScheme.primary,
+                      unselectedLabelColor:
+                          Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                      indicatorColor: Theme.of(context).colorScheme.primary,
+                      tabs: const [
+                        Tab(icon: Icon(Icons.account_circle_outlined), text: 'Overview'),
+                        Tab(icon: Icon(Icons.email_outlined), text: 'Emails'),
+                      ],
                     ),
-                  ],
-                ));
-              }
-              if (_editingNotes) {
-                notesChildren.add(Column(
-                  children: [
-                    TextField(
-                      controller: _notesController,
-                      maxLines: 5,
-                      decoration: const InputDecoration(
-                        hintText: 'Add notes about this member...',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                  ),
+                  Expanded(
+                    child: TabBarView(
                       children: [
-                        TextButton(
-                          onPressed: () {
-                            _notesController.text = _member.notes ?? '';
-                            setState(() => _editingNotes = false);
-                          },
-                          child: const Text('Cancel'),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: _saveNotes,
-                          child: const Text('Save'),
+                        _buildOverviewTab(context),
+                        EmailHistoryTab(
+                          memberId: _member.id,
+                          memberName: _member.name,
                         ),
                       ],
                     ),
-                  ],
-                ));
-              }
-              final notesSection =
-                  notesChildren.isEmpty ? null : _buildSection('Notes', notesChildren);
-              final internalReportsSection = _buildInternalReportsSection();
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
 
-              final allSections = <Widget>[
-                ...sections,
-                if (internalReportsSection != null) internalReportsSection,
-                if (notesSection != null) notesSection,
-                if (metadataSection != null) metadataSection,
-              ];
+  Widget _buildOverviewTab(BuildContext context) {
+    final theme = Theme.of(context);
+    final phoneDisplay = _cleanText(_member.phone);
+    final phoneE164 = _cleanText(_member.phoneE164);
+    final primaryPhone = phoneDisplay ?? phoneE164;
+    final phoneCopyValue = phoneE164 ?? phoneDisplay;
+    final email = _cleanText(_member.email);
+    final county = _cleanText(_member.county);
+    final addressParts = _buildAddressParts(
+      street: _member.address,
+      city: _member.city,
+      county: _member.county,
+      state: _member.state,
+    );
+    final addressDisplay = addressParts.isEmpty ? null : addressParts.join('\n');
+    final addressCopyValue = addressParts.isEmpty ? null : addressParts.join(', ');
+    final addressLink = _buildAppleMapsLink(addressParts);
+    final districtLabel = _formatDistrict(_member.congressionalDistrict);
+    final committees = (_member.committee != null && _member.committee!.isNotEmpty)
+        ? _member.committeesString
+        : null;
+    final notesValue = _cleanText(_member.notes);
+    final isExecutive = _member.executiveCommittee;
+    final executiveTitle =
+        _cleanText(_member.executiveTitle) ?? (isExecutive ? 'Executive Committee' : null);
+    final executiveRole = _cleanText(_member.executiveRoleDisplay);
+    final chapterStatus = _cleanText(_member.currentChapterMember);
+    final chapterName = _cleanText(_member.chapterName);
+    final chapterPosition = _cleanText(_member.chapterPosition);
+    final graduationYear = _cleanText(_member.graduationYear);
+    final schoolEmail = _cleanText(_member.schoolEmail);
+    final dateElected = _member.dateElected;
+    final termExpiration = _member.termExpiration;
+    final college = _cleanText(_member.college);
+    final highSchool = _cleanText(_member.highSchool);
+    final legacySchool =
+        (college == null && highSchool == null) ? _cleanText(_member.schoolName) : null;
 
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth >= 768;
-                  final listPadding = isWide
-                      ? const EdgeInsets.symmetric(horizontal: 32, vertical: 24)
-                      : const EdgeInsets.all(16);
-                  final chipsAlignment = isWide ? WrapAlignment.start : WrapAlignment.center;
-                  final actionsAlignment = isWide ? WrapAlignment.start : WrapAlignment.center;
+    final sections = <Widget?>[
+      _buildOptionalSection('Contact Information', [
+        _copyRow('Phone', primaryPhone, copyValue: phoneCopyValue),
+        _copyRow('Email', email),
+        _copyRow('School Email', schoolEmail),
+        _copyRow('Address', addressDisplay, copyValue: addressCopyValue, link: addressLink),
+      ]),
+      _buildOptionalSection('Chapter Involvement', [
+        _infoRowOrNull('Current Chapter Member', chapterStatus),
+        _infoRowOrNull('Chapter Name', chapterName),
+        _infoRowOrNull('Chapter Position', chapterPosition),
+        if (dateElected != null) _buildInfoRow('Date Elected', _formatDateOnly(dateElected)),
+        if (termExpiration != null)
+          _buildInfoRow('Term Expiration', _formatDateOnly(termExpiration)),
+        _infoRowOrNull('Graduation Year', graduationYear),
+      ]),
+      _buildOptionalSection('Social Profiles', [
+        _socialRow(_SocialPlatform.instagram, 'Instagram', _member.instagram),
+        _socialRow(_SocialPlatform.tiktok, 'TikTok', _member.tiktok),
+        _socialRow(_SocialPlatform.x, 'X (Twitter)', _member.x),
+      ]),
+      _buildOptionalSection('Political & Civic', [
+        _infoRowOrNull('County', county),
+        if (districtLabel != null) _buildInfoRow('Congressional District', districtLabel),
+        if (committees != null) _buildInfoRow('Committees', committees),
+        if (_member.registeredVoter != null)
+          _buildInfoRow('Registered Voter', _member.registeredVoter! ? 'Yes' : 'No'),
+        _infoRowOrNull('Political Experience', _member.politicalExperience),
+        _infoRowOrNull('Current Involvement', _member.currentInvolvement),
+      ]),
+      _buildOptionalSection('Education & Employment', [
+        _infoRowOrNull('Education Level', _member.educationLevel),
+        _infoRowOrNull('In School', _member.inSchool),
+        _infoRowOrNull('College', college),
+        _infoRowOrNull('High School', highSchool),
+        _infoRowOrNull('School (Legacy)', legacySchool),
+        _infoRowOrNull('Employed', _member.employed),
+        _infoRowOrNull('Industry', _member.industry),
+        _infoRowOrNull('Leadership Experience', _member.leadershipExperience),
+      ]),
+      _buildOptionalSection('Personal Details', [
+        if (_member.dateOfBirth != null)
+          _buildInfoRow('Date of Birth', _formatDateOnly(_member.dateOfBirth!)),
+        if (_member.age != null) _buildInfoRow('Age', '${_member.age} years old'),
+        _infoRowOrNull('Pronouns', _member.preferredPronouns),
+        _infoRowOrNull('Gender Identity', _member.genderIdentity),
+        _infoRowOrNull('Race', _member.race),
+        _infoRowOrNull('Sexual Orientation', _member.sexualOrientation),
+        if (_member.hispanicLatino != null)
+          _buildInfoRow('Hispanic/Latino', _member.hispanicLatino! ? 'Yes' : 'No'),
+        _infoRowOrNull('Languages', _member.languages),
+        _infoRowOrNull('Community Type', _member.communityType),
+        _infoRowOrNull('Disability', _member.disability),
+        _infoRowOrNull('Religion', _member.religion),
+        _infoRowOrNull('Zodiac Sign', _member.zodiacSign),
+      ]),
+      _buildOptionalSection('Engagement & Interests', [
+        _infoRowOrNull('Desire to Lead', _member.desireToLead),
+        _infoRowOrNull('Hours per Week', _member.hoursPerWeek),
+        _infoRowOrNull('Why Join', _member.whyJoin),
+        _infoRowOrNull('Goals & Ambitions', _member.goalsAndAmbitions),
+        _infoRowOrNull('Qualified Experience', _member.qualifiedExperience),
+        _infoRowOrNull('Referral Source', _member.referralSource),
+        _infoRowOrNull('Passionate Issues', _member.passionateIssues),
+        _infoRowOrNull('Why Issues Matter', _member.whyIssuesMatter),
+        _infoRowOrNull('Areas of Interest', _member.areasOfInterest),
+        _infoRowOrNull('Accommodations', _member.accommodations),
+      ]),
+    ].whereType<Widget>().toList();
 
-                  Widget? sectionLayout;
-                  if (allSections.isNotEmpty) {
-                    if (isWide) {
-                      const double spacing = 24;
-                      const double maxCardWidth = 420;
-                      const double minCardWidth = 320;
-                      final double availableWidth = constraints.maxWidth - listPadding.horizontal;
-                      double cardWidth = maxCardWidth;
-                      if (availableWidth < maxCardWidth * 2 + spacing) {
-                        if (availableWidth >= minCardWidth * 2 + spacing) {
-                          cardWidth = (availableWidth - spacing) / 2;
-                        } else {
-                          cardWidth = availableWidth;
-                        }
-                      }
+    final metadataSection = _buildOptionalSection('CRM Metadata', [
+      _copyRow('Member ID', _member.id),
+      if (_member.lastContacted != null)
+        _buildInfoRow('Last Contacted', _formatDate(_member.lastContacted!)),
+      if (_member.introSentAt != null)
+        _buildInfoRow('Intro Sent', _formatDate(_member.introSentAt!)),
+      if (_member.dateJoined != null)
+        _buildInfoRow('Date Joined', _formatDate(_member.dateJoined!)),
+      if (_member.createdAt != null)
+        _buildInfoRow('Added to System', _formatDate(_member.createdAt!)),
+      _infoRowOrNull('Opt-Out Reason', _member.optOutReason),
+      if (_member.optOutDate != null)
+        _buildInfoRow('Opt-Out Date', _formatDateOnly(_member.optOutDate!)),
+      if (_member.optInDate != null)
+        _buildInfoRow('Opt-In Date', _formatDateOnly(_member.optInDate!)),
+    ]);
 
-                      sectionLayout = Wrap(
-                        spacing: spacing,
-                        runSpacing: spacing,
-                        alignment: WrapAlignment.start,
-                        children: allSections
-                            .map(
-                              (section) => SizedBox(
-                                width: cardWidth.clamp(minCardWidth, maxCardWidth).toDouble(),
-                                child: section,
-                              ),
-                            )
-                            .toList(),
-                      );
-                    } else {
-                      sectionLayout = Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (int i = 0; i < allSections.length; i++) ...[
-                            allSections[i],
-                            if (i != allSections.length - 1) const SizedBox(height: 24),
-                          ],
-                        ],
-                      );
-                    }
-                  }
-
-                  return ListView(
-                    padding: listPadding,
-                    children: [
-                      Center(child: _buildProfilePhoto()),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: Column(
-                          children: [
-                            Text(
-                              _member.name,
-                              style: theme.textTheme.headlineSmall,
-                              textAlign: TextAlign.center,
-                            ),
-                            if (isExecutive && (executiveTitle != null || executiveRole != null)) ...[
-                              const SizedBox(height: 6),
-                              if (executiveTitle != null)
-                                Text(
-                                  executiveTitle,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              if (executiveRole != null)
-                                Text(
-                                  executiveRole,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.75),
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        alignment: chipsAlignment,
-                        runAlignment: chipsAlignment,
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          if (_member.lastContacted != null)
-                            Chip(
-                              avatar: const Icon(Icons.schedule_send, size: 18),
-                              label: Text('Last contacted ${_formatDate(_member.lastContacted!)}'),
-                            ),
-                          if (_member.introSentAt != null)
-                            Chip(
-                              avatar: const Icon(Icons.auto_awesome, size: 18),
-                              label: Text('Intro sent ${_formatDate(_member.introSentAt!)}'),
-                            ),
-                        ],
-                      ),
-                      if (_member.lastContacted != null || _member.introSentAt != null)
-                        const SizedBox(height: 8),
-                      if (_member.optOut)
-                        Align(
-                          alignment: isWide ? Alignment.centerLeft : Alignment.center,
-                          child: const Chip(
-                            label: Text('OPTED OUT'),
-                            backgroundColor: Colors.red,
-                            labelStyle: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      if (_crmReady)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Wrap(
-                            spacing: 12,
-                            runSpacing: 8,
-                            alignment: actionsAlignment,
-                            children: [
-                              OutlinedButton.icon(
-                                icon: _uploadingPhoto
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      )
-                                    : Icon(
-                                        _member.hasProfilePhoto
-                                            ? Icons.photo_camera_outlined
-                                            : Icons.add_a_photo_outlined,
-                                      ),
-                                label: Text(_uploadingPhoto
-                                    ? 'Uploading...'
-                                    : (_member.hasProfilePhoto ? 'Update Photo' : 'Add Photo')),
-                                onPressed: _uploadingPhoto ? null : _selectProfilePhoto,
-                              ),
-                              OutlinedButton.icon(
-                                icon: const Icon(Icons.edit_outlined),
-                                label: const Text('Edit Member'),
-                                onPressed: _editMember,
-                              ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-                      ..._buildMeetingAttendanceSection(),
-                      if (_crmReady || sectionLayout != null)
-                        const SizedBox(height: 24),
-                      if (sectionLayout != null) ...[
-                        sectionLayout,
-                        const SizedBox(height: 24),
-                      ],
-                      ElevatedButton.icon(
-                        icon: Icon(_member.optOut ? Icons.check_circle : Icons.block),
-                        label: Text(_member.optOut ? 'Opt In' : 'Opt Out'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _member.optOut ? Colors.green : Colors.red,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: _crmReady ? _toggleOptOut : null,
-                      ),
-                    ],
-                  );
+    final notesChildren = <Widget>[];
+    if (!_editingNotes && notesValue == null) {
+      notesChildren.add(TextButton.icon(
+        icon: const Icon(Icons.add),
+        label: const Text('Add notes'),
+        onPressed: () => setState(() => _editingNotes = true),
+      ));
+    }
+    if (!_editingNotes && notesValue != null) {
+      notesChildren.add(Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(notesValue),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            icon: const Icon(Icons.edit),
+            label: const Text('Edit'),
+            onPressed: () => setState(() => _editingNotes = true),
+          ),
+        ],
+      ));
+    }
+    if (_editingNotes) {
+      notesChildren.add(Column(
+        children: [
+          TextField(
+            controller: _notesController,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              hintText: 'Add notes about this member...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () {
+                  _notesController.text = _member.notes ?? '';
+                  setState(() => _editingNotes = false);
                 },
-              );
-            }(),
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: _saveNotes,
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        ],
+      ));
+    }
+    final notesSection = notesChildren.isEmpty ? null : _buildSection('Notes', notesChildren);
+    final internalReportsSection = _buildInternalReportsSection();
+
+    final allSections = <Widget>[
+      ...sections,
+      if (internalReportsSection != null) internalReportsSection,
+      if (notesSection != null) notesSection,
+      if (metadataSection != null) metadataSection,
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 768;
+        final listPadding =
+            isWide ? const EdgeInsets.symmetric(horizontal: 32, vertical: 24) : const EdgeInsets.all(16);
+        final chipsAlignment = isWide ? WrapAlignment.start : WrapAlignment.center;
+        final actionsAlignment = isWide ? WrapAlignment.start : WrapAlignment.center;
+
+        Widget? sectionLayout;
+        if (allSections.isNotEmpty) {
+          if (isWide) {
+            const double spacing = 24;
+            const double maxCardWidth = 420;
+            const double minCardWidth = 320;
+            final double availableWidth = constraints.maxWidth - listPadding.horizontal;
+            double cardWidth = maxCardWidth;
+            if (availableWidth < maxCardWidth * 2 + spacing) {
+              if (availableWidth >= minCardWidth * 2 + spacing) {
+                cardWidth = (availableWidth - spacing) / 2;
+              } else {
+                cardWidth = availableWidth;
+              }
+            }
+
+            sectionLayout = Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              alignment: WrapAlignment.start,
+              children: allSections
+                  .map(
+                    (section) => SizedBox(
+                      width: cardWidth.clamp(minCardWidth, maxCardWidth).toDouble(),
+                      child: section,
+                    ),
+                  )
+                  .toList(),
+            );
+          } else {
+            sectionLayout = Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (int i = 0; i < allSections.length; i++) ...[
+                  allSections[i],
+                  if (i != allSections.length - 1) const SizedBox(height: 24),
+                ],
+              ],
+            );
+          }
+        }
+
+        return ListView(
+          padding: listPadding,
+          children: [
+            Center(child: _buildProfilePhoto()),
+            const SizedBox(height: 16),
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    _member.name,
+                    style: theme.textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  if (isExecutive && (executiveTitle != null || executiveRole != null)) ...[
+                    const SizedBox(height: 6),
+                    if (executiveTitle != null)
+                      Text(
+                        executiveTitle,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    if (executiveRole != null)
+                      Text(
+                        executiveRole,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.textTheme.bodySmall?.color?.withOpacity(0.75),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: chipsAlignment,
+              runAlignment: chipsAlignment,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                if (_member.lastContacted != null)
+                  Chip(
+                    avatar: const Icon(Icons.schedule_send, size: 18),
+                    label: Text('Last contacted ${_formatDate(_member.lastContacted!)}'),
+                  ),
+                if (_member.introSentAt != null)
+                  Chip(
+                    avatar: const Icon(Icons.auto_awesome, size: 18),
+                    label: Text('Intro sent ${_formatDate(_member.introSentAt!)}'),
+                  ),
+              ],
+            ),
+            if (_member.lastContacted != null || _member.introSentAt != null)
+              const SizedBox(height: 8),
+            if (_member.optOut)
+              Align(
+                alignment: isWide ? Alignment.centerLeft : Alignment.center,
+                child: const Chip(
+                  label: Text('OPTED OUT'),
+                  backgroundColor: Colors.red,
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+              ),
+            if (_crmReady)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  alignment: actionsAlignment,
+                  children: [
+                    OutlinedButton.icon(
+                      icon: _uploadingPhoto
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              _member.hasProfilePhoto
+                                  ? Icons.photo_camera_outlined
+                                  : Icons.add_a_photo_outlined,
+                            ),
+                      label: Text(_uploadingPhoto
+                          ? 'Uploading...'
+                          : (_member.hasProfilePhoto ? 'Update Photo' : 'Add Photo')),
+                      onPressed: _uploadingPhoto ? null : _selectProfilePhoto,
+                    ),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit Member'),
+                      onPressed: _editMember,
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 24),
+            ..._buildMeetingAttendanceSection(),
+            if (_crmReady || sectionLayout != null) const SizedBox(height: 24),
+            if (sectionLayout != null) ...[
+              sectionLayout,
+              const SizedBox(height: 24),
+            ],
+            ElevatedButton.icon(
+              icon: Icon(_member.optOut ? Icons.check_circle : Icons.block),
+              label: Text(_member.optOut ? 'Opt In' : 'Opt Out'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _member.optOut ? Colors.green : Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _crmReady ? _toggleOptOut : null,
+            ),
+          ],
+        );
+      },
     );
   }
 
