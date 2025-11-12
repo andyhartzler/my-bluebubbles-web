@@ -137,7 +137,6 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
         email: email,
         emailRedirectTo: _redirectUrl,
         shouldCreateUser: false,
-        type: OtpType.magiclink,
       );
       if (!mounted) return;
       setState(() {
