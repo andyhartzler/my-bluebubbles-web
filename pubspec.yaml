@@ -82,6 +82,7 @@ dependencies:
   flutter_map: ^7.0.1
   flutter_map_marker_popup: ^7.0.0
   flutter_markdown: ^0.7.2+1
+  flutter_html: ^3.0.0-beta.2
   flutter_quill: ^9.3.3
   flutter_slidable: ^3.1.0
   flutter_staggered_grid_view: ^0.7.0
@@ -148,6 +149,7 @@ dependencies:
   pasteboard: ^0.3.0
   path: ^1.9.0
   path_provider: ^2.1.2 # no web support
+  provider: ^6.1.2
   pdf: ^3.10.8
   permission_handler:
     path: packages/permission_handler_stub
