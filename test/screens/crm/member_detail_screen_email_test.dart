@@ -1,13 +1,60 @@
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/screens/crm/member_detail/email_history_provider.dart';
+import 'package:bluebubbles/screens/crm/member_detail/email_history_tab.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/widgets/email_detail_screen.dart';
+import 'package:bluebubbles/widgets/email_reply_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
   final supabaseService = CRMSupabaseService();
+
+  class FakeEmailHistoryProvider extends EmailHistoryProvider {
+    FakeEmailHistoryProvider({
+      required this.memberId,
+      required this.entries,
+      required this.threadMessages,
+      required CRMSupabaseService supabaseService,
+    }) : super(supabaseService: supabaseService);
+
+    final String memberId;
+    List<EmailHistoryEntry> entries;
+    List<EmailMessage> threadMessages;
+
+    @override
+    EmailHistoryState stateForMember(String memberId) {
+      if (memberId == this.memberId) {
+        return EmailHistoryState(
+          isLoading: false,
+          hasLoaded: true,
+          entries: entries,
+        );
+      }
+      return const EmailHistoryState(
+        isLoading: false,
+        hasLoaded: true,
+        entries: [],
+      );
+    }
+
+    @override
+    Future<void> ensureLoaded(String memberId) async {}
+
+    @override
+    Future<void> refresh(String memberId) async {}
+
+    @override
+    Future<List<EmailMessage>> fetchThreadMessages({
+      required String memberId,
+      required String threadId,
+    }) async {
+      return threadMessages;
+    }
+  }
 
   setUp(() {
     supabaseService.debugSetInitialized(true);
@@ -73,5 +120,103 @@ void main() {
     await tester.pump();
 
     expect(sendButton().onPressed, isNotNull);
+  });
+
+  testWidgets('tapping history entry opens reply flow and sends via handler',
+      (tester) async {
+    final member = _buildMember(email: 'member@example.com');
+    final entry = EmailHistoryEntry(
+      id: 'history-1',
+      subject: 'Welcome to the movement',
+      status: 'delivered',
+      sentAt: DateTime.utc(2024, 1, 1),
+      to: const ['member@example.com'],
+      cc: const ['ally@example.com'],
+      bcc: const [],
+      threadId: 'thread-1',
+      previewText: 'Preview',
+    );
+
+    final messages = <EmailMessage>[
+      EmailMessage(
+        id: 'message-1',
+        sentAt: DateTime.utc(2024, 1, 1, 12),
+        sender: const EmailParticipant(address: 'organizer@example.com'),
+        to: const [EmailParticipant(address: 'member@example.com')],
+        cc: const [],
+        subject: 'Welcome to the movement',
+        plainTextBody: 'Hello there',
+        htmlBody: '<p>Hello there</p>',
+        isOutgoing: true,
+      ),
+    ];
+
+    final provider = FakeEmailHistoryProvider(
+      memberId: member.id,
+      entries: [entry],
+      threadMessages: messages,
+      supabaseService: supabaseService,
+    );
+
+    bool loaderCalled = false;
+    bool sendCalled = false;
+    String? capturedThreadId;
+    EmailReplyData? capturedReply;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChangeNotifierProvider<EmailHistoryProvider>.value(
+          value: provider,
+          child: Scaffold(
+            body: EmailHistoryTab(
+              memberId: member.id,
+              memberName: member.name,
+              loadThreadMessages: (memberId, threadId) async {
+                loaderCalled = true;
+                expect(memberId, member.id);
+                expect(threadId, entry.threadId);
+                return messages;
+              },
+              onSendReply: (threadId, data) async {
+                sendCalled = true;
+                capturedThreadId = threadId;
+                capturedReply = data;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+    await tester.tap(find.text(entry.subject));
+    await tester.pumpAndSettle();
+
+    expect(loaderCalled, isTrue);
+    expect(find.byType(EmailDetailScreen), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FloatingActionButton, 'Reply'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EmailReplyDialog), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Subject'),
+      'Re: Welcome to the movement',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Message'),
+      'Thanks for the update!',
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Send reply'));
+    await tester.pumpAndSettle();
+
+    expect(sendCalled, isTrue);
+    expect(capturedThreadId, entry.threadId);
+    expect(capturedReply, isNotNull);
+    expect(capturedReply!.body, 'Thanks for the update!');
+    expect(capturedReply!.sendAsHtml, isTrue);
   });
 }

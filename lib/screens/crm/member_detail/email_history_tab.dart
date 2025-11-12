@@ -1,4 +1,8 @@
+import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/screens/crm/member_detail/email_history_provider.dart';
+import 'package:bluebubbles/services/crm/crm_email_service.dart';
+import 'package:bluebubbles/widgets/email_detail_screen.dart';
+import 'package:bluebubbles/widgets/email_reply_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -8,10 +12,15 @@ class EmailHistoryTab extends StatefulWidget {
     super.key,
     required this.memberId,
     required this.memberName,
+    this.loadThreadMessages,
+    this.onSendReply,
   });
 
   final String memberId;
   final String memberName;
+  final Future<List<EmailMessage>> Function(String memberId, String threadId)?
+      loadThreadMessages;
+  final Future<void> Function(String threadId, EmailReplyData data)? onSendReply;
 
   @override
   State<EmailHistoryTab> createState() => _EmailHistoryTabState();
@@ -27,6 +36,99 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
       if (!mounted) return;
       context.read<EmailHistoryProvider>().ensureLoaded(widget.memberId);
     });
+  }
+
+  Future<void> _openThread(EmailHistoryEntry entry) async {
+    final threadId = entry.threadId?.trim();
+    if (threadId == null || threadId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This email does not have a conversation thread yet.'),
+        ),
+      );
+      return;
+    }
+
+    final loader = widget.loadThreadMessages;
+    final loadMessages = loader != null
+        ? () => loader(widget.memberId, threadId)
+        : () => context
+            .read<EmailHistoryProvider>()
+            .fetchThreadMessages(memberId: widget.memberId, threadId: threadId);
+
+    final replyHandler = widget.onSendReply;
+    Future<void> Function(EmailReplyData data)? onSendReply;
+    if (replyHandler != null) {
+      onSendReply = (data) => replyHandler(threadId, data);
+    } else {
+      onSendReply = (data) => _defaultReplyHandler(threadId, data);
+    }
+
+    final participants = _participantsFromEntry(entry);
+    final thread = EmailThread(
+      id: threadId,
+      subject: entry.subject,
+      updatedAt: entry.sentAt ?? DateTime.now(),
+      snippet: entry.previewText,
+      messages: const [],
+      participants: participants,
+    );
+
+    if (!mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => EmailDetailScreen(
+          thread: thread,
+          loadMessages: loadMessages,
+          onSendReply: onSendReply,
+          initiallyLoading: true,
+          error: entry.errorMessage,
+        ),
+      ),
+    );
+  }
+
+  List<EmailParticipant> _participantsFromEntry(EmailHistoryEntry entry) {
+    final seen = <String>{};
+    final participants = <EmailParticipant>[];
+
+    void addAll(List<String> values) {
+      for (final value in values) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) continue;
+        final lower = trimmed.toLowerCase();
+        if (!seen.add(lower)) continue;
+        participants.add(EmailParticipant(address: trimmed));
+      }
+    }
+
+    addAll(entry.to);
+    addAll(entry.cc);
+    addAll(entry.bcc);
+
+    return participants;
+  }
+
+  Future<void> _defaultReplyHandler(String threadId, EmailReplyData data) async {
+    final trimmedCc = data.cc
+        .map((email) => email.trim())
+        .where((email) => email.isNotEmpty)
+        .toList(growable: false);
+    final trimmedBcc = data.bcc
+        .map((email) => email.trim())
+        .where((email) => email.isNotEmpty)
+        .toList(growable: false);
+
+    await CRMEmailService().sendEmailReply(
+      threadId: threadId,
+      body: data.body,
+      subject: data.subject,
+      cc: trimmedCc.isEmpty ? null : trimmedCc,
+      bcc: trimmedBcc.isEmpty ? null : trimmedBcc,
+      sendAsHtml: data.sendAsHtml,
+    );
   }
 
   @override
@@ -89,6 +191,7 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
               return _EmailHistoryTile(
                 entry: entry,
                 formatTimestamp: _timestampFormat,
+                onTap: () => _openThread(entry),
               );
             },
           ),
@@ -102,10 +205,12 @@ class _EmailHistoryTile extends StatelessWidget {
   const _EmailHistoryTile({
     required this.entry,
     required this.formatTimestamp,
+    this.onTap,
   });
 
   final EmailHistoryEntry entry;
   final DateFormat formatTimestamp;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -184,18 +289,22 @@ class _EmailHistoryTile extends StatelessWidget {
 
     return Card(
       elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              entry.subject,
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            ...subtitle,
-          ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                entry.subject,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              ...subtitle,
+            ],
+          ),
         ),
       ),
     );
