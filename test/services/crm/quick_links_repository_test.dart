@@ -143,6 +143,7 @@ void main() {
       expect(repo.lastUploadedBytes, bytes);
       expect(repo.lastUploadedContentType, 'application/pdf');
       expect(repo.lastInsertPayload?['file_name'], 'Report 2024.pdf');
+      expect(repo.lastInsertPayload?['url'], 'https://example.com/report');
       final expectedPathPrefix = '${now.toUtc().millisecondsSinceEpoch}-Report_2024.pdf';
       expect(repo.lastUploadedPath, expectedPathPrefix);
       expect(link.storagePath, expectedPathPrefix);
@@ -150,6 +151,26 @@ void main() {
       expect(link.fileSize, bytes.length);
       expect(repo.lastInsertPayload?['icon_url'], 'https://example.com/icon.png');
       expect(link.iconUrl, 'https://example.com/icon.png');
+      expect(link.externalUrl, 'https://example.com/report');
+    });
+
+    test('createQuickLink falls back to empty url when only a file is provided', () async {
+      final now = DateTime.utc(2024, 06, 01, 08, 30);
+      final repo = _FakeQuickLinksRepository(now: now)..debugOverrideClients(isInitialized: true);
+      final bytes = Uint8List.fromList([9, 8, 7, 6]);
+      final file = PlatformFile(name: 'agenda.docx', size: bytes.length, bytes: bytes);
+
+      final link = await repo.createQuickLink(
+        title: 'General Meeting Agenda',
+        category: 'Documents',
+        description: 'Latest agenda draft',
+        file: file,
+      );
+
+      expect(repo.lastInsertPayload?['url'], isA<String>());
+      expect(repo.lastInsertPayload?['url'], isEmpty);
+      expect(link.externalUrl, isEmpty);
+      expect(link.signedUrl, isNotEmpty);
     });
 
     test('updateQuickLink replaces stored file and clears metadata when requested', () async {
@@ -187,6 +208,7 @@ void main() {
       expect(repo.removeCalled, isTrue);
       expect(repo.lastUpdateId, existing.id);
       expect(repo.lastUpdatePayload?['file_name'], 'New Script.docx');
+      expect(repo.lastUpdatePayload?['url'], isA<String>());
       expect(repo.lastUploadedPath, endsWith('New_Script.docx'));
       expect(updated.fileName, 'New Script.docx');
       expect(updated.signedUrl, isNotNull);

@@ -106,11 +106,11 @@ class QuickLinksRepository {
       throw StateError('Supabase is not initialized');
     }
 
+    final normalizedExternalUrl = _normalizeExternalUrl(externalUrl);
     final sanitized = _sanitizePayload(
       title: title,
       category: category,
       description: description,
-      externalUrl: externalUrl,
       iconUrl: iconUrl,
     );
 
@@ -123,6 +123,11 @@ class QuickLinksRepository {
       if (upload != null) ...upload,
       'is_active': isActive,
     };
+
+    payload['url'] = _resolvePersistedUrl(
+      normalizedExternalUrl,
+      uploadMetadata: upload,
+    );
 
     final row = await insertQuickLinkRow(payload);
     final link = QuickLink.fromJson(row);
@@ -148,11 +153,11 @@ class QuickLinksRepository {
       throw ArgumentError('Quick link ID is required for updates.');
     }
 
+    final normalizedExternalUrl = _normalizeExternalUrl(externalUrl);
     final sanitized = _sanitizePayload(
       title: title ?? link.title,
       category: category ?? link.category,
       description: description ?? link.description,
-      externalUrl: externalUrl,
       iconUrl: iconUrl,
     );
 
@@ -160,6 +165,8 @@ class QuickLinksRepository {
       ...sanitized,
       'is_active': isActive ?? link.isActive,
     };
+
+    Map<String, dynamic>? upload;
 
     if (removeExistingFile || file != null) {
       if (link.hasStorageReference) {
@@ -172,9 +179,19 @@ class QuickLinksRepository {
     }
 
     if (file != null) {
-      final upload = await _uploadQuickLinkFile(file);
+      upload = await _uploadQuickLinkFile(file);
       updates.addAll(upload);
     }
+
+    final fallbackUrl =
+        (normalizedExternalUrl == null && upload == null && !removeExistingFile)
+            ? link.externalUrl
+            : null;
+    updates['url'] = _resolvePersistedUrl(
+      normalizedExternalUrl,
+      uploadMetadata: upload,
+      fallbackUrl: fallbackUrl,
+    );
 
     final row = await updateQuickLinkRow(link.id, updates);
     final updated = QuickLink.fromJson(row);
@@ -348,7 +365,6 @@ class QuickLinksRepository {
     required String title,
     required String category,
     String? description,
-    String? externalUrl,
     String? iconUrl,
   }) {
     final sanitizedTitle = title.trim();
@@ -359,13 +375,6 @@ class QuickLinksRepository {
     if (sanitizedCategory.isEmpty) {
       throw ArgumentError('Category is required');
     }
-
-    String? normalizedUrl;
-    if (externalUrl != null && externalUrl.trim().isNotEmpty) {
-      normalizedUrl = externalUrl.trim();
-    }
-
-    final bool includeUrl = externalUrl != null;
 
     String? normalizedIconUrl;
     if (iconUrl != null) {
@@ -381,18 +390,46 @@ class QuickLinksRepository {
       'title': sanitizedTitle,
       'category': sanitizedCategory,
       'description': description?.trim(),
-      'url': normalizedUrl,
       'icon_url': normalizedIconUrl,
     }
       ..removeWhere((key, value) {
-        if (key == 'url' && includeUrl) {
-          return false;
-        }
         if (key == 'icon_url' && includeIconUrl) {
           return false;
         }
         return value == null || (value is String && value.isEmpty);
       });
+  }
+
+  String? _normalizeExternalUrl(String? raw) {
+    if (raw == null) {
+      return null;
+    }
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
+  }
+
+  String _resolvePersistedUrl(
+    String? normalizedExternalUrl, {
+    Map<String, dynamic>? uploadMetadata,
+    String? fallbackUrl,
+  }) {
+    if (normalizedExternalUrl != null && normalizedExternalUrl.isNotEmpty) {
+      return normalizedExternalUrl;
+    }
+
+    final storageUrl = uploadMetadata?['storage_url'];
+    if (storageUrl is String && storageUrl.trim().isNotEmpty) {
+      return storageUrl.trim();
+    }
+
+    if (fallbackUrl != null && fallbackUrl.trim().isNotEmpty) {
+      return fallbackUrl.trim();
+    }
+
+    return '';
   }
 
   Map<String, dynamic> _clearStorageMetadata() {

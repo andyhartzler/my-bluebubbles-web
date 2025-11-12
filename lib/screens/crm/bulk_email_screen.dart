@@ -1198,11 +1198,15 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
 
     _bodyController.readOnly = !isEnabled;
 
+    final locale = Localizations.maybeLocaleOf(context) ?? const Locale('en');
+    final sharedConfigurations = quill.QuillSharedConfigurations(locale: locale);
+
     final toolbar = SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: quill.QuillSimpleToolbar(
         configurations: quill.QuillSimpleToolbarConfigurations(
           controller: _bodyController,
+          sharedConfigurations: sharedConfigurations,
           multiRowsDisplay: false,
           showDividers: false,
           showFontFamily: false,
@@ -1257,6 +1261,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         scrollController: _bodyScrollController,
         configurations: quill.QuillEditorConfigurations(
           controller: _bodyController,
+          sharedConfigurations: sharedConfigurations,
           scrollable: true,
           expands: false,
           padding: const EdgeInsets.all(12),
