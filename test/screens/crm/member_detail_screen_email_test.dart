@@ -10,51 +10,51 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
-void main() {
-  final supabaseService = CRMSupabaseService();
+class FakeEmailHistoryProvider extends EmailHistoryProvider {
+  FakeEmailHistoryProvider({
+    required this.memberId,
+    required this.entries,
+    required this.threadMessages,
+    required CRMSupabaseService supabaseService,
+  }) : super(supabaseService: supabaseService);
 
-  class FakeEmailHistoryProvider extends EmailHistoryProvider {
-    FakeEmailHistoryProvider({
-      required this.memberId,
-      required this.entries,
-      required this.threadMessages,
-      required CRMSupabaseService supabaseService,
-    }) : super(supabaseService: supabaseService);
+  final String memberId;
+  List<EmailHistoryEntry> entries;
+  List<EmailMessage> threadMessages;
 
-    final String memberId;
-    List<EmailHistoryEntry> entries;
-    List<EmailMessage> threadMessages;
-
-    @override
-    EmailHistoryState stateForMember(String memberId) {
-      if (memberId == this.memberId) {
-        return EmailHistoryState(
-          isLoading: false,
-          hasLoaded: true,
-          entries: entries,
-        );
-      }
-      return const EmailHistoryState(
+  @override
+  EmailHistoryState stateForMember(String memberId) {
+    if (memberId == this.memberId) {
+      return EmailHistoryState(
         isLoading: false,
         hasLoaded: true,
-        entries: [],
+        entries: entries,
       );
     }
-
-    @override
-    Future<void> ensureLoaded(String memberId) async {}
-
-    @override
-    Future<void> refresh(String memberId) async {}
-
-    @override
-    Future<List<EmailMessage>> fetchThreadMessages({
-      required String memberId,
-      required String threadId,
-    }) async {
-      return threadMessages;
-    }
+    return const EmailHistoryState(
+      isLoading: false,
+      hasLoaded: true,
+      entries: [],
+    );
   }
+
+  @override
+  Future<void> ensureLoaded(String memberId) async {}
+
+  @override
+  Future<void> refresh(String memberId) async {}
+
+  @override
+  Future<List<EmailMessage>> fetchThreadMessages({
+    required String memberId,
+    required String threadId,
+  }) async {
+    return threadMessages;
+  }
+}
+
+void main() {
+  final supabaseService = CRMSupabaseService();
 
   setUp(() {
     supabaseService.debugSetInitialized(true);

@@ -1,7 +1,7 @@
 import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/widgets/email_reply_dialog.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_html/flutter_html.dart' show Html, Style;
 import 'package:intl/intl.dart';
 
 class EmailDetailScreen extends StatefulWidget {
@@ -406,8 +406,8 @@ class _EmailDetailScreenState extends State<EmailDetailScreen> {
                 data: message.htmlBody!,
                 style: {
                   'body': Style(
-                    margin: EdgeInsets.zero,
-                    padding: EdgeInsets.zero,
+                    margin: Margins.zero,
+                    padding: HtmlPaddings.zero,
                     color: colorScheme.onSurface,
                     fontSize: FontSize(textTheme.bodyMedium?.fontSize ?? 14),
                     fontFamily: textTheme.bodyMedium?.fontFamily,
