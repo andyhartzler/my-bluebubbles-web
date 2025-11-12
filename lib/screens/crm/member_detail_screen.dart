@@ -97,6 +97,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     if (_crmReady) {
       _hasLoadedAttendance = true;
       _loadMeetingAttendance();
+      _fetchLatestMember();
     }
   }
 
@@ -491,7 +492,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
   }
 
-  Future<void> _refreshMember() async {
+  Future<void> _fetchLatestMember({bool showFeedback = false}) async {
     if (!_crmReady || _refreshingMember) return;
 
     setState(() => _refreshingMember = true);
@@ -508,18 +509,23 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           }
         });
         _memberLookup.cacheMember(refreshed);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Member refreshed')),
-        );
-      } else {
+        if (showFeedback) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Member refreshed')),
+          );
+        }
+      } else if (showFeedback) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Unable to refresh member')),
         );
       }
     } catch (e) {
       if (!mounted) return;
+      final message = showFeedback
+          ? 'Error refreshing member: $e'
+          : 'Error loading member details: $e';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error refreshing member: $e')),
+        SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) {
@@ -527,6 +533,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       }
     }
   }
+
+  Future<void> _refreshMember() => _fetchLatestMember(showFeedback: true);
 
   Future<void> _loadMeetingAttendance() async {
     if (!_crmReady) return;
