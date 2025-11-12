@@ -311,7 +311,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final result = await invoke(
         'get-member-emails',
-        body: <String, dynamic>{'member_id': memberId},
+        body: <String, dynamic>{'memberId': memberId},
       );
 
       if (result.status != 200) {
