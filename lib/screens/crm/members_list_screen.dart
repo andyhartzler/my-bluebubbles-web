@@ -92,6 +92,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   bool _isLoadingPage = false;
   bool _hasMoreMembers = true;
   int? _totalAvailableMembers;
+  int _memberFetchRequestId = 0;
 
   Future<List<String>>? _countiesFuture;
   Future<List<String>>? _districtsFuture;
@@ -387,10 +388,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   Future<void> _fetchMembersPage({bool reset = false, bool requestTotalCount = false}) async {
     if (!_crmReady) return;
-    if (_isLoadingPage) return;
+    if (_isLoadingPage && !reset) return;
 
     final shouldUsePaging = _shouldUsePaging;
     final currentOffset = !shouldUsePaging || reset ? 0 : _members.length;
+
+    final requestId = ++_memberFetchRequestId;
 
     setState(() {
       _isLoadingPage = true;
@@ -423,7 +426,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
         columns: MemberRepository.listingColumns,
       );
 
-      if (!mounted) return;
+      if (!mounted || requestId != _memberFetchRequestId) {
+        return;
+      }
 
       setState(() {
         if (!shouldUsePaging || reset) {
@@ -450,12 +455,16 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _rebuildFilters();
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _memberFetchRequestId) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading members: $e')),
       );
     } finally {
-      if (!mounted) return;
+      if (!mounted || requestId != _memberFetchRequestId) {
+        return;
+      }
       setState(() {
         _isLoadingPage = false;
       });
