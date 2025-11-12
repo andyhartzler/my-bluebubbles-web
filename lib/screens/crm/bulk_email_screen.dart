@@ -992,11 +992,13 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     final replaceLength = (extentOffset - baseOffset)
         .clamp(0, documentLength - baseOffset) as int;
 
+    final newSelection = TextSelection.collapsed(offset: baseOffset + token.length);
+
     _bodyController.replaceText(
       baseOffset,
       replaceLength,
       token,
-      selection: TextSelection.collapsed(offset: baseOffset + token.length),
+      newSelection,
     );
 
     if (!_bodyFocusNode.hasFocus) {
