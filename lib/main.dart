@@ -32,6 +32,7 @@ import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_debounce.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -57,6 +58,8 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:universal_io/io.dart';
 import 'package:window_manager/window_manager.dart';
+
+import 'package:bluebubbles/screens/crm/member_detail/email_history_provider.dart';
 import 'package:windows_taskbar/windows_taskbar.dart';
 
 bool isAuthing = false;
@@ -282,79 +285,85 @@ class Main extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AdaptiveTheme(
-      light: lightTheme.copyWith(
-          textSelectionTheme: TextSelectionThemeData(selectionColor: lightTheme.colorScheme.primary)),
-      dark:
-          darkTheme.copyWith(textSelectionTheme: TextSelectionThemeData(selectionColor: darkTheme.colorScheme.primary)),
-      initial: AdaptiveThemeMode.system,
-      builder: (theme, darkTheme) => GetMaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Missouri Young Democrats CRM',
-        theme: theme.copyWith(appBarTheme: theme.appBarTheme.copyWith(elevation: 0.0)),
-        darkTheme: darkTheme.copyWith(appBarTheme: darkTheme.appBarTheme.copyWith(elevation: 0.0)),
-        navigatorKey: ns.key,
-        scrollBehavior: const MaterialScrollBehavior().copyWith(
-          // Specifically for GNU/Linux & Android-x86 family, where touch isn't interpreted as a drag device by Flutter apparently.
-          dragDevices: Platform.isLinux || Platform.isAndroid ? PointerDeviceKind.values.toSet() : null,
-          // Prevent scrolling with multiple fingers accelerating the scrolling
-          multitouchDragStrategy: MultitouchDragStrategy.latestPointer,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<EmailHistoryProvider>(
+          create: (_) => EmailHistoryProvider(),
         ),
-        getPages: [
-          GetPage(name: '/auth/callback', page: AuthCallbackScreen.new),
-        ],
-        home: SupabaseAuthGate(child: Home()),
-        shortcuts: {
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.comma): const OpenSettingsIntent(),
-          LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyN): const OpenNewChatCreatorIntent(),
-          if (kIsDesktop)
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyN): const OpenNewChatCreatorIntent(),
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyF): const OpenSearchIntent(),
-          LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyR): const ReplyRecentIntent(),
-          if (kIsDesktop) LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyR): const ReplyRecentIntent(),
-          LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyG): const StartIncrementalSyncIntent(),
-          if (kIsDesktop)
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.keyR):
-                const StartIncrementalSyncIntent(),
-          if (kIsDesktop)
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyG): const StartIncrementalSyncIntent(),
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.exclamation):
-              const HeartRecentIntent(),
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.at):
-              const LikeRecentIntent(),
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.numberSign):
-              const DislikeRecentIntent(),
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.dollar):
-              const LaughRecentIntent(),
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.percent):
-              const EmphasizeRecentIntent(),
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.caret):
-              const QuestionRecentIntent(),
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.arrowDown): const OpenNextChatIntent(),
-          if (kIsDesktop) LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.tab): const OpenNextChatIntent(),
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.arrowUp): const OpenPreviousChatIntent(),
-          if (kIsDesktop)
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.tab):
-                const OpenPreviousChatIntent(),
-          LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyI): const OpenChatDetailsIntent(),
-          LogicalKeySet(LogicalKeyboardKey.escape): const GoBackIntent(),
-        },
-        builder: (context, child) => SafeArea(
-          top: false,
-          bottom: false,
-          left: false,
-          right: false,
-          child: SecureApplication(
-            child: Builder(
-              builder: (context) {
-                if (ss.canAuthenticate && (!ls.isAlive || !StartupTasks.uiReady.isCompleted)) {
-                  if (ss.settings.shouldSecure.value) {
-                    SecureApplicationProvider.of(context, listen: false)!.lock();
-                    if (ss.settings.securityLevel.value == SecurityLevel.locked_and_secured) {
-                      SecureApplicationProvider.of(context, listen: false)!.secure();
+      ],
+      child: AdaptiveTheme(
+        light: lightTheme.copyWith(
+            textSelectionTheme: TextSelectionThemeData(selectionColor: lightTheme.colorScheme.primary)),
+        dark:
+            darkTheme.copyWith(textSelectionTheme: TextSelectionThemeData(selectionColor: darkTheme.colorScheme.primary)),
+        initial: AdaptiveThemeMode.system,
+        builder: (theme, darkTheme) => GetMaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Missouri Young Democrats CRM',
+          theme: theme.copyWith(appBarTheme: theme.appBarTheme.copyWith(elevation: 0.0)),
+          darkTheme: darkTheme.copyWith(appBarTheme: darkTheme.appBarTheme.copyWith(elevation: 0.0)),
+          navigatorKey: ns.key,
+          scrollBehavior: const MaterialScrollBehavior().copyWith(
+            // Specifically for GNU/Linux & Android-x86 family, where touch isn't interpreted as a drag device by Flutter apparently.
+            dragDevices: Platform.isLinux || Platform.isAndroid ? PointerDeviceKind.values.toSet() : null,
+            // Prevent scrolling with multiple fingers accelerating the scrolling
+            multitouchDragStrategy: MultitouchDragStrategy.latestPointer,
+          ),
+          getPages: [
+            GetPage(name: '/auth/callback', page: AuthCallbackScreen.new),
+          ],
+          home: SupabaseAuthGate(child: Home()),
+          shortcuts: {
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.comma): const OpenSettingsIntent(),
+            LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyN): const OpenNewChatCreatorIntent(),
+            if (kIsDesktop)
+              LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyN): const OpenNewChatCreatorIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyF): const OpenSearchIntent(),
+            LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyR): const ReplyRecentIntent(),
+            if (kIsDesktop) LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyR): const ReplyRecentIntent(),
+            LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyG): const StartIncrementalSyncIntent(),
+            if (kIsDesktop)
+              LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.keyR):
+                  const StartIncrementalSyncIntent(),
+            if (kIsDesktop)
+              LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyG): const StartIncrementalSyncIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.exclamation):
+                const HeartRecentIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.at):
+                const LikeRecentIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.numberSign):
+                const DislikeRecentIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.dollar):
+                const LaughRecentIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.percent):
+                const EmphasizeRecentIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.caret):
+                const QuestionRecentIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.arrowDown): const OpenNextChatIntent(),
+            if (kIsDesktop) LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.tab): const OpenNextChatIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.arrowUp): const OpenPreviousChatIntent(),
+            if (kIsDesktop)
+              LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.tab):
+                  const OpenPreviousChatIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyI): const OpenChatDetailsIntent(),
+            LogicalKeySet(LogicalKeyboardKey.escape): const GoBackIntent(),
+          },
+          builder: (context, child) => SafeArea(
+            top: false,
+            bottom: false,
+            left: false,
+            right: false,
+            child: SecureApplication(
+              child: Builder(
+                builder: (context) {
+                  if (ss.canAuthenticate && (!ls.isAlive || !StartupTasks.uiReady.isCompleted)) {
+                    if (ss.settings.shouldSecure.value) {
+                      SecureApplicationProvider.of(context, listen: false)!.lock();
+                      if (ss.settings.securityLevel.value == SecurityLevel.locked_and_secured) {
+                        SecureApplicationProvider.of(context, listen: false)!.secure();
+                      }
                     }
                   }
-                }
                 return TitleBarWrapper(
                   child: SecureGate(
                     blurr: 5,
