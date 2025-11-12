@@ -1,3 +1,4 @@
+import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:flutter/foundation.dart';
@@ -12,6 +13,7 @@ class EmailHistoryEntry {
     required this.to,
     required this.cc,
     required this.bcc,
+    this.threadId,
     this.previewText,
     this.errorMessage,
   });
@@ -168,14 +170,15 @@ class EmailHistoryEntry {
 
     return EmailHistoryEntry(
       id: id,
-      subject: resolveSubject(),
-      status: resolveStatus(),
-      sentAt: resolveTimestamp(),
-      to: resolveRecipients(),
-      cc: resolveCc(),
-      bcc: resolveBcc(),
-      previewText: resolvePreview(),
-      errorMessage: resolveError(),
+      subject: subject,
+      status: status,
+      sentAt: parseDate(map['sent_at'] ?? map['created_at']),
+      to: parseRecipients(map['to_emails'] ?? map['to'] ?? map['recipients']),
+      cc: parseRecipients(map['cc_emails'] ?? map['cc']),
+      bcc: parseRecipients(map['bcc_emails'] ?? map['bcc']),
+      threadId: map['thread_id']?.toString(),
+      previewText: map['preview_text']?.toString(),
+      errorMessage: map['error_message']?.toString(),
     );
   }
 
@@ -186,6 +189,7 @@ class EmailHistoryEntry {
   final List<String> to;
   final List<String> cc;
   final List<String> bcc;
+  final String? threadId;
   final String? previewText;
   final String? errorMessage;
 }
@@ -334,76 +338,146 @@ class EmailHistoryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<Map<String, dynamic>> _extractEntries(dynamic payload) {
-    List<Map<String, dynamic>> parse(dynamic value) {
-      if (value is List) {
-        return value
-            .whereType<Map>()
-            .map((item) => item.map<String, dynamic>(
-                  (key, value) => MapEntry(key.toString(), value),
-                ))
-            .toList(growable: false);
-      }
-      if (value is Map) {
-        final normalized = value.map<String, dynamic>(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-        for (final key in const ['emails', 'records', 'data', 'items', 'results']) {
-          if (!normalized.containsKey(key)) continue;
-          final nested = parse(normalized[key]);
-          if (nested.isNotEmpty) {
-            return nested;
-          }
-        }
-      }
-      return const <Map<String, dynamic>>[];
+  Future<List<EmailMessage>> fetchThreadMessages({
+    required String memberId,
+    required String threadId,
+  }) async {
+    if (!_supabaseService.isInitialized) {
+      throw StateError('CRM Supabase is not configured.');
     }
 
-    final entries = parse(payload);
-    if (entries.isNotEmpty) {
-      return entries;
+    SupabaseClient client;
+    try {
+      client = _supabaseService.privilegedClient;
+    } catch (error, stack) {
+      Logger.warn('Supabase client unavailable for email thread: $error', trace: stack);
+      throw StateError('Supabase client is not available.');
     }
-    if (payload is Map) {
-      return [payload.map<String, dynamic>(
-        (key, value) => MapEntry(key.toString(), value),
-      )];
+
+    try {
+      final response = await client
+          .from('email_inbox')
+          .select()
+          .eq('member_id', memberId)
+          .eq('thread_id', threadId)
+          .order('received_at', ascending: true)
+          .order('sent_at', ascending: true);
+
+      final rows = response is List
+          ? response.whereType<Map<String, dynamic>>().toList(growable: false)
+          : <Map<String, dynamic>>[];
+
+      return rows.map(_mapEmailMessage).toList(growable: false);
+    } catch (error, stack) {
+      Logger.warn('Failed to load email thread $threadId for $memberId: $error', trace: stack);
+      throw Exception('Failed to load email thread. Please try again.');
     }
-    return const <Map<String, dynamic>>[];
   }
 
-  String? _extractErrorMessage(dynamic payload) {
-    if (payload is String) {
-      final trimmed = payload.trim();
-      return trimmed.isEmpty ? null : trimmed;
-    }
-    if (payload is Map) {
-      final normalized = payload.map<String, dynamic>(
-        (key, value) => MapEntry(key.toString().toLowerCase(), value),
-      );
-      for (final key in const ['error', 'message', 'detail', 'description']) {
-        final value = normalized[key];
-        if (value is String && value.trim().isNotEmpty) {
-          return value.trim();
-        }
+  EmailMessage _mapEmailMessage(Map<String, dynamic> row) {
+    DateTime? parseTimestamp(dynamic value) {
+      if (value is DateTime) {
+        return value.toLocal();
       }
-      if (normalized['errors'] is List) {
-        final errors = normalized['errors'] as List;
-        for (final item in errors) {
-          final message = _extractErrorMessage(item);
-          if (message != null && message.isNotEmpty) {
-            return message;
-          }
-        }
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) return null;
+        return DateTime.tryParse(trimmed)?.toLocal();
+      }
+      return null;
+    }
+
+    String? normalizeBody(dynamic value) {
+      if (value == null) return null;
+      final text = value.toString().trim();
+      return text.isEmpty ? null : text;
+    }
+
+    final sentAt =
+        parseTimestamp(row['sent_at']) ?? parseTimestamp(row['received_at']) ?? DateTime.now();
+    final direction = row['direction']?.toString().toLowerCase() ?? '';
+    final isOutgoing = direction == 'outbound';
+    final sender = _parseParticipant(row['from_email']) ??
+        EmailParticipant(
+          address: isOutgoing ? 'outbound@crm.local' : 'unknown@crm.local',
+        );
+
+    final messageId = row['message_id']?.toString();
+    final fallbackId = row['id']?.toString();
+    final id = (messageId != null && messageId.trim().isNotEmpty)
+        ? messageId
+        : ((fallbackId != null && fallbackId.trim().isNotEmpty)
+            ? fallbackId
+            : 'message-${sentAt.microsecondsSinceEpoch}');
+
+    return EmailMessage(
+      id: id,
+      sentAt: sentAt,
+      sender: sender,
+      to: _parseParticipants(row['to_emails']),
+      cc: _parseParticipants(row['cc_emails']),
+      subject: normalizeBody(row['subject']),
+      plainTextBody: normalizeBody(row['body_text']),
+      htmlBody: normalizeBody(row['body_html']),
+      isOutgoing: isOutgoing,
+    );
+  }
+
+  EmailParticipant? _parseParticipant(dynamic value) {
+    if (value == null) return null;
+    final raw = value.toString().trim();
+    if (raw.isEmpty) return null;
+
+    final angleMatch = RegExp(r'^(.*)<([^>]+)>$').firstMatch(raw);
+    if (angleMatch != null) {
+      final name = angleMatch.group(1)?.trim();
+      final email = angleMatch.group(2)?.trim();
+      if (email != null && email.isNotEmpty) {
+        final cleanedName =
+            name != null && name.isNotEmpty ? name.replaceAll(RegExp(r"^[\"']|[\"']$"), '').trim() : null;
+        return EmailParticipant(
+          address: email,
+          displayName: cleanedName?.isNotEmpty == true ? cleanedName : null,
+        );
       }
     }
-    if (payload is List) {
-      for (final item in payload) {
-        final message = _extractErrorMessage(item);
-        if (message != null && message.isNotEmpty) {
-          return message;
-        }
-      }
+
+    final emailMatch =
+        RegExp(r'[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}', caseSensitive: false).firstMatch(raw);
+    final email = emailMatch?.group(0)?.trim() ?? raw;
+    final nameRemainder = emailMatch != null
+        ? raw
+            .replaceFirst(emailMatch.group(0)!, '')
+            .replaceAll(RegExp(r"^[\"']|[\"']$"), '')
+            .trim()
+        : null;
+
+    return EmailParticipant(
+      address: email,
+      displayName: nameRemainder != null && nameRemainder.isNotEmpty ? nameRemainder : null,
+    );
+  }
+
+  List<EmailParticipant> _parseParticipants(dynamic value) {
+    final participants = <EmailParticipant>[];
+    Iterable<dynamic> values;
+    if (value is List) {
+      values = value;
+    } else if (value is String) {
+      values = value.split(',');
+    } else {
+      return participants;
     }
-    return null;
+
+    final seen = <String>{};
+    for (final item in values) {
+      final participant = _parseParticipant(item);
+      if (participant == null) continue;
+      final lower = participant.address.toLowerCase();
+      if (lower.isEmpty || !seen.add(lower)) continue;
+      participants.add(participant);
+    }
+
+    return participants;
   }
 }

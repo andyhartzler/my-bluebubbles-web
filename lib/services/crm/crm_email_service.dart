@@ -211,6 +211,119 @@ class CRMEmailService {
     );
   }
 
+  /// Sends a reply to an existing email thread. Mirrors the validation and
+  /// error handling of [sendEmail] while targeting the `send-email-reply`
+  /// Supabase edge function.
+  Future<CRMEmailResult> sendEmailReply({
+    required String threadId,
+    required String body,
+    String? subject,
+    List<String>? cc,
+    List<String>? bcc,
+    bool sendAsHtml = true,
+  }) async {
+    final trimmedThreadId = threadId.trim();
+    if (trimmedThreadId.isEmpty) {
+      throw CRMEmailException('A valid thread ID is required to send a reply.');
+    }
+
+    final trimmedBody = body.trim();
+    if (trimmedBody.isEmpty) {
+      throw CRMEmailException('Reply body cannot be empty.');
+    }
+
+    final payload = <String, dynamic>{
+      'threadId': trimmedThreadId,
+    };
+
+    final trimmedSubject = subject?.trim() ?? '';
+    if (trimmedSubject.isNotEmpty) {
+      payload['subject'] = trimmedSubject;
+    }
+
+    final ccList = _sanitizeEmails(cc);
+    if (ccList.isNotEmpty) {
+      payload['cc'] = ccList.length == 1 ? ccList.first : ccList;
+    }
+
+    final bccList = _sanitizeEmails(bcc);
+    if (bccList.isNotEmpty) {
+      payload['bcc'] = bccList.length == 1 ? bccList.first : bccList;
+    }
+
+    if (sendAsHtml) {
+      payload['htmlBody'] = trimmedBody;
+      payload['textBody'] = trimmedBody;
+    } else {
+      payload['textBody'] = trimmedBody;
+      payload['htmlBody'] = _convertPlainTextToHtml(trimmedBody);
+    }
+
+    final supabaseService = CRMSupabaseService();
+    if (!supabaseService.isInitialized) {
+      try {
+        await supabaseService.initialize();
+      } catch (error) {
+        throw CRMEmailException(
+          'Failed to initialize CRM Supabase service: $error',
+          cause: error,
+        );
+      }
+    }
+
+    if (!supabaseService.isInitialized) {
+      throw CRMEmailException(
+        'Supabase credentials are not configured for the CRM email relay.',
+      );
+    }
+
+    FunctionResponse response;
+    try {
+      response = await supabaseService.privilegedClient.functions.invoke(
+        'send-email-reply',
+        body: payload,
+      );
+    } on Exception catch (error) {
+      final message = error.toString();
+      throw CRMEmailException(
+        message.isNotEmpty
+            ? message
+            : 'Failed to send email via Supabase function.',
+        cause: error,
+      );
+    } catch (error) {
+      throw CRMEmailException(
+        'Failed to send email via Supabase function: $error',
+        cause: error,
+      );
+    }
+
+    final statusCode = response.status;
+    Map<String, dynamic>? data;
+    final rawData = response.data;
+    if (rawData is Map) {
+      data = rawData.map<String, dynamic>(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+    }
+
+    if (statusCode == 200) {
+      return CRMEmailResult(success: true, statusCode: statusCode, data: data);
+    }
+
+    final dynamic messageSource =
+        data != null ? (data['error'] ?? data['message'] ?? rawData) : rawData;
+    final String? messageString = messageSource is String
+        ? messageSource
+        : messageSource?.toString();
+
+    throw CRMEmailException(
+      messageString != null && messageString.isNotEmpty
+          ? messageString
+          : 'Failed to send email (HTTP $statusCode).',
+    );
+  }
+
   /// Convenience helper that extracts emails from the provided members
   /// and forwards the request to [sendEmail]. Members lacking a usable
   /// email address are ignored. Throws when no valid addresses remain.
