@@ -61,7 +61,6 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   final TextEditingController _ccManualEmailController = TextEditingController();
   final TextEditingController _bccSearchController = TextEditingController();
   final TextEditingController _bccManualEmailController = TextEditingController();
-  final FocusNode _bodyFocusNode = FocusNode();
 
   final List<Member> _selectedMembers = [];
   final List<Member> _searchResults = [];
@@ -982,18 +981,23 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   void _insertMergeField(String token) {
     if (_sending || !_mailMergeEnabled) return;
 
-    final text = _bodyController.text;
     final selection = _bodyController.selection;
-    final start = selection.start >= 0 ? selection.start : text.length;
-    final end = selection.end >= 0 ? selection.end : text.length;
-    final newText = text.replaceRange(start, end, token);
+    final documentLength = _bodyController.document.length;
+    final isSelectionValid = selection.start >= 0 && selection.end >= 0;
+    final defaultIndex = documentLength >= 0 ? documentLength : 0;
+    final start = isSelectionValid ? selection.start : defaultIndex;
+    final end = isSelectionValid ? selection.end : start;
+    final baseOffset = start.clamp(0, defaultIndex) as int;
+    final extentOffset = end.clamp(0, defaultIndex) as int;
+    final replaceLength = (extentOffset - baseOffset)
+        .clamp(0, documentLength - baseOffset) as int;
 
-    setState(() {
-      _bodyController.value = TextEditingValue(
-        text: newText,
-        selection: TextSelection.collapsed(offset: start + token.length),
-      );
-    });
+    _bodyController.replaceText(
+      baseOffset,
+      replaceLength,
+      token,
+      selection: TextSelection.collapsed(offset: baseOffset + token.length),
+    );
 
     if (!_bodyFocusNode.hasFocus) {
       _bodyFocusNode.requestFocus();
@@ -1190,11 +1194,13 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     final theme = Theme.of(context);
     final isEnabled = _hasRecipients && !_sending;
 
+    _bodyController.readOnly = !isEnabled;
+
     final toolbar = SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: quill.QuillSimpleToolbar(
-        controller: _bodyController,
-        config: quill.QuillSimpleToolbarConfig(
+        configurations: quill.QuillSimpleToolbarConfigurations(
+          controller: _bodyController,
           multiRowsDisplay: false,
           showDividers: false,
           showFontFamily: false,
@@ -1245,11 +1251,10 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       ),
       constraints: const BoxConstraints(minHeight: 200),
       child: quill.QuillEditor(
-        controller: _bodyController,
         focusNode: _bodyFocusNode,
         scrollController: _bodyScrollController,
-        config: quill.QuillEditorConfig(
-          readOnly: !isEnabled,
+        configurations: quill.QuillEditorConfigurations(
+          controller: _bodyController,
           scrollable: true,
           expands: false,
           padding: const EdgeInsets.all(12),
