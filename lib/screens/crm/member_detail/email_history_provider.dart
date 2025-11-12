@@ -159,7 +159,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final response = await client
           .from(historyTable)
-          .select<Map<String, dynamic>>()
+          .select()
           .eq('member_id', memberId)
           .order('sent_at', ascending: false);
 
