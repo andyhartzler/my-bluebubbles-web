@@ -150,7 +150,6 @@ dependencies:
   pasteboard: ^0.3.0
   path: ^1.9.0
   path_provider: ^2.1.2 # no web support
-  provider: ^6.1.2
   pdf: ^3.10.8
   permission_handler:
     path: packages/permission_handler_stub
