@@ -189,6 +189,13 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
         errorMessage = _mapErrorMessage(message);
       }
 
+    try {
+      await client.auth.signInWithOtp(
+        email: email,
+        emailRedirectTo: _redirectUrl,
+        shouldCreateUser: false,
+      );
+      if (!mounted) return;
       setState(() {
         _errorMessage = errorMessage;
         _showCodeInput = false;
@@ -208,6 +215,26 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
         _isSending = false;
       });
     }
+
+    if (normalized.contains('auth_failed') || normalized.contains('expired')) {
+      return 'That sign-in link was invalid or expired. Request a new link to continue.';
+    }
+
+    if (decoded.isEmpty) {
+      return 'Unable to send the sign-in link. Please try again.';
+    }
+
+    return decoded;
+  }
+
+  void _stripErrorQuery() {
+    if (!kIsWeb) return;
+    final uri = Uri.base;
+    if (!uri.queryParameters.containsKey('error')) return;
+    final params = Map<String, String>.from(uri.queryParameters);
+    params.remove('error');
+    final updated = uri.replace(queryParameters: params.isEmpty ? null : params);
+    html.window.history.replaceState(null, '', updated.toString());
   }
 
   Future<void> _verifyCode() async {
