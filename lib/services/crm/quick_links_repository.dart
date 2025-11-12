@@ -99,6 +99,7 @@ class QuickLinksRepository {
     String? externalUrl,
     String? iconUrl,
     PlatformFile? file,
+    bool isActive = true,
     Duration signedUrlTTL = const Duration(hours: 6),
   }) async {
     if (!isReady) {
@@ -120,6 +121,7 @@ class QuickLinksRepository {
     final payload = {
       ...sanitized,
       if (upload != null) ...upload,
+      'is_active': isActive,
     };
 
     final row = await insertQuickLinkRow(payload);
@@ -136,6 +138,7 @@ class QuickLinksRepository {
     String? iconUrl,
     PlatformFile? file,
     bool removeExistingFile = false,
+    bool? isActive,
     Duration signedUrlTTL = const Duration(hours: 6),
   }) async {
     if (!isReady) {
@@ -155,6 +158,7 @@ class QuickLinksRepository {
 
     final updates = <String, dynamic>{
       ...sanitized,
+      'is_active': isActive ?? link.isActive,
     };
 
     if (removeExistingFile || file != null) {
