@@ -88,10 +88,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
   bool _showAgedOutMembers = false;
 
   late final ScrollController _scrollController;
+  late final TextEditingController _searchController;
   late final int _pageSize;
   bool _isLoadingPage = false;
   bool _hasMoreMembers = true;
   int? _totalAvailableMembers;
+  int _memberFetchRequestId = 0;
+  bool _suppressSearchListener = false;
+  bool _inlineSearchLoading = false;
 
   Future<List<String>>? _countiesFuture;
   Future<List<String>>? _districtsFuture;
@@ -152,6 +156,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
     _chapterRepository = widget.chapterRepository ?? ChapterRepository();
     _pageSize = widget.pageSize;
     _scrollController = ScrollController()..addListener(_handleScroll);
+    _searchController = TextEditingController(text: _searchQuery)
+      ..addListener(_handleSearchTextChanged);
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
     _activeView = widget.showChaptersOnly ? 1 : 0;
     _loadData(refreshMetadata: true, includeMetadata: true);
@@ -169,6 +175,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
   void dispose() {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
+    _searchController.removeListener(_handleSearchTextChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -186,13 +194,17 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  Future<void> _loadData({bool refreshMetadata = false, bool includeMetadata = true}) async {
+  Future<void> _loadData({
+    bool refreshMetadata = false,
+    bool includeMetadata = true,
+  }) async {
     if (!_crmReady) {
       setState(() {
         _loading = false;
         _members = [];
         _filteredMembers = [];
         _agedOutMembers = [];
+        _inlineSearchLoading = false;
       });
       return;
     }
@@ -208,6 +220,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
       _members = [];
       _filteredMembers = [];
       _agedOutMembers = [];
+      _inlineSearchLoading = false;
     });
 
     Future<void>? metadataFuture;
@@ -385,22 +398,30 @@ class _MembersListScreenState extends State<MembersListScreen> {
     }
   }
 
-  Future<void> _fetchMembersPage({bool reset = false, bool requestTotalCount = false}) async {
+  Future<void> _fetchMembersPage({
+    bool reset = false,
+    bool requestTotalCount = false,
+    bool clearExistingResults = true,
+  }) async {
     if (!_crmReady) return;
-    if (_isLoadingPage) return;
+    if (_isLoadingPage && !reset) return;
 
     final shouldUsePaging = _shouldUsePaging;
     final currentOffset = !shouldUsePaging || reset ? 0 : _members.length;
 
+    final requestId = ++_memberFetchRequestId;
+
     setState(() {
       _isLoadingPage = true;
       if (reset || !shouldUsePaging) {
-        _members = [];
-        _filteredMembers = [];
-        _agedOutMembers = [];
         _hasMoreMembers = true;
-        if (requestTotalCount) {
+        if (requestTotalCount || !shouldUsePaging) {
           _totalAvailableMembers = null;
+        }
+        if (clearExistingResults) {
+          _members = [];
+          _filteredMembers = [];
+          _agedOutMembers = [];
         }
       }
     });
@@ -423,7 +444,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
         columns: MemberRepository.listingColumns,
       );
 
-      if (!mounted) return;
+      if (!mounted || requestId != _memberFetchRequestId) {
+        return;
+      }
 
       setState(() {
         if (!shouldUsePaging || reset) {
@@ -450,12 +473,16 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _rebuildFilters();
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _memberFetchRequestId) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading members: $e')),
       );
     } finally {
-      if (!mounted) return;
+      if (!mounted || requestId != _memberFetchRequestId) {
+        return;
+      }
       setState(() {
         _isLoadingPage = false;
       });
@@ -489,7 +516,30 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   Future<void> _refreshAll() => _loadData(refreshMetadata: true, includeMetadata: true);
 
-  Future<void> _reloadMembersOnly() => _loadData(includeMetadata: false);
+  Future<void> _reloadMembersOnly() async {
+    if (!_crmReady) return;
+
+    final useInlineLoading = !_loading;
+    if (useInlineLoading) {
+      setState(() {
+        _inlineSearchLoading = true;
+      });
+    }
+
+    try {
+      await _fetchMembersPage(
+        reset: true,
+        requestTotalCount: true,
+        clearExistingResults: !useInlineLoading,
+      );
+    } finally {
+      if (useInlineLoading && mounted) {
+        setState(() {
+          _inlineSearchLoading = false;
+        });
+      }
+    }
+  }
 
   void _handleScroll() {
     if (_showingChapters) return;
@@ -547,6 +597,23 @@ class _MembersListScreenState extends State<MembersListScreen> {
     if (_crmReady) {
       _reloadMembersOnly();
     }
+  }
+
+  void _handleSearchTextChanged() {
+    if (_suppressSearchListener) return;
+    final value = _searchController.text;
+    if (value == _searchQuery) return;
+    _updateFilters(() => _searchQuery = value);
+  }
+
+  void _replaceSearchText(String value) {
+    if (_searchController.text == value) return;
+    _suppressSearchListener = true;
+    _searchController.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+    _suppressSearchListener = false;
   }
 
   List<Member> _computeFilteredMembers() {
@@ -1169,6 +1236,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   void _clearFilters() {
+    _replaceSearchText('');
     _updateFilters(() {
       _searchQuery = '';
       _selectedCounty = null;
@@ -1335,29 +1403,45 @@ class _MembersListScreenState extends State<MembersListScreen> {
         ? 'Search chapters by name, contact, or status...'
         : 'Search by name, contact, chapter, or committee...';
     final searchField = TextField(
+      controller: _searchController,
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: const Icon(Icons.search),
         suffixIcon: _searchQuery.isNotEmpty
             ? IconButton(
                 icon: const Icon(Icons.clear),
-                onPressed: () => _updateFilters(() => _searchQuery = ''),
+                onPressed: () {
+                  _replaceSearchText('');
+                  _updateFilters(() => _searchQuery = '');
+                },
               )
             : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
         ),
       ),
-      onChanged: (value) => _updateFilters(() => _searchQuery = value),
+    );
+
+    final searchContent = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        searchField,
+        if (_inlineSearchLoading) ...[
+          const SizedBox(height: 6),
+          const LinearProgressIndicator(minHeight: 3),
+        ],
+      ],
     );
 
     if (!widget.embed) {
-      return searchField;
+      return searchContent;
     }
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: searchField),
+        Expanded(child: searchContent),
         const SizedBox(width: 8),
         IconButton(
           icon: const Icon(Icons.refresh),
