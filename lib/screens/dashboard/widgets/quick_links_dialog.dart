@@ -238,6 +238,7 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         externalUrl: result.externalUrl,
         file: result.file,
         removeExistingFile: result.removeFile && result.file == null,
+        isActive: result.isActive,
       );
       if (!mounted) return;
       setState(() {
@@ -262,6 +263,7 @@ class _QuickLinksPanelState extends State<QuickLinksPanel> {
         description: result.description,
         externalUrl: result.externalUrl,
         file: result.file,
+        isActive: result.isActive,
       );
       if (!mounted) return;
       setState(() {
@@ -1227,6 +1229,7 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
   bool _removeFile = false;
   bool _delete = false;
   String? _selectedCategory;
+  bool _isActive = true;
 
   QuickLink? get existing => widget.existing;
 
@@ -1253,6 +1256,7 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
     _selectedCategory = _normalizeCategoryValue(existing?.category);
     _delete = widget.startInDeleteMode;
     _removeFile = widget.startInDeleteMode;
+    _isActive = existing?.isActive ?? true;
   }
 
   @override
@@ -1343,6 +1347,7 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
         file: _selectedFile,
         removeFile: _removeFile,
         delete: _delete,
+        isActive: _isActive,
       ),
     );
   }
@@ -1501,6 +1506,18 @@ class _QuickLinkFormDialogState extends State<_QuickLinkFormDialog> {
                   subtitle: const Text('This action cannot be undone'),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                value: _isActive,
+                onChanged: (value) => setState(() => _isActive = value),
+                title: const Text('Active'),
+                subtitle: Text(
+                  existing != null
+                      ? 'Inactive links are hidden from quick access.'
+                      : 'Only active links appear in quick access.',
+                ),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
             ],
           ),
         ),
@@ -1528,6 +1545,7 @@ class _QuickLinkFormResult {
     this.file,
     this.removeFile = false,
     this.delete = false,
+    required this.isActive,
   });
 
   final String title;
@@ -1537,6 +1555,7 @@ class _QuickLinkFormResult {
   final PlatformFile? file;
   final bool removeFile;
   final bool delete;
+  final bool isActive;
 }
 
 class _CategoryOption {
