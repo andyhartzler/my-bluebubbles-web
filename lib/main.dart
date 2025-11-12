@@ -293,9 +293,15 @@ class Main extends StatelessWidget {
       ],
       child: AdaptiveTheme(
         light: lightTheme.copyWith(
-            textSelectionTheme: TextSelectionThemeData(selectionColor: lightTheme.colorScheme.primary)),
-        dark:
-            darkTheme.copyWith(textSelectionTheme: TextSelectionThemeData(selectionColor: darkTheme.colorScheme.primary)),
+          textSelectionTheme: TextSelectionThemeData(
+            selectionColor: lightTheme.colorScheme.primary,
+          ),
+        ),
+        dark: darkTheme.copyWith(
+          textSelectionTheme: TextSelectionThemeData(
+            selectionColor: darkTheme.colorScheme.primary,
+          ),
+        ),
         initial: AdaptiveThemeMode.system,
         builder: (theme, darkTheme) => GetMaterialApp(
           debugShowCheckedModeBanner: false,
