@@ -1194,7 +1194,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
 
   Widget _buildMessageEditor() {
     final theme = Theme.of(context);
-    final isEnabled = _hasRecipients && !_sending;
+    final isEnabled = !_sending;
 
     _bodyController.readOnly = !isEnabled;
 
@@ -1274,18 +1274,20 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       children: [
         Text('Message', style: labelStyle),
         const SizedBox(height: 8),
-        Opacity(
-          opacity: isEnabled ? 1 : 0.5,
-          child: IgnorePointer(
-            ignoring: !isEnabled,
+        IgnorePointer(
+          ignoring: !isEnabled,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: isEnabled ? 1 : 0.5,
             child: toolbarContainer,
           ),
         ),
         const SizedBox(height: 12),
-        Opacity(
-          opacity: isEnabled ? 1 : 0.5,
-          child: IgnorePointer(
-            ignoring: !isEnabled,
+        IgnorePointer(
+          ignoring: !isEnabled,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: isEnabled ? 1 : 0.5,
             child: editor,
           ),
         ),
