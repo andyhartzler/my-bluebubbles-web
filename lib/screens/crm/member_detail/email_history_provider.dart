@@ -1,11 +1,11 @@
 import 'dart:collection';
-import 'dart:convert';
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:flutter/foundation.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const Set<String> _orgMailboxAddresses = <String>{
@@ -23,6 +23,108 @@ const Set<String> _orgMailboxAddresses = <String>{
   'policy@moyoungdemocrats.org',
   'political-affairs@moyoungdemocrats.org',
 };
+
+String? _sanitizePreview(String? raw) {
+  if (raw == null) return null;
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return null;
+
+  final withBreaks = trimmed
+      .replaceAll(RegExp(r'(?i)<br\s*/?>'), '\n')
+      .replaceAll(RegExp(r'(?i)</(div|p|section|article|table|tbody|tr)>'), '\n\n')
+      .replaceAll(RegExp(r'(?i)</?(ul|ol)>'), '\n\n')
+      .replaceAll(RegExp(r'(?i)</li>'), '\n')
+      .replaceAll(RegExp(r'(?i)<li[^>]*>'), '\n• ');
+
+  final withoutScripts = withBreaks.replaceAll(RegExp(r'(?is)<script[^>]*>.*?</script>'), '');
+  final withoutStyles = withoutScripts.replaceAll(RegExp(r'(?is)<style[^>]*>.*?</style>'), '');
+
+  final stripped = withoutStyles.replaceAll(RegExp(r'<[^>]+>'), ' ');
+  final decoded = _decodeHtmlEntities(stripped);
+  final normalized = _normalizePreviewWhitespace(decoded);
+  return normalized.isEmpty ? null : normalized;
+}
+
+String _decodeHtmlEntities(String input) {
+  return input.replaceAllMapped(
+    RegExp(r'&(#x?[0-9a-fA-F]+|[a-zA-Z]+);'),
+    (match) {
+      final value = match.group(1);
+      if (value == null) return match.group(0)!;
+
+      switch (value) {
+        case 'nbsp':
+          return ' ';
+        case 'amp':
+          return '&';
+        case 'lt':
+          return '<';
+        case 'gt':
+          return '>';
+        case 'quot':
+          return '"';
+        case 'apos':
+        case 'lsquo':
+        case 'rsquo':
+          return "'";
+        case 'ldquo':
+        case 'rdquo':
+          return '"';
+        case 'ndash':
+          return '–';
+        case 'mdash':
+          return '—';
+      }
+
+      if (value.startsWith('#x') || value.startsWith('#X')) {
+        final hex = value.substring(2);
+        final codePoint = int.tryParse(hex, radix: 16);
+        if (codePoint != null) {
+          return String.fromCharCode(codePoint);
+        }
+      } else if (value.startsWith('#')) {
+        final decimal = value.substring(1);
+        final codePoint = int.tryParse(decimal, radix: 10);
+        if (codePoint != null) {
+          return String.fromCharCode(codePoint);
+        }
+      }
+
+      return match.group(0)!;
+    },
+  );
+}
+
+String _normalizePreviewWhitespace(String? input) {
+  if (input == null || input.isEmpty) return '';
+
+  final cleaned = input
+      .replaceAll(String.fromCharCode(0x00A0), ' ')
+      .replaceAll(RegExp(r'\r\n?'), '\n')
+      .replaceAll(RegExp(r'[\t\f\v]+'), ' ');
+
+  final lines = cleaned.split('\n');
+  final paragraphs = <String>[];
+  final buffer = <String>[];
+
+  void flushBuffer() {
+    if (buffer.isEmpty) return;
+    paragraphs.add(buffer.join(' ').trim());
+    buffer.clear();
+  }
+
+  for (final rawLine in lines) {
+    final line = rawLine.trim();
+    if (line.isEmpty) {
+      flushBuffer();
+    } else {
+      buffer.add(line.replaceAll(RegExp(r' {2,}'), ' '));
+    }
+  }
+  flushBuffer();
+
+  return paragraphs.join('\n\n').trim();
+}
 
 class EmailHistoryEntry {
   EmailHistoryEntry({
@@ -193,7 +295,10 @@ class EmailHistoryEntry {
       ];
       for (final candidate in candidates) {
         if (candidate != null && candidate.trim().isNotEmpty) {
-          return candidate;
+          final sanitized = _sanitizePreview(candidate);
+          if (sanitized != null && sanitized.isNotEmpty) {
+            return sanitized;
+          }
         }
       }
       return null;
