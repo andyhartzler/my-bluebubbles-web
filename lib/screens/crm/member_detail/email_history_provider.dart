@@ -615,8 +615,65 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
     final sentAt = headerDate ?? receivedAt ?? internalDate ?? DateTime.now();
 
-    final EmailParticipant? parsedSender =
-        _parseParticipant(row['from_address'] ?? row['from_email'] ?? row['from']);
+    List<dynamic> expandRecipientSource(dynamic source) {
+      final values = <dynamic>[];
+
+      void collect(dynamic value) {
+        if (value == null) return;
+        if (value is EmailParticipant) {
+          values.add(value);
+          return;
+        }
+        if (value is Iterable) {
+          for (final item in value) {
+            collect(item);
+          }
+          return;
+        }
+        if (value is Map) {
+          values.add(value);
+          return;
+        }
+        if (value is String) {
+          final trimmed = value.trim();
+          if (trimmed.isEmpty) return;
+          for (final segment in trimmed.split(',')) {
+            final normalized = segment.trim();
+            if (normalized.isNotEmpty) {
+              values.add(normalized);
+            }
+          }
+          return;
+        }
+        values.add(value);
+      }
+
+      collect(source);
+      return values;
+    }
+
+    List<dynamic> preferRecipientSources({
+      dynamic primary,
+      List<dynamic> fallbacks = const [],
+    }) {
+      final preferred = expandRecipientSource(primary);
+      if (preferred.isNotEmpty) {
+        return preferred;
+      }
+      for (final candidate in fallbacks) {
+        final expanded = expandRecipientSource(candidate);
+        if (expanded.isNotEmpty) {
+          return expanded;
+        }
+      }
+      return const [];
+    }
+
+    final List<dynamic> fromCandidates = expandRecipientSource(row['from_address']);
+    final dynamic fromValue = fromCandidates.isNotEmpty
+        ? fromCandidates.first
+        : (row['from_email'] ?? row['from']);
+    final EmailParticipant? parsedSender = _parseParticipant(fromValue);
 
     final bool isOutgoing;
     if (parsedSender != null) {
@@ -641,24 +698,18 @@ class EmailHistoryProvider extends ChangeNotifier {
             ? fallbackId
             : 'message-${sentAt.microsecondsSinceEpoch}');
 
-    final toParticipants = _parseParticipants([
-      row['to_address'],
-      row['to_addresses'],
-      row['to_emails'],
-      row['to'],
-    ]);
-    final ccParticipants = _parseParticipants([
-      row['cc_address'],
-      row['cc_addresses'],
-      row['cc_emails'],
-      row['cc'],
-    ]);
-    final bccParticipants = _parseParticipants([
-      row['bcc_address'],
-      row['bcc_addresses'],
-      row['bcc_emails'],
-      row['bcc'],
-    ]);
+    final toParticipants = _parseParticipants(preferRecipientSources(
+      primary: row['to_address'],
+      fallbacks: [row['to_addresses'], row['to_emails'], row['to']],
+    ));
+    final ccParticipants = _parseParticipants(preferRecipientSources(
+      primary: row['cc_address'],
+      fallbacks: [row['cc_addresses'], row['cc_emails'], row['cc']],
+    ));
+    final bccParticipants = _parseParticipants(preferRecipientSources(
+      primary: row['bcc_address'],
+      fallbacks: [row['bcc_addresses'], row['bcc_emails'], row['bcc']],
+    ));
 
     final mergedCc = <EmailParticipant>[...ccParticipants];
     final seen = mergedCc.map((participant) => participant.address.toLowerCase()).toSet();
