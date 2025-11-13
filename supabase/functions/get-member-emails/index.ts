@@ -1,6 +1,13 @@
 import { serve } from "https://deno.land/std@0.203.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.1";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, prefer",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
+};
+
 const GMAIL_REFRESH_TOKEN = Deno.env.get("GMAIL_REFRESH_TOKEN");
 const GMAIL_CLIENT_ID = Deno.env.get("GMAIL_CLIENT_ID");
 const GMAIL_CLIENT_SECRET = Deno.env.get("GMAIL_CLIENT_SECRET");
@@ -300,10 +307,20 @@ serve(async (req) => {
   const requestId = crypto.randomUUID();
   const log = logger(requestId);
 
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/plain",
+      },
+    });
+  }
+
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -315,13 +332,13 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ processed, failures }), {
       status: failures > 0 && processed === 0 ? 500 : 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     log.error("Unexpected failure while syncing Gmail", { error: `${error}` });
     return new Response(JSON.stringify({ error: "Failed to sync Gmail", details: `${error}` }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
