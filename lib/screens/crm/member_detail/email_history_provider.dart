@@ -529,14 +529,14 @@ class EmailHistoryProvider extends ChangeNotifier {
           body: sanitizedBody,
         );
         return (status: response.status, data: response.data);
-      } on supabase.FunctionsException catch (error, stack) {
+      } catch (error, stack) {
         Logger.warn(
-          'Email history edge function threw ${error.statusCode ?? 'unknown'} for $name: ${error.message}',
+          'Email history edge function threw for $name: $error',
           trace: stack,
         );
         return (
-          status: error.statusCode ?? 500,
-          data: error.details ?? error.message ?? 'Function invocation failed',
+          status: 500,
+          data: error.toString(),
         );
       }
     }
