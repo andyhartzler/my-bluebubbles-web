@@ -9,15 +9,36 @@ const baseCorsHeaders = {
 };
 
 function buildCorsHeaders(request: Request): Record<string, string> {
-  const origin = request.headers.get("Origin") ?? "*";
-  const requestedHeaders =
-    request.headers.get("Access-Control-Request-Headers") ?? DEFAULT_ALLOWED_HEADERS;
+  const origin = request.headers.get("Origin");
+  const requestedHeaders = request.headers.get("Access-Control-Request-Headers");
 
-  return {
+  const headerSet = new Set(
+    `${DEFAULT_ALLOWED_HEADERS}${requestedHeaders ? "," + requestedHeaders : ""}`
+      .split(",")
+      .map((header) => header.trim())
+      .filter((header) => header.length > 0)
+      .map((header) => header.toLowerCase()),
+  );
+
+  const corsHeaders: Record<string, string> = {
     ...baseCorsHeaders,
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Headers": requestedHeaders,
+    "Access-Control-Allow-Origin": origin ?? "*",
+    "Access-Control-Allow-Headers": Array.from(headerSet).join(", "),
   };
+
+  const varyValues: string[] = [];
+  if (origin) {
+    varyValues.push("Origin");
+    corsHeaders["Access-Control-Allow-Credentials"] = "true";
+  }
+  if (requestedHeaders) {
+    varyValues.push("Access-Control-Request-Headers");
+  }
+  if (varyValues.length > 0) {
+    corsHeaders["Vary"] = varyValues.join(", ");
+  }
+
+  return corsHeaders;
 }
 
 const GMAIL_REFRESH_TOKEN = Deno.env.get("GMAIL_REFRESH_TOKEN");
