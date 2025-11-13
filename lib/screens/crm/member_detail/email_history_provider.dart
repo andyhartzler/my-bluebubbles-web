@@ -580,30 +580,26 @@ class EmailHistoryProvider extends ChangeNotifier {
       return text.isEmpty ? null : text;
     }
 
-    final receivedAt = parseTimestamp(row['received_at']);
-    final internalDate = parseTimestamp(row['internal_date']);
     final headerDate = parseTimestamp(row['date']);
-    final sentAt = headerDate ?? receivedAt ?? internalDate ?? DateTime.now();
-
-    final directionRaw =
-        (row['direction'] ?? row['message_direction'])?.toString().trim().toLowerCase();
-    bool? directionIsOutgoing;
-    if (directionRaw != null && directionRaw.isNotEmpty) {
-      directionIsOutgoing = directionRaw == 'outbound' || directionRaw == 'outgoing';
+    DateTime? receivedAt;
+    DateTime? internalDate;
+    if (headerDate == null) {
+      receivedAt = parseTimestamp(row['received_at']);
+      if (receivedAt == null) {
+        internalDate = parseTimestamp(row['internal_date']);
+      }
     }
+    final sentAt = headerDate ?? receivedAt ?? internalDate ?? DateTime.now();
 
     final EmailParticipant? parsedSender =
         _parseParticipant(row['from_address'] ?? row['from_email'] ?? row['from']);
 
-    if (directionIsOutgoing == true && parsedSender != null) {
-      _registerOrgEmailAddress(parsedSender.address);
-    }
-
     final bool isOutgoing;
-    if (directionIsOutgoing != null) {
-      isOutgoing = directionIsOutgoing;
-    } else if (parsedSender != null) {
+    if (parsedSender != null) {
       isOutgoing = _isOrgEmailAddress(parsedSender.address);
+      if (isOutgoing) {
+        _registerOrgEmailAddress(parsedSender.address);
+      }
     } else {
       isOutgoing = false;
     }
@@ -621,15 +617,24 @@ class EmailHistoryProvider extends ChangeNotifier {
             ? fallbackId
             : 'message-${sentAt.microsecondsSinceEpoch}');
 
-    final toParticipants = _parseParticipants(
-      row['to_address'] ?? row['to_addresses'] ?? row['to_emails'] ?? row['to'],
-    );
-    final ccParticipants = _parseParticipants(
-      row['cc_address'] ?? row['cc_addresses'] ?? row['cc_emails'] ?? row['cc'],
-    );
-    final bccParticipants = _parseParticipants(
-      row['bcc_address'] ?? row['bcc_addresses'] ?? row['bcc_emails'] ?? row['bcc'],
-    );
+    final toParticipants = _parseParticipants([
+      row['to_address'],
+      row['to_addresses'],
+      row['to_emails'],
+      row['to'],
+    ]);
+    final ccParticipants = _parseParticipants([
+      row['cc_address'],
+      row['cc_addresses'],
+      row['cc_emails'],
+      row['cc'],
+    ]);
+    final bccParticipants = _parseParticipants([
+      row['bcc_address'],
+      row['bcc_addresses'],
+      row['bcc_emails'],
+      row['bcc'],
+    ]);
 
     final mergedCc = <EmailParticipant>[...ccParticipants];
     final seen = mergedCc.map((participant) => participant.address.toLowerCase()).toSet();
@@ -718,7 +723,9 @@ class EmailHistoryProvider extends ChangeNotifier {
       _registerOrgEmailAddress(value);
     }
 
-    addSeed(CRMConfig.defaultSenderEmail);
+    for (final seed in CRMConfig.orgEmailAddresses) {
+      addSeed(seed);
+    }
 
     if (knownOrgEmailAddresses != null) {
       for (final candidate in knownOrgEmailAddresses) {
