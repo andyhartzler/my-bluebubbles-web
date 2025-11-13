@@ -311,4 +311,17 @@ void main() {
     expect(entry.previewText, 'See you soon!');
     expect(entry.threadId, 'thread-abc');
   });
+
+  test('history entry leaves cc/bcc empty when fields are missing', () {
+    final map = <String, dynamic>{
+      'email_id': 'log-99',
+      'subject': 'Hello there',
+      'to_emails': ['member@example.com'],
+    };
+
+    final entry = EmailHistoryEntry.fromMap(map);
+
+    expect(entry.cc, isEmpty);
+    expect(entry.bcc, isEmpty);
+  });
 }
