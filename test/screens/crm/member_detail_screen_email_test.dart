@@ -251,14 +251,22 @@ void main() {
       'id': 'row-1',
       'gmail_message_id': 'gmail-123',
       'direction': 'outbound',
+      'message_direction': 'incoming',
       'from_address': 'Organizer <organizer@example.com>',
+      'from': 'Legacy Sender <legacy@example.com>',
       'to_address': 'member@example.com, Ally <ally@example.com>',
-      'cc_address': 'helper@example.com',
+      'to': 'legacy@example.com',
+      'cc_address': 'Helper <helper@example.com>',
+      'cc': 'legacycc@example.com',
       'bcc_address': 'BCC Person <bcc@example.com>',
+      'bcc': 'legacybcc@example.com',
       'subject': 'Welcome',
       'plain_body': 'Plain message',
+      'body_text': 'Legacy plain message',
       'html_body': '<p>Plain message</p>',
+      'body_html': '<p>Legacy plain message</p>',
       'date': '2024-01-01T12:00:00Z',
+      'received_at': '2024-01-01T10:00:00Z',
     };
 
     final message = provider.debugMapEmailMessage(row);
@@ -275,6 +283,14 @@ void main() {
     expect(
       message.cc.map((p) => p.address).toSet(),
       equals({'helper@example.com', 'bcc@example.com'}),
+    );
+    expect(
+      message.to.firstWhere((p) => p.address == 'ally@example.com').displayName,
+      'Ally',
+    );
+    expect(
+      message.cc.firstWhere((p) => p.address == 'helper@example.com').displayName,
+      'Helper',
     );
     expect(message.plainTextBody, 'Plain message');
     expect(message.htmlBody, '<p>Plain message</p>');
