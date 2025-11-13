@@ -292,21 +292,17 @@ void main() {
       'gmail_message_id': 'gmail-123',
       'direction': 'outbound',
       'message_direction': 'incoming',
-      'from_address': 'Organizer <organizer@example.com>',
-      'from': 'Legacy Sender <legacy@example.com>',
+      'date': '2024-01-01T12:00:00Z',
+      'from_address': 'Volunteer <volunteer@ally.org>',
       'to_address': 'member@example.com, Ally <ally@example.com>',
-      'to': 'legacy@example.com',
+      'to_emails': const ['legacy@example.com'],
       'cc_address': 'Helper <helper@example.com>',
-      'cc': 'legacycc@example.com',
+      'cc_emails': const ['legacycc@example.com'],
       'bcc_address': 'BCC Person <bcc@example.com>',
-      'bcc': 'legacybcc@example.com',
+      'bcc_emails': const ['legacybcc@example.com'],
       'subject': 'Welcome',
       'plain_body': 'Plain message',
-      'body_text': 'Legacy plain message',
       'html_body': '<p>Plain message</p>',
-      'body_html': '<p>Legacy plain message</p>',
-      'date': '2024-01-01T12:00:00Z',
-      'received_at': '2024-01-01T10:00:00Z',
     };
 
     final message = provider.debugMapEmailMessage(row);
@@ -314,8 +310,8 @@ void main() {
     expect(message.id, 'gmail-123');
     expect(message.sentAt, DateTime.utc(2024, 1, 1, 12).toLocal());
     expect(message.isOutgoing, isTrue);
-    expect(message.sender.address, 'organizer@example.com');
-    expect(message.sender.displayName, 'Organizer');
+    expect(message.sender.address, 'volunteer@ally.org');
+    expect(message.sender.displayName, 'Volunteer');
     expect(
       message.to.map((p) => p.address).toSet(),
       equals({'member@example.com', 'ally@example.com'}),
