@@ -738,14 +738,50 @@ class EmailHistoryProvider extends ChangeNotifier {
         : (row['from_email'] ?? row['from']);
     final EmailParticipant? parsedSender = _parseParticipant(fromValue);
 
+    bool? resolveDirection(dynamic value) {
+      if (value == null) return null;
+      final normalized = value.toString().trim().toLowerCase();
+      if (normalized.isEmpty) return null;
+      const outgoingValues = {
+        'outbound',
+        'outgoing',
+        'sent',
+        'out',
+      };
+      const incomingValues = {
+        'inbound',
+        'incoming',
+        'received',
+        'in',
+      };
+      if (outgoingValues.contains(normalized)) {
+        return true;
+      }
+      if (incomingValues.contains(normalized)) {
+        return false;
+      }
+      return null;
+    }
+
+    final bool? directionHint =
+        resolveDirection(row['direction']) ?? resolveDirection(row['message_direction']);
+
     final bool isOutgoing;
     if (parsedSender != null) {
-      isOutgoing = _isOrgEmailAddress(parsedSender.address);
-      if (isOutgoing) {
+      final bool senderMatchesOrg = _isOrgEmailAddress(parsedSender.address);
+      if (senderMatchesOrg) {
+        isOutgoing = true;
         _registerOrgEmailAddress(parsedSender.address);
+      } else if (directionHint != null) {
+        isOutgoing = directionHint;
+        if (isOutgoing) {
+          _registerOrgEmailAddress(parsedSender.address);
+        }
+      } else {
+        isOutgoing = false;
       }
     } else {
-      isOutgoing = false;
+      isOutgoing = directionHint ?? false;
     }
 
     final sender = parsedSender ??
