@@ -66,11 +66,12 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
     }
 
     final participants = _participantsFromEntry(entry);
+    final preview = _sanitizeEmailPreview(entry.previewText);
     final thread = EmailThread(
       id: threadId,
       subject: entry.subject,
       updatedAt: entry.sentAt ?? DateTime.now(),
-      snippet: entry.previewText,
+      snippet: preview,
       messages: const [],
       participants: participants,
     );
@@ -217,6 +218,7 @@ class _EmailHistoryTile extends StatelessWidget {
     final theme = Theme.of(context);
     final sentAt = entry.sentAt;
     final subtitle = <Widget>[];
+    final preview = _sanitizeEmailPreview(entry.previewText);
 
     subtitle.add(
       Row(
@@ -253,10 +255,10 @@ class _EmailHistoryTile extends StatelessWidget {
       subtitle.add(bcc);
     }
 
-    if (entry.previewText != null && entry.previewText!.trim().isNotEmpty) {
+    if (preview != null && preview.isNotEmpty) {
       subtitle.add(const SizedBox(height: 8));
       subtitle.add(Text(
-        entry.previewText!.trim(),
+        preview,
         style: theme.textTheme.bodyMedium,
       ));
     }
@@ -410,4 +412,119 @@ class _ErrorView extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _sanitizeEmailPreview(String? raw) {
+  if (raw == null) return null;
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return null;
+
+  final withBreaks = trimmed
+      .replaceAll(RegExp(r'(?i)<br\s*/?>'), '\n')
+      .replaceAll(
+        RegExp(r'(?i)</(div|p|section|article|header|footer|table|tbody|tr)>'),
+        '\n\n',
+      )
+      .replaceAll(RegExp(r'(?i)</?(ul|ol)>'), '\n\n')
+      .replaceAll(RegExp(r'(?i)</li>'), '\n')
+      .replaceAll(RegExp(r'(?i)<li[^>]*>'), '\n• ');
+
+  final withoutCodeBlocks = withBreaks.replaceAll(
+    RegExp(r'(?is)<(script|style)[^>]*>.*?</\1>'),
+    '',
+  );
+
+  final stripped = withoutCodeBlocks.replaceAll(RegExp(r'<[^>]+>'), ' ');
+  final decoded = _decodeHtmlEntities(stripped);
+  final normalized = _normalizePreviewWhitespace(decoded);
+  return normalized.isEmpty ? null : normalized;
+}
+
+String _decodeHtmlEntities(String input) {
+  return input.replaceAllMapped(
+    RegExp(r'&(#x?[0-9a-fA-F]+|[a-zA-Z]+);'),
+    (match) {
+      final value = match.group(1);
+      if (value == null) return match.group(0)!;
+
+      switch (value) {
+        case 'nbsp':
+          return ' ';
+        case 'amp':
+          return '&';
+        case 'lt':
+          return '<';
+        case 'gt':
+          return '>';
+        case 'quot':
+          return '"';
+        case 'apos':
+        case 'lsquo':
+        case 'rsquo':
+          return "'";
+        case 'ldquo':
+        case 'rdquo':
+          return '"';
+        case 'ndash':
+          return '–';
+        case 'mdash':
+          return '—';
+      }
+
+      if (value.startsWith('#x') || value.startsWith('#X')) {
+        final hex = value.substring(2);
+        final codePoint = int.tryParse(hex, radix: 16);
+        if (codePoint != null && codePoint >= 0 && codePoint <= 0x10FFFF) {
+          try {
+            return String.fromCharCode(codePoint);
+          } catch (_) {
+            return match.group(0)!;
+          }
+        }
+      } else if (value.startsWith('#')) {
+        final decimal = value.substring(1);
+        final codePoint = int.tryParse(decimal, radix: 10);
+        if (codePoint != null && codePoint >= 0 && codePoint <= 0x10FFFF) {
+          try {
+            return String.fromCharCode(codePoint);
+          } catch (_) {
+            return match.group(0)!;
+          }
+        }
+      }
+
+      return match.group(0)!;
+    },
+  );
+}
+
+String _normalizePreviewWhitespace(String input) {
+  if (input.isEmpty) return '';
+
+  final cleaned = input
+      .replaceAll(String.fromCharCode(0x00A0), ' ')
+      .replaceAll(RegExp(r'\r\n?'), '\n')
+      .replaceAll(RegExp(r'[\t\f\v]+'), ' ');
+
+  final lines = cleaned.split('\n');
+  final paragraphs = <String>[];
+  final buffer = <String>[];
+
+  void flushBuffer() {
+    if (buffer.isEmpty) return;
+    paragraphs.add(buffer.join(' ').trim());
+    buffer.clear();
+  }
+
+  for (final rawLine in lines) {
+    final line = rawLine.trim();
+    if (line.isEmpty) {
+      flushBuffer();
+    } else {
+      buffer.add(line.replaceAll(RegExp(r' {2,}'), ' '));
+    }
+  }
+  flushBuffer();
+
+  return paragraphs.join('\n\n').trim();
 }

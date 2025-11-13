@@ -406,7 +406,7 @@ class EmailHistoryProvider extends ChangeNotifier {
       }
     }
 
-    Future<({int status, dynamic data})> invoke(String name, {Map<String, dynamic>? body}) {
+    Future<({int status, dynamic data})> invoke(String name, {Map<String, dynamic>? body}) async {
       Map<String, dynamic>? sanitizedBody;
       if (body != null) {
         sanitizedBody = Map<String, dynamic>.from(body)
@@ -418,9 +418,22 @@ class EmailHistoryProvider extends ChangeNotifier {
       }
 
       final SupabaseClient resolvedClient = client!;
-      return resolvedClient.functions
-          .invoke(name, body: sanitizedBody)
-          .then((response) => (status: response.status, data: response.data));
+      try {
+        final response = await resolvedClient.functions.invoke(
+          name,
+          body: sanitizedBody,
+        );
+        return (status: response.status, data: response.data);
+      } on FunctionsException catch (error, stack) {
+        Logger.warn(
+          'Email history edge function threw ${error.statusCode ?? 'unknown'} for $name: ${error.message}',
+          trace: stack,
+        );
+        return (
+          status: error.statusCode ?? 500,
+          data: error.details ?? error.message ?? 'Function invocation failed',
+        );
+      }
     }
 
     try {
