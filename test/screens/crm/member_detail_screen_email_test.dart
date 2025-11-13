@@ -256,6 +256,17 @@ void main() {
     expect(entry.sentAt, DateTime.utc(2024, 5, 20, 18, 15).toLocal());
   });
 
+  test('EmailHistoryEntry.fromMap resolves sentAt from additional Supabase fields', () {
+    final entry = EmailHistoryEntry.fromMap({
+      'id': 'history-email-queued-at',
+      'subject': 'Queued subject',
+      'email_queued_at': '2024-06-05T09:00:00Z',
+    });
+
+    expect(entry.sentAt, isNotNull);
+    expect(entry.sentAt, DateTime.utc(2024, 6, 5, 9).toLocal());
+  });
+
   test('EmailHistoryEntry.fromMap prefers singular recipient fields', () {
     final entry = EmailHistoryEntry.fromMap({
       'id': 'history-recipients',
@@ -274,6 +285,23 @@ void main() {
     expect(entry.bcc, equals(['hidden@example.com']));
   });
 
+  test('EmailHistoryEntry.fromMap falls back to legacy recipient arrays when needed', () {
+    final entry = EmailHistoryEntry.fromMap({
+      'id': 'history-legacy-recipients',
+      'subject': 'Legacy recipient subject',
+      'to_address': '',
+      'to_emails': ['fallback@example.com'],
+      'cc_address': null,
+      'cc_emails': ['legacycc@example.com'],
+      'bcc_address': '   ',
+      'bcc_emails': ['legacybcc@example.com'],
+    });
+
+    expect(entry.to, equals(['fallback@example.com']));
+    expect(entry.cc, equals(['legacycc@example.com']));
+    expect(entry.bcc, equals(['legacybcc@example.com']));
+  });
+
   test('EmailHistoryEntry.fromMap resolves status from email_type field', () {
     final entry = EmailHistoryEntry.fromMap({
       'id': 'history-email-type',
@@ -282,6 +310,17 @@ void main() {
     });
 
     expect(entry.status, 'sent');
+  });
+
+  test('EmailHistoryEntry.fromMap resolves status from Supabase status fields', () {
+    final entry = EmailHistoryEntry.fromMap({
+      'id': 'history-email-status',
+      'subject': 'Status subject',
+      'email_status': 'received',
+      'message_direction': 'inbound',
+    });
+
+    expect(entry.status, 'received');
   });
 
   test('email mapper handles Supabase schema with participants and timestamps', () {

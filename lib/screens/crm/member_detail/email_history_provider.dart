@@ -66,53 +66,108 @@ class EmailHistoryEntry {
       (key, value) => MapEntry(key.toString(), value),
     );
 
+    Map<String, dynamic>? resolveRecipientMap() {
+      final raw = normalized['recipients'];
+      if (raw is Map) {
+        return raw.map<String, dynamic>(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
+      return null;
+    }
+
+    List<String> resolveRecipientSet({
+      required List<dynamic> primary,
+      required List<dynamic> fallback,
+    }) {
+      for (final candidate in primary) {
+        final parsed = parseRecipients(candidate);
+        if (parsed.isNotEmpty) {
+          return parsed;
+        }
+      }
+      for (final candidate in fallback) {
+        final parsed = parseRecipients(candidate);
+        if (parsed.isNotEmpty) {
+          return parsed;
+        }
+      }
+      return const <String>[];
+    }
+
+    final Map<String, dynamic>? recipientMap = resolveRecipientMap();
+
     List<String> resolveRecipients() {
-      final recipients = <String>{};
-      recipients.addAll(parseRecipients(
-        normalized['to_address'] ??
-            normalized['to_email'] ??
-            normalized['to_emails'] ??
-            normalized['to_addresses'] ??
-            normalized['to'] ??
-            (normalized['recipients'] is Map
-                ? (normalized['recipients'] as Map)['to']
-                : normalized['recipients']),
-      ));
-      return recipients.toList(growable: false);
+      return resolveRecipientSet(
+        primary: [
+          normalized['to_address'],
+          recipientMap?['to_address'],
+          normalized['to_email'],
+          recipientMap?['to_email'],
+        ],
+        fallback: [
+          normalized['to_emails'],
+          recipientMap?['to_emails'],
+          normalized['to_addresses'],
+          recipientMap?['to_addresses'],
+          normalized['to'],
+          recipientMap?['to'],
+          recipientMap,
+        ],
+      );
     }
 
     List<String> resolveCc() {
-      final recipients = <String>{};
-      recipients.addAll(parseRecipients(
-        normalized['cc_address'] ??
-            normalized['cc_email'] ??
-            normalized['cc_emails'] ??
-            normalized['cc_addresses'] ??
-            normalized['cc'] ??
-            (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['cc'] : null),
-      ));
-      return recipients.toList(growable: false);
+      return resolveRecipientSet(
+        primary: [
+          normalized['cc_address'],
+          recipientMap?['cc_address'],
+          normalized['cc_email'],
+          recipientMap?['cc_email'],
+        ],
+        fallback: [
+          normalized['cc_emails'],
+          recipientMap?['cc_emails'],
+          normalized['cc_addresses'],
+          recipientMap?['cc_addresses'],
+          normalized['cc'],
+          recipientMap?['cc'],
+          recipientMap,
+        ],
+      );
     }
 
     List<String> resolveBcc() {
-      final recipients = <String>{};
-      recipients.addAll(parseRecipients(
-        normalized['bcc_address'] ??
-            normalized['bcc_email'] ??
-            normalized['bcc_emails'] ??
-            normalized['bcc_addresses'] ??
-            normalized['bcc'] ??
-            (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['bcc'] : null),
-      ));
-      return recipients.toList(growable: false);
+      return resolveRecipientSet(
+        primary: [
+          normalized['bcc_address'],
+          recipientMap?['bcc_address'],
+          normalized['bcc_email'],
+          recipientMap?['bcc_email'],
+        ],
+        fallback: [
+          normalized['bcc_emails'],
+          recipientMap?['bcc_emails'],
+          normalized['bcc_addresses'],
+          recipientMap?['bcc_addresses'],
+          normalized['bcc'],
+          recipientMap?['bcc'],
+          recipientMap,
+        ],
+      );
     }
 
     String resolveStatus() {
       final candidates = <String?>[
         normalized['status']?.toString(),
+        normalized['email_status']?.toString(),
         normalized['email_type']?.toString(),
+        normalized['message_status']?.toString(),
         normalized['message_state']?.toString(),
+        normalized['email_direction']?.toString(),
+        normalized['message_direction']?.toString(),
         normalized['direction']?.toString(),
+        normalized['state']?.toString(),
       ];
       for (final candidate in candidates) {
         if (candidate != null && candidate.trim().isNotEmpty) {
@@ -172,6 +227,14 @@ class EmailHistoryEntry {
         normalized['emailSentAt'],
         normalized['email_received_at'],
         normalized['emailReceivedAt'],
+        normalized['email_queued_at'],
+        normalized['emailQueuedAt'],
+        normalized['email_processed_at'],
+        normalized['emailProcessedAt'],
+        normalized['message_sent_at'],
+        normalized['messageSentAt'],
+        normalized['message_received_at'],
+        normalized['messageReceivedAt'],
         normalized['sent_at'],
         normalized['sentAt'],
         normalized['received_at'],
