@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
@@ -250,12 +251,19 @@ class EmailHistoryProvider extends ChangeNotifier {
   EmailHistoryProvider({
     CRMSupabaseService? supabaseService,
     _FunctionInvocation? functionInvoker,
+    Iterable<String>? knownOrgEmailAddresses,
   })  : _supabaseService = supabaseService ?? CRMSupabaseService(),
-        _functionInvokerOverride = functionInvoker;
+        _functionInvokerOverride = functionInvoker,
+        _knownOrgEmailAddresses = <String>{},
+        _knownOrgEmailDomains = <String>{} {
+    _seedOrgEmailAddresses(knownOrgEmailAddresses);
+  }
 
   final CRMSupabaseService _supabaseService;
   final _FunctionInvocation? _functionInvokerOverride;
   final Map<String, EmailHistoryState> _stateByMember = <String, EmailHistoryState>{};
+  final Set<String> _knownOrgEmailAddresses;
+  final Set<String> _knownOrgEmailDomains;
 
   EmailHistoryState stateForMember(String memberId) {
     return _stateByMember.putIfAbsent(memberId, EmailHistoryState.initial);
@@ -508,12 +516,16 @@ class EmailHistoryProvider extends ChangeNotifier {
             'id,'
             'direction,'
             'message_direction,'
+            'date,'
             'subject,'
             'body_text,'
             'body_html,'
             'from_address,'
+            'to_address,'
             'to_addresses,'
+            'cc_address,'
             'cc_addresses,'
+            'bcc_address,'
             'bcc_addresses,'
             'gmail_message_id,'
             'received_at,'
@@ -545,6 +557,9 @@ class EmailHistoryProvider extends ChangeNotifier {
         if (trimmed.isEmpty) return null;
         return DateTime.tryParse(trimmed)?.toLocal();
       }
+      if (value is num) {
+        return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true).toLocal();
+      }
       return null;
     }
 
@@ -556,12 +571,33 @@ class EmailHistoryProvider extends ChangeNotifier {
 
     final receivedAt = parseTimestamp(row['received_at']);
     final internalDate = parseTimestamp(row['internal_date']);
-    final sentAt = receivedAt ?? internalDate ?? DateTime.now();
-    final direction =
-        (row['direction'] ?? row['message_direction'])?.toString().toLowerCase() ?? '';
-    final isOutgoing = direction == 'outbound';
-    final sender =
-        _parseParticipant(row['from_address'] ?? row['from_email'] ?? row['from']) ??
+    final headerDate = parseTimestamp(row['date']);
+    final sentAt = headerDate ?? receivedAt ?? internalDate ?? DateTime.now();
+
+    final directionRaw =
+        (row['direction'] ?? row['message_direction'])?.toString().trim().toLowerCase();
+    bool? directionIsOutgoing;
+    if (directionRaw != null && directionRaw.isNotEmpty) {
+      directionIsOutgoing = directionRaw == 'outbound' || directionRaw == 'outgoing';
+    }
+
+    final EmailParticipant? parsedSender =
+        _parseParticipant(row['from_address'] ?? row['from_email'] ?? row['from']);
+
+    if (directionIsOutgoing == true && parsedSender != null) {
+      _registerOrgEmailAddress(parsedSender.address);
+    }
+
+    final bool isOutgoing;
+    if (directionIsOutgoing != null) {
+      isOutgoing = directionIsOutgoing;
+    } else if (parsedSender != null) {
+      isOutgoing = _isOrgEmailAddress(parsedSender.address);
+    } else {
+      isOutgoing = false;
+    }
+
+    final sender = parsedSender ??
         EmailParticipant(
           address: isOutgoing ? 'outbound@crm.local' : 'unknown@crm.local',
         );
@@ -575,13 +611,13 @@ class EmailHistoryProvider extends ChangeNotifier {
             : 'message-${sentAt.microsecondsSinceEpoch}');
 
     final toParticipants = _parseParticipants(
-      row['to_addresses'] ?? row['to_emails'] ?? row['to'],
+      row['to_address'] ?? row['to_addresses'] ?? row['to_emails'] ?? row['to'],
     );
     final ccParticipants = _parseParticipants(
-      row['cc_addresses'] ?? row['cc_emails'] ?? row['cc'],
+      row['cc_address'] ?? row['cc_addresses'] ?? row['cc_emails'] ?? row['cc'],
     );
     final bccParticipants = _parseParticipants(
-      row['bcc_addresses'] ?? row['bcc_emails'] ?? row['bcc'],
+      row['bcc_address'] ?? row['bcc_addresses'] ?? row['bcc_emails'] ?? row['bcc'],
     );
 
     final mergedCc = <EmailParticipant>[...ccParticipants];
@@ -662,6 +698,59 @@ class EmailHistoryProvider extends ChangeNotifier {
       address: email,
       displayName: nameRemainder != null && nameRemainder.isNotEmpty ? nameRemainder : null,
     );
+  }
+
+  void _seedOrgEmailAddresses(Iterable<String>? knownOrgEmailAddresses) {
+    void addSeed(String? value) {
+      if (value == null) return;
+      _registerOrgEmailAddress(value);
+    }
+
+    addSeed(CRMConfig.defaultSenderEmail);
+
+    if (knownOrgEmailAddresses != null) {
+      for (final candidate in knownOrgEmailAddresses) {
+        addSeed(candidate);
+      }
+    }
+  }
+
+  bool _isOrgEmailAddress(String? address) {
+    final normalized = _normalizeEmail(address);
+    if (normalized == null) {
+      return false;
+    }
+    if (_knownOrgEmailAddresses.contains(normalized)) {
+      return true;
+    }
+    final domain = _extractDomain(normalized);
+    return domain != null && _knownOrgEmailDomains.contains(domain);
+  }
+
+  void _registerOrgEmailAddress(String? address) {
+    final normalized = _normalizeEmail(address);
+    if (normalized == null) return;
+    if (_knownOrgEmailAddresses.add(normalized)) {
+      final domain = _extractDomain(normalized);
+      if (domain != null) {
+        _knownOrgEmailDomains.add(domain);
+      }
+    }
+  }
+
+  String? _normalizeEmail(String? address) {
+    if (address == null) return null;
+    final trimmed = address.trim();
+    if (trimmed.isEmpty) return null;
+    return trimmed.toLowerCase();
+  }
+
+  String? _extractDomain(String address) {
+    final atIndex = address.lastIndexOf('@');
+    if (atIndex == -1 || atIndex == address.length - 1) {
+      return null;
+    }
+    return address.substring(atIndex + 1);
   }
 
   List<EmailParticipant> _parseParticipants(dynamic value) {
