@@ -289,9 +289,9 @@ class EmailHistoryEntry {
       final candidates = <String?>[
         normalized['preview_text']?.toString(),
         normalized['snippet']?.toString(),
+        normalized['body']?.toString(),
         normalized['body_text']?.toString(),
         normalized['body_html']?.toString(),
-        normalized['body']?.toString(),
       ];
       for (final candidate in candidates) {
         if (candidate != null && candidate.trim().isNotEmpty) {
@@ -320,8 +320,8 @@ class EmailHistoryEntry {
 
     DateTime? resolveTimestamp() {
       final candidates = <dynamic>[
-        normalized['date'],
         normalized['email_date'],
+        normalized['date'],
         normalized['timestamp'],
         normalized['sent_at'],
         normalized['sentAt'],
@@ -343,11 +343,11 @@ class EmailHistoryEntry {
 
     String resolveId() {
       final candidates = <dynamic>[
-        normalized['id'],
-        normalized['email_id'],
         normalized['log_id'],
         normalized['gmail_message_id'],
+        normalized['email_id'],
         normalized['message_id'],
+        normalized['id'],
       ];
       for (final candidate in candidates) {
         if (candidate == null) continue;
@@ -361,10 +361,10 @@ class EmailHistoryEntry {
 
     String? resolveThreadId() {
       final candidates = <String?>[
+        normalized['gmail_thread_id']?.toString(),
         normalized['thread_id']?.toString(),
         normalized['thread']?.toString(),
         normalized['threadId']?.toString(),
-        normalized['gmail_thread_id']?.toString(),
       ];
       for (final candidate in candidates) {
         if (candidate != null && candidate.trim().isNotEmpty) {
@@ -589,29 +589,22 @@ class EmailHistoryProvider extends ChangeNotifier {
               .from('member_email_history')
               .select(
                 [
-                  'email_id',
-                  'message_id',
-                  'thread_id',
+                  'log_id',
+                  'gmail_message_id',
+                  'gmail_thread_id',
+                  'email_type',
                   'subject',
-                  'direction',
-                  'message_state',
-                  'from_email',
-                  'to_emails',
-                  'cc_emails',
-                  'bcc_emails',
-                  'reply_to_email',
-                  'received_at',
-                  'sent_at',
-                  'snippet',
-                  'body_text',
-                  'body_html',
-                  'metadata',
+                  'body',
+                  'from_address',
+                  'to_address',
+                  'cc_address',
+                  'bcc_address',
+                  'email_date',
                   'created_at',
-                  'updated_at',
                 ].join(','),
               )
               .eq('member_id', trimmedMemberId)
-              .order('received_at', ascending: false)
+              .order('email_date', ascending: false)
               .limit(200);
 
           if (response is List) {
@@ -891,8 +884,11 @@ class EmailHistoryProvider extends ChangeNotifier {
         parseTimestamp(row['created_at']) ??
         DateTime.now();
 
-    final direction =
-        (row['direction'] ?? row['message_direction'])?.toString().toLowerCase().trim() ?? '';
+    final direction = (row['direction'] ?? row['message_direction'] ?? row['email_type'])
+            ?.toString()
+            .toLowerCase()
+            .trim() ??
+        '';
     bool? outgoingHint;
     if (direction.isNotEmpty) {
       if (direction.contains('outbound') || direction.contains('sent') || direction.contains('outgoing')) {
