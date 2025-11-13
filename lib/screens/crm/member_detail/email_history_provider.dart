@@ -6,6 +6,7 @@ import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:flutter/foundation.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const Set<String> _orgMailboxAddresses = <String>{
