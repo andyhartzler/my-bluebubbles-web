@@ -225,16 +225,17 @@ void main() {
 
     final row = <String, dynamic>{
       'id': 'row-1',
-      'gmail_message_id': 'gmail-123',
-      'from_address': 'Organizer <info@moyoungdemocrats.org>',
-      'to_address': 'member@example.com, Ally <ally@example.com>',
-      'cc_address': 'helper@example.com',
-      'bcc_address': 'BCC Person <bcc@example.com>',
+      'message_id': 'gmail-123',
+      'from_email': 'Organizer <info@moyoungdemocrats.org>',
+      'to_emails': ['member@example.com', 'Ally <ally@example.com>'],
+      'cc_emails': ['helper@example.com'],
+      'bcc_emails': ['BCC Person <bcc@example.com>'],
       'subject': 'Welcome',
       'body_text': 'Plain message',
       'body_html': '<p>Plain message</p>',
       'snippet': 'Preview text',
-      'date': '2024-01-01T12:00:00Z',
+      'received_at': '2024-01-01T12:00:00Z',
+      'direction': 'outbound',
     };
 
     final message = provider.debugMapEmailMessage(row);
@@ -284,14 +285,15 @@ void main() {
 
   test('history entry parses member_email_history view payload', () {
     final map = <String, dynamic>{
-      'log_id': 'log-42',
+      'email_id': 'log-42',
       'subject': 'GOTV Reminder',
-      'email_type': 'sent',
-      'email_date': '2024-03-01T18:15:00Z',
-      'to_address': 'member@example.com',
-      'body': '<p>See you soon!</p>',
-      'gmail_message_id': 'gmail-42',
-      'gmail_thread_id': 'thread-abc',
+      'direction': 'outbound',
+      'message_state': 'sent',
+      'sent_at': '2024-03-01T18:15:00Z',
+      'to_emails': ['member@example.com'],
+      'body_html': '<p>See you soon!</p>',
+      'message_id': 'gmail-42',
+      'thread_id': 'thread-abc',
     };
 
     final entry = EmailHistoryEntry.fromMap(map);
@@ -300,7 +302,7 @@ void main() {
     expect(entry.status, 'sent');
     expect(entry.sentAt, DateTime.utc(2024, 3, 1, 18, 15).toLocal());
     expect(entry.to, equals(['member@example.com']));
-    expect(entry.previewText, '<p>See you soon!</p>');
+    expect(entry.previewText, 'See you soon!');
     expect(entry.threadId, 'thread-abc');
   });
 }
