@@ -69,10 +69,13 @@ class EmailHistoryEntry {
     List<String> resolveRecipients() {
       final recipients = <String>{};
       recipients.addAll(parseRecipients(
-        normalized['to_emails'] ??
+        normalized['to_address'] ??
+            normalized['to_emails'] ??
             normalized['to_addresses'] ??
             normalized['to'] ??
-            (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['to'] : normalized['recipients']),
+            (normalized['recipients'] is Map
+                ? (normalized['recipients'] as Map)['to']
+                : normalized['recipients']),
       ));
       return recipients.toList(growable: false);
     }
@@ -80,7 +83,8 @@ class EmailHistoryEntry {
     List<String> resolveCc() {
       final recipients = <String>{};
       recipients.addAll(parseRecipients(
-        normalized['cc_emails'] ??
+        normalized['cc_address'] ??
+            normalized['cc_emails'] ??
             normalized['cc_addresses'] ??
             normalized['cc'] ??
             (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['cc'] : null),
@@ -91,7 +95,8 @@ class EmailHistoryEntry {
     List<String> resolveBcc() {
       final recipients = <String>{};
       recipients.addAll(parseRecipients(
-        normalized['bcc_emails'] ??
+        normalized['bcc_address'] ??
+            normalized['bcc_emails'] ??
             normalized['bcc_addresses'] ??
             normalized['bcc'] ??
             (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['bcc'] : null),
@@ -156,11 +161,17 @@ class EmailHistoryEntry {
 
     DateTime? resolveTimestamp() {
       final candidates = <dynamic>[
+        normalized['date'],
         normalized['sent_at'],
+        normalized['sentAt'],
         normalized['received_at'],
+        normalized['receivedAt'],
         normalized['internal_date'],
+        normalized['internalDate'],
         normalized['created_at'],
+        normalized['createdAt'],
         normalized['updated_at'],
+        normalized['updatedAt'],
       ];
       for (final candidate in candidates) {
         final parsed = parseDate(candidate);
@@ -528,13 +539,13 @@ class EmailHistoryProvider extends ChangeNotifier {
             'bcc_address,'
             'bcc_addresses,'
             'gmail_message_id,'
+            'date,'
             'received_at,'
             'internal_date',
           )
           .eq('member_id', memberId)
           .eq('gmail_thread_id', threadId)
-          .order('received_at', ascending: true)
-          .order('internal_date', ascending: true);
+          .order('date', ascending: true);
 
       final rows = response is List
           ? response.whereType<Map<String, dynamic>>().toList(growable: false)
@@ -635,8 +646,9 @@ class EmailHistoryProvider extends ChangeNotifier {
       to: toParticipants,
       cc: mergedCc,
       subject: normalizeBody(row['subject']),
-      plainTextBody: normalizeBody(row['body_text']),
-      htmlBody: normalizeBody(row['body_html']),
+      plainTextBody:
+          normalizeBody(row['plain_body'] ?? row['body_plain'] ?? row['body_text']),
+      htmlBody: normalizeBody(row['html_body'] ?? row['body_html']),
       isOutgoing: isOutgoing,
     );
   }
