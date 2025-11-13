@@ -262,7 +262,9 @@ void main() {
       'subject': 'Update',
       'status': 'sent',
       'email_type': 'received',
+      'threadId': 'gmail-thread-123',
       'to_address': 'member@example.com',
+      'recipient_emails': ['member@example.com', 'ally@example.com'],
       'cc_address': 'helper@example.com',
       'bcc_address': 'ally@example.com',
       'date': '2024-02-01T15:30:00Z',
@@ -274,8 +276,31 @@ void main() {
     expect(entry.id, 'entry-1');
     expect(entry.sentAt, DateTime.utc(2024, 2, 1, 15, 30).toLocal());
     expect(entry.status, 'received');
-    expect(entry.to, equals(['member@example.com']));
+    expect(entry.to, equals(['member@example.com', 'ally@example.com']));
     expect(entry.cc, contains('helper@example.com'));
     expect(entry.bcc, contains('ally@example.com'));
+    expect(entry.threadId, 'gmail-thread-123');
+  });
+
+  test('history entry parses member_email_history view payload', () {
+    final map = <String, dynamic>{
+      'log_id': 'log-42',
+      'subject': 'GOTV Reminder',
+      'email_type': 'sent',
+      'email_date': '2024-03-01T18:15:00Z',
+      'to_address': 'member@example.com',
+      'body': '<p>See you soon!</p>',
+      'gmail_message_id': 'gmail-42',
+      'gmail_thread_id': 'thread-abc',
+    };
+
+    final entry = EmailHistoryEntry.fromMap(map);
+
+    expect(entry.id, 'log-42');
+    expect(entry.status, 'sent');
+    expect(entry.sentAt, DateTime.utc(2024, 3, 1, 18, 15).toLocal());
+    expect(entry.to, equals(['member@example.com']));
+    expect(entry.previewText, '<p>See you soon!</p>');
+    expect(entry.threadId, 'thread-abc');
   });
 }
