@@ -7,6 +7,11 @@ const String _supabaseAnonKeyNextDefine = String.fromEnvironment('NEXT_PUBLIC_SU
 const String _supabaseServiceRoleDefine = String.fromEnvironment('SUPABASE_SERVICE_ROLE_KEY');
 const String _supabaseServiceRoleNextDefine =
     String.fromEnvironment('NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY');
+const String _crmOrgMailboxesDefine = String.fromEnvironment('CRM_ORG_MAILBOXES');
+const String _crmOrgMailboxesAltDefine =
+    String.fromEnvironment('CRM_ORGANIZATION_MAILBOXES');
+const String _crmOrgMailboxesNextDefine =
+    String.fromEnvironment('NEXT_PUBLIC_CRM_ORG_MAILBOXES');
 
 /// CRM Configuration - Supabase connection details
 /// IMPORTANT: Never commit real credentials to Git
@@ -70,4 +75,37 @@ class CRMConfig {
   static const String defaultEmailOptOutSnippet =
       'We respect your inbox. If you no longer wish to receive updates, click '
       '{{opt_out_url}} to unsubscribe.';
+
+  /// List of organization-managed mailbox addresses. Used to determine
+  /// whether an email originated from our team when parsing historical data.
+  /// Values can be provided via compile-time `--dart-define` flags or runtime
+  /// environment variables (comma or newline separated).
+  static List<String> get orgEmailAddresses {
+    final seeds = <String>{};
+
+    void addSeed(String? value) {
+      if (value == null) return;
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return;
+      seeds.add(trimmed);
+    }
+
+    void addSeeds(String? value) {
+      if (value == null || value.isEmpty) return;
+      for (final segment in value.split(RegExp(r'[\n,]'))) {
+        addSeed(segment);
+      }
+    }
+
+    addSeed(defaultSenderEmail);
+    addSeeds(_crmOrgMailboxesDefine);
+    addSeeds(_crmOrgMailboxesAltDefine);
+    addSeeds(_crmOrgMailboxesNextDefine);
+
+    addSeeds(dotenv.env['CRM_ORG_MAILBOXES']);
+    addSeeds(dotenv.env['CRM_ORGANIZATION_MAILBOXES']);
+    addSeeds(dotenv.env['NEXT_PUBLIC_CRM_ORG_MAILBOXES']);
+
+    return List<String>.unmodifiable(seeds);
+  }
 }

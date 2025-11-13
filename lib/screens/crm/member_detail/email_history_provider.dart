@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:convert';
 
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
@@ -82,6 +83,37 @@ class EmailHistoryEntry {
       (key, value) => MapEntry(key.toString(), value),
     );
 
+    Map<String, dynamic>? resolveRecipientMap() {
+      final raw = normalized['recipients'];
+      if (raw is Map) {
+        return raw.map<String, dynamic>(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
+      return null;
+    }
+
+    List<String> resolveRecipientSet({
+      required List<dynamic> primary,
+      required List<dynamic> fallback,
+    }) {
+      for (final candidate in primary) {
+        final parsed = parseRecipients(candidate);
+        if (parsed.isNotEmpty) {
+          return parsed;
+        }
+      }
+      for (final candidate in fallback) {
+        final parsed = parseRecipients(candidate);
+        if (parsed.isNotEmpty) {
+          return parsed;
+        }
+      }
+      return const <String>[];
+    }
+
+    final Map<String, dynamic>? recipientMap = resolveRecipientMap();
+
     List<String> resolveRecipients() {
       final recipients = <String>{};
       recipients.addAll(parseRecipients(
@@ -122,9 +154,13 @@ class EmailHistoryEntry {
     String resolveStatus() {
       final candidates = <String?>[
         normalized['status']?.toString(),
+        normalized['email_status']?.toString(),
+        normalized['email_type']?.toString(),
+        normalized['message_status']?.toString(),
         normalized['message_state']?.toString(),
         normalized['email_type']?.toString(),
         normalized['direction']?.toString(),
+        normalized['state']?.toString(),
       ];
       for (final candidate in candidates) {
         if (candidate != null && candidate.trim().isNotEmpty) {
@@ -183,11 +219,15 @@ class EmailHistoryEntry {
         normalized['email_date'],
         normalized['timestamp'],
         normalized['sent_at'],
+        normalized['sentAt'],
         normalized['received_at'],
+        normalized['receivedAt'],
         normalized['internal_date'],
+        normalized['internalDate'],
         normalized['created_at'],
         normalized['synced_at'],
         normalized['updated_at'],
+        normalized['updatedAt'],
       ];
       for (final candidate in candidates) {
         final parsed = parseDate(candidate);
@@ -309,12 +349,19 @@ class EmailHistoryProvider extends ChangeNotifier {
   EmailHistoryProvider({
     CRMSupabaseService? supabaseService,
     _FunctionInvocation? functionInvoker,
+    Iterable<String>? knownOrgEmailAddresses,
   })  : _supabaseService = supabaseService ?? CRMSupabaseService(),
-        _functionInvokerOverride = functionInvoker;
+        _functionInvokerOverride = functionInvoker,
+        _knownOrgEmailAddresses = <String>{},
+        _knownOrgEmailDomains = <String>{} {
+    _seedOrgEmailAddresses(knownOrgEmailAddresses);
+  }
 
   final CRMSupabaseService _supabaseService;
   final _FunctionInvocation? _functionInvokerOverride;
   final Map<String, EmailHistoryState> _stateByMember = <String, EmailHistoryState>{};
+  final Set<String> _knownOrgEmailAddresses;
+  final Set<String> _knownOrgEmailDomains;
 
   EmailHistoryState stateForMember(String memberId) {
     return _stateByMember.putIfAbsent(memberId, EmailHistoryState.initial);
@@ -612,6 +659,15 @@ class EmailHistoryProvider extends ChangeNotifier {
     return data;
   }
 
+  bool _isMissingColumnError(PostgrestException error, String columnName) {
+    final String lowerColumn = columnName.toLowerCase();
+    if (error.code == '42703') {
+      return true;
+    }
+    final String message = (error.message ?? '').toLowerCase();
+    return message.contains('column') && message.contains(lowerColumn);
+  }
+
   Future<List<EmailMessage>> fetchThreadMessages({
     required String memberId,
     required String threadId,
@@ -655,7 +711,9 @@ class EmailHistoryProvider extends ChangeNotifier {
           ? response.whereType<Map<String, dynamic>>().toList(growable: false)
           : <Map<String, dynamic>>[];
 
-      return rows.map(_mapEmailMessage).toList(growable: false);
+      final messages = rows.map(_mapEmailMessage).toList(growable: false);
+      messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      return messages;
     } catch (error, stack) {
       Logger.warn('Failed to load email thread $threadId for $memberId: $error', trace: stack);
       throw Exception('Failed to load email thread. Please try again.');
@@ -814,6 +872,61 @@ class EmailHistoryProvider extends ChangeNotifier {
       address: email,
       displayName: nameRemainder != null && nameRemainder.isNotEmpty ? nameRemainder : null,
     );
+  }
+
+  void _seedOrgEmailAddresses(Iterable<String>? knownOrgEmailAddresses) {
+    void addSeed(String? value) {
+      if (value == null) return;
+      _registerOrgEmailAddress(value);
+    }
+
+    for (final seed in CRMConfig.orgEmailAddresses) {
+      addSeed(seed);
+    }
+
+    if (knownOrgEmailAddresses != null) {
+      for (final candidate in knownOrgEmailAddresses) {
+        addSeed(candidate);
+      }
+    }
+  }
+
+  bool _isOrgEmailAddress(String? address) {
+    final normalized = _normalizeEmail(address);
+    if (normalized == null) {
+      return false;
+    }
+    if (_knownOrgEmailAddresses.contains(normalized)) {
+      return true;
+    }
+    final domain = _extractDomain(normalized);
+    return domain != null && _knownOrgEmailDomains.contains(domain);
+  }
+
+  void _registerOrgEmailAddress(String? address) {
+    final normalized = _normalizeEmail(address);
+    if (normalized == null) return;
+    if (_knownOrgEmailAddresses.add(normalized)) {
+      final domain = _extractDomain(normalized);
+      if (domain != null) {
+        _knownOrgEmailDomains.add(domain);
+      }
+    }
+  }
+
+  String? _normalizeEmail(String? address) {
+    if (address == null) return null;
+    final trimmed = address.trim();
+    if (trimmed.isEmpty) return null;
+    return trimmed.toLowerCase();
+  }
+
+  String? _extractDomain(String address) {
+    final atIndex = address.lastIndexOf('@');
+    if (atIndex == -1 || atIndex == address.length - 1) {
+      return null;
+    }
+    return address.substring(atIndex + 1);
   }
 
   List<EmailParticipant> _parseParticipants(dynamic value) {
