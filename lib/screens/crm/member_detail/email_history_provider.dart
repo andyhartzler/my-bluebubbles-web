@@ -524,8 +524,13 @@ class EmailHistoryProvider extends ChangeNotifier {
       }
 
       final SupabaseClient resolvedClient = client!;
+      final dynamic payload = sanitizedBody == null ? null : jsonEncode(sanitizedBody);
+      final Map<String, String>? headers = sanitizedBody == null
+          ? null
+          : const {'Content-Type': 'application/json'};
+
       return resolvedClient.functions
-          .invoke(name, body: sanitizedBody)
+          .invoke(name, body: payload, headers: headers)
           .then((response) => (status: response.status, data: response.data));
     }
 
