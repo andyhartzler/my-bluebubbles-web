@@ -70,6 +70,7 @@ class EmailHistoryEntry {
       final recipients = <String>{};
       recipients.addAll(parseRecipients(
         normalized['to_address'] ??
+            normalized['to_email'] ??
             normalized['to_emails'] ??
             normalized['to_addresses'] ??
             normalized['to'] ??
@@ -84,6 +85,7 @@ class EmailHistoryEntry {
       final recipients = <String>{};
       recipients.addAll(parseRecipients(
         normalized['cc_address'] ??
+            normalized['cc_email'] ??
             normalized['cc_emails'] ??
             normalized['cc_addresses'] ??
             normalized['cc'] ??
@@ -96,6 +98,7 @@ class EmailHistoryEntry {
       final recipients = <String>{};
       recipients.addAll(parseRecipients(
         normalized['bcc_address'] ??
+            normalized['bcc_email'] ??
             normalized['bcc_emails'] ??
             normalized['bcc_addresses'] ??
             normalized['bcc'] ??
@@ -107,6 +110,7 @@ class EmailHistoryEntry {
     String resolveStatus() {
       final candidates = <String?>[
         normalized['status']?.toString(),
+        normalized['email_type']?.toString(),
         normalized['message_state']?.toString(),
         normalized['direction']?.toString(),
       ];
@@ -162,6 +166,12 @@ class EmailHistoryEntry {
     DateTime? resolveTimestamp() {
       final candidates = <dynamic>[
         normalized['date'],
+        normalized['email_date'],
+        normalized['emailDate'],
+        normalized['email_sent_at'],
+        normalized['emailSentAt'],
+        normalized['email_received_at'],
+        normalized['emailReceivedAt'],
         normalized['sent_at'],
         normalized['sentAt'],
         normalized['received_at'],

@@ -244,6 +244,46 @@ void main() {
     expect(entry.sentAt, DateTime.utc(2024, 4, 15, 8, 45).toLocal());
   });
 
+  test('EmailHistoryEntry.fromMap resolves sentAt from Supabase view fields', () {
+    final entry = EmailHistoryEntry.fromMap({
+      'id': 'history-email-sent-at',
+      'subject': 'Sent at subject',
+      'status': 'queued',
+      'email_sent_at': '2024-05-20T18:15:00Z',
+    });
+
+    expect(entry.sentAt, isNotNull);
+    expect(entry.sentAt, DateTime.utc(2024, 5, 20, 18, 15).toLocal());
+  });
+
+  test('EmailHistoryEntry.fromMap prefers singular recipient fields', () {
+    final entry = EmailHistoryEntry.fromMap({
+      'id': 'history-recipients',
+      'subject': 'Recipient subject',
+      'status': 'delivered',
+      'to_email': 'primary@example.com',
+      'cc_email': 'friend@example.com',
+      'bcc_email': 'hidden@example.com',
+      'to_emails': ['fallback@example.com'],
+      'cc_emails': ['other@example.com'],
+      'bcc_emails': ['another@example.com'],
+    });
+
+    expect(entry.to, equals(['primary@example.com']));
+    expect(entry.cc, equals(['friend@example.com']));
+    expect(entry.bcc, equals(['hidden@example.com']));
+  });
+
+  test('EmailHistoryEntry.fromMap resolves status from email_type field', () {
+    final entry = EmailHistoryEntry.fromMap({
+      'id': 'history-email-type',
+      'subject': 'Status subject',
+      'email_type': 'sent',
+    });
+
+    expect(entry.status, 'sent');
+  });
+
   test('email mapper handles Supabase schema with participants and timestamps', () {
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
 
