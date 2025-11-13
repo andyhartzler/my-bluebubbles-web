@@ -1,5 +1,4 @@
 import 'dart:collection';
-import 'dart:convert';
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/email_thread.dart';
