@@ -155,11 +155,21 @@ class EmailHistoryEntry {
 
     DateTime? resolveTimestamp() {
       final candidates = <dynamic>[
+        normalized['date'],
+        normalized['email_date'],
+        normalized['emailDate'],
+        normalized['email_sent_at'],
+        normalized['emailSentAt'],
         normalized['sent_at'],
+        normalized['sentAt'],
         normalized['received_at'],
+        normalized['receivedAt'],
         normalized['internal_date'],
+        normalized['internalDate'],
         normalized['created_at'],
+        normalized['createdAt'],
         normalized['updated_at'],
+        normalized['updatedAt'],
       ];
       for (final candidate in candidates) {
         final parsed = parseDate(candidate);
