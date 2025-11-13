@@ -30,42 +30,70 @@ String? _sanitizePreview(String? raw) {
   final trimmed = raw.trim();
   if (trimmed.isEmpty) return null;
 
-  final htmlWithBreaks = trimmed.replaceAllMapped(
-    RegExp(r'(?i)</?(br|div|p|li)[^>]*>'),
-    (match) {
-      final fullMatch = match.group(0) ?? '';
-      final tag = match.group(1)?.toLowerCase();
-      final isClosing = fullMatch.startsWith('</');
+  final withBreaks = trimmed
+      .replaceAll(RegExp(r'(?i)<br\s*/?>'), '\n')
+      .replaceAll(RegExp(r'(?i)</(div|p|section|article|table|tbody|tr)>'), '\n\n')
+      .replaceAll(RegExp(r'(?i)</?(ul|ol)>'), '\n\n')
+      .replaceAll(RegExp(r'(?i)</li>'), '\n')
+      .replaceAll(RegExp(r'(?i)<li[^>]*>'), '\n• ');
 
-      switch (tag) {
-        case 'br':
-          return '\n';
-        case 'li':
-          return isClosing ? '' : '\n• ';
-        default:
-          return isClosing ? '\n\n' : '\n';
+  final withoutScripts = withBreaks.replaceAll(RegExp(r'(?is)<script[^>]*>.*?</script>'), '');
+  final withoutStyles = withoutScripts.replaceAll(RegExp(r'(?is)<style[^>]*>.*?</style>'), '');
+
+  final stripped = withoutStyles.replaceAll(RegExp(r'<[^>]+>'), ' ');
+  final decoded = _decodeHtmlEntities(stripped);
+  final normalized = _normalizePreviewWhitespace(decoded);
+  return normalized.isEmpty ? null : normalized;
+}
+
+String _decodeHtmlEntities(String input) {
+  return input.replaceAllMapped(
+    RegExp(r'&(#x?[0-9a-fA-F]+|[a-zA-Z]+);'),
+    (match) {
+      final value = match.group(1);
+      if (value == null) return match.group(0)!;
+
+      switch (value) {
+        case 'nbsp':
+          return ' ';
+        case 'amp':
+          return '&';
+        case 'lt':
+          return '<';
+        case 'gt':
+          return '>';
+        case 'quot':
+          return '"';
+        case 'apos':
+        case 'lsquo':
+        case 'rsquo':
+          return "'";
+        case 'ldquo':
+        case 'rdquo':
+          return '"';
+        case 'ndash':
+          return '–';
+        case 'mdash':
+          return '—';
       }
+
+      if (value.startsWith('#x') || value.startsWith('#X')) {
+        final hex = value.substring(2);
+        final codePoint = int.tryParse(hex, radix: 16);
+        if (codePoint != null) {
+          return String.fromCharCode(codePoint);
+        }
+      } else if (value.startsWith('#')) {
+        final decimal = value.substring(1);
+        final codePoint = int.tryParse(decimal, radix: 10);
+        if (codePoint != null) {
+          return String.fromCharCode(codePoint);
+        }
+      }
+
+      return match.group(0)!;
     },
   );
-
-  String? convertUsingParser(String input) {
-    try {
-      final fragment = html_parser.parseFragment(input);
-      final textContent = fragment.text;
-      return _normalizePreviewWhitespace(textContent);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  final parsed = convertUsingParser(htmlWithBreaks);
-  if (parsed != null && parsed.isNotEmpty) {
-    return parsed;
-  }
-
-  final stripped = htmlWithBreaks.replaceAll(RegExp(r'<[^>]*>'), ' ');
-  final normalized = _normalizePreviewWhitespace(stripped);
-  return normalized.isEmpty ? null : normalized;
 }
 
 String _normalizePreviewWhitespace(String? input) {
