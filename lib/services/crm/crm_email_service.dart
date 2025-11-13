@@ -216,6 +216,7 @@ class CRMEmailService {
   /// Supabase edge function.
   Future<CRMEmailResult> sendEmailReply({
     required String threadId,
+    required List<String> to,
     required String body,
     String? subject,
     List<String>? cc,
@@ -227,6 +228,11 @@ class CRMEmailService {
       throw CRMEmailException('A valid thread ID is required to send a reply.');
     }
 
+    final recipients = _sanitizeEmails(to);
+    if (recipients.isEmpty) {
+      throw CRMEmailException('At least one recipient email is required.');
+    }
+
     final trimmedBody = body.trim();
     if (trimmedBody.isEmpty) {
       throw CRMEmailException('Reply body cannot be empty.');
@@ -234,6 +240,7 @@ class CRMEmailService {
 
     final payload = <String, dynamic>{
       'threadId': trimmedThreadId,
+      'to': recipients.length == 1 ? recipients.first : recipients,
     };
 
     final trimmedSubject = subject?.trim() ?? '';
