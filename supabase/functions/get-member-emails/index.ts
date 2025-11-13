@@ -1,12 +1,45 @@
 import { serve } from "https://deno.land/std@0.203.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, prefer",
+const DEFAULT_ALLOWED_HEADERS = "authorization, x-client-info, apikey, content-type, prefer";
+
+const baseCorsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Max-Age": "86400",
 };
+
+function buildCorsHeaders(request: Request): Record<string, string> {
+  const origin = request.headers.get("Origin");
+  const requestedHeaders = request.headers.get("Access-Control-Request-Headers");
+
+  const headerSet = new Set(
+    `${DEFAULT_ALLOWED_HEADERS}${requestedHeaders ? "," + requestedHeaders : ""}`
+      .split(",")
+      .map((header) => header.trim())
+      .filter((header) => header.length > 0)
+      .map((header) => header.toLowerCase()),
+  );
+
+  const corsHeaders: Record<string, string> = {
+    ...baseCorsHeaders,
+    "Access-Control-Allow-Origin": origin ?? "*",
+    "Access-Control-Allow-Headers": Array.from(headerSet).join(", "),
+  };
+
+  const varyValues: string[] = [];
+  if (origin) {
+    varyValues.push("Origin");
+    corsHeaders["Access-Control-Allow-Credentials"] = "true";
+  }
+  if (requestedHeaders) {
+    varyValues.push("Access-Control-Request-Headers");
+  }
+  if (varyValues.length > 0) {
+    corsHeaders["Vary"] = varyValues.join(", ");
+  }
+
+  return corsHeaders;
+}
 
 const GMAIL_REFRESH_TOKEN = Deno.env.get("GMAIL_REFRESH_TOKEN");
 const GMAIL_CLIENT_ID = Deno.env.get("GMAIL_CLIENT_ID");
@@ -311,7 +344,7 @@ serve(async (req) => {
     return new Response("ok", {
       status: 200,
       headers: {
-        ...corsHeaders,
+        ...buildCorsHeaders(req),
         "Content-Type": "text/plain",
       },
     });
@@ -320,7 +353,7 @@ serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -332,13 +365,13 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ processed, failures }), {
       status: failures > 0 && processed === 0 ? 500 : 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (error) {
     log.error("Unexpected failure while syncing Gmail", { error: `${error}` });
     return new Response(JSON.stringify({ error: "Failed to sync Gmail", details: `${error}` }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });
