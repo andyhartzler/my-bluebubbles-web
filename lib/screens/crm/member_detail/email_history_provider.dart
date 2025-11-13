@@ -68,8 +68,8 @@ String? _sanitizePreview(String? raw) {
   return normalized.isEmpty ? null : normalized;
 }
 
-String _normalizePreviewWhitespace(String input) {
-  if (input.isEmpty) return '';
+String _normalizePreviewWhitespace(String? input) {
+  if (input == null || input.isEmpty) return '';
 
   final cleaned = input
       .replaceAll(String.fromCharCode(0x00A0), ' ')
