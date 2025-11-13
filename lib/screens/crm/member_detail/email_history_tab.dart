@@ -12,12 +12,14 @@ class EmailHistoryTab extends StatefulWidget {
     super.key,
     required this.memberId,
     required this.memberName,
+    this.memberEmail,
     this.loadThreadMessages,
     this.onSendReply,
   });
 
   final String memberId;
   final String memberName;
+  final String? memberEmail;
   final Future<List<EmailMessage>> Function(String memberId, String threadId)?
       loadThreadMessages;
   final Future<void> Function(String threadId, EmailReplyData data)? onSendReply;
@@ -65,6 +67,7 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
       onSendReply = (data) => _defaultReplyHandler(threadId, data);
     }
 
+    final defaultRecipients = _resolveDefaultReplyRecipients(entry);
     final participants = _participantsFromEntry(entry);
     final preview = _sanitizeEmailPreview(entry.previewText);
     final thread = EmailThread(
@@ -86,6 +89,7 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
           onSendReply: onSendReply,
           initiallyLoading: true,
           error: entry.errorMessage,
+          initialReplyTo: defaultRecipients,
         ),
       ),
     );
@@ -112,24 +116,103 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
     return participants;
   }
 
+  List<String> _resolveDefaultReplyRecipients(EmailHistoryEntry entry) {
+    final nonOrg = <String>[];
+    final fallback = <String>[];
+    final seen = <String>{};
+
+    void collect(List<String> values) {
+      for (final value in values) {
+        final email = _normalizeEmail(value);
+        if (email == null) continue;
+        final lower = email.toLowerCase();
+        if (!seen.add(lower)) continue;
+        if (_isOrgAddress(email)) {
+          fallback.add(email);
+        } else {
+          nonOrg.add(email);
+        }
+      }
+    }
+
+    collect(entry.to);
+    collect(entry.cc);
+    collect(entry.bcc);
+
+    final result = <String>[];
+    final added = <String>{};
+
+    void addToResult(String? email) {
+      final normalized = _normalizeEmail(email);
+      if (normalized == null) return;
+      final lower = normalized.toLowerCase();
+      if (added.add(lower)) {
+        result.add(normalized);
+      }
+    }
+
+    for (final email in nonOrg) {
+      addToResult(email);
+    }
+
+    for (final email in fallback) {
+      addToResult(email);
+    }
+
+    addToResult(widget.memberEmail);
+
+    return result;
+  }
+
   Future<void> _defaultReplyHandler(String threadId, EmailReplyData data) async {
+    final trimmedTo = data.to
+        .map(_normalizeEmail)
+        .whereType<String>()
+        .toList(growable: false);
     final trimmedCc = data.cc
-        .map((email) => email.trim())
-        .where((email) => email.isNotEmpty)
+        .map(_normalizeEmail)
+        .whereType<String>()
         .toList(growable: false);
     final trimmedBcc = data.bcc
-        .map((email) => email.trim())
-        .where((email) => email.isNotEmpty)
+        .map(_normalizeEmail)
+        .whereType<String>()
         .toList(growable: false);
+
+    if (trimmedTo.isEmpty) {
+      throw CRMEmailException('At least one recipient email is required for the reply.');
+    }
 
     await CRMEmailService().sendEmailReply(
       threadId: threadId,
+      to: trimmedTo,
       body: data.body,
       subject: data.subject,
       cc: trimmedCc.isEmpty ? null : trimmedCc,
       bcc: trimmedBcc.isEmpty ? null : trimmedBcc,
       sendAsHtml: data.sendAsHtml,
     );
+  }
+
+  String? _normalizeEmail(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    final match = RegExp(r'<([^>]+)>').firstMatch(trimmed);
+    final extracted = match != null ? match.group(1)! : trimmed;
+    var cleaned = extracted.trim();
+    while (cleaned.startsWith('"') || cleaned.startsWith("'")) {
+      cleaned = cleaned.substring(1).trim();
+    }
+    while (cleaned.endsWith('"') || cleaned.endsWith("'")) {
+      cleaned = cleaned.substring(0, cleaned.length - 1).trim();
+    }
+    return cleaned.isEmpty ? null : cleaned;
+  }
+
+  bool _isOrgAddress(String value) {
+    final normalized = _normalizeEmail(value);
+    if (normalized == null) return false;
+    return normalized.toLowerCase().endsWith('@moyoungdemocrats.org');
   }
 
   @override

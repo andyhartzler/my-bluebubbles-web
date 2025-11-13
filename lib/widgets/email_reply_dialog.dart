@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class EmailReplyData {
   const EmailReplyData({
+    required this.to,
     this.subject,
     required this.body,
     this.cc = const [],
@@ -9,6 +10,7 @@ class EmailReplyData {
     this.sendAsHtml = true,
   });
 
+  final List<String> to;
   final String? subject;
   final String body;
   final List<String> cc;
@@ -20,6 +22,7 @@ class EmailReplyDialog extends StatefulWidget {
   const EmailReplyDialog({
     super.key,
     required this.threadSubject,
+    this.initialTo,
     this.initialSubject,
     this.initialBody,
     this.initialCc,
@@ -28,6 +31,7 @@ class EmailReplyDialog extends StatefulWidget {
   });
 
   final String threadSubject;
+  final List<String>? initialTo;
   final String? initialSubject;
   final String? initialBody;
   final List<String>? initialCc;
@@ -40,6 +44,7 @@ class EmailReplyDialog extends StatefulWidget {
 
 class _EmailReplyDialogState extends State<EmailReplyDialog> {
   final _formKey = GlobalKey<FormState>();
+  late TextEditingController _toController;
   late TextEditingController _subjectController;
   late TextEditingController _bodyController;
   late TextEditingController _ccController;
@@ -49,6 +54,9 @@ class _EmailReplyDialogState extends State<EmailReplyDialog> {
   @override
   void initState() {
     super.initState();
+    _toController = TextEditingController(
+      text: widget.initialTo?.join(', ') ?? '',
+    );
     _subjectController = TextEditingController(
       text: widget.initialSubject ?? 'Re: ${widget.threadSubject}'.trim(),
     );
@@ -63,6 +71,7 @@ class _EmailReplyDialogState extends State<EmailReplyDialog> {
 
   @override
   void dispose() {
+    _toController.dispose();
     _subjectController.dispose();
     _bodyController.dispose();
     _ccController.dispose();
@@ -76,6 +85,7 @@ class _EmailReplyDialogState extends State<EmailReplyDialog> {
 
     Navigator.of(context).pop(
       EmailReplyData(
+        to: _parseEmails(_toController.text),
         subject: _subjectController.text.trim().isEmpty
             ? null
             : _subjectController.text.trim(),
@@ -113,6 +123,21 @@ class _EmailReplyDialogState extends State<EmailReplyDialog> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
+                TextFormField(
+                  controller: _toController,
+                  decoration: const InputDecoration(
+                    labelText: 'To',
+                    hintText: 'Separate multiple emails with commas',
+                  ),
+                  validator: (value) {
+                    final emails = _parseEmails(value ?? '');
+                    if (emails.isEmpty) {
+                      return 'At least one recipient is required';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _subjectController,
                   decoration: const InputDecoration(

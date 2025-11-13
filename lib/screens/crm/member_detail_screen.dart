@@ -1654,6 +1654,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         EmailHistoryTab(
                           memberId: _member.id,
                           memberName: _member.name,
+                          memberEmail: _member.preferredEmail,
                         ),
                       ],
                     ),

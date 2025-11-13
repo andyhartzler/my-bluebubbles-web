@@ -201,6 +201,11 @@ void main() {
 
     expect(find.byType(EmailReplyDialog), findsOneWidget);
 
+    final toField = tester.widget<TextFormField>(
+      find.widgetWithText(TextFormField, 'To'),
+    );
+    expect(toField.controller?.text, contains('member@example.com'));
+
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Subject'),
       'Re: Welcome to the movement',
@@ -216,6 +221,7 @@ void main() {
     expect(sendCalled, isTrue);
     expect(capturedThreadId, entry.threadId);
     expect(capturedReply, isNotNull);
+    expect(capturedReply!.to, contains('member@example.com'));
     expect(capturedReply!.body, 'Thanks for the update!');
     expect(capturedReply!.sendAsHtml, isTrue);
   });

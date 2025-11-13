@@ -13,6 +13,7 @@ class EmailDetailScreen extends StatefulWidget {
     this.onSendReply,
     this.initiallyLoading = false,
     this.error,
+    this.initialReplyTo,
   });
 
   final EmailThread thread;
@@ -20,6 +21,7 @@ class EmailDetailScreen extends StatefulWidget {
   final Future<void> Function(EmailReplyData data)? onSendReply;
   final bool initiallyLoading;
   final String? error;
+  final List<String>? initialReplyTo;
 
   @override
   State<EmailDetailScreen> createState() => _EmailDetailScreenState();
@@ -81,6 +83,7 @@ class _EmailDetailScreenState extends State<EmailDetailScreen> {
       context: context,
       builder: (context) => EmailReplyDialog(
         threadSubject: widget.thread.subject,
+        initialTo: _resolveInitialRecipients(),
       ),
     );
 
@@ -103,6 +106,85 @@ class _EmailDetailScreenState extends State<EmailDetailScreen> {
         setState(() => _sendingReply = false);
       }
     }
+  }
+
+  List<String> _resolveInitialRecipients() {
+    final recipients = <String>[];
+    final seen = <String>{};
+
+    void add(String? value) {
+      final normalized = _normalizeEmail(value);
+      if (normalized == null) return;
+      final lower = normalized.toLowerCase();
+      if (seen.add(lower)) {
+        recipients.add(normalized);
+      }
+    }
+
+    for (final message in _messages.reversed) {
+      if (message.isOutgoing) continue;
+      final senderEmail = _normalizeEmail(message.sender.address);
+      if (senderEmail != null && !_isOrgAddress(senderEmail)) {
+        add(senderEmail);
+        break;
+      }
+    }
+
+    final initial = widget.initialReplyTo;
+    if (initial != null) {
+      for (final email in initial) {
+        add(email);
+      }
+    }
+
+    EmailMessage? lastOutgoing;
+    for (final message in _messages.reversed) {
+      if (message.isOutgoing) {
+        lastOutgoing = message;
+        break;
+      }
+    }
+    if (lastOutgoing != null) {
+      for (final participant in lastOutgoing.to) {
+        add(participant.address);
+      }
+    }
+
+    for (final participant in widget.thread.participants) {
+      final normalized = _normalizeEmail(participant.address);
+      if (normalized == null || _isOrgAddress(normalized)) continue;
+      add(normalized);
+    }
+
+    if (recipients.isEmpty) {
+      for (final participant in widget.thread.participants) {
+        add(participant.address);
+      }
+    }
+
+    return recipients;
+  }
+
+  String? _normalizeEmail(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    final match = RegExp(r'<([^>]+)>').firstMatch(trimmed);
+    final extracted = match != null ? match.group(1)! : trimmed;
+    var cleaned = extracted.trim();
+    while (cleaned.startsWith('"') || cleaned.startsWith("'")) {
+      cleaned = cleaned.substring(1).trim();
+    }
+    while (cleaned.endsWith('"') || cleaned.endsWith("'")) {
+      cleaned = cleaned.substring(0, cleaned.length - 1).trim();
+    }
+    return cleaned.isEmpty ? null : cleaned;
+  }
+
+  bool _isOrgAddress(String value) {
+    final normalized = _normalizeEmail(value);
+    if (normalized == null) return false;
+    return normalized.toLowerCase().endsWith('@moyoungdemocrats.org');
   }
 
   @override
