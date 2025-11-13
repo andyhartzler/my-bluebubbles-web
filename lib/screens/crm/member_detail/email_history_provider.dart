@@ -344,6 +344,7 @@ class EmailHistoryEntry {
     String resolveId() {
       final candidates = <dynamic>[
         normalized['id'],
+        normalized['email_id'],
         normalized['log_id'],
         normalized['gmail_message_id'],
         normalized['message_id'],
@@ -588,19 +589,29 @@ class EmailHistoryProvider extends ChangeNotifier {
               .from('member_email_history')
               .select(
                 [
-                  'log_id',
-                  'email_type',
-                  'email_date',
+                  'email_id',
+                  'message_id',
+                  'thread_id',
                   'subject',
-                  'body',
-                  'from_address',
-                  'to_address',
-                  'gmail_message_id',
-                  'gmail_thread_id',
+                  'direction',
+                  'message_state',
+                  'from_email',
+                  'to_emails',
+                  'cc_emails',
+                  'bcc_emails',
+                  'reply_to_email',
+                  'received_at',
+                  'sent_at',
+                  'snippet',
+                  'body_text',
+                  'body_html',
+                  'metadata',
+                  'created_at',
+                  'updated_at',
                 ].join(','),
               )
               .eq('member_id', trimmedMemberId)
-              .order('email_date', ascending: false)
+              .order('received_at', ascending: false)
               .limit(200);
 
           if (response is List) {
@@ -808,22 +819,31 @@ class EmailHistoryProvider extends ChangeNotifier {
           .select(
             [
               'id',
+              'message_id',
+              'thread_id',
               'subject',
               'body_text',
               'body_html',
               'snippet',
-              'from_address',
-              'to_address',
-              'cc_address',
-              'gmail_message_id',
-              'message_id',
-              'date',
-              'in_reply_to',
+              'from_email',
+              'to_emails',
+              'cc_emails',
+              'bcc_emails',
+              'direction',
+              'message_state',
+              'received_at',
+              'sent_at',
+              'reply_to_email',
+              'references_header',
+              'in_reply_to_header',
+              'metadata',
+              'created_at',
+              'updated_at',
             ].join(','),
           )
           .eq('member_id', memberId)
-          .eq('gmail_thread_id', threadId)
-          .order('date', ascending: true);
+          .eq('thread_id', threadId)
+          .order('received_at', ascending: true);
 
       final rows = response is List
           ? response.whereType<Map<String, dynamic>>().toList(growable: false)
