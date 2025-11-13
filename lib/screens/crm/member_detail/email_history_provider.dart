@@ -68,10 +68,13 @@ class EmailHistoryEntry {
     List<String> resolveRecipients() {
       final recipients = <String>{};
       recipients.addAll(parseRecipients(
-        normalized['to_emails'] ??
+        normalized['to_address'] ??
+            normalized['to_emails'] ??
             normalized['to_addresses'] ??
             normalized['to'] ??
-            (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['to'] : normalized['recipients']),
+            (normalized['recipients'] is Map
+                ? (normalized['recipients'] as Map)['to']
+                : normalized['recipients']),
       ));
       return recipients.toList(growable: false);
     }
@@ -79,7 +82,8 @@ class EmailHistoryEntry {
     List<String> resolveCc() {
       final recipients = <String>{};
       recipients.addAll(parseRecipients(
-        normalized['cc_emails'] ??
+        normalized['cc_address'] ??
+            normalized['cc_emails'] ??
             normalized['cc_addresses'] ??
             normalized['cc'] ??
             (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['cc'] : null),
@@ -90,7 +94,8 @@ class EmailHistoryEntry {
     List<String> resolveBcc() {
       final recipients = <String>{};
       recipients.addAll(parseRecipients(
-        normalized['bcc_emails'] ??
+        normalized['bcc_address'] ??
+            normalized['bcc_emails'] ??
             normalized['bcc_addresses'] ??
             normalized['bcc'] ??
             (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['bcc'] : null),
@@ -156,10 +161,6 @@ class EmailHistoryEntry {
     DateTime? resolveTimestamp() {
       final candidates = <dynamic>[
         normalized['date'],
-        normalized['email_date'],
-        normalized['emailDate'],
-        normalized['email_sent_at'],
-        normalized['emailSentAt'],
         normalized['sent_at'],
         normalized['sentAt'],
         normalized['received_at'],
@@ -564,10 +565,9 @@ class EmailHistoryProvider extends ChangeNotifier {
       return text.isEmpty ? null : text;
     }
 
-    final date = parseTimestamp(row['date']);
-    final receivedAt = parseTimestamp(row['received_at']);
-    final internalDate = parseTimestamp(row['internal_date']);
-    final sentAt = date ?? receivedAt ?? internalDate ?? DateTime.now();
+    final receivedAt = parseTimestamp(row['date'] ?? row['received_at']);
+    final internalDate = parseTimestamp(row['sent_at'] ?? row['internal_date']);
+    final sentAt = receivedAt ?? internalDate ?? DateTime.now();
     final direction =
         (row['direction'] ?? row['message_direction'])?.toString().toLowerCase() ?? '';
     final isOutgoing = direction == 'outbound';
@@ -610,8 +610,9 @@ class EmailHistoryProvider extends ChangeNotifier {
       to: toParticipants,
       cc: mergedCc,
       subject: normalizeBody(row['subject']),
-      plainTextBody: normalizeBody(row['body_text']),
-      htmlBody: normalizeBody(row['body_html']),
+      plainTextBody:
+          normalizeBody(row['plain_body'] ?? row['body_plain'] ?? row['body_text']),
+      htmlBody: normalizeBody(row['html_body'] ?? row['body_html']),
       isOutgoing: isOutgoing,
     );
   }
