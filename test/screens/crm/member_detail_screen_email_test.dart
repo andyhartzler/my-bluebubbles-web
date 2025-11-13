@@ -279,4 +279,26 @@ void main() {
     expect(message.plainTextBody, 'Plain message');
     expect(message.htmlBody, '<p>Plain message</p>');
   });
+
+  test('email mapper infers outgoing when direction is missing but sender is known', () {
+    final provider = EmailHistoryProvider(
+      supabaseService: supabaseService,
+      knownOrgEmailAddresses: const ['info@moyoungdemocrats.org'],
+    );
+
+    final row = <String, dynamic>{
+      'gmail_message_id': 'gmail-456',
+      'from_address': 'Organizer <INFO@MOYOUNGDEMOCRATS.ORG>',
+      'subject': 'Update',
+      'body_text': 'Hello there',
+      'date': '2024-02-01T14:00:00Z',
+      'to_address': 'member@example.com',
+    };
+
+    final message = provider.debugMapEmailMessage(row);
+
+    expect(message.isOutgoing, isTrue);
+    expect(message.sender.address, 'info@moyoungdemocrats.org');
+    expect(message.sentAt, DateTime.utc(2024, 2, 1, 14).toLocal());
+  });
 }
