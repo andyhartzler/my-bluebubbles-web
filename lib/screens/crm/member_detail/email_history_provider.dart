@@ -522,17 +522,17 @@ class EmailHistoryProvider extends ChangeNotifier {
             'body_text,'
             'body_html,'
             'from_address,'
-            'to_addresses,'
-            'cc_addresses,'
-            'bcc_addresses,'
+            'to_address,'
+            'cc_address,'
+            'bcc_address,'
             'gmail_message_id,'
+            'date,'
             'received_at,'
             'internal_date',
           )
           .eq('member_id', memberId)
           .eq('gmail_thread_id', threadId)
-          .order('received_at', ascending: true)
-          .order('internal_date', ascending: true);
+          .order('date', ascending: true);
 
       final rows = response is List
           ? response.whereType<Map<String, dynamic>>().toList(growable: false)
@@ -564,9 +564,10 @@ class EmailHistoryProvider extends ChangeNotifier {
       return text.isEmpty ? null : text;
     }
 
+    final date = parseTimestamp(row['date']);
     final receivedAt = parseTimestamp(row['received_at']);
     final internalDate = parseTimestamp(row['internal_date']);
-    final sentAt = receivedAt ?? internalDate ?? DateTime.now();
+    final sentAt = date ?? receivedAt ?? internalDate ?? DateTime.now();
     final direction =
         (row['direction'] ?? row['message_direction'])?.toString().toLowerCase() ?? '';
     final isOutgoing = direction == 'outbound';
@@ -585,13 +586,13 @@ class EmailHistoryProvider extends ChangeNotifier {
             : 'message-${sentAt.microsecondsSinceEpoch}');
 
     final toParticipants = _parseParticipants(
-      row['to_addresses'] ?? row['to_emails'] ?? row['to'],
+      row['to_address'] ?? row['to_addresses'] ?? row['to_emails'] ?? row['to'],
     );
     final ccParticipants = _parseParticipants(
-      row['cc_addresses'] ?? row['cc_emails'] ?? row['cc'],
+      row['cc_address'] ?? row['cc_addresses'] ?? row['cc_emails'] ?? row['cc'],
     );
     final bccParticipants = _parseParticipants(
-      row['bcc_addresses'] ?? row['bcc_emails'] ?? row['bcc'],
+      row['bcc_address'] ?? row['bcc_addresses'] ?? row['bcc_emails'] ?? row['bcc'],
     );
 
     final mergedCc = <EmailParticipant>[...ccParticipants];
