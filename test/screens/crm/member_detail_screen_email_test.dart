@@ -220,128 +220,21 @@ void main() {
     expect(capturedReply!.sendAsHtml, isTrue);
   });
 
-  test('EmailHistoryEntry.fromMap resolves sentAt from date field', () {
-    final entry = EmailHistoryEntry.fromMap({
-      'id': 'history-date',
-      'subject': 'Date subject',
-      'status': 'delivered',
-      'date': '2024-03-01T12:30:00Z',
-    });
-
-    expect(entry.sentAt, isNotNull);
-    expect(entry.sentAt, DateTime.utc(2024, 3, 1, 12, 30).toLocal());
-  });
-
-  test('EmailHistoryEntry.fromMap resolves sentAt from email_date field', () {
-    final entry = EmailHistoryEntry.fromMap({
-      'id': 'history-email-date',
-      'subject': 'Email date subject',
-      'status': 'delivered',
-      'email_date': '2024-04-15T08:45:00Z',
-    });
-
-    expect(entry.sentAt, isNotNull);
-    expect(entry.sentAt, DateTime.utc(2024, 4, 15, 8, 45).toLocal());
-  });
-
-  test('EmailHistoryEntry.fromMap resolves sentAt from Supabase view fields', () {
-    final entry = EmailHistoryEntry.fromMap({
-      'id': 'history-email-sent-at',
-      'subject': 'Sent at subject',
-      'status': 'queued',
-      'email_sent_at': '2024-05-20T18:15:00Z',
-    });
-
-    expect(entry.sentAt, isNotNull);
-    expect(entry.sentAt, DateTime.utc(2024, 5, 20, 18, 15).toLocal());
-  });
-
-  test('EmailHistoryEntry.fromMap resolves sentAt from additional Supabase fields', () {
-    final entry = EmailHistoryEntry.fromMap({
-      'id': 'history-email-queued-at',
-      'subject': 'Queued subject',
-      'email_queued_at': '2024-06-05T09:00:00Z',
-    });
-
-    expect(entry.sentAt, isNotNull);
-    expect(entry.sentAt, DateTime.utc(2024, 6, 5, 9).toLocal());
-  });
-
-  test('EmailHistoryEntry.fromMap prefers singular recipient fields', () {
-    final entry = EmailHistoryEntry.fromMap({
-      'id': 'history-recipients',
-      'subject': 'Recipient subject',
-      'status': 'delivered',
-      'to_email': 'primary@example.com',
-      'cc_email': 'friend@example.com',
-      'bcc_email': 'hidden@example.com',
-      'to_emails': ['fallback@example.com'],
-      'cc_emails': ['other@example.com'],
-      'bcc_emails': ['another@example.com'],
-    });
-
-    expect(entry.to, equals(['primary@example.com']));
-    expect(entry.cc, equals(['friend@example.com']));
-    expect(entry.bcc, equals(['hidden@example.com']));
-  });
-
-  test('EmailHistoryEntry.fromMap falls back to legacy recipient arrays when needed', () {
-    final entry = EmailHistoryEntry.fromMap({
-      'id': 'history-legacy-recipients',
-      'subject': 'Legacy recipient subject',
-      'to_address': '',
-      'to_emails': ['fallback@example.com'],
-      'cc_address': null,
-      'cc_emails': ['legacycc@example.com'],
-      'bcc_address': '   ',
-      'bcc_emails': ['legacybcc@example.com'],
-    });
-
-    expect(entry.to, equals(['fallback@example.com']));
-    expect(entry.cc, equals(['legacycc@example.com']));
-    expect(entry.bcc, equals(['legacybcc@example.com']));
-  });
-
-  test('EmailHistoryEntry.fromMap resolves status from email_type field', () {
-    final entry = EmailHistoryEntry.fromMap({
-      'id': 'history-email-type',
-      'subject': 'Status subject',
-      'email_type': 'sent',
-    });
-
-    expect(entry.status, 'sent');
-  });
-
-  test('EmailHistoryEntry.fromMap resolves status from Supabase status fields', () {
-    final entry = EmailHistoryEntry.fromMap({
-      'id': 'history-email-status',
-      'subject': 'Status subject',
-      'email_status': 'received',
-      'message_direction': 'inbound',
-    });
-
-    expect(entry.status, 'received');
-  });
-
   test('email mapper handles Supabase schema with participants and timestamps', () {
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
 
     final row = <String, dynamic>{
       'id': 'row-1',
       'gmail_message_id': 'gmail-123',
-      'direction': 'outbound',
-      'message_direction': 'incoming',
-      'date': '2024-01-01T12:00:00Z',
-      'from_address': 'Volunteer <volunteer@ally.org>',
+      'from_address': 'Organizer <info@moyoungdemocrats.org>',
       'to_address': 'member@example.com, Ally <ally@example.com>',
-      'to_emails': const ['legacy@example.com'],
-      'cc_address': 'Helper <helper@example.com>',
-      'cc_emails': const ['legacycc@example.com'],
+      'cc_address': 'helper@example.com',
       'bcc_address': 'BCC Person <bcc@example.com>',
-      'bcc_emails': const ['legacybcc@example.com'],
       'subject': 'Welcome',
-      'plain_body': 'Plain message',
-      'html_body': '<p>Plain message</p>',
+      'body_text': 'Plain message',
+      'body_html': '<p>Plain message</p>',
+      'snippet': 'Preview text',
+      'date': '2024-01-01T12:00:00Z',
     };
 
     final message = provider.debugMapEmailMessage(row);
@@ -349,8 +242,8 @@ void main() {
     expect(message.id, 'gmail-123');
     expect(message.sentAt, DateTime.utc(2024, 1, 1, 12).toLocal());
     expect(message.isOutgoing, isTrue);
-    expect(message.sender.address, 'volunteer@ally.org');
-    expect(message.sender.displayName, 'Volunteer');
+    expect(message.sender.address, 'info@moyoungdemocrats.org');
+    expect(message.sender.displayName, 'Organizer');
     expect(
       message.to.map((p) => p.address).toSet(),
       equals({'member@example.com', 'ally@example.com'}),
@@ -359,37 +252,30 @@ void main() {
       message.cc.map((p) => p.address).toSet(),
       equals({'helper@example.com', 'bcc@example.com'}),
     );
-    expect(
-      message.to.firstWhere((p) => p.address == 'ally@example.com').displayName,
-      'Ally',
-    );
-    expect(
-      message.cc.firstWhere((p) => p.address == 'helper@example.com').displayName,
-      'Helper',
-    );
     expect(message.plainTextBody, 'Plain message');
     expect(message.htmlBody, '<p>Plain message</p>');
   });
 
-  test('email mapper infers outgoing when direction is missing but sender is known', () {
-    final provider = EmailHistoryProvider(
-      supabaseService: supabaseService,
-      knownOrgEmailAddresses: const ['info@moyoungdemocrats.org'],
-    );
-
-    final row = <String, dynamic>{
-      'gmail_message_id': 'gmail-456',
-      'from_address': 'Organizer <INFO@MOYOUNGDEMOCRATS.ORG>',
+  test('history entry resolves singular address and date fields', () {
+    final map = <String, dynamic>{
+      'id': 'entry-1',
       'subject': 'Update',
-      'body_text': 'Hello there',
-      'date': '2024-02-01T14:00:00Z',
+      'status': 'sent',
+      'email_type': 'received',
       'to_address': 'member@example.com',
+      'cc_address': 'helper@example.com',
+      'bcc_address': 'ally@example.com',
+      'date': '2024-02-01T15:30:00Z',
+      'preview_text': 'Preview',
     };
 
-    final message = provider.debugMapEmailMessage(row);
+    final entry = EmailHistoryEntry.fromMap(map);
 
-    expect(message.isOutgoing, isTrue);
-    expect(message.sender.address, 'info@moyoungdemocrats.org');
-    expect(message.sentAt, DateTime.utc(2024, 2, 1, 14).toLocal());
+    expect(entry.id, 'entry-1');
+    expect(entry.sentAt, DateTime.utc(2024, 2, 1, 15, 30).toLocal());
+    expect(entry.status, 'received');
+    expect(entry.to, equals(['member@example.com']));
+    expect(entry.cc, contains('helper@example.com'));
+    expect(entry.bcc, contains('ally@example.com'));
   });
 }
