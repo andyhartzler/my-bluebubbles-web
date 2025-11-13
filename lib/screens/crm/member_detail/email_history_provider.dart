@@ -521,28 +521,40 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     try {
+      const selectedColumns = [
+        'id',
+        'direction',
+        'message_direction',
+        'date',
+        'subject',
+        'plain_body',
+        'body_plain',
+        'body_text',
+        'html_body',
+        'body_html',
+        'from_address',
+        'from_email',
+        'from',
+        'to_address',
+        'to_addresses',
+        'to_emails',
+        'to',
+        'cc_address',
+        'cc_addresses',
+        'cc_emails',
+        'cc',
+        'bcc_address',
+        'bcc_addresses',
+        'bcc_emails',
+        'bcc',
+        'gmail_message_id',
+        'received_at',
+        'internal_date',
+      ];
+
       final response = await client
           .from('email_inbox')
-          .select(
-            'id,'
-            'direction,'
-            'message_direction,'
-            'date,'
-            'subject,'
-            'body_text,'
-            'body_html,'
-            'from_address,'
-            'to_address,'
-            'to_addresses,'
-            'cc_address,'
-            'cc_addresses,'
-            'bcc_address,'
-            'bcc_addresses,'
-            'gmail_message_id,'
-            'date,'
-            'received_at,'
-            'internal_date',
-          )
+          .select(selectedColumns.join(','))
           .eq('member_id', memberId)
           .eq('gmail_thread_id', threadId)
           .order('date', ascending: true);
@@ -551,7 +563,9 @@ class EmailHistoryProvider extends ChangeNotifier {
           ? response.whereType<Map<String, dynamic>>().toList(growable: false)
           : <Map<String, dynamic>>[];
 
-      return rows.map(_mapEmailMessage).toList(growable: false);
+      final messages = rows.map(_mapEmailMessage).toList(growable: false);
+      messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      return messages;
     } catch (error, stack) {
       Logger.warn('Failed to load email thread $threadId for $memberId: $error', trace: stack);
       throw Exception('Failed to load email thread. Please try again.');
