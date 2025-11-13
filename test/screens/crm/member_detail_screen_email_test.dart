@@ -227,21 +227,14 @@ void main() {
       'id': 'row-1',
       'gmail_message_id': 'gmail-123',
       'direction': 'outbound',
-      'from_address': {
-        'email': 'Organizer <organizer@example.com>',
-        'name': 'Organizer',
-      },
-      'to_addresses': [
-        'member@example.com',
-        {'email': 'Ally <ally@example.com>', 'name': 'Ally'},
-      ],
-      'cc_addresses': '["helper@example.com"]',
-      'bcc_addresses': ['BCC Person <bcc@example.com>'],
+      'from_address': 'Organizer <organizer@example.com>',
+      'to_address': 'member@example.com, Ally <ally@example.com>',
+      'cc_address': 'helper@example.com',
+      'bcc_address': 'BCC Person <bcc@example.com>',
       'subject': 'Welcome',
-      'body_text': 'Plain message',
-      'body_html': '<p>Plain message</p>',
-      'received_at': '2024-01-01T12:00:00Z',
-      'internal_date': '2024-01-01T11:59:00Z',
+      'plain_body': 'Plain message',
+      'html_body': '<p>Plain message</p>',
+      'date': '2024-01-01T12:00:00Z',
     };
 
     final message = provider.debugMapEmailMessage(row);
