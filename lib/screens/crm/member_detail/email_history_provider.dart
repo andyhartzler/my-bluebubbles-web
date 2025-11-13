@@ -577,6 +577,15 @@ class EmailHistoryProvider extends ChangeNotifier {
     return data;
   }
 
+  bool _isMissingColumnError(PostgrestException error, String columnName) {
+    final String lowerColumn = columnName.toLowerCase();
+    if (error.code == '42703') {
+      return true;
+    }
+    final String message = (error.message ?? '').toLowerCase();
+    return message.contains('column') && message.contains(lowerColumn);
+  }
+
   Future<List<EmailMessage>> fetchThreadMessages({
     required String memberId,
     required String threadId,
@@ -596,10 +605,13 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       const selectedColumns = [
         'id',
+        'gmail_message_id',
+        'gmail_thread_id',
         'direction',
-        'message_direction',
+        'message_state',
         'date',
         'subject',
+        'snippet',
         'plain_body',
         'body_plain',
         'body_text',
@@ -609,28 +621,34 @@ class EmailHistoryProvider extends ChangeNotifier {
         'from_email',
         'from',
         'to_address',
-        'to_addresses',
-        'to_emails',
         'to',
         'cc_address',
-        'cc_addresses',
-        'cc_emails',
         'cc',
         'bcc_address',
-        'bcc_addresses',
-        'bcc_emails',
         'bcc',
-        'gmail_message_id',
-        'received_at',
-        'internal_date',
       ];
 
-      final response = await client
-          .from('email_inbox')
-          .select(selectedColumns.join(','))
-          .eq('member_id', memberId)
-          .eq('gmail_thread_id', threadId)
-          .order('date', ascending: true);
+      dynamic response;
+      try {
+        response = await client
+            .from('email_inbox')
+            .select(selectedColumns.join(','))
+            .eq('member_id', memberId)
+            .eq('gmail_thread_id', threadId)
+            .order('date', ascending: true);
+      } on PostgrestException catch (error) {
+        if (_isMissingColumnError(error, 'date')) {
+          response = await client
+              .from('email_inbox')
+              .select(selectedColumns.join(','))
+              .eq('member_id', memberId)
+              .eq('gmail_thread_id', threadId)
+              .order('received_at', ascending: true)
+              .order('internal_date', ascending: true);
+        } else {
+          rethrow;
+        }
+      }
 
       final rows = response is List
           ? response.whereType<Map<String, dynamic>>().toList(growable: false)
