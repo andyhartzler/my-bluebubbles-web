@@ -162,10 +162,15 @@ class EmailHistoryEntry {
       final candidates = <dynamic>[
         normalized['date'],
         normalized['sent_at'],
+        normalized['sentAt'],
         normalized['received_at'],
+        normalized['receivedAt'],
         normalized['internal_date'],
+        normalized['internalDate'],
         normalized['created_at'],
+        normalized['createdAt'],
         normalized['updated_at'],
+        normalized['updatedAt'],
       ];
       for (final candidate in candidates) {
         final parsed = parseDate(candidate);
@@ -518,17 +523,17 @@ class EmailHistoryProvider extends ChangeNotifier {
             'body_text,'
             'body_html,'
             'from_address,'
-            'to_addresses,'
-            'cc_addresses,'
-            'bcc_addresses,'
+            'to_address,'
+            'cc_address,'
+            'bcc_address,'
             'gmail_message_id,'
+            'date,'
             'received_at,'
             'internal_date',
           )
           .eq('member_id', memberId)
           .eq('gmail_thread_id', threadId)
-          .order('received_at', ascending: true)
-          .order('internal_date', ascending: true);
+          .order('date', ascending: true);
 
       final rows = response is List
           ? response.whereType<Map<String, dynamic>>().toList(growable: false)

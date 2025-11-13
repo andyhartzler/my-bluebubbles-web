@@ -220,6 +220,30 @@ void main() {
     expect(capturedReply!.sendAsHtml, isTrue);
   });
 
+  test('EmailHistoryEntry.fromMap resolves sentAt from date field', () {
+    final entry = EmailHistoryEntry.fromMap({
+      'id': 'history-date',
+      'subject': 'Date subject',
+      'status': 'delivered',
+      'date': '2024-03-01T12:30:00Z',
+    });
+
+    expect(entry.sentAt, isNotNull);
+    expect(entry.sentAt, DateTime.utc(2024, 3, 1, 12, 30).toLocal());
+  });
+
+  test('EmailHistoryEntry.fromMap resolves sentAt from email_date field', () {
+    final entry = EmailHistoryEntry.fromMap({
+      'id': 'history-email-date',
+      'subject': 'Email date subject',
+      'status': 'delivered',
+      'email_date': '2024-04-15T08:45:00Z',
+    });
+
+    expect(entry.sentAt, isNotNull);
+    expect(entry.sentAt, DateTime.utc(2024, 4, 15, 8, 45).toLocal());
+  });
+
   test('email mapper handles Supabase schema with participants and timestamps', () {
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
 
