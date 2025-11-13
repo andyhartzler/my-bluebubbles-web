@@ -219,4 +219,47 @@ void main() {
     expect(capturedReply!.body, 'Thanks for the update!');
     expect(capturedReply!.sendAsHtml, isTrue);
   });
+
+  test('email mapper handles Supabase schema with participants and timestamps', () {
+    final provider = EmailHistoryProvider(supabaseService: supabaseService);
+
+    final row = <String, dynamic>{
+      'id': 'row-1',
+      'gmail_message_id': 'gmail-123',
+      'direction': 'outbound',
+      'from_address': {
+        'email': 'Organizer <organizer@example.com>',
+        'name': 'Organizer',
+      },
+      'to_addresses': [
+        'member@example.com',
+        {'email': 'Ally <ally@example.com>', 'name': 'Ally'},
+      ],
+      'cc_addresses': '["helper@example.com"]',
+      'bcc_addresses': ['BCC Person <bcc@example.com>'],
+      'subject': 'Welcome',
+      'body_text': 'Plain message',
+      'body_html': '<p>Plain message</p>',
+      'received_at': '2024-01-01T12:00:00Z',
+      'internal_date': '2024-01-01T11:59:00Z',
+    };
+
+    final message = provider.debugMapEmailMessage(row);
+
+    expect(message.id, 'gmail-123');
+    expect(message.sentAt, DateTime.utc(2024, 1, 1, 12).toLocal());
+    expect(message.isOutgoing, isTrue);
+    expect(message.sender.address, 'organizer@example.com');
+    expect(message.sender.displayName, 'Organizer');
+    expect(
+      message.to.map((p) => p.address).toSet(),
+      equals({'member@example.com', 'ally@example.com'}),
+    );
+    expect(
+      message.cc.map((p) => p.address).toSet(),
+      equals({'helper@example.com', 'bcc@example.com'}),
+    );
+    expect(message.plainTextBody, 'Plain message');
+    expect(message.htmlBody, '<p>Plain message</p>');
+  });
 }

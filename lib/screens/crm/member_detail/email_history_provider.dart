@@ -504,11 +504,25 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final response = await client
           .from('email_inbox')
-          .select()
+          .select(
+            'id,'
+            'direction,'
+            'message_direction,'
+            'subject,'
+            'body_text,'
+            'body_html,'
+            'from_address,'
+            'to_addresses,'
+            'cc_addresses,'
+            'bcc_addresses,'
+            'gmail_message_id,'
+            'received_at,'
+            'internal_date',
+          )
           .eq('member_id', memberId)
-          .eq('thread_id', threadId)
+          .eq('gmail_thread_id', threadId)
           .order('received_at', ascending: true)
-          .order('sent_at', ascending: true);
+          .order('internal_date', ascending: true);
 
       final rows = response is List
           ? response.whereType<Map<String, dynamic>>().toList(growable: false)
@@ -540,16 +554,19 @@ class EmailHistoryProvider extends ChangeNotifier {
       return text.isEmpty ? null : text;
     }
 
-    final sentAt =
-        parseTimestamp(row['sent_at']) ?? parseTimestamp(row['received_at']) ?? DateTime.now();
-    final direction = row['direction']?.toString().toLowerCase() ?? '';
+    final receivedAt = parseTimestamp(row['received_at']);
+    final internalDate = parseTimestamp(row['internal_date']);
+    final sentAt = receivedAt ?? internalDate ?? DateTime.now();
+    final direction =
+        (row['direction'] ?? row['message_direction'])?.toString().toLowerCase() ?? '';
     final isOutgoing = direction == 'outbound';
-    final sender = _parseParticipant(row['from_email']) ??
+    final sender =
+        _parseParticipant(row['from_address'] ?? row['from_email'] ?? row['from']) ??
         EmailParticipant(
           address: isOutgoing ? 'outbound@crm.local' : 'unknown@crm.local',
         );
 
-    final messageId = row['message_id']?.toString();
+    final messageId = row['gmail_message_id']?.toString();
     final fallbackId = row['id']?.toString();
     final id = (messageId != null && messageId.trim().isNotEmpty)
         ? messageId
@@ -557,12 +574,30 @@ class EmailHistoryProvider extends ChangeNotifier {
             ? fallbackId
             : 'message-${sentAt.microsecondsSinceEpoch}');
 
+    final toParticipants = _parseParticipants(
+      row['to_addresses'] ?? row['to_emails'] ?? row['to'],
+    );
+    final ccParticipants = _parseParticipants(
+      row['cc_addresses'] ?? row['cc_emails'] ?? row['cc'],
+    );
+    final bccParticipants = _parseParticipants(
+      row['bcc_addresses'] ?? row['bcc_emails'] ?? row['bcc'],
+    );
+
+    final mergedCc = <EmailParticipant>[...ccParticipants];
+    final seen = mergedCc.map((participant) => participant.address.toLowerCase()).toSet();
+    for (final participant in bccParticipants) {
+      if (seen.add(participant.address.toLowerCase())) {
+        mergedCc.add(participant);
+      }
+    }
+
     return EmailMessage(
       id: id,
       sentAt: sentAt,
       sender: sender,
-      to: _parseParticipants(row['to_emails']),
-      cc: _parseParticipants(row['cc_emails']),
+      to: toParticipants,
+      cc: mergedCc,
       subject: normalizeBody(row['subject']),
       plainTextBody: normalizeBody(row['body_text']),
       htmlBody: normalizeBody(row['body_html']),
@@ -572,6 +607,29 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   EmailParticipant? _parseParticipant(dynamic value) {
     if (value == null) return null;
+    if (value is EmailParticipant) return value;
+    if (value is Map) {
+      final dynamic rawAddress = value['address'] ??
+          value['email'] ??
+          value['value'] ??
+          value['email_address'] ??
+          value['gmail_address'];
+      final dynamic rawName =
+          value['display_name'] ?? value['name'] ?? value['label'] ?? value['displayName'];
+      final EmailParticipant? parsed = _parseParticipant(rawAddress);
+      if (parsed != null) {
+        final String? displayName = rawName is String ? rawName.trim() : rawName?.toString().trim();
+        return EmailParticipant(
+          address: parsed.address,
+          displayName:
+              displayName != null && displayName.isNotEmpty ? displayName : parsed.displayName,
+        );
+      }
+      if (value.length == 1) {
+        return _parseParticipant(value.values.first);
+      }
+      return null;
+    }
     final raw = value.toString().trim();
     if (raw.isEmpty) return null;
 
@@ -607,25 +665,73 @@ class EmailHistoryProvider extends ChangeNotifier {
   }
 
   List<EmailParticipant> _parseParticipants(dynamic value) {
-    final participants = <EmailParticipant>[];
-    Iterable<dynamic> values;
-    if (value is List) {
-      values = value;
-    } else if (value is String) {
-      values = value.split(',');
-    } else {
-      return participants;
+    final rawValues = <dynamic>[];
+
+    void collect(dynamic source) {
+      if (source == null) return;
+      if (source is EmailParticipant) {
+        rawValues.add(source);
+        return;
+      }
+      if (source is Iterable) {
+        for (final item in source) {
+          collect(item);
+        }
+        return;
+      }
+      if (source is Map) {
+        if (source.containsKey('address') ||
+            source.containsKey('email') ||
+            source.containsKey('value') ||
+            source.containsKey('email_address') ||
+            source.containsKey('gmail_address')) {
+          rawValues.add(source);
+          return;
+        }
+        for (final entry in source.values) {
+          collect(entry);
+        }
+        return;
+      }
+      if (source is String) {
+        final trimmed = source.trim();
+        if (trimmed.isEmpty) return;
+        if ((trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+            (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+          try {
+            final decoded = jsonDecode(trimmed);
+            collect(decoded);
+            return;
+          } catch (_) {
+            // Fall through to comma parsing if JSON decoding fails.
+          }
+        }
+        for (final segment in trimmed.split(',')) {
+          final normalized = segment.trim();
+          if (normalized.isNotEmpty) {
+            rawValues.add(normalized);
+          }
+        }
+        return;
+      }
+      rawValues.add(source);
     }
 
+    collect(value);
+
+    final participants = <EmailParticipant>[];
     final seen = <String>{};
-    for (final item in values) {
+    for (final item in rawValues) {
       final participant = _parseParticipant(item);
       if (participant == null) continue;
-      final lower = participant.address.toLowerCase();
+      final lower = participant.address.trim().toLowerCase();
       if (lower.isEmpty || !seen.add(lower)) continue;
       participants.add(participant);
     }
 
     return participants;
   }
+
+  @visibleForTesting
+  EmailMessage debugMapEmailMessage(Map<String, dynamic> row) => _mapEmailMessage(row);
 }
