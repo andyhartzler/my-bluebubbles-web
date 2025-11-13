@@ -819,31 +819,27 @@ class EmailHistoryProvider extends ChangeNotifier {
           .select(
             [
               'id',
-              'message_id',
-              'thread_id',
+              'gmail_message_id',
+              'gmail_thread_id',
               'subject',
-              'body_text',
               'body_html',
+              'body_text',
               'snippet',
-              'from_email',
-              'to_emails',
-              'cc_emails',
-              'bcc_emails',
-              'direction',
-              'message_state',
-              'received_at',
-              'sent_at',
-              'reply_to_email',
+              'from_address',
+              'to_address',
+              'cc_address',
+              'bcc_address',
+              'label_ids',
+              'message_id',
+              'in_reply_to',
               'references_header',
-              'in_reply_to_header',
-              'metadata',
-              'created_at',
-              'updated_at',
+              'date',
+              'synced_at',
             ].join(','),
           )
           .eq('member_id', memberId)
-          .eq('thread_id', threadId)
-          .order('received_at', ascending: true);
+          .eq('gmail_thread_id', threadId)
+          .order('date', ascending: true);
 
       final rows = response is List
           ? response.whereType<Map<String, dynamic>>().toList(growable: false)
@@ -884,6 +880,7 @@ class EmailHistoryProvider extends ChangeNotifier {
 
     final sentAt =
         parseTimestamp(row['date']) ??
+        parseTimestamp(row['synced_at']) ??
         parseTimestamp(row['email_date']) ??
         parseTimestamp(row['received_at']) ??
         parseTimestamp(row['internal_date']) ??
