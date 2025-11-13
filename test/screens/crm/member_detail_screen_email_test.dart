@@ -219,4 +219,88 @@ void main() {
     expect(capturedReply!.body, 'Thanks for the update!');
     expect(capturedReply!.sendAsHtml, isTrue);
   });
+
+  test('email mapper handles Supabase schema with participants and timestamps', () {
+    final provider = EmailHistoryProvider(supabaseService: supabaseService);
+
+    final row = <String, dynamic>{
+      'id': 'row-1',
+      'gmail_message_id': 'gmail-123',
+      'from_address': 'Organizer <info@moyoungdemocrats.org>',
+      'to_address': 'member@example.com, Ally <ally@example.com>',
+      'cc_address': 'helper@example.com',
+      'bcc_address': 'BCC Person <bcc@example.com>',
+      'subject': 'Welcome',
+      'body_text': 'Plain message',
+      'body_html': '<p>Plain message</p>',
+      'snippet': 'Preview text',
+      'date': '2024-01-01T12:00:00Z',
+    };
+
+    final message = provider.debugMapEmailMessage(row);
+
+    expect(message.id, 'gmail-123');
+    expect(message.sentAt, DateTime.utc(2024, 1, 1, 12).toLocal());
+    expect(message.isOutgoing, isTrue);
+    expect(message.sender.address, 'info@moyoungdemocrats.org');
+    expect(message.sender.displayName, 'Organizer');
+    expect(
+      message.to.map((p) => p.address).toSet(),
+      equals({'member@example.com', 'ally@example.com'}),
+    );
+    expect(
+      message.cc.map((p) => p.address).toSet(),
+      equals({'helper@example.com', 'bcc@example.com'}),
+    );
+    expect(message.plainTextBody, 'Plain message');
+    expect(message.htmlBody, '<p>Plain message</p>');
+  });
+
+  test('history entry resolves singular address and date fields', () {
+    final map = <String, dynamic>{
+      'id': 'entry-1',
+      'subject': 'Update',
+      'status': 'sent',
+      'email_type': 'received',
+      'threadId': 'gmail-thread-123',
+      'to_address': 'member@example.com',
+      'recipient_emails': ['member@example.com', 'ally@example.com'],
+      'cc_address': 'helper@example.com',
+      'bcc_address': 'ally@example.com',
+      'date': '2024-02-01T15:30:00Z',
+      'preview_text': 'Preview',
+    };
+
+    final entry = EmailHistoryEntry.fromMap(map);
+
+    expect(entry.id, 'entry-1');
+    expect(entry.sentAt, DateTime.utc(2024, 2, 1, 15, 30).toLocal());
+    expect(entry.status, 'received');
+    expect(entry.to, equals(['member@example.com', 'ally@example.com']));
+    expect(entry.cc, contains('helper@example.com'));
+    expect(entry.bcc, contains('ally@example.com'));
+    expect(entry.threadId, 'gmail-thread-123');
+  });
+
+  test('history entry parses member_email_history view payload', () {
+    final map = <String, dynamic>{
+      'log_id': 'log-42',
+      'subject': 'GOTV Reminder',
+      'email_type': 'sent',
+      'email_date': '2024-03-01T18:15:00Z',
+      'to_address': 'member@example.com',
+      'body': '<p>See you soon!</p>',
+      'gmail_message_id': 'gmail-42',
+      'gmail_thread_id': 'thread-abc',
+    };
+
+    final entry = EmailHistoryEntry.fromMap(map);
+
+    expect(entry.id, 'log-42');
+    expect(entry.status, 'sent');
+    expect(entry.sentAt, DateTime.utc(2024, 3, 1, 18, 15).toLocal());
+    expect(entry.to, equals(['member@example.com']));
+    expect(entry.previewText, '<p>See you soon!</p>');
+    expect(entry.threadId, 'thread-abc');
+  });
 }
