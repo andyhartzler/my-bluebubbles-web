@@ -1,344 +1,347 @@
-import { serve } from "https://deno.land/std@0.203.0/http/server.ts";
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.1";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { google } from "npm:googleapis@130";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, prefer",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+const DEFAULT_ALLOWED_ORIGIN = "*";
+const DEFAULT_ALLOWED_METHODS = "POST, OPTIONS";
+const DEFAULT_ALLOWED_HEADERS = [
+  "authorization",
+  "x-client-info",
+  "apikey",
+  "content-type",
+  "prefer",
+  "x-supabase-authorization",
+];
+
+const baseCorsHeaders: Record<string, string> = {
   "Access-Control-Max-Age": "86400",
 };
 
-const GMAIL_REFRESH_TOKEN = Deno.env.get("GMAIL_REFRESH_TOKEN");
-const GMAIL_CLIENT_ID = Deno.env.get("GMAIL_CLIENT_ID");
-const GMAIL_CLIENT_SECRET = Deno.env.get("GMAIL_CLIENT_SECRET");
-const GMAIL_USER_ID = Deno.env.get("GMAIL_USER_ID") ?? "me";
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const DEFAULT_MAX_RESULTS = Number(Deno.env.get("GMAIL_MAX_RESULTS") ?? "50");
+function buildCorsHeaders(request: Request): Headers {
+  const headers = new Headers(baseCorsHeaders);
+  headers.set("Access-Control-Allow-Methods", DEFAULT_ALLOWED_METHODS);
 
-interface GmailMessageListResponse {
-  messages?: { id: string; threadId?: string }[];
-  nextPageToken?: string;
+  const origin = request.headers.get("Origin");
+  if (origin && origin.trim().length > 0) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Access-Control-Allow-Credentials", "true");
+    headers.set("Vary", "Origin, Access-Control-Request-Headers");
+  } else {
+    headers.set("Access-Control-Allow-Origin", DEFAULT_ALLOWED_ORIGIN);
+    headers.set("Vary", "Access-Control-Request-Headers");
+  }
+
+  const requestedHeaders = request.headers.get("Access-Control-Request-Headers");
+  const allowedHeaderSet = new Set(
+    DEFAULT_ALLOWED_HEADERS.map((header) => header.trim()).filter((header) => header.length > 0),
+  );
+
+  if (requestedHeaders) {
+    for (const header of requestedHeaders.split(",")) {
+      const trimmed = header.trim();
+      if (trimmed.length > 0) {
+        allowedHeaderSet.add(trimmed.toLowerCase());
+      }
+    }
+  }
+
+  headers.set("Access-Control-Allow-Headers", Array.from(allowedHeaderSet).join(", "));
+
+  return headers;
 }
 
-interface GmailHeader {
-  name?: string;
-  value?: string;
+function jsonResponse(request: Request, body: unknown, init: ResponseInit = {}): Response {
+  const headers = buildCorsHeaders(request);
+  headers.set("Content-Type", "application/json");
+
+  if (init.headers) {
+    const extra = new Headers(init.headers);
+    extra.forEach((value, key) => {
+      headers.set(key, value);
+    });
+  }
+
+  return new Response(JSON.stringify(body), { ...init, headers });
 }
 
-interface GmailMessagePayload {
-  headers?: GmailHeader[];
+const supabaseUrl = Deno.env.get("SUPABASE_URL");
+const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+  throw new Error("Supabase environment variables are not configured");
 }
 
-interface GmailMessageResponse {
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+const ORG_EMAILS = [
+  "info@moyoungdemocrats.org",
+  "andrew@moyoungdemocrats.org",
+  "collegedems@moyoungdemocrats.org",
+  "comms@moyoungdemocrats.org",
+  "creators@moyoungdemocrats.org",
+  "events@moyoungdemocrats.org",
+  "eboard@moyoungdemocrats.org",
+  "fundraising@moyoungdemocrats.org",
+  "highschool@moyoungdemocrats.org",
+  "members@moyoungdemocrats.org",
+  "membership@moyoungdemocrats.org",
+  "policy@moyoungdemocrats.org",
+  "political-affairs@moyoungdemocrats.org",
+];
+
+function decodeBody(encodedBody: string): string {
+  try {
+    const base64 = encodedBody.replace(/-/g, "+").replace(/_/g, "/");
+    return decodeURIComponent(escape(atob(base64)));
+  } catch (err) {
+    console.error("Failed to decode body:", err);
+    return "";
+  }
+}
+
+function extractBody(payload: any): { html: string; text: string } {
+  let html = "";
+  let text = "";
+
+  if (payload.body?.data) {
+    const decoded = decodeBody(payload.body.data);
+    if (payload.mimeType === "text/html") {
+      html = decoded;
+    } else {
+      text = decoded;
+    }
+  }
+
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      if (part.mimeType === "text/html" && part.body?.data) {
+        html = decodeBody(part.body.data);
+      } else if (part.mimeType === "text/plain" && part.body?.data) {
+        text = decodeBody(part.body.data);
+      } else if (part.parts) {
+        const nested = extractBody(part);
+        if (nested.html) html = nested.html;
+        if (nested.text) text = nested.text;
+      }
+    }
+  }
+
+  return { html, text };
+}
+
+function getHeader(headers: any[], name: string): string {
+  const header = headers?.find(
+    (h) => typeof h.name === "string" && h.name.toLowerCase() === name.toLowerCase(),
+  );
+  return header?.value || "";
+}
+
+interface EmailDetail {
   id: string;
   threadId?: string;
-  historyId?: string;
-  internalDate?: string;
-  labelIds?: string[];
+  from?: string;
+  to?: string;
+  cc?: string;
+  subject?: string;
+  date?: string;
   snippet?: string;
-  payload?: GmailMessagePayload;
+  bodyHtml?: string;
+  bodyText?: string;
+  messageId?: string;
+  inReplyTo?: string;
+  references?: string;
+  labelIds: string[];
 }
 
-interface EmailInboxRecord {
-  gmail_message_id: string;
-  gmail_thread_id: string | null;
-  history_id: string | null;
-  snippet: string | null;
-  subject: string | null;
-  from_address: string | null;
-  to_addresses: string[] | null;
-  cc_addresses: string[] | null;
-  bcc_addresses: string[] | null;
-  message_id_header: string | null;
-  references_header: string | null;
-  in_reply_to_header: string | null;
-  received_at: string | null;
-  internal_date: string | null;
-  label_ids: string[] | null;
-  member_id: string | null;
-  synced_at: string;
-}
+Deno.serve(async (req) => {
+  const method = req.method?.toUpperCase();
 
-interface SupabaseQueryResult<T> {
-  data: T | null;
-  error: { message: string } | null;
-}
-
-const logger = (requestId: string) => ({
-  info: (message: string, meta: Record<string, unknown> = {}) =>
-    console.log(JSON.stringify({ level: "info", requestId, message, ...meta })),
-  warn: (message: string, meta: Record<string, unknown> = {}) =>
-    console.warn(JSON.stringify({ level: "warn", requestId, message, ...meta })),
-  error: (message: string, meta: Record<string, unknown> = {}) =>
-    console.error(JSON.stringify({ level: "error", requestId, message, ...meta })),
-});
-
-function assertEnv(value: string | undefined, key: string): string {
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`);
+  if (method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: buildCorsHeaders(req),
+    });
   }
 
-  return value;
-}
-
-async function getGmailAccessToken(): Promise<string> {
-  const refreshToken = assertEnv(GMAIL_REFRESH_TOKEN, "GMAIL_REFRESH_TOKEN");
-  const clientId = assertEnv(GMAIL_CLIENT_ID, "GMAIL_CLIENT_ID");
-  const clientSecret = assertEnv(GMAIL_CLIENT_SECRET, "GMAIL_CLIENT_SECRET");
-
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Failed to refresh Gmail access token: ${response.status} ${body}`);
-  }
-
-  const json = await response.json();
-  return json.access_token as string;
-}
-
-async function listGmailMessages(accessToken: string, pageToken?: string): Promise<GmailMessageListResponse> {
-  const params = new URLSearchParams({
-    maxResults: `${DEFAULT_MAX_RESULTS}`,
-  });
-
-  if (pageToken) {
-    params.set("pageToken", pageToken);
-  }
-
-  const response = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?${params}`,
-    {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    },
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Failed to list Gmail messages: ${response.status} ${body}`);
-  }
-
-  return response.json() as Promise<GmailMessageListResponse>;
-}
-
-async function getGmailMessage(accessToken: string, id: string): Promise<GmailMessageResponse> {
-  const response = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Bcc&metadataHeaders=Date&metadataHeaders=Message-ID&metadataHeaders=References&metadataHeaders=In-Reply-To`,
-    {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    },
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Failed to load Gmail message ${id}: ${response.status} ${body}`);
-  }
-
-  return response.json() as Promise<GmailMessageResponse>;
-}
-
-export function extractHeader(message: GmailMessageResponse, name: string): string | null {
-  const headers = message.payload?.headers ?? [];
-  const match = headers.find((header) => header.name?.toLowerCase() === name.toLowerCase());
-  return match?.value ?? null;
-}
-
-export function parseEmailAddresses(value: string | null): string[] {
-  if (!value) return [];
-
-  return value
-    .split(",")
-    .map((segment) => segment.trim())
-    .map((segment) => {
-      const emailMatch = segment.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-      return emailMatch ? emailMatch[0].toLowerCase() : segment.toLowerCase();
-    })
-    .filter((segment, index, array) => segment.length > 0 && array.indexOf(segment) === index);
-}
-
-export function firstEmailAddress(value: string | null): string | null {
-  const [first] = parseEmailAddresses(value);
-  return first ?? null;
-}
-
-export async function resolveMemberId(
-  supabase: SupabaseClient,
-  email: string | null,
-  log: ReturnType<typeof logger>,
-): Promise<string | null> {
-  if (!email) {
-    return null;
+  if (method !== "POST") {
+    return jsonResponse(req, { error: "Method not allowed" }, { status: 405 });
   }
 
   try {
-    const normalized = email.toLowerCase();
-    const query = supabase
+    const { memberId, maxResults = 50, syncToDatabase = true } = await req.json();
+
+    if (!memberId) {
+      return jsonResponse(req, { error: "Missing required field: memberId" }, { status: 400 });
+    }
+
+    const { data: member, error: memberError } = await supabase
       .from("members")
-      .select("id,email,school_email")
-      .or(`email.ilike.${normalized},school_email.ilike.${normalized}`)
-      .limit(1);
+      .select("email, school_email")
+      .eq("id", memberId)
+      .single();
 
-    const result = (await query.maybeSingle()) as SupabaseQueryResult<{ id: string } | null>;
-
-    if (result.error) {
-      log.warn("Failed to resolve member for email", {
-        email,
-        error: result.error.message,
-      });
-      return null;
+    if (memberError || !member) {
+      return jsonResponse(req, { error: "Member not found" }, { status: 404 });
     }
 
-    if (!result.data) {
-      log.info("No member found for email", { email });
-      return null;
+    const memberEmails = [member.email, member.school_email].filter(Boolean);
+
+    if (memberEmails.length === 0) {
+      return jsonResponse(
+        req,
+        {
+          emails: [],
+          message: "Member has no email addresses",
+        },
+        { status: 200 },
+      );
     }
 
-    log.info("Resolved member for email", { email, memberId: result.data.id });
-    return result.data.id;
-  } catch (error) {
-    log.error("Unexpected error resolving member", { email, error: `${error}` });
-    return null;
-  }
-}
+    const serviceAccount = JSON.parse(Deno.env.get("SERVICE_ACCOUNT_JSON"));
+    const impersonateUser = Deno.env.get("GMAIL_IMPERSONATE_USER");
 
-export async function buildEmailInboxRecord(
-  supabase: SupabaseClient,
-  message: GmailMessageResponse,
-  log: ReturnType<typeof logger>,
-): Promise<EmailInboxRecord> {
-  const from = extractHeader(message, "From");
-  const to = extractHeader(message, "To");
-  const cc = extractHeader(message, "Cc");
-  const bcc = extractHeader(message, "Bcc");
-  const dateHeader = extractHeader(message, "Date");
+    const auth = new google.auth.GoogleAuth({
+      credentials: serviceAccount,
+      scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
+      clientOptions: {
+        subject: impersonateUser,
+      },
+    });
 
-  const memberId = await resolveMemberId(supabase, firstEmailAddress(from), log);
-  const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : null;
-  const internalDate = message.internalDate ? new Date(Number(message.internalDate)).toISOString() : null;
-  const toAddresses = parseEmailAddresses(to);
-  const ccAddresses = parseEmailAddresses(cc);
-  const bccAddresses = parseEmailAddresses(bcc);
+    const gmail = google.gmail({
+      version: "v1",
+      auth,
+    });
 
-  return {
-    gmail_message_id: message.id,
-    gmail_thread_id: message.threadId ?? null,
-    history_id: message.historyId ?? null,
-    snippet: message.snippet ?? null,
-    subject: extractHeader(message, "Subject"),
-    from_address: firstEmailAddress(from),
-    to_addresses: toAddresses.length ? toAddresses : null,
-    cc_addresses: ccAddresses.length ? ccAddresses : null,
-    bcc_addresses: bccAddresses.length ? bccAddresses : null,
-    message_id_header: extractHeader(message, "Message-ID"),
-    references_header: extractHeader(message, "References"),
-    in_reply_to_header: extractHeader(message, "In-Reply-To"),
-    received_at: receivedAt,
-    internal_date: internalDate,
-    label_ids: message.labelIds ?? null,
-    member_id: memberId,
-    synced_at: new Date().toISOString(),
-  };
-}
+    const fromQuery = ORG_EMAILS.map((e) => `from:${e}`).join(" OR ");
+    const toQuery = memberEmails.map((e) => `to:${e}`).join(" OR ");
+    const query = `(${fromQuery}) (${toQuery})`;
 
-async function upsertEmailInboxRecord(
-  supabase: SupabaseClient,
-  record: EmailInboxRecord,
-): Promise<void> {
-  const { error } = await supabase
-    .from("email_inbox")
-    .upsert(record, { onConflict: "gmail_message_id" });
+    const maxResultsNumber = Number(maxResults) || 50;
 
-  if (error) {
-    throw new Error(`Failed to upsert email_inbox record for ${record.gmail_message_id}: ${error.message}`);
-  }
-}
+    const searchResponse = await gmail.users.messages.list({
+      userId: "me",
+      q: query,
+      maxResults: maxResultsNumber,
+    });
 
-async function syncGmailMessages(supabase: SupabaseClient, log: ReturnType<typeof logger>): Promise<{ processed: number; failures: number }> {
-  const accessToken = await getGmailAccessToken();
-  let pageToken: string | undefined;
-  let processed = 0;
-  let failures = 0;
+    const messages = searchResponse.data.messages || [];
 
-  do {
-    const listResponse = await listGmailMessages(accessToken, pageToken);
-    const messages = listResponse.messages ?? [];
+    if (messages.length === 0) {
+      return jsonResponse(
+        req,
+        {
+          emails: [],
+          message: "No emails found for this member",
+        },
+        { status: 200 },
+      );
+    }
 
-    for (const message of messages) {
+    const emailDetails: EmailDetail[] = [];
+
+    for (const msg of messages) {
       try {
-        const fullMessage = await getGmailMessage(accessToken, message.id);
-        const record = await buildEmailInboxRecord(supabase, fullMessage, log);
-        await upsertEmailInboxRecord(supabase, record);
-        processed += 1;
-      } catch (error) {
-        failures += 1;
-        log.error("Failed to sync Gmail message", {
-          messageId: message.id,
-          error: `${error}`,
+        const messageResponse = await gmail.users.messages.get({
+          userId: "me",
+          id: msg.id!,
+          format: "full",
         });
+
+        const message = messageResponse.data as any;
+        const headers = message.payload?.headers || [];
+        const from = getHeader(headers, "from");
+        const to = getHeader(headers, "to");
+        const cc = getHeader(headers, "cc");
+        const subject = getHeader(headers, "subject");
+        const date = getHeader(headers, "date");
+        const messageId = getHeader(headers, "message-id");
+        const inReplyTo = getHeader(headers, "in-reply-to");
+        const references = getHeader(headers, "references");
+        const { html, text } = extractBody(message.payload);
+
+        emailDetails.push({
+          id: message.id,
+          threadId: message.threadId,
+          from,
+          to,
+          cc,
+          subject,
+          date,
+          snippet: message.snippet,
+          bodyHtml: html,
+          bodyText: text,
+          messageId,
+          inReplyTo,
+          references,
+          labelIds: message.labelIds || [],
+        });
+      } catch (err) {
+        console.error(`Failed to fetch message ${msg.id}:`, err);
       }
     }
 
-    pageToken = listResponse.nextPageToken;
-  } while (pageToken);
+    if (syncToDatabase && emailDetails.length > 0) {
+      try {
+        const emailRecords = emailDetails.map((email) => {
+          const extractEmail = (fullAddress: string | undefined) => {
+            if (!fullAddress) return null;
+            const match = fullAddress.match(/<(.+?)>/);
+            return match ? match[1] : fullAddress;
+          };
 
-  return { processed, failures };
-}
+          const toAddress = extractEmail(email.to) ?? email.to ?? email.from ?? "";
 
-function createSupabaseClient(): SupabaseClient {
-  const url = assertEnv(SUPABASE_URL, "SUPABASE_URL");
-  const key = assertEnv(SUPABASE_SERVICE_ROLE_KEY, "SUPABASE_SERVICE_ROLE_KEY");
+          return {
+            gmail_message_id: email.id,
+            gmail_thread_id: email.threadId ?? email.id,
+            from_address: email.from ?? "",
+            to_address: toAddress,
+            cc_address: email.cc ?? null,
+            subject: email.subject ?? "",
+            date: email.date ?? new Date().toISOString(),
+            snippet: email.snippet ?? null,
+            body_html: email.bodyHtml ?? null,
+            body_text: email.bodyText ?? null,
+            message_id: email.messageId ?? null,
+            in_reply_to: email.inReplyTo ?? null,
+            references_header: email.references ?? null,
+            label_ids: email.labelIds,
+            member_id: memberId,
+            synced_at: new Date().toISOString(),
+          };
+        });
 
-  return createClient(url, key, {
-    auth: { persistSession: false },
-  });
-}
+        const { error: upsertError } = await supabase
+          .from("email_inbox")
+          .upsert(emailRecords, {
+            onConflict: "gmail_message_id",
+            ignoreDuplicates: false,
+          });
 
-serve(async (req) => {
-  const requestId = crypto.randomUUID();
-  const log = logger(requestId);
+        if (upsertError) {
+          console.error("Failed to cache emails:", upsertError);
+        }
+      } catch (cacheError) {
+        console.error("Error during email caching:", cacheError);
+      }
+    }
 
-  if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/plain",
+    return jsonResponse(
+      req,
+      {
+        success: true,
+        memberId,
+        memberEmails,
+        emailCount: emailDetails.length,
+        emails: emailDetails,
+        cached: syncToDatabase,
+        syncedAt: new Date().toISOString(),
       },
-    });
-  }
-
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  try {
-    const supabase = createSupabaseClient();
-    const { processed, failures } = await syncGmailMessages(supabase, log);
-
-    log.info("Finished Gmail sync", { processed, failures });
-
-    return new Response(JSON.stringify({ processed, failures }), {
-      status: failures > 0 && processed === 0 ? 500 : 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    log.error("Unexpected failure while syncing Gmail", { error: `${error}` });
-    return new Response(JSON.stringify({ error: "Failed to sync Gmail", details: `${error}` }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    );
+  } catch (err) {
+    console.error("Failed to fetch member emails:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    return jsonResponse(req, { error: message }, { status: 500 });
   }
 });
