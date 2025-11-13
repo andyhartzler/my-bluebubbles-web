@@ -216,40 +216,86 @@ class EmailHistoryEntry {
 
     final Map<String, dynamic>? recipientMap = resolveRecipientMap();
 
+    bool hasRecipientField(Iterable<String> keys) {
+      for (final key in keys) {
+        if (normalized.containsKey(key)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     List<String> resolveRecipients() {
       final recipients = <String>{};
-      recipients.addAll(parseRecipients(
-        normalized['to_emails'] ??
-            normalized['to_addresses'] ??
-            normalized['recipient_emails'] ??
-            normalized['to_address'] ??
-            normalized['to'] ??
-            (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['to'] : normalized['recipients']),
-      ));
+
+      void add(dynamic value) {
+        recipients.addAll(parseRecipients(value));
+      }
+
+      add(normalized['to_emails']);
+      add(normalized['to_addresses']);
+      add(normalized['recipient_emails']);
+      add(normalized['to_address']);
+      add(normalized['to']);
+
+      if (recipientMap != null) {
+        add(recipientMap!['to']);
+      } else if (normalized['recipients'] is! Map) {
+        add(normalized['recipients']);
+      }
+
       return recipients.toList(growable: false);
     }
 
     List<String> resolveCc() {
+      final bool hasCcData = hasRecipientField(
+            const ['cc_emails', 'cc_addresses', 'cc_address', 'cc'],
+          ) ||
+          (recipientMap?.containsKey('cc') ?? false);
+      if (!hasCcData) {
+        return const <String>[];
+      }
+
       final recipients = <String>{};
-      recipients.addAll(parseRecipients(
-        normalized['cc_emails'] ??
-            normalized['cc_addresses'] ??
-            normalized['cc_address'] ??
-            normalized['cc'] ??
-            (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['cc'] : null),
-      ));
+
+      void add(dynamic value) {
+        recipients.addAll(parseRecipients(value));
+      }
+
+      add(normalized['cc_emails']);
+      add(normalized['cc_addresses']);
+      add(normalized['cc_address']);
+      add(normalized['cc']);
+      if (recipientMap != null) {
+        add(recipientMap!['cc']);
+      }
+
       return recipients.toList(growable: false);
     }
 
     List<String> resolveBcc() {
+      final bool hasBccData = hasRecipientField(
+            const ['bcc_emails', 'bcc_addresses', 'bcc_address', 'bcc'],
+          ) ||
+          (recipientMap?.containsKey('bcc') ?? false);
+      if (!hasBccData) {
+        return const <String>[];
+      }
+
       final recipients = <String>{};
-      recipients.addAll(parseRecipients(
-        normalized['bcc_emails'] ??
-            normalized['bcc_addresses'] ??
-            normalized['bcc_address'] ??
-            normalized['bcc'] ??
-            (normalized['recipients'] is Map ? (normalized['recipients'] as Map)['bcc'] : null),
-      ));
+
+      void add(dynamic value) {
+        recipients.addAll(parseRecipients(value));
+      }
+
+      add(normalized['bcc_emails']);
+      add(normalized['bcc_addresses']);
+      add(normalized['bcc_address']);
+      add(normalized['bcc']);
+      if (recipientMap != null) {
+        add(recipientMap!['bcc']);
+      }
+
       return recipients.toList(growable: false);
     }
 
@@ -589,22 +635,35 @@ class EmailHistoryProvider extends ChangeNotifier {
               .from('member_email_history')
               .select(
                 [
-                  'log_id',
-                  'gmail_message_id',
-                  'gmail_thread_id',
-                  'email_type',
+                  'member_id',
+                  'member_name',
+                  'member_email',
+                  'email_id',
+                  'message_id',
+                  'thread_id',
                   'subject',
-                  'body',
-                  'from_address',
-                  'to_address',
-                  'cc_address',
-                  'bcc_address',
-                  'email_date',
+                  'direction',
+                  'message_state',
+                  'from_email',
+                  'to_emails',
+                  'cc_emails',
+                  'bcc_emails',
+                  'reply_to_email',
+                  'received_at',
+                  'sent_at',
+                  'snippet',
+                  'body_text',
+                  'body_html',
+                  'references_header',
+                  'in_reply_to_header',
+                  'headers',
+                  'metadata',
                   'created_at',
+                  'updated_at',
                 ].join(','),
               )
               .eq('member_id', trimmedMemberId)
-              .order('email_date', ascending: false)
+              .order('sent_at', ascending: false)
               .limit(200);
 
           if (response is List) {
