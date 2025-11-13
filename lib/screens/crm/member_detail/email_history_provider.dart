@@ -1,12 +1,12 @@
 import 'dart:collection';
+import 'dart:convert' as convert;
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:flutter/foundation.dart';
-import 'package:html/parser.dart' as html_parser;
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 const Set<String> _orgMailboxAddresses = <String>{
   'info@moyoungdemocrats.org',
@@ -494,7 +494,7 @@ class EmailHistoryProvider extends ChangeNotifier {
       return;
     }
 
-    SupabaseClient? client;
+    supabase.SupabaseClient? client;
     if (_functionInvokerOverride == null) {
       try {
         client = _supabaseService.privilegedClient;
@@ -522,14 +522,14 @@ class EmailHistoryProvider extends ChangeNotifier {
         return _functionInvokerOverride!(name, body: sanitizedBody);
       }
 
-      final SupabaseClient resolvedClient = client!;
+      final supabase.SupabaseClient resolvedClient = client!;
       try {
         final response = await resolvedClient.functions.invoke(
           name,
           body: sanitizedBody,
         );
         return (status: response.status, data: response.data);
-      } on FunctionsException catch (error, stack) {
+      } on supabase.FunctionsException catch (error, stack) {
         Logger.warn(
           'Email history edge function threw ${error.statusCode ?? 'unknown'} for $name: ${error.message}',
           trace: stack,
@@ -769,7 +769,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         return data;
       }
       try {
-        return jsonDecode(trimmed);
+        return convert.jsonDecode(trimmed);
       } catch (_) {
         return data;
       }
@@ -777,7 +777,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     return data;
   }
 
-  bool _isMissingColumnError(PostgrestException error, String columnName) {
+  bool _isMissingColumnError(supabase.PostgrestException error, String columnName) {
     final String lowerColumn = columnName.toLowerCase();
     if (error.code == '42703') {
       return true;
@@ -794,7 +794,7 @@ class EmailHistoryProvider extends ChangeNotifier {
       throw StateError('CRM Supabase is not configured.');
     }
 
-    SupabaseClient client;
+    supabase.SupabaseClient client;
     try {
       client = _supabaseService.privilegedClient;
     } catch (error, stack) {
@@ -1082,7 +1082,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         if ((trimmed.startsWith('[') && trimmed.endsWith(']')) ||
             (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
           try {
-            final decoded = jsonDecode(trimmed);
+            final decoded = convert.jsonDecode(trimmed);
             collect(decoded);
             return;
           } catch (_) {
