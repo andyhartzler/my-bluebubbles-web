@@ -642,7 +642,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         failures.add(trimmed);
       }
 
-      void appendFromRows(List<Map<String, dynamic>> rows) {
+      void appendEntryRows(List<Map<String, dynamic>> rows) {
         for (final row in rows) {
           try {
             final entry = EmailHistoryEntry.fromMap(row);
@@ -666,7 +666,7 @@ class EmailHistoryProvider extends ChangeNotifier {
             databaseClient,
             trimmedMemberId,
           );
-          appendFromRows(cachedRows);
+          appendEntryRows(cachedRows);
         } catch (error, stack) {
           Logger.warn('Failed to query cached email history for $memberId: $error', trace: stack);
           recordFailure('Failed to load cached email history.');
@@ -722,7 +722,7 @@ class EmailHistoryProvider extends ChangeNotifier {
       }
 
       if (functionRows.isNotEmpty) {
-        appendFromRows(functionRows);
+        appendEntryRows(functionRows);
       }
 
       if (syncSucceeded && databaseClient != null) {
@@ -733,7 +733,7 @@ class EmailHistoryProvider extends ChangeNotifier {
           );
           if (refreshedRows.isNotEmpty) {
             cachedRows = refreshedRows;
-            appendFromRows(refreshedRows);
+            appendEntryRows(refreshedRows);
           }
         } catch (error, stack) {
           Logger.warn('Failed to reload email history for $memberId after sync: $error', trace: stack);
@@ -741,7 +741,13 @@ class EmailHistoryProvider extends ChangeNotifier {
         }
       }
 
-      final String? failureMessage = failures.isEmpty ? null : failures.join(' ');
+      final bool hasAnyRows = entries.isNotEmpty || cachedRows.isNotEmpty || functionRows.isNotEmpty;
+      final String? failureMessage;
+      if (failures.isEmpty || hasAnyRows) {
+        failureMessage = null;
+      } else {
+        failureMessage = failures.join(' ');
+      }
 
       if (entries.isEmpty && cachedRows.isEmpty && functionRows.isEmpty) {
         final List<EmailHistoryEntry> resolvedEntries = failureMessage == null
