@@ -336,24 +336,22 @@ function createSupabaseClient(): SupabaseClient {
   });
 }
 
-serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const requestId = crypto.randomUUID();
   const log = logger(requestId);
+  const corsHeaders = buildCorsHeaders(req);
 
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      status: 200,
-      headers: {
-        ...buildCorsHeaders(req),
-        "Content-Type": "text/plain",
-      },
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
     });
   }
 
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -365,13 +363,15 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ processed, failures }), {
       status: failures > 0 && processed === 0 ? 500 : 200,
-      headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     log.error("Unexpected failure while syncing Gmail", { error: `${error}` });
     return new Response(JSON.stringify({ error: "Failed to sync Gmail", details: `${error}` }), {
       status: 500,
-      headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}
+
+serve(handleRequest);
