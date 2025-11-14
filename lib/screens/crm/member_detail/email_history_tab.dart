@@ -32,10 +32,18 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
   late final DateFormat _timestampFormat = DateFormat('MMM d, y • h:mm a');
   bool _requestedInitialLoad = false;
 
+  EmailHistoryProvider? _maybeReadProvider(BuildContext context) {
+    try {
+      return Provider.of<EmailHistoryProvider>(context, listen: false);
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final provider = Provider.maybeOf<EmailHistoryProvider>(context, listen: false);
+    final provider = _maybeReadProvider(context);
     if (provider != null && !_requestedInitialLoad) {
       _requestedInitialLoad = true;
       provider.ensureLoaded(widget.memberId);
@@ -219,7 +227,7 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.maybeOf<EmailHistoryProvider>(context, listen: false);
+    final provider = _maybeReadProvider(context);
     if (provider == null) {
       return const _MissingProviderView();
     }
