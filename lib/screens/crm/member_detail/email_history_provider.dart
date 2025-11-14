@@ -1524,7 +1524,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final query = client
           .from('email_inbox')
-          .select(
+          .select<List<Map<String, dynamic>>>(
             [
               'id',
               'gmail_message_id',
