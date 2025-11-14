@@ -117,12 +117,15 @@ Deno.test("buildEmailInboxRecord populates Supabase payload", async () => {
     assertEquals(record.snippet, "Snippet text");
     assertEquals(record.subject, "Test Subject");
     assertEquals(record.from_address, "alice@example.com");
-    assertEquals(record.to_addresses, ["bob@example.com"]);
-    assertEquals(record.cc_addresses, ["cc@example.com"]);
-    assertEquals(record.bcc_addresses, ["bcc@example.com"]);
+    assertEquals(record.to_address, ["bob@example.com"]);
+    assertEquals(record.cc_address, ["cc@example.com"]);
+    assertEquals(record.bcc_address, ["bcc@example.com"]);
+    assertEquals(record.message_id, "msg-123");
     assertEquals(record.message_id_header, "<message@example.com>");
     assertEquals(record.references_header, "<ref@example.com>");
+    assertEquals(record.in_reply_to, "<reply@example.com>");
     assertEquals(record.in_reply_to_header, "<reply@example.com>");
+    assertEquals(record.date, "2023-09-14T12:00:00.000Z");
     assertEquals(record.received_at, "2023-09-14T12:00:00.000Z");
     assertEquals(record.internal_date, "2023-09-14T12:00:00.000Z");
     assertEquals(record.label_ids, ["INBOX"]);

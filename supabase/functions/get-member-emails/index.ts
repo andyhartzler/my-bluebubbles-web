@@ -76,16 +76,24 @@ interface GmailMessageResponse {
 interface EmailInboxRecord {
   gmail_message_id: string;
   gmail_thread_id: string | null;
+  thread_id: string | null;
   history_id: string | null;
   snippet: string | null;
   subject: string | null;
   from_address: string | null;
-  to_addresses: string[] | null;
-  cc_addresses: string[] | null;
-  bcc_addresses: string[] | null;
+  from_email: string | null;
+  to_address: string[] | null;
+  to_emails: string[] | null;
+  cc_address: string[] | null;
+  cc_emails: string[] | null;
+  bcc_address: string[] | null;
+  bcc_emails: string[] | null;
+  message_id: string;
   message_id_header: string | null;
   references_header: string | null;
+  in_reply_to: string | null;
   in_reply_to_header: string | null;
+  date: string | null;
   received_at: string | null;
   internal_date: string | null;
   label_ids: string[] | null;
@@ -265,16 +273,24 @@ export async function buildEmailInboxRecord(
   return {
     gmail_message_id: message.id,
     gmail_thread_id: message.threadId ?? null,
+    thread_id: message.threadId ?? null,
     history_id: message.historyId ?? null,
     snippet: message.snippet ?? null,
     subject: extractHeader(message, "Subject"),
     from_address: firstEmailAddress(from),
-    to_addresses: toAddresses.length ? toAddresses : null,
-    cc_addresses: ccAddresses.length ? ccAddresses : null,
-    bcc_addresses: bccAddresses.length ? bccAddresses : null,
+    from_email: firstEmailAddress(from),
+    to_address: toAddresses.length ? toAddresses : null,
+    to_emails: toAddresses.length ? toAddresses : null,
+    cc_address: ccAddresses.length ? ccAddresses : null,
+    cc_emails: ccAddresses.length ? ccAddresses : null,
+    bcc_address: bccAddresses.length ? bccAddresses : null,
+    bcc_emails: bccAddresses.length ? bccAddresses : null,
+    message_id: message.id,
     message_id_header: extractHeader(message, "Message-ID"),
     references_header: extractHeader(message, "References"),
+    in_reply_to: extractHeader(message, "In-Reply-To"),
     in_reply_to_header: extractHeader(message, "In-Reply-To"),
+    date: receivedAt,
     received_at: receivedAt,
     internal_date: internalDate,
     label_ids: message.labelIds ?? null,
@@ -289,7 +305,7 @@ async function upsertEmailInboxRecord(
 ): Promise<void> {
   const { error } = await supabase
     .from("email_inbox")
-    .upsert(record, { onConflict: "gmail_message_id" });
+    .upsert(record, { onConflict: "member_id,gmail_message_id" });
 
   if (error) {
     throw new Error(`Failed to upsert email_inbox record for ${record.gmail_message_id}: ${error.message}`);
