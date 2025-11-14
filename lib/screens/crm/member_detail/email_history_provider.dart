@@ -1547,15 +1547,14 @@ class EmailHistoryProvider extends ChangeNotifier {
             ].join(','),
           )
           .eq('member_id', memberId)
+          .or(
+            [
+              'gmail_thread_id.eq.$threadId',
+              'message_id.eq.$threadId',
+              'gmail_message_id.eq.$threadId',
+            ].join(','),
+          )
           .order('date', ascending: true);
-
-      final response = await query.or(
-        [
-          'gmail_thread_id.eq.$threadId',
-          'message_id.eq.$threadId',
-          'gmail_message_id.eq.$threadId',
-        ].join(','),
-      );
 
       final rows = _normalizeSupabaseResponse(response);
       for (final row in rows) {
