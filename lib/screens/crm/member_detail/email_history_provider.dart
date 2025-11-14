@@ -528,7 +528,10 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   Future<void> refresh(String memberId) async {
     final current = stateForMember(memberId);
-    _stateByMember[memberId] = current.copyWith(isLoading: true, error: null);
+    _stateByMember[memberId] = current.copyWith(
+      isLoading: true,
+      clearError: true,
+    );
     notifyListeners();
 
     if (!_supabaseService.isInitialized) {
@@ -542,197 +545,97 @@ class EmailHistoryProvider extends ChangeNotifier {
       return;
     }
 
-    supabase.SupabaseClient? databaseClient;
-    supabase.SupabaseClient? functionClient;
-
-    try {
-      databaseClient = _supabaseService.privilegedClient;
-    } catch (error, stack) {
-      Logger.warn('Supabase client unavailable for email history: $error', trace: stack);
-      try {
-        databaseClient = _supabaseService.client;
-      } catch (clientError, clientStack) {
-        Logger.warn('Fallback Supabase client unavailable: $clientError', trace: clientStack);
-        _stateByMember[memberId] = EmailHistoryState(
-          isLoading: false,
-          hasLoaded: true,
-          entries: const [],
-          error: 'Supabase client is not available.',
-        );
-        notifyListeners();
-        return;
-      }
+    final clients = _resolveSupabaseClients();
+    if (clients == null) {
+      _stateByMember[memberId] = EmailHistoryState(
+        isLoading: false,
+        hasLoaded: true,
+        entries: const [],
+        error: 'Supabase client is not available.',
+      );
+      notifyListeners();
+      return;
     }
 
-    if (_functionInvokerOverride == null) {
-      try {
-        functionClient = _supabaseService.client;
-      } catch (error, stack) {
-        Logger.warn('Supabase function client unavailable: $error', trace: stack);
-        functionClient = databaseClient;
-      }
-    }
-
-    Future<({int status, dynamic data})> invoke(
-      String name, {
-      Map<String, dynamic>? body,
-    }) async {
-      Map<String, dynamic>? sanitizedBody;
-      if (body != null) {
-        sanitizedBody = Map<String, dynamic>.from(body)
-          ..removeWhere((_, value) => value == null);
-      }
-
-      if (_functionInvokerOverride != null) {
-        return _functionInvokerOverride!(name, body: sanitizedBody);
-      }
-
-      final supabase.SupabaseClient? target = functionClient;
-      if (target == null) {
-        return (status: 503, data: 'Supabase client unavailable');
-      }
-
-      try {
-        final response = await target.functions.invoke(
-          name,
-          body: sanitizedBody,
-        );
-        return (status: response.status, data: response.data);
-      } catch (error, stack) {
-        Logger.warn(
-          'Email history edge function threw for $name: $error',
-          trace: stack,
-        );
-        return (
-          status: 500,
-          data: error.toString(),
-        );
-      }
+    final trimmedMemberId = memberId.trim();
+    if (trimmedMemberId.isEmpty) {
+      _stateByMember[memberId] = EmailHistoryState(
+        isLoading: false,
+        hasLoaded: true,
+        entries: current.entries,
+        error: 'Member identifier is missing. Please refresh and try again.',
+      );
+      notifyListeners();
+      return;
     }
 
     try {
-      final trimmedMemberId = memberId.trim();
-      if (trimmedMemberId.isEmpty) {
-        _stateByMember[memberId] = EmailHistoryState(
-          isLoading: false,
-          hasLoaded: true,
-          entries: current.entries,
-          error: 'Member identifier is missing. Please refresh and try again.',
-        );
-        notifyListeners();
-        return;
-      }
+      final _MemberMetadata? memberMetadata =
+          await _fetchMemberMetadata(clients.database, trimmedMemberId);
 
-      final seen = LinkedHashSet<String>();
-      final entries = <EmailHistoryEntry>[];
-
-      for (final entry in current.entries) {
-        final key = entry.id.trim().isEmpty ? entry.hashCode.toString() : entry.id.trim();
-        if (seen.add(key)) {
-          entries.add(entry);
-        }
-      }
-
-      final failures = <String>[];
-
-      void recordFailure(String? message) {
-        if (message == null) return;
-        final trimmed = message.trim();
-        if (trimmed.isEmpty) return;
-        failures.add(trimmed);
-      }
-
-      _MemberMetadata? memberMetadata;
-      if (databaseClient != null) {
-        memberMetadata = await _fetchMemberMetadata(databaseClient, trimmedMemberId);
-      }
-
-      Map<String, dynamic> normalizeRow(Map<String, dynamic> row) {
-        return _normalizeHistoryRow(
+      final accumulator = _EmailHistoryAccumulator(
+        memberId: trimmedMemberId,
+        normalizeRow: (row) => _normalizeHistoryRow(
           row,
           trimmedMemberId,
           member: memberMetadata,
-        );
-      }
+        ),
+      )..addExisting(current.entries);
 
-      void ingestRows(Iterable<Map<String, dynamic>> rows) {
-        for (final row in rows) {
-          try {
-            final normalized = normalizeRow(row);
-            final entry = EmailHistoryEntry.fromMap(normalized);
-            final key = entry.id.trim().isEmpty ? normalized.hashCode.toString() : entry.id.trim();
-            if (seen.add(key)) {
-              entries.add(entry);
-            }
-          } catch (error, stack) {
-            Logger.warn('Failed to parse email history row for $memberId: $error', trace: stack);
-          }
-        } catch (error, stack) {
-          Logger.warn('Failed to reload email history for $memberId after sync: $error', trace: stack);
-          recordFailure('Email history synced but could not reload results.');
-        }
-      }
-
-      Future<void> fetchSource(
+      Future<void> loadSource(
         String label,
         Future<List<Map<String, dynamic>>> Function() loader, {
-        String? failureMessage,
-        bool reportFailure = true,
+        bool recordFailure = true,
       }) async {
         try {
           final rows = await loader();
           if (rows.isNotEmpty) {
-            ingestRows(rows);
+            accumulator.addRows(rows);
           }
         } catch (error, stack) {
-          Logger.warn('Failed to load $label for $memberId: $error', trace: stack);
-          if (reportFailure) {
-            recordFailure(failureMessage ?? 'Failed to load $label.');
+          Logger.warn('Failed to load $label for $trimmedMemberId: $error', trace: stack);
+          if (recordFailure) {
+            accumulator.addFailure('Failed to load $label.');
           }
         }
       }
 
-      if (databaseClient != null) {
-        await fetchSource(
-          'received emails',
-          () => _fetchInboxRows(
-            databaseClient,
-            trimmedMemberId,
-            member: memberMetadata,
-          ),
-          failureMessage: 'Failed to load received emails.',
-        );
+      await loadSource(
+        'received emails',
+        () => _fetchInboxRows(
+          clients.database,
+          trimmedMemberId,
+          member: memberMetadata,
+        ),
+      );
 
-        await fetchSource(
-          'sent emails',
-          () => _fetchSentLogRows(
-            databaseClient,
-            trimmedMemberId,
-            member: memberMetadata,
-          ),
-          failureMessage: 'Failed to load sent emails.',
-        );
+      await loadSource(
+        'sent emails',
+        () => _fetchSentLogRows(
+          clients.database,
+          trimmedMemberId,
+          member: memberMetadata,
+        ),
+      );
 
-        await fetchSource(
-          'cached email history',
-          () => _fetchMemberEmailHistoryRows(databaseClient, trimmedMemberId),
-          failureMessage: 'Failed to load cached email history.',
-        );
-      }
+      await loadSource(
+        'cached email history',
+        () => _fetchMemberEmailHistoryRows(clients.database, trimmedMemberId),
+      );
 
-      if (entries.isNotEmpty && current.entries.isEmpty) {
+      final initialEntries = accumulator.snapshot(limit: 200);
+      if (initialEntries.isNotEmpty) {
         _stateByMember[memberId] = EmailHistoryState(
           isLoading: true,
           hasLoaded: true,
-          entries: List<EmailHistoryEntry>.unmodifiable(entries),
-          error: null,
+          entries: initialEntries,
+          error: accumulator.warningMessage,
         );
         notifyListeners();
       }
 
       bool syncSucceeded = false;
-
-      if (_functionInvokerOverride != null || functionClient != null) {
+      if (_functionInvokerOverride != null || clients.functions != null) {
         final requestBody = <String, dynamic>{
           'memberId': trimmedMemberId,
           'member_id': trimmedMemberId,
@@ -742,16 +645,20 @@ class EmailHistoryProvider extends ChangeNotifier {
         };
 
         try {
-          final result = await invoke('get-member-emails', body: requestBody);
+          final result = await _invokeEdgeFunction(
+            'get-member-emails',
+            body: requestBody,
+            client: clients.functions ?? clients.database,
+          );
           final normalizedData = _normalizeResponsePayload(result.data);
           final int status = result.status;
 
           if (status >= 200 && status < 300) {
             syncSucceeded = true;
-            final rows = _extractEntries(normalizedData)
-                .map((row) => normalizeRow(row))
-                .toList(growable: false);
-            ingestRows(rows);
+            final rows = _extractEntries(normalizedData);
+            if (rows.isNotEmpty) {
+              accumulator.addRows(rows);
+            }
           } else {
             final extracted = _extractErrorMessage(normalizedData);
             final bool workerLimit = status == 546 ||
@@ -762,61 +669,63 @@ class EmailHistoryProvider extends ChangeNotifier {
             final String detailedMessage = extracted != null && extracted.isNotEmpty
                 ? '$baseMessage ${extracted.trim()}'
                 : baseMessage;
-            recordFailure(detailedMessage);
+            accumulator.addWarning(detailedMessage);
           }
         } catch (error, stack) {
           Logger.warn('Email history sync failed for $memberId: $error', trace: stack);
-          recordFailure('Unable to refresh email history from Supabase.');
+          accumulator.addWarning('Unable to refresh email history from Supabase.');
         }
       }
 
-      if (syncSucceeded && databaseClient != null) {
-        await fetchSource(
+      if (syncSucceeded) {
+        await loadSource(
           'refreshed email history',
-          () => _fetchMemberEmailHistoryRows(databaseClient, trimmedMemberId),
-          reportFailure: false,
+          () => _fetchMemberEmailHistoryRows(clients.database, trimmedMemberId),
+          recordFailure: false,
         );
-        await fetchSource(
+        await loadSource(
           'refreshed received emails',
           () => _fetchInboxRows(
-            databaseClient,
+            clients.database,
             trimmedMemberId,
             member: memberMetadata,
           ),
-          reportFailure: false,
+          recordFailure: false,
         );
-        await fetchSource(
+        await loadSource(
           'refreshed sent emails',
           () => _fetchSentLogRows(
-            databaseClient,
+            clients.database,
             trimmedMemberId,
             member: memberMetadata,
           ),
-          reportFailure: false,
+          recordFailure: false,
         );
       }
 
-      entries.sort((a, b) {
-        final aTime = a.sentAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bTime = b.sentAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return bTime.compareTo(aTime);
-      });
+      final finalEntries = accumulator.snapshot(limit: 200);
+      List<EmailHistoryEntry> outputEntries;
+      String? errorMessage;
 
-      if (entries.length > 200) {
-        entries.removeRange(200, entries.length);
+      if (finalEntries.isEmpty) {
+        outputEntries = current.entries;
+        if (outputEntries.isEmpty) {
+          errorMessage = accumulator.failureMessage ??
+              accumulator.warningMessage ??
+              'Failed to load email history. Please try again.';
+        } else {
+          errorMessage = accumulator.warningMessage ?? accumulator.failureMessage;
+        }
+      } else {
+        outputEntries = finalEntries;
+        errorMessage = accumulator.warningMessage;
       }
-
-      final bool hasEntries = entries.isNotEmpty;
-      final String? failureMessage = hasEntries || failures.isEmpty ? null : failures.join(' ');
-      final List<EmailHistoryEntry> finalEntries = hasEntries
-          ? List<EmailHistoryEntry>.unmodifiable(entries)
-          : current.entries;
 
       _stateByMember[memberId] = EmailHistoryState(
         isLoading: false,
         hasLoaded: true,
-        entries: finalEntries,
-        error: failureMessage,
+        entries: outputEntries,
+        error: errorMessage,
       );
     } catch (error, stack) {
       Logger.warn('Failed to load email history for $memberId: $error', trace: stack);
@@ -827,20 +736,76 @@ class EmailHistoryProvider extends ChangeNotifier {
         error: 'Failed to load email history. Please try again.',
       );
     }
+
     notifyListeners();
   }
 
-  bool _isWorkerLimitCoolingDown(String memberId) {
-    final lastFailure = _workerLimitFailures[memberId];
-    if (lastFailure == null) {
-      return false;
+  _SupabaseClients? _resolveSupabaseClients() {
+    supabase.SupabaseClient? database;
+    try {
+      database = _supabaseService.privilegedClient;
+    } catch (error, stack) {
+      Logger.warn('Supabase client unavailable for email history: $error', trace: stack);
+      try {
+        database = _supabaseService.client;
+      } catch (clientError, clientStack) {
+        Logger.warn('Fallback Supabase client unavailable: $clientError', trace: clientStack);
+        database = null;
+      }
     }
-    const cooldown = Duration(minutes: 5);
-    return DateTime.now().difference(lastFailure) < cooldown;
+
+    if (database == null) {
+      return null;
+    }
+
+    supabase.SupabaseClient? functionClient;
+    if (_functionInvokerOverride == null) {
+      try {
+        functionClient = _supabaseService.client;
+      } catch (error, stack) {
+        Logger.warn('Supabase function client unavailable: $error', trace: stack);
+        functionClient = database;
+      }
+    }
+
+    return _SupabaseClients(
+      database: database,
+      functions: functionClient,
+    );
   }
 
-  void _recordWorkerLimit(String memberId) {
-    _workerLimitFailures[memberId] = DateTime.now();
+  Future<({int status, dynamic data})> _invokeEdgeFunction(
+    String name, {
+    Map<String, dynamic>? body,
+    supabase.SupabaseClient? client,
+  }) async {
+    Map<String, dynamic>? sanitizedBody;
+    if (body != null) {
+      sanitizedBody = Map<String, dynamic>.from(body)
+        ..removeWhere((_, value) => value == null);
+    }
+
+    if (_functionInvokerOverride != null) {
+      return _functionInvokerOverride!(name, body: sanitizedBody);
+    }
+
+    if (client == null) {
+      return (status: 503, data: 'Supabase client unavailable');
+    }
+
+    try {
+      final response = await client.functions.invoke(
+        name,
+        body: sanitizedBody,
+      );
+      return (status: response.status, data: response.data);
+    } catch (error, stack) {
+      Logger.warn(
+        'Email history edge function threw for $name: $error',
+        trace: stack,
+      );
+      return (status: 500, data: error.toString());
+    }
   }
 
   String? _extractErrorMessage(dynamic data) {
@@ -1874,6 +1839,96 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   @visibleForTesting
   EmailMessage debugMapEmailMessage(Map<String, dynamic> row) => _mapEmailMessage(row);
+}
+
+class _EmailHistoryAccumulator {
+  _EmailHistoryAccumulator({
+    required this.memberId,
+    required Map<String, dynamic> Function(Map<String, dynamic>) normalizeRow,
+  })  : _normalizeRow = normalizeRow,
+        _entriesById = LinkedHashMap<String, EmailHistoryEntry>();
+
+  final String memberId;
+  final Map<String, EmailHistoryEntry> _entriesById;
+  final List<String> _blockingFailures = <String>[];
+  final List<String> _warnings = <String>[];
+  final Map<String, dynamic> Function(Map<String, dynamic>) _normalizeRow;
+
+  void addExisting(List<EmailHistoryEntry> entries) {
+    for (final entry in entries) {
+      final key = _normalizeKey(entry.id);
+      _entriesById[key] = entry;
+    }
+  }
+
+  void addRows(Iterable<Map<String, dynamic>> rows) {
+    for (final row in rows) {
+      try {
+        final normalized = _normalizeRow(Map<String, dynamic>.from(row));
+        final entry = EmailHistoryEntry.fromMap(normalized);
+        final key = _normalizeKey(entry.id, fallback: normalized.hashCode.toString());
+        _entriesById[key] = entry;
+      } catch (error, stack) {
+        Logger.warn('Failed to parse email history row for $memberId: $error', trace: stack);
+      }
+    }
+  }
+
+  void addFailure(String? message) {
+    final trimmed = _trimmed(message);
+    if (trimmed != null) {
+      _blockingFailures.add(trimmed);
+    }
+  }
+
+  void addWarning(String? message) {
+    final trimmed = _trimmed(message);
+    if (trimmed != null) {
+      _warnings.add(trimmed);
+    }
+  }
+
+  List<EmailHistoryEntry> snapshot({int? limit}) {
+    final entries = _entriesById.values.toList(growable: false);
+    entries.sort((a, b) {
+      final aTime = a.sentAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.sentAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
+    if (limit != null && entries.length > limit) {
+      return List<EmailHistoryEntry>.unmodifiable(entries.sublist(0, limit));
+    }
+    return List<EmailHistoryEntry>.unmodifiable(entries);
+  }
+
+  String? get failureMessage =>
+      _blockingFailures.isEmpty ? null : _blockingFailures.join(' ');
+
+  String? get warningMessage => _warnings.isEmpty ? null : _warnings.join(' ');
+
+  String _normalizeKey(String value, {String? fallback}) {
+    final trimmed = value.trim();
+    if (trimmed.isNotEmpty) {
+      return trimmed;
+    }
+    return fallback ?? value.hashCode.toString();
+  }
+
+  String? _trimmed(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+}
+
+class _SupabaseClients {
+  const _SupabaseClients({
+    required this.database,
+    this.functions,
+  });
+
+  final supabase.SupabaseClient database;
+  final supabase.SupabaseClient? functions;
 }
 
 class _MemberMetadata {
