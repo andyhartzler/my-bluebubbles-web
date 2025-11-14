@@ -660,7 +660,7 @@ class EmailHistoryProvider extends ChangeNotifier {
                 ].join(','),
               )
               .eq('member_id', trimmedMemberId)
-              .order('sent_at', ascending: false)
+              .order('email_date', ascending: false)
               .limit(200);
 
           if (response is List) {
