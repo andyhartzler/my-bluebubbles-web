@@ -1522,7 +1522,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     try {
-      final supabase.PostgrestFilterBuilder<List<Map<String, dynamic>>> query = client
+      final query = client
           .from('email_inbox')
           .select<List<Map<String, dynamic>>>(
             [
@@ -1556,6 +1556,7 @@ class EmailHistoryProvider extends ChangeNotifier {
           )
           .order('date', ascending: true);
 
+      final supabase.PostgrestResponse<dynamic> response = await query;
       final rows = _normalizeSupabaseResponse(response);
       for (final row in rows) {
         row['from_email'] ??= row['from_address'];
