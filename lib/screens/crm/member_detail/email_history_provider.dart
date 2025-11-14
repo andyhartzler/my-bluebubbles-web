@@ -512,6 +512,7 @@ class EmailHistoryProvider extends ChangeNotifier {
   final CRMSupabaseService _supabaseService;
   final _FunctionInvocation? _functionInvokerOverride;
   final Map<String, EmailHistoryState> _stateByMember = <String, EmailHistoryState>{};
+  final Map<String, DateTime> _workerLimitFailures = <String, DateTime>{};
   final Set<String> _knownOrgEmailAddresses;
   final Set<String> _knownOrgEmailDomains;
 
@@ -639,10 +640,15 @@ class EmailHistoryProvider extends ChangeNotifier {
         }
       }
 
+      final includeFallbackTables = _supabaseService.hasServiceRole;
       List<Map<String, dynamic>> cachedRows = const <Map<String, dynamic>>[];
       if (databaseClient != null) {
         try {
-          cachedRows = await _fetchCachedHistoryRows(databaseClient, trimmedMemberId);
+          cachedRows = await _fetchCachedHistoryRows(
+            databaseClient,
+            trimmedMemberId,
+            includeFallbackTables: includeFallbackTables,
+          );
           appendFromRows(cachedRows);
         } catch (error, stack) {
           Logger.warn('Failed to query member_email_history for $memberId: $error', trace: stack);
@@ -660,44 +666,58 @@ class EmailHistoryProvider extends ChangeNotifier {
         notifyListeners();
       }
 
-      final requestBody = <String, dynamic>{
-        'memberId': trimmedMemberId,
-        'member_id': trimmedMemberId,
-        'maxResults': 200,
-        'syncToDatabase': true,
-      };
+      final bool workerLimitCoolingDown = _isWorkerLimitCoolingDown(trimmedMemberId);
+      final bool hasCachedEntries = entries.isNotEmpty;
+      final bool shouldInvokeFunction =
+          functionClient != null && (!workerLimitCoolingDown || !hasCachedEntries);
+
+      if (workerLimitCoolingDown && hasCachedEntries) {
+        failureMessage ??=
+            'Email sync is temporarily paused after repeated worker limit errors. Displaying cached history only.';
+      }
 
       List<Map<String, dynamic>> functionEntries = const <Map<String, dynamic>>[];
 
-      try {
-        final result = await invoke('get-member-emails', body: requestBody);
-        final normalizedData = _normalizeResponsePayload(result.data);
+      if (shouldInvokeFunction) {
+        final requestBody = <String, dynamic>{
+          'memberId': trimmedMemberId,
+          'member_id': trimmedMemberId,
+          'maxResults': 200,
+          'syncToDatabase': true,
+        };
 
-        if (result.status != 200) {
-          Logger.warn(
-            'Email history edge function returned ${result.status} for member $memberId: $normalizedData',
-          );
-          final extractedMessage = _extractErrorMessage(normalizedData);
-          final bool isServerError = result.status >= 500;
-          final bool isWorkerLimit = result.status == 546 || _containsWorkerLimit(normalizedData);
-          final String fallback;
-          if (isWorkerLimit) {
-            fallback = 'Email sync is temporarily over capacity. Showing cached history when available.';
-          } else if (isServerError) {
-            fallback =
-                'Email sync is currently unavailable (HTTP ${result.status}). Any cached results will be shown if available.';
+        try {
+          final result = await invoke('get-member-emails', body: requestBody);
+          final normalizedData = _normalizeResponsePayload(result.data);
+
+          if (result.status != 200) {
+            Logger.warn(
+              'Email history edge function returned ${result.status} for member $memberId: $normalizedData',
+            );
+            final extractedMessage = _extractErrorMessage(normalizedData);
+            final bool isServerError = result.status >= 500;
+            final bool isWorkerLimit = result.status == 546 || _containsWorkerLimit(normalizedData);
+            final String fallback;
+            if (isWorkerLimit) {
+              _recordWorkerLimit(trimmedMemberId);
+              fallback = 'Email sync is temporarily over capacity. Showing cached history when available.';
+            } else if (isServerError) {
+              fallback =
+                  'Email sync is currently unavailable (HTTP ${result.status}). Any cached results will be shown if available.';
+            } else {
+              fallback = 'Failed to sync email history (HTTP ${result.status}).';
+            }
+            failureMessage = (extractedMessage != null && extractedMessage.trim().isNotEmpty)
+                ? extractedMessage.trim()
+                : fallback;
           } else {
-            fallback = 'Failed to sync email history (HTTP ${result.status}).';
+            _workerLimitFailures.remove(trimmedMemberId);
+            functionEntries = _extractEntries(normalizedData);
           }
-          failureMessage = (extractedMessage != null && extractedMessage.trim().isNotEmpty)
-              ? extractedMessage.trim()
-              : fallback;
-        } else {
-          functionEntries = _extractEntries(normalizedData);
+        } catch (error, stack) {
+          Logger.warn('Email history sync failed for $memberId: $error', trace: stack);
+          failureMessage ??= 'Unable to refresh email history from Supabase.';
         }
-      } catch (error, stack) {
-        Logger.warn('Email history sync failed for $memberId: $error', trace: stack);
-        failureMessage ??= 'Unable to refresh email history from Supabase.';
       }
 
       appendFromRows(functionEntries);
@@ -738,6 +758,19 @@ class EmailHistoryProvider extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  bool _isWorkerLimitCoolingDown(String memberId) {
+    final lastFailure = _workerLimitFailures[memberId];
+    if (lastFailure == null) {
+      return false;
+    }
+    const cooldown = Duration(minutes: 5);
+    return DateTime.now().difference(lastFailure) < cooldown;
+  }
+
+  void _recordWorkerLimit(String memberId) {
+    _workerLimitFailures[memberId] = DateTime.now();
   }
 
   String? _extractErrorMessage(dynamic data) {
@@ -864,10 +897,11 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   Future<List<Map<String, dynamic>>> _fetchCachedHistoryRows(
     supabase.SupabaseClient client,
-    String memberId,
-  ) async {
+    String memberId, {
+    required bool includeFallbackTables,
+  }) async {
     final viewRows = await _queryMemberEmailHistoryView(client, memberId);
-    if (viewRows.isNotEmpty) {
+    if (viewRows.isNotEmpty || !includeFallbackTables) {
       return viewRows;
     }
 
