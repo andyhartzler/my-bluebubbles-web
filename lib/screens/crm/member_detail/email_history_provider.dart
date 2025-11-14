@@ -916,7 +916,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final response = await client
           .from('member_email_history')
-          .select<List<Map<String, dynamic>>>(
+          .select(
             [
               'member_id',
               'member_name',
@@ -965,7 +965,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final inboxResponse = await client
           .from('email_inbox')
-          .select<List<Map<String, dynamic>>>(
+          .select(
             [
               'id',
               'member_id',
@@ -1017,7 +1017,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final sentResponse = await client
           .from('email_logs')
-          .select<List<Map<String, dynamic>>>(
+          .select(
             [
               'id',
               'subject',
@@ -1104,7 +1104,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final response = await client
           .from('members')
-          .select<List<Map<String, dynamic>>>('id,name,email')
+          .select('id,name,email')
           .eq('id', memberId)
           .limit(1);
 
