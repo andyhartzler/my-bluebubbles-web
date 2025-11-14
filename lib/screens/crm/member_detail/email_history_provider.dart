@@ -882,7 +882,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final response = await client
           .from('member_email_history')
-          .select(
+          .select<List<Map<String, dynamic>>>(
             [
               'member_id',
               'member_name',
@@ -902,15 +902,9 @@ class EmailHistoryProvider extends ChangeNotifier {
           .order('email_date', ascending: false)
           .limit(200);
 
-      if (response is List) {
-        return response
-            .whereType<Map<String, dynamic>>()
-            .map(
-              (row) => row.map<String, dynamic>(
-                (key, value) => MapEntry(key.toString(), value),
-              ),
-            )
-            .toList(growable: false);
+      final rows = _normalizeSupabaseList(response);
+      if (rows.isNotEmpty) {
+        return rows;
       }
     } on supabase.PostgrestException catch (error, stack) {
       Logger.warn(
@@ -937,7 +931,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final inboxResponse = await client
           .from('email_inbox')
-          .select(
+          .select<List<Map<String, dynamic>>>(
             [
               'id',
               'member_id',
@@ -966,25 +960,21 @@ class EmailHistoryProvider extends ChangeNotifier {
           .order('date', ascending: false)
           .limit(200);
 
-      if (inboxResponse is List) {
-        for (final item in inboxResponse.whereType<Map<String, dynamic>>()) {
-          final normalized = item.map<String, dynamic>(
-            (key, value) => MapEntry(key.toString(), value),
-          );
-          results.add({
-            ...normalized,
-            'member_id': memberId,
-            if (member?.name != null) 'member_name': member!.name,
-            if (member?.email != null) 'member_email': member!.email,
-            'email_type': 'received',
-            'log_id': normalized['id'] ?? normalized['log_id'],
-            'email_date': normalized['date'] ?? normalized['created_at'],
-            'to_address': normalized['to_address'],
-            'cc_emails': normalized['cc_address'],
-            'bcc_emails': normalized['bcc_address'],
-            'from_address': normalized['from_address'],
-          });
-        }
+      for (final item in _normalizeSupabaseList(inboxResponse)) {
+        final normalized = item;
+        results.add({
+          ...normalized,
+          'member_id': memberId,
+          if (member?.name != null) 'member_name': member!.name,
+          if (member?.email != null) 'member_email': member!.email,
+          'email_type': 'received',
+          'log_id': normalized['id'] ?? normalized['log_id'],
+          'email_date': normalized['date'] ?? normalized['created_at'],
+          'to_address': normalized['to_address'],
+          'cc_emails': normalized['cc_address'],
+          'bcc_emails': normalized['bcc_address'],
+          'from_address': normalized['from_address'],
+        });
       }
     } catch (error, stack) {
       Logger.warn('Failed to query email_inbox for $memberId: $error', trace: stack);
@@ -993,7 +983,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final sentResponse = await client
           .from('email_logs')
-          .select(
+          .select<List<Map<String, dynamic>>>(
             [
               'id',
               'subject',
@@ -1016,32 +1006,28 @@ class EmailHistoryProvider extends ChangeNotifier {
           .order('created_at', ascending: false)
           .limit(200);
 
-      if (sentResponse is List) {
-        for (final item in sentResponse.whereType<Map<String, dynamic>>()) {
-          final normalized = item.map<String, dynamic>(
-            (key, value) => MapEntry(key.toString(), value),
-          );
+      for (final item in _normalizeSupabaseList(sentResponse)) {
+        final normalized = item;
 
-          final dynamic recipients = normalized['recipient_emails'];
-          String? toAddress;
-          if (recipients is List) {
-            toAddress = recipients.map((e) => e.toString()).join(', ');
-          } else if (recipients is String) {
-            toAddress = recipients;
-          }
-
-          results.add({
-            ...normalized,
-            'member_id': memberId,
-            if (member?.name != null) 'member_name': member!.name,
-            if (member?.email != null) 'member_email': member!.email,
-            'email_type': 'sent',
-            'log_id': normalized['id'] ?? normalized['log_id'],
-            'email_date': normalized['created_at'],
-            'from_address': normalized['sender'],
-            if (toAddress != null) 'to_address': toAddress,
-          });
+        final dynamic recipients = normalized['recipient_emails'];
+        String? toAddress;
+        if (recipients is List) {
+          toAddress = recipients.map((e) => e.toString()).join(', ');
+        } else if (recipients is String) {
+          toAddress = recipients;
         }
+
+        results.add({
+          ...normalized,
+          'member_id': memberId,
+          if (member?.name != null) 'member_name': member!.name,
+          if (member?.email != null) 'member_email': member!.email,
+          'email_type': 'sent',
+          'log_id': normalized['id'] ?? normalized['log_id'],
+          'email_date': normalized['created_at'],
+          'from_address': normalized['sender'],
+          if (toAddress != null) 'to_address': toAddress,
+        });
       }
     } catch (error, stack) {
       Logger.warn('Failed to query email_logs for $memberId: $error', trace: stack);
@@ -1084,13 +1070,13 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final response = await client
           .from('members')
-          .select('id,name,email')
+          .select<List<Map<String, dynamic>>>('id,name,email')
           .eq('id', memberId)
           .limit(1);
 
-      if (response is List && response.isNotEmpty) {
-        final Map<String, dynamic> row =
-            Map<String, dynamic>.from(response.first as Map<dynamic, dynamic>);
+      final rows = _normalizeSupabaseList(response);
+      if (rows.isNotEmpty) {
+        final row = rows.first;
         return _MemberMetadata(
           id: row['id']?.toString(),
           name: row['name']?.toString(),
@@ -1101,6 +1087,27 @@ class EmailHistoryProvider extends ChangeNotifier {
       Logger.warn('Failed to fetch member metadata for $memberId: $error', trace: stack);
     }
     return null;
+  }
+
+  List<Map<String, dynamic>> _normalizeSupabaseList(dynamic response) {
+    dynamic data = response;
+    if (response is supabase.PostgrestResponse) {
+      data = response.data;
+    } else if (response is Map<String, dynamic> && response.containsKey('data')) {
+      data = response['data'];
+    }
+
+    if (data is List) {
+      return data.where((row) => row is Map).map((row) {
+        final result = <String, dynamic>{};
+        (row as Map).forEach((key, value) {
+          result[key.toString()] = value;
+        });
+        return result;
+      }).toList(growable: false);
+    }
+
+    return const <Map<String, dynamic>>[];
   }
 
   dynamic _normalizeResponsePayload(dynamic data) {
