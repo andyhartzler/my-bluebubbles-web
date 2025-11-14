@@ -571,7 +571,7 @@ class EmailHistoryProvider extends ChangeNotifier {
 
     try {
       final _MemberMetadata? memberMetadata =
-          await _fetchMemberMetadata(clients.database, trimmedMemberId);
+          await _loadMemberMetadata(clients.database, trimmedMemberId);
 
       final accumulator = _EmailHistoryAccumulator(
         memberId: trimmedMemberId,
@@ -1328,7 +1328,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         .order('email_date', ascending: false)
         .limit(200);
 
-    return _normalizeSupabaseList(response)
+    return _normalizeSupabaseResponse(response)
         .map(_normalizeViewHistoryRow)
         .toList(growable: false);
   }
@@ -1368,7 +1368,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         .limit(200);
 
     final rows = <Map<String, dynamic>>[];
-    for (final item in _normalizeSupabaseList(response)) {
+    for (final item in _normalizeSupabaseResponse(response)) {
       final normalized = Map<String, dynamic>.from(item);
       normalized['member_id'] = memberId;
       if (member?.name != null) {
@@ -1424,7 +1424,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         .limit(200);
 
     final rows = <Map<String, dynamic>>[];
-    for (final item in _normalizeSupabaseList(response)) {
+    for (final item in _normalizeSupabaseResponse(response)) {
       final normalized = Map<String, dynamic>.from(item);
       normalized['member_id'] = memberId;
       if (member?.name != null) {
@@ -1452,7 +1452,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     return rows;
   }
 
-  Future<_MemberMetadata?> _fetchMemberMetadata(
+  Future<_MemberMetadata?> _loadMemberMetadata(
     supabase.SupabaseClient client,
     String memberId,
   ) async {
@@ -1463,7 +1463,7 @@ class EmailHistoryProvider extends ChangeNotifier {
           .eq('id', memberId)
           .limit(1);
 
-      final rows = _normalizeSupabaseList(response);
+      final rows = _normalizeSupabaseResponse(response);
       if (rows.isNotEmpty) {
         final row = rows.first;
         return _MemberMetadata(
@@ -1478,7 +1478,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     return null;
   }
 
-  List<Map<String, dynamic>> _normalizeSupabaseList(dynamic response) {
+  List<Map<String, dynamic>> _normalizeSupabaseResponse(dynamic response) {
     dynamic data = response;
     if (response is supabase.PostgrestResponse) {
       data = response.data;
