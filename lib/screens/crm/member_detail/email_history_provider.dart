@@ -568,6 +568,8 @@ class EmailHistoryProvider extends ChangeNotifier {
       }
     }
 
+    databaseClient ??= functionClient;
+
     Future<({int status, dynamic data})> invoke(String name, {Map<String, dynamic>? body}) async {
       Map<String, dynamic>? sanitizedBody;
       if (body != null) {
@@ -628,8 +630,14 @@ class EmailHistoryProvider extends ChangeNotifier {
           Logger.warn(
             'Email history edge function returned ${result.status} for member $memberId: $normalizedData',
           );
-          failureMessage = _extractErrorMessage(normalizedData) ??
-              'Failed to sync email history (HTTP ${result.status}).';
+          final extractedMessage = _extractErrorMessage(normalizedData);
+          final bool isServerError = result.status >= 500;
+          final String fallback = isServerError
+              ? 'Email sync is currently unavailable (HTTP ${result.status}). Any cached results will be shown if available.'
+              : 'Failed to sync email history (HTTP ${result.status}).';
+          failureMessage = (extractedMessage != null && extractedMessage.trim().isNotEmpty)
+              ? extractedMessage.trim()
+              : fallback;
         } else {
           functionEntries = _extractEntries(normalizedData);
         }
@@ -701,11 +709,14 @@ class EmailHistoryProvider extends ChangeNotifier {
       appendEntries(historyRows);
 
       if (entries.isEmpty) {
+        final List<EmailHistoryEntry> resolvedEntries = failureMessage == null
+            ? const <EmailHistoryEntry>[]
+            : current.entries;
         _stateByMember[memberId] = EmailHistoryState(
           isLoading: false,
           hasLoaded: true,
-          entries: current.entries,
-          error: failureMessage ?? 'No email history is available for this member yet.',
+          entries: resolvedEntries,
+          error: failureMessage,
         );
         notifyListeners();
         return;
@@ -721,6 +732,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         isLoading: false,
         hasLoaded: true,
         entries: entries,
+        error: null,
       );
     } catch (error, stack) {
       Logger.warn('Failed to load email history for $memberId: $error', trace: stack);
