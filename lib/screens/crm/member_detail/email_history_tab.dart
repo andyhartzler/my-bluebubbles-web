@@ -30,14 +30,16 @@ class EmailHistoryTab extends StatefulWidget {
 
 class _EmailHistoryTabState extends State<EmailHistoryTab> {
   late final DateFormat _timestampFormat = DateFormat('MMM d, y • h:mm a');
+  bool _requestedInitialLoad = false;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      context.read<EmailHistoryProvider>().ensureLoaded(widget.memberId);
-    });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = Provider.maybeOf<EmailHistoryProvider>(context, listen: false);
+    if (provider != null && !_requestedInitialLoad) {
+      _requestedInitialLoad = true;
+      provider.ensureLoaded(widget.memberId);
+    }
   }
 
   Future<void> _openThread(EmailHistoryEntry entry) async {
@@ -217,6 +219,11 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = Provider.maybeOf<EmailHistoryProvider>(context, listen: false);
+    if (provider == null) {
+      return const _MissingProviderView();
+    }
+
     return Consumer<EmailHistoryProvider>(
       builder: (context, provider, _) {
         final state = provider.stateForMember(widget.memberId);
@@ -489,6 +496,38 @@ class _ErrorView extends StatelessWidget {
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MissingProviderView extends StatelessWidget {
+  const _MissingProviderView();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyMedium?.color?.withOpacity(0.75);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.info_outline, size: 40, color: theme.colorScheme.primary),
+            const SizedBox(height: 16),
+            Text(
+              'Email history unavailable',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Email history requires an EmailHistoryProvider above this screen. Please ensure the CRM providers are configured.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
             ),
           ],
         ),
