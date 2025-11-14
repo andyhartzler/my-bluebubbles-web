@@ -278,14 +278,34 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
           );
         }
 
+        final bool showWarning = state.error != null;
+        final int itemCount = state.entries.length + (showWarning ? 1 : 0);
+
         return RefreshIndicator(
           onRefresh: () => provider.refresh(widget.memberId),
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             physics: const AlwaysScrollableScrollPhysics(),
-            itemCount: state.entries.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemCount: itemCount,
+            separatorBuilder: (_, index) {
+              if (showWarning && index == 0) {
+                return const SizedBox(height: 16);
+              }
+              return const SizedBox(height: 12);
+            },
             itemBuilder: (context, index) {
+              if (showWarning) {
+                if (index == 0) {
+                  return _SyncWarningBanner(message: state.error!);
+                }
+                final entry = state.entries[index - 1];
+                return _EmailHistoryTile(
+                  entry: entry,
+                  formatTimestamp: _timestampFormat,
+                  onTap: () => _openThread(entry),
+                );
+              }
+
               final entry = state.entries[index];
               return _EmailHistoryTile(
                 entry: entry,
@@ -507,6 +527,55 @@ class _ErrorView extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SyncWarningBanner extends StatelessWidget {
+  const _SyncWarningBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: colorScheme.tertiaryContainer.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.tertiary.withOpacity(0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: colorScheme.tertiary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Email sync is experiencing issues',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: colorScheme.tertiary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
