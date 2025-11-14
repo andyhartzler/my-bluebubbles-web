@@ -4,6 +4,7 @@ import {
   buildEmailInboxRecord,
   extractHeader,
   firstEmailAddress,
+  handleRequest,
   parseEmailAddresses,
   resolveMemberId,
 } from "./index.ts";
@@ -145,5 +146,22 @@ Deno.test("resolveMemberId logs and returns null when lookup fails", async () =>
 
   assertEquals(memberId, null);
   assertStringIncludes(messages.at(-1) ?? "", "warn:Failed to resolve member for email");
+});
+
+Deno.test("handleRequest responds to OPTIONS with CORS headers", async () => {
+  const request = new Request("https://example.com", {
+    method: "OPTIONS",
+    headers: {
+      Origin: "https://app.example.com",
+      "Access-Control-Request-Headers": "X-Test-Header",
+    },
+  });
+
+  const response = await handleRequest(request);
+
+  assertEquals(response.status, 204);
+  assertEquals(response.headers.get("Access-Control-Allow-Origin"), "https://app.example.com");
+  assertEquals(response.headers.get("Access-Control-Allow-Methods"), "POST, OPTIONS");
+  assertStringIncludes(response.headers.get("Access-Control-Allow-Headers") ?? "", "x-test-header");
 });
 
