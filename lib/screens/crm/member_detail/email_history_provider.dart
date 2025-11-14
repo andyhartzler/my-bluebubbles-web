@@ -541,10 +541,12 @@ class EmailHistoryProvider extends ChangeNotifier {
       return;
     }
 
-    supabase.SupabaseClient? client;
+    supabase.SupabaseClient? databaseClient;
+    supabase.SupabaseClient? functionClient;
+
     if (_functionInvokerOverride == null) {
       try {
-        client = _supabaseService.privilegedClient;
+        functionClient = _supabaseService.client;
       } catch (error, stack) {
         Logger.warn('Supabase client unavailable for email history: $error', trace: stack);
         _stateByMember[memberId] = EmailHistoryState(
@@ -555,6 +557,14 @@ class EmailHistoryProvider extends ChangeNotifier {
         );
         notifyListeners();
         return;
+      }
+    }
+
+    if (_supabaseService.hasServiceRole && _functionInvokerOverride == null) {
+      try {
+        databaseClient = _supabaseService.privilegedClient;
+      } catch (error, stack) {
+        Logger.warn('Supabase privileged client unavailable: $error', trace: stack);
       }
     }
 
@@ -569,7 +579,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         return _functionInvokerOverride!(name, body: sanitizedBody);
       }
 
-      final supabase.SupabaseClient resolvedClient = client!;
+      final supabase.SupabaseClient resolvedClient = functionClient!;
       try {
         final response = await resolvedClient.functions.invoke(
           name,
@@ -603,7 +613,7 @@ class EmailHistoryProvider extends ChangeNotifier {
       final requestBody = <String, dynamic>{
         'memberId': trimmedMemberId,
         'member_id': trimmedMemberId,
-        'maxResults': 50,
+        'maxResults': 200,
         'syncToDatabase': true,
       };
 
@@ -629,9 +639,9 @@ class EmailHistoryProvider extends ChangeNotifier {
       }
 
       final List<Map<String, dynamic>> historyRows = <Map<String, dynamic>>[];
-      if (client != null) {
+      if (databaseClient != null) {
         try {
-          final response = await client
+          final response = await databaseClient
               .from('member_email_history')
               .select(
                 [
