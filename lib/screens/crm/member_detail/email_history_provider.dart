@@ -616,6 +616,7 @@ class EmailHistoryProvider extends ChangeNotifier {
           trimmedMemberId,
           member: memberMetadata,
         ),
+        recordFailure: false,
       );
 
       await loadSource(
@@ -1398,58 +1399,63 @@ class EmailHistoryProvider extends ChangeNotifier {
     String memberId, {
     _MemberMetadata? member,
   }) async {
-    final response = await client
-        .from('email_logs')
-        .select(
-          [
-            'id',
-            'subject',
-            'body',
-            'sender',
-            'recipient_emails',
-            'cc_emails',
-            'bcc_emails',
-            'created_at',
-            'gmail_message_id',
-            'gmail_thread_id',
-            'message_state',
-            'status',
-            'metadata',
-            'headers',
-            'email_log_members!inner(member_id)',
-          ].join(','),
-        )
-        .eq('email_log_members.member_id', memberId)
-        .order('created_at', ascending: false)
-        .limit(200);
+    try {
+      final response = await client
+          .from('email_logs')
+          .select(
+            [
+              'id',
+              'subject',
+              'body',
+              'sender',
+              'recipient_emails',
+              'cc_emails',
+              'bcc_emails',
+              'created_at',
+              'gmail_message_id',
+              'gmail_thread_id',
+              'message_state',
+              'status',
+              'metadata',
+              'headers',
+              'email_log_members!inner(member_id)',
+            ].join(','),
+          )
+          .eq('email_log_members.member_id', memberId)
+          .order('created_at', ascending: false)
+          .limit(200);
 
-    final rows = <Map<String, dynamic>>[];
-    for (final item in _normalizeSupabaseResponse(response)) {
-      final normalized = Map<String, dynamic>.from(item);
-      normalized['member_id'] = memberId;
-      if (member?.name != null) {
-        normalized['member_name'] ??= member!.name;
-      }
-      if (member?.email != null) {
-        normalized['member_email'] ??= member!.email;
-      }
-      normalized['email_type'] = (normalized['email_type'] ?? 'sent').toString();
-      normalized['direction'] ??= normalized['email_type'];
-      normalized['email_date'] ??= normalized['created_at'];
-      normalized['from_address'] ??= normalized['sender'];
+      final rows = <Map<String, dynamic>>[];
+      for (final item in _normalizeSupabaseResponse(response)) {
+        final normalized = Map<String, dynamic>.from(item);
+        normalized['member_id'] = memberId;
+        if (member?.name != null) {
+          normalized['member_name'] ??= member!.name;
+        }
+        if (member?.email != null) {
+          normalized['member_email'] ??= member!.email;
+        }
+        normalized['email_type'] = (normalized['email_type'] ?? 'sent').toString();
+        normalized['direction'] ??= normalized['email_type'];
+        normalized['email_date'] ??= normalized['created_at'];
+        normalized['from_address'] ??= normalized['sender'];
 
-      final dynamic recipients = normalized['recipient_emails'];
-      if (recipients is List) {
-        normalized['to_address'] =
-            recipients.map((value) => value.toString()).join(', ');
-      } else if (recipients is String) {
-        normalized['to_address'] ??= recipients;
+        final dynamic recipients = normalized['recipient_emails'];
+        if (recipients is List) {
+          normalized['to_address'] =
+              recipients.map((value) => value.toString()).join(', ');
+        } else if (recipients is String) {
+          normalized['to_address'] ??= recipients;
+        }
+
+        rows.add(normalized);
       }
 
-      rows.add(normalized);
+      return rows;
+    } catch (error, stack) {
+      Logger.warn('Failed to fetch sent email logs for $memberId: $error', trace: stack);
+      return const <Map<String, dynamic>>[];
     }
-
-    return rows;
   }
 
   Future<_MemberMetadata?> _loadMemberMetadata(
