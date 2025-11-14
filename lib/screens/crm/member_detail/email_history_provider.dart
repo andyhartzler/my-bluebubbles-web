@@ -640,14 +640,12 @@ class EmailHistoryProvider extends ChangeNotifier {
         }
       }
 
-      final includeFallbackTables = _supabaseService.hasServiceRole;
       List<Map<String, dynamic>> cachedRows = const <Map<String, dynamic>>[];
       if (databaseClient != null) {
         try {
           cachedRows = await _fetchCachedHistoryRows(
             databaseClient,
             trimmedMemberId,
-            includeFallbackTables: includeFallbackTables,
           );
           appendFromRows(cachedRows);
         } catch (error, stack) {
@@ -897,16 +895,19 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   Future<List<Map<String, dynamic>>> _fetchCachedHistoryRows(
     supabase.SupabaseClient client,
-    String memberId, {
-    required bool includeFallbackTables,
-  }) async {
+    String memberId,
+  ) async {
     final viewRows = await _queryMemberEmailHistoryView(client, memberId);
-    if (viewRows.isNotEmpty || !includeFallbackTables) {
+    if (viewRows.isNotEmpty) {
       return viewRows;
     }
 
     final fallbackRows = await _fetchCachedHistoryRowsFromTables(client, memberId);
-    return fallbackRows;
+    if (fallbackRows.isNotEmpty) {
+      return fallbackRows;
+    }
+
+    return const <Map<String, dynamic>>[];
   }
 
   Future<List<Map<String, dynamic>>> _queryMemberEmailHistoryView(
@@ -972,22 +973,20 @@ class EmailHistoryProvider extends ChangeNotifier {
               'from_address',
               'to_address',
               'cc_address',
-              'bcc_address',
               'subject',
               'snippet',
               'body_html',
               'body_text',
               'date',
               'created_at',
-              'updated_at',
               'gmail_message_id',
               'gmail_thread_id',
               'message_id',
               'in_reply_to',
               'references_header',
               'label_ids',
-              'metadata',
-              'headers',
+              'is_read',
+              'synced_at',
             ].join(','),
           )
           .eq('member_id', memberId)
@@ -1003,10 +1002,9 @@ class EmailHistoryProvider extends ChangeNotifier {
           if (member?.email != null) 'member_email': member!.email,
           'email_type': 'received',
           'log_id': normalized['id'] ?? normalized['log_id'],
-          'email_date': normalized['date'] ?? normalized['created_at'],
+          'email_date': normalized['date'] ?? normalized['created_at'] ?? normalized['synced_at'],
           'to_address': normalized['to_address'],
-          'cc_emails': normalized['cc_address'],
-          'bcc_emails': normalized['bcc_address'],
+          if (normalized.containsKey('cc_address')) 'cc_emails': normalized['cc_address'],
           'from_address': normalized['from_address'],
         });
       }
