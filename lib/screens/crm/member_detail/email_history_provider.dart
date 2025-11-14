@@ -541,10 +541,12 @@ class EmailHistoryProvider extends ChangeNotifier {
       return;
     }
 
-    supabase.SupabaseClient? client;
+    supabase.SupabaseClient? databaseClient;
+    supabase.SupabaseClient? functionClient;
+
     if (_functionInvokerOverride == null) {
       try {
-        client = _supabaseService.privilegedClient;
+        functionClient = _supabaseService.client;
       } catch (error, stack) {
         Logger.warn('Supabase client unavailable for email history: $error', trace: stack);
         _stateByMember[memberId] = EmailHistoryState(
@@ -555,6 +557,14 @@ class EmailHistoryProvider extends ChangeNotifier {
         );
         notifyListeners();
         return;
+      }
+    }
+
+    if (_supabaseService.hasServiceRole && _functionInvokerOverride == null) {
+      try {
+        databaseClient = _supabaseService.privilegedClient;
+      } catch (error, stack) {
+        Logger.warn('Supabase privileged client unavailable: $error', trace: stack);
       }
     }
 
@@ -569,7 +579,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         return _functionInvokerOverride!(name, body: sanitizedBody);
       }
 
-      final supabase.SupabaseClient resolvedClient = client!;
+      final supabase.SupabaseClient resolvedClient = functionClient!;
       try {
         final response = await resolvedClient.functions.invoke(
           name,
@@ -603,7 +613,7 @@ class EmailHistoryProvider extends ChangeNotifier {
       final requestBody = <String, dynamic>{
         'memberId': trimmedMemberId,
         'member_id': trimmedMemberId,
-        'maxResults': 50,
+        'maxResults': 200,
         'syncToDatabase': true,
       };
 
@@ -629,37 +639,24 @@ class EmailHistoryProvider extends ChangeNotifier {
       }
 
       final List<Map<String, dynamic>> historyRows = <Map<String, dynamic>>[];
-      if (client != null) {
+      if (databaseClient != null) {
         try {
-          final response = await client
+          final response = await databaseClient
               .from('member_email_history')
               .select(
                 [
                   'member_id',
                   'member_name',
                   'member_email',
-                  'email_id',
-                  'message_id',
-                  'thread_id',
+                  'email_type',
+                  'log_id',
                   'subject',
-                  'direction',
-                  'message_state',
-                  'from_email',
-                  'to_emails',
-                  'cc_emails',
-                  'bcc_emails',
-                  'reply_to_email',
-                  'received_at',
-                  'sent_at',
-                  'snippet',
-                  'body_text',
-                  'body_html',
-                  'references_header',
-                  'in_reply_to_header',
-                  'headers',
-                  'metadata',
-                  'created_at',
-                  'updated_at',
+                  'body',
+                  'from_address',
+                  'to_address',
+                  'email_date',
+                  'gmail_message_id',
+                  'gmail_thread_id',
                 ].join(','),
               )
               .eq('member_id', trimmedMemberId)
