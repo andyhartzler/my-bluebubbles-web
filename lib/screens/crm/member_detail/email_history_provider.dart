@@ -541,24 +541,36 @@ class EmailHistoryProvider extends ChangeNotifier {
       return;
     }
 
-    supabase.SupabaseClient? client;
+    supabase.SupabaseClient? databaseClient;
+    supabase.SupabaseClient? functionClient;
+
+    try {
+      databaseClient = _supabaseService.privilegedClient;
+    } catch (error, stack) {
+      Logger.warn('Supabase client unavailable for email history: $error', trace: stack);
+      _stateByMember[memberId] = EmailHistoryState(
+        isLoading: false,
+        hasLoaded: true,
+        entries: const [],
+        error: 'Supabase client is not available.',
+      );
+      notifyListeners();
+      return;
+    }
+
     if (_functionInvokerOverride == null) {
       try {
-        client = _supabaseService.privilegedClient;
+        functionClient = _supabaseService.client;
       } catch (error, stack) {
-        Logger.warn('Supabase client unavailable for email history: $error', trace: stack);
-        _stateByMember[memberId] = EmailHistoryState(
-          isLoading: false,
-          hasLoaded: true,
-          entries: const [],
-          error: 'Supabase client is not available.',
-        );
-        notifyListeners();
-        return;
+        Logger.warn('Supabase function client unavailable: $error', trace: stack);
+        functionClient = databaseClient;
       }
     }
 
-    Future<({int status, dynamic data})> invoke(String name, {Map<String, dynamic>? body}) async {
+    Future<({int status, dynamic data})> invoke(
+      String name, {
+      Map<String, dynamic>? body,
+    }) async {
       Map<String, dynamic>? sanitizedBody;
       if (body != null) {
         sanitizedBody = Map<String, dynamic>.from(body)
@@ -569,9 +581,13 @@ class EmailHistoryProvider extends ChangeNotifier {
         return _functionInvokerOverride!(name, body: sanitizedBody);
       }
 
-      final supabase.SupabaseClient resolvedClient = client!;
+      final supabase.SupabaseClient? target = functionClient;
+      if (target == null) {
+        return (status: 503, data: 'Supabase client unavailable');
+      }
+
       try {
-        final response = await resolvedClient.functions.invoke(
+        final response = await target.functions.invoke(
           name,
           body: sanitizedBody,
         );
@@ -600,97 +616,31 @@ class EmailHistoryProvider extends ChangeNotifier {
         notifyListeners();
         return;
       }
-      final requestBody = <String, dynamic>{
-        'memberId': trimmedMemberId,
-        'member_id': trimmedMemberId,
-        'maxResults': 50,
-        'syncToDatabase': true,
-      };
 
-      List<Map<String, dynamic>> functionEntries = const <Map<String, dynamic>>[];
-      String? failureMessage;
-
-      try {
-        final result = await invoke('get-member-emails', body: requestBody);
-        final normalizedData = _normalizeResponsePayload(result.data);
-
-        if (result.status != 200) {
-          Logger.warn(
-            'Email history edge function returned ${result.status} for member $memberId: $normalizedData',
-          );
-          failureMessage = _extractErrorMessage(normalizedData) ??
-              'Failed to sync email history (HTTP ${result.status}).';
-        } else {
-          functionEntries = _extractEntries(normalizedData);
-        }
-      } catch (error, stack) {
-        Logger.warn('Email history sync failed for $memberId: $error', trace: stack);
-        failureMessage ??= 'Unable to refresh email history from Supabase.';
-      }
-
-      final List<Map<String, dynamic>> historyRows = <Map<String, dynamic>>[];
-      if (client != null) {
-        try {
-          final response = await client
-              .from('member_email_history')
-              .select(
-                [
-                  'member_id',
-                  'member_name',
-                  'member_email',
-                  'email_id',
-                  'message_id',
-                  'thread_id',
-                  'subject',
-                  'direction',
-                  'message_state',
-                  'from_email',
-                  'to_emails',
-                  'cc_emails',
-                  'bcc_emails',
-                  'reply_to_email',
-                  'received_at',
-                  'sent_at',
-                  'snippet',
-                  'body_text',
-                  'body_html',
-                  'references_header',
-                  'in_reply_to_header',
-                  'headers',
-                  'metadata',
-                  'created_at',
-                  'updated_at',
-                ].join(','),
-              )
-              .eq('member_id', trimmedMemberId)
-              .order('sent_at', ascending: false)
-              .limit(200);
-
-          if (response is List) {
-            historyRows.addAll(
-              response.whereType<Map<String, dynamic>>().map(
-                    (row) => row.map<String, dynamic>(
-                      (key, value) => MapEntry(key.toString(), value),
-                    ),
-                  ),
-            );
-          }
-        } catch (error, stack) {
-          Logger.warn('Failed to query member_email_history for $memberId: $error', trace: stack);
-          failureMessage ??= 'Failed to load cached email history.';
-        }
-      }
-
-      final entries = <EmailHistoryEntry>[];
       final seen = LinkedHashSet<String>();
+      final entries = <EmailHistoryEntry>[];
 
-      void appendEntries(Iterable<Map<String, dynamic>> rows) {
+      for (final entry in current.entries) {
+        final key = entry.id.trim().isEmpty ? entry.hashCode.toString() : entry.id.trim();
+        if (seen.add(key)) {
+          entries.add(entry);
+        }
+      }
+
+      final failures = <String>[];
+
+      void recordFailure(String? message) {
+        if (message == null) return;
+        final trimmed = message.trim();
+        if (trimmed.isEmpty) return;
+        failures.add(trimmed);
+      }
+
+      void appendFromRows(List<Map<String, dynamic>> rows) {
         for (final row in rows) {
           try {
             final entry = EmailHistoryEntry.fromMap(row);
-            final key = entry.id.trim().isEmpty
-                ? row.hashCode.toString()
-                : entry.id.trim();
+            final key = entry.id.trim().isEmpty ? row.hashCode.toString() : entry.id.trim();
             if (seen.add(key)) {
               entries.add(entry);
             }
@@ -700,15 +650,99 @@ class EmailHistoryProvider extends ChangeNotifier {
         }
       }
 
-      appendEntries(functionEntries);
-      appendEntries(historyRows);
+      List<Map<String, dynamic>> cachedRows = const <Map<String, dynamic>>[];
+      if (databaseClient != null) {
+        try {
+          cachedRows = await _fetchCachedHistoryRows(
+            databaseClient,
+            trimmedMemberId,
+          );
+          appendFromRows(cachedRows);
+        } catch (error, stack) {
+          Logger.warn('Failed to query member_email_history for $memberId: $error', trace: stack);
+          recordFailure('Failed to load cached email history.');
+        }
+      }
 
-      if (entries.isEmpty) {
+      if (entries.isNotEmpty && current.entries.isEmpty) {
+        _stateByMember[memberId] = EmailHistoryState(
+          isLoading: true,
+          hasLoaded: true,
+          entries: List<EmailHistoryEntry>.unmodifiable(entries),
+          error: null,
+        );
+        notifyListeners();
+      }
+
+      List<Map<String, dynamic>> functionRows = const <Map<String, dynamic>>[];
+      bool syncSucceeded = false;
+
+      if (_functionInvokerOverride != null || functionClient != null) {
+        final requestBody = <String, dynamic>{
+          'memberId': trimmedMemberId,
+          'member_id': trimmedMemberId,
+          'maxResults': 200,
+          'limit': 200,
+          'syncToDatabase': true,
+        };
+
+        try {
+          final result = await invoke('get-member-emails', body: requestBody);
+          final normalizedData = _normalizeResponsePayload(result.data);
+          final int status = result.status;
+
+          if (status >= 200 && status < 300) {
+            syncSucceeded = true;
+            functionRows = _extractEntries(normalizedData);
+          } else {
+            final extracted = _extractErrorMessage(normalizedData);
+            final bool workerLimit = status == 546 ||
+                (extracted?.toUpperCase().contains('WORKER_LIMIT') ?? false);
+            final String baseMessage = workerLimit
+                ? 'Email sync is temporarily over capacity. Showing cached history.'
+                : 'Failed to sync email history (HTTP $status).';
+            final String detailedMessage = extracted != null && extracted.isNotEmpty
+                ? '$baseMessage ${extracted.trim()}'
+                : baseMessage;
+            recordFailure(detailedMessage);
+          }
+        } catch (error, stack) {
+          Logger.warn('Email history sync failed for $memberId: $error', trace: stack);
+          recordFailure('Unable to refresh email history from Supabase.');
+        }
+      }
+
+      if (functionRows.isNotEmpty) {
+        appendFromRows(functionRows);
+      }
+
+      if (syncSucceeded && databaseClient != null) {
+        try {
+          final refreshedRows = await _fetchCachedHistoryRows(
+            databaseClient,
+            trimmedMemberId,
+          );
+          if (refreshedRows.isNotEmpty) {
+            cachedRows = refreshedRows;
+            appendFromRows(refreshedRows);
+          }
+        } catch (error, stack) {
+          Logger.warn('Failed to reload email history for $memberId after sync: $error', trace: stack);
+          recordFailure('Email history synced but could not reload results.');
+        }
+      }
+
+      final String? failureMessage = failures.isEmpty ? null : failures.join(' ');
+
+      if (entries.isEmpty && cachedRows.isEmpty && functionRows.isEmpty) {
+        final List<EmailHistoryEntry> resolvedEntries = failureMessage == null
+            ? const <EmailHistoryEntry>[]
+            : current.entries;
         _stateByMember[memberId] = EmailHistoryState(
           isLoading: false,
           hasLoaded: true,
-          entries: current.entries,
-          error: failureMessage ?? 'No email history is available for this member yet.',
+          entries: resolvedEntries,
+          error: failureMessage,
         );
         notifyListeners();
         return;
@@ -723,7 +757,8 @@ class EmailHistoryProvider extends ChangeNotifier {
       _stateByMember[memberId] = EmailHistoryState(
         isLoading: false,
         hasLoaded: true,
-        entries: entries,
+        entries: List<EmailHistoryEntry>.unmodifiable(entries),
+        error: failureMessage,
       );
     } catch (error, stack) {
       Logger.warn('Failed to load email history for $memberId: $error', trace: stack);
@@ -840,13 +875,263 @@ class EmailHistoryProvider extends ChangeNotifier {
     return data;
   }
 
-  bool _isMissingColumnError(supabase.PostgrestException error, String columnName) {
-    final String lowerColumn = columnName.toLowerCase();
-    if (error.code == '42703') {
-      return true;
+  Future<List<Map<String, dynamic>>> _fetchCachedHistoryRows(
+    supabase.SupabaseClient client,
+    String memberId,
+  ) async {
+    List<Map<String, dynamic>> viewRows = const <Map<String, dynamic>>[];
+    try {
+      final response = await client
+          .from('member_email_history')
+          .select(
+            [
+              'id',
+              'member_id',
+              'member_name',
+              'member_email',
+              'email_type',
+              'log_id',
+              'subject',
+              'body',
+              'from_address',
+              'to_address',
+              'email_date',
+              'gmail_message_id',
+              'gmail_thread_id',
+              'created_at',
+              'updated_at',
+            ].join(','),
+          )
+          .eq('member_id', memberId)
+          .order('email_date', ascending: false)
+          .limit(200);
+
+      final normalized = _normalizeSupabaseList(response);
+      if (normalized.isNotEmpty) {
+        viewRows = normalized.map((row) {
+          final map = Map<String, dynamic>.from(row);
+          final dynamic rawLogId = row['log_id'] ?? row['id'];
+          if (rawLogId != null) {
+            final logId = rawLogId.toString();
+            map['log_id'] = logId;
+            map['email_id'] = logId;
+            map['id'] = logId;
+          }
+          map['direction'] = row['email_type'] ?? row['direction'];
+          map['from_email'] = row['from_address'] ?? row['from_email'];
+          map['to_emails'] = row['to_address'] ?? row['to_emails'];
+          final dynamic emailDate = row['email_date'];
+          if (emailDate != null) {
+            map['email_date'] = emailDate;
+            map['sent_at'] = emailDate;
+            map['received_at'] = emailDate;
+          }
+          map['thread_id'] = row['gmail_thread_id'] ?? row['thread_id'];
+          map['gmail_thread_id'] = row['gmail_thread_id'];
+          map['message_id'] = row['gmail_message_id'] ?? row['message_id'];
+          map['gmail_message_id'] = row['gmail_message_id'];
+          map['body_text'] = row['body'] ?? row['body_text'];
+          return map;
+        }).toList(growable: false);
+      }
+    } catch (error, stack) {
+      Logger.warn(
+        'Failed to query member_email_history view for $memberId: $error',
+        trace: stack,
+      );
     }
-    final String message = (error.message ?? '').toLowerCase();
-    return message.contains('column') && message.contains(lowerColumn);
+
+    if (viewRows.isNotEmpty) {
+      return viewRows;
+    }
+
+    return _fetchCachedHistoryRowsFromTables(client, memberId);
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchCachedHistoryRowsFromTables(
+    supabase.SupabaseClient client,
+    String memberId,
+  ) async {
+    final member = await _fetchMemberMetadata(client, memberId);
+    final results = <Map<String, dynamic>>[];
+
+    try {
+      final inboxResponse = await client
+          .from('email_inbox')
+          .select(
+            [
+              'id',
+              'member_id',
+              'from_address',
+              'to_address',
+              'cc_address',
+              'subject',
+              'snippet',
+              'body_html',
+              'body_text',
+              'date',
+              'created_at',
+              'gmail_message_id',
+              'gmail_thread_id',
+              'message_id',
+              'in_reply_to',
+              'references_header',
+              'label_ids',
+              'is_read',
+              'synced_at',
+            ].join(','),
+          )
+          .eq('member_id', memberId)
+          .order('date', ascending: false)
+          .limit(200);
+
+      for (final item in _normalizeSupabaseList(inboxResponse)) {
+        final normalized = item;
+        results.add({
+          ...normalized,
+          'member_id': memberId,
+          if (member?.name != null) 'member_name': member!.name,
+          if (member?.email != null) 'member_email': member!.email,
+          'email_type': 'received',
+          'log_id': normalized['id'] ?? normalized['log_id'],
+          'email_date': normalized['date'] ?? normalized['created_at'] ?? normalized['synced_at'],
+          'to_address': normalized['to_address'],
+          if (normalized.containsKey('cc_address')) 'cc_emails': normalized['cc_address'],
+          'from_address': normalized['from_address'],
+        });
+      }
+    } catch (error, stack) {
+      Logger.warn('Failed to query email_inbox for $memberId: $error', trace: stack);
+    }
+
+    try {
+      final sentResponse = await client
+          .from('email_logs')
+          .select(
+            [
+              'id',
+              'subject',
+              'body',
+              'sender',
+              'recipient_emails',
+              'cc_emails',
+              'bcc_emails',
+              'created_at',
+              'gmail_message_id',
+              'gmail_thread_id',
+              'message_state',
+              'status',
+              'metadata',
+              'headers',
+              'email_log_members!inner(member_id)',
+            ].join(','),
+          )
+          .eq('email_log_members.member_id', memberId)
+          .order('created_at', ascending: false)
+          .limit(200);
+
+      for (final item in _normalizeSupabaseList(sentResponse)) {
+        final normalized = item;
+
+        final dynamic recipients = normalized['recipient_emails'];
+        String? toAddress;
+        if (recipients is List) {
+          toAddress = recipients.map((e) => e.toString()).join(', ');
+        } else if (recipients is String) {
+          toAddress = recipients;
+        }
+
+        results.add({
+          ...normalized,
+          'member_id': memberId,
+          if (member?.name != null) 'member_name': member!.name,
+          if (member?.email != null) 'member_email': member!.email,
+          'email_type': 'sent',
+          'log_id': normalized['id'] ?? normalized['log_id'],
+          'email_date': normalized['created_at'],
+          'from_address': normalized['sender'],
+          if (toAddress != null) 'to_address': toAddress,
+        });
+      }
+    } catch (error, stack) {
+      Logger.warn('Failed to query email_logs for $memberId: $error', trace: stack);
+    }
+
+    if (results.length <= 200) {
+      return results;
+    }
+
+    results.sort((a, b) {
+      final aDate = _coerceToDateTime(a['email_date']);
+      final bDate = _coerceToDateTime(b['email_date']);
+      final aMillis = aDate?.millisecondsSinceEpoch ?? 0;
+      final bMillis = bDate?.millisecondsSinceEpoch ?? 0;
+      return bMillis.compareTo(aMillis);
+    });
+
+    return results.take(200).toList(growable: false);
+  }
+
+  DateTime? _coerceToDateTime(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+      return DateTime.tryParse(trimmed);
+    }
+    if (value is num) {
+      final millis = value.toInt();
+      if (millis <= 0) return null;
+      return DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
+    }
+    return null;
+  }
+
+  Future<_MemberMetadata?> _fetchMemberMetadata(
+    supabase.SupabaseClient client,
+    String memberId,
+  ) async {
+    try {
+      final response = await client
+          .from('members')
+          .select('id,name,email')
+          .eq('id', memberId)
+          .limit(1);
+
+      final rows = _normalizeSupabaseList(response);
+      if (rows.isNotEmpty) {
+        final row = rows.first;
+        return _MemberMetadata(
+          id: row['id']?.toString(),
+          name: row['name']?.toString(),
+          email: row['email']?.toString(),
+        );
+      }
+    } catch (error, stack) {
+      Logger.warn('Failed to fetch member metadata for $memberId: $error', trace: stack);
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> _normalizeSupabaseList(dynamic response) {
+    dynamic data = response;
+    if (response is supabase.PostgrestResponse) {
+      data = response.data;
+    } else if (response is Map<String, dynamic> && response.containsKey('data')) {
+      data = response['data'];
+    }
+
+    if (data is List) {
+      return data.where((row) => row is Map).map((row) {
+        final result = <String, dynamic>{};
+        (row as Map).forEach((key, value) {
+          result[key.toString()] = value;
+        });
+        return result;
+      }).toList(growable: false);
+    }
+
+    return const <Map<String, dynamic>>[];
   }
 
   Future<List<EmailMessage>> fetchThreadMessages({
@@ -1189,4 +1474,16 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   @visibleForTesting
   EmailMessage debugMapEmailMessage(Map<String, dynamic> row) => _mapEmailMessage(row);
+}
+
+class _MemberMetadata {
+  const _MemberMetadata({
+    this.id,
+    this.name,
+    this.email,
+  });
+
+  final String? id;
+  final String? name;
+  final String? email;
 }
