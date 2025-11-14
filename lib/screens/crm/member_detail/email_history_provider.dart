@@ -1345,23 +1345,23 @@ class EmailHistoryProvider extends ChangeNotifier {
           [
             'id',
             'member_id',
-            'from_address',
-            'to_address',
-            'cc_address',
-            'subject',
-            'snippet',
-            'body_html',
-            'body_text',
-            'date',
-            'created_at',
             'gmail_message_id',
             'gmail_thread_id',
             'message_id',
-            'in_reply_to',
-            'references_header',
+            'subject',
+            'from_address',
+            'to_address',
+            'cc_address',
+            'snippet',
+            'body_html',
+            'body_text',
             'label_ids',
-            'is_read',
+            'references_header',
+            'in_reply_to',
+            'date',
+            'created_at',
             'synced_at',
+            'is_read',
           ].join(','),
         )
         .eq('member_id', memberId)
@@ -1385,9 +1385,9 @@ class EmailHistoryProvider extends ChangeNotifier {
       normalized['thread_id'] ??= normalized['gmail_thread_id'];
       normalized['gmail_thread_id'] ??= normalized['thread_id'];
       normalized['gmail_message_id'] ??= normalized['message_id'];
-      if (normalized.containsKey('cc_address')) {
-        normalized['cc_emails'] ??= normalized['cc_address'];
-      }
+      normalized['from_email'] ??= normalized['from_address'];
+      normalized['to_emails'] ??= normalized['to_address'];
+      normalized['cc_emails'] ??= normalized['cc_address'];
       rows.add(normalized);
     }
 
@@ -1529,6 +1529,7 @@ class EmailHistoryProvider extends ChangeNotifier {
               'id',
               'gmail_message_id',
               'gmail_thread_id',
+              'message_id',
               'subject',
               'body_html',
               'body_text',
@@ -1536,22 +1537,33 @@ class EmailHistoryProvider extends ChangeNotifier {
               'from_address',
               'to_address',
               'cc_address',
-              'bcc_address',
               'label_ids',
-              'message_id',
               'in_reply_to',
               'references_header',
               'date',
+              'created_at',
               'synced_at',
+              'is_read',
             ].join(','),
           )
           .eq('member_id', memberId)
-          .eq('gmail_thread_id', threadId)
+          .or(
+            [
+              'gmail_thread_id.eq.$threadId',
+              'message_id.eq.$threadId',
+              'gmail_message_id.eq.$threadId',
+            ].join(','),
+          )
           .order('date', ascending: true);
 
-      final rows = response is List
-          ? response.whereType<Map<String, dynamic>>().toList(growable: false)
-          : <Map<String, dynamic>>[];
+      final rows = _normalizeSupabaseResponse(response);
+      for (final row in rows) {
+        row['from_email'] ??= row['from_address'];
+        row['to_emails'] ??= row['to_address'];
+        row['cc_emails'] ??= row['cc_address'];
+        row['thread_id'] ??= row['gmail_thread_id'];
+        row['email_type'] ??= 'received';
+      }
 
       final messages = rows.map(_mapEmailMessage).toList(growable: false);
       messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
