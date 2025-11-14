@@ -512,6 +512,7 @@ class EmailHistoryProvider extends ChangeNotifier {
   final CRMSupabaseService _supabaseService;
   final _FunctionInvocation? _functionInvokerOverride;
   final Map<String, EmailHistoryState> _stateByMember = <String, EmailHistoryState>{};
+  final Map<String, DateTime> _workerLimitFailures = <String, DateTime>{};
   final Set<String> _knownOrgEmailAddresses;
   final Set<String> _knownOrgEmailDomains;
 
@@ -644,9 +645,16 @@ class EmailHistoryProvider extends ChangeNotifier {
             if (seen.add(key)) {
               entries.add(entry);
             }
-          } catch (error, stack) {
-            Logger.warn('Failed to parse email history row for $memberId: $error', trace: stack);
+            failureMessage = (extractedMessage != null && extractedMessage.trim().isNotEmpty)
+                ? extractedMessage.trim()
+                : fallback;
+          } else {
+            _workerLimitFailures.remove(trimmedMemberId);
+            functionEntries = _extractEntries(normalizedData);
           }
+        } catch (error, stack) {
+          Logger.warn('Email history sync failed for $memberId: $error', trace: stack);
+          failureMessage ??= 'Unable to refresh email history from Supabase.';
         }
       }
 
@@ -772,6 +780,19 @@ class EmailHistoryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _isWorkerLimitCoolingDown(String memberId) {
+    final lastFailure = _workerLimitFailures[memberId];
+    if (lastFailure == null) {
+      return false;
+    }
+    const cooldown = Duration(minutes: 5);
+    return DateTime.now().difference(lastFailure) < cooldown;
+  }
+
+  void _recordWorkerLimit(String memberId) {
+    _workerLimitFailures[memberId] = DateTime.now();
+  }
+
   String? _extractErrorMessage(dynamic data) {
     data = _normalizeResponsePayload(data);
     if (data == null) {
@@ -857,6 +878,289 @@ class EmailHistoryProvider extends ChangeNotifier {
         ),
       ];
     }
+    return const <Map<String, dynamic>>[];
+  }
+
+  bool _containsWorkerLimit(dynamic data) {
+    data = _normalizeResponsePayload(data);
+    if (data == null) {
+      return false;
+    }
+    if (data is String) {
+      return data.toUpperCase().contains('WORKER_LIMIT');
+    }
+    if (data is Map) {
+      final Map<String, dynamic> normalized = data.map<String, dynamic>(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+      for (final key in const ['code', 'message', 'error', 'detail']) {
+        final value = normalized[key];
+        if (value is String && value.toUpperCase().contains('WORKER_LIMIT')) {
+          return true;
+        }
+      }
+      final nested = normalized['data'];
+      if (nested != null && nested != data) {
+        return _containsWorkerLimit(nested);
+      }
+      return false;
+    }
+    if (data is Iterable) {
+      for (final item in data) {
+        if (_containsWorkerLimit(item)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchCachedHistoryRows(
+    supabase.SupabaseClient client,
+    String memberId,
+  ) async {
+    final viewRows = await _queryMemberEmailHistoryView(client, memberId);
+    if (viewRows.isNotEmpty) {
+      return viewRows;
+    }
+
+    final fallbackRows = await _fetchCachedHistoryRowsFromTables(client, memberId);
+    if (fallbackRows.isNotEmpty) {
+      return fallbackRows;
+    }
+
+    return const <Map<String, dynamic>>[];
+  }
+
+  Future<List<Map<String, dynamic>>> _queryMemberEmailHistoryView(
+    supabase.SupabaseClient client,
+    String memberId,
+  ) async {
+    try {
+      final response = await client
+          .from('member_email_history')
+          .select(
+            [
+              'member_id',
+              'member_name',
+              'member_email',
+              'email_type',
+              'log_id',
+              'subject',
+              'body',
+              'from_address',
+              'to_address',
+              'email_date',
+              'gmail_message_id',
+              'gmail_thread_id',
+            ].join(','),
+          )
+          .eq('member_id', memberId)
+          .order('email_date', ascending: false)
+          .limit(200);
+
+      final rows = _normalizeSupabaseList(response);
+      if (rows.isNotEmpty) {
+        return rows;
+      }
+    } on supabase.PostgrestException catch (error, stack) {
+      Logger.warn(
+        'member_email_history view unavailable for $memberId: ${error.message}',
+        trace: stack,
+      );
+    } catch (error, stack) {
+      Logger.warn(
+        'Unexpected failure querying member_email_history for $memberId: $error',
+        trace: stack,
+      );
+    }
+
+    return const <Map<String, dynamic>>[];
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchCachedHistoryRowsFromTables(
+    supabase.SupabaseClient client,
+    String memberId,
+  ) async {
+    final member = await _fetchMemberMetadata(client, memberId);
+    final results = <Map<String, dynamic>>[];
+
+    try {
+      final inboxResponse = await client
+          .from('email_inbox')
+          .select(
+            [
+              'id',
+              'member_id',
+              'from_address',
+              'to_address',
+              'cc_address',
+              'subject',
+              'snippet',
+              'body_html',
+              'body_text',
+              'date',
+              'created_at',
+              'gmail_message_id',
+              'gmail_thread_id',
+              'message_id',
+              'in_reply_to',
+              'references_header',
+              'label_ids',
+              'is_read',
+              'synced_at',
+            ].join(','),
+          )
+          .eq('member_id', memberId)
+          .order('date', ascending: false)
+          .limit(200);
+
+      for (final item in _normalizeSupabaseList(inboxResponse)) {
+        final normalized = item;
+        results.add({
+          ...normalized,
+          'member_id': memberId,
+          if (member?.name != null) 'member_name': member!.name,
+          if (member?.email != null) 'member_email': member!.email,
+          'email_type': 'received',
+          'log_id': normalized['id'] ?? normalized['log_id'],
+          'email_date': normalized['date'] ?? normalized['created_at'] ?? normalized['synced_at'],
+          'to_address': normalized['to_address'],
+          if (normalized.containsKey('cc_address')) 'cc_emails': normalized['cc_address'],
+          'from_address': normalized['from_address'],
+        });
+      }
+    } catch (error, stack) {
+      Logger.warn('Failed to query email_inbox for $memberId: $error', trace: stack);
+    }
+
+    try {
+      final sentResponse = await client
+          .from('email_logs')
+          .select(
+            [
+              'id',
+              'subject',
+              'body',
+              'sender',
+              'recipient_emails',
+              'cc_emails',
+              'bcc_emails',
+              'created_at',
+              'gmail_message_id',
+              'gmail_thread_id',
+              'message_state',
+              'status',
+              'metadata',
+              'headers',
+              'email_log_members!inner(member_id)',
+            ].join(','),
+          )
+          .eq('email_log_members.member_id', memberId)
+          .order('created_at', ascending: false)
+          .limit(200);
+
+      for (final item in _normalizeSupabaseList(sentResponse)) {
+        final normalized = item;
+
+        final dynamic recipients = normalized['recipient_emails'];
+        String? toAddress;
+        if (recipients is List) {
+          toAddress = recipients.map((e) => e.toString()).join(', ');
+        } else if (recipients is String) {
+          toAddress = recipients;
+        }
+
+        results.add({
+          ...normalized,
+          'member_id': memberId,
+          if (member?.name != null) 'member_name': member!.name,
+          if (member?.email != null) 'member_email': member!.email,
+          'email_type': 'sent',
+          'log_id': normalized['id'] ?? normalized['log_id'],
+          'email_date': normalized['created_at'],
+          'from_address': normalized['sender'],
+          if (toAddress != null) 'to_address': toAddress,
+        });
+      }
+    } catch (error, stack) {
+      Logger.warn('Failed to query email_logs for $memberId: $error', trace: stack);
+    }
+
+    if (results.length <= 200) {
+      return results;
+    }
+
+    results.sort((a, b) {
+      final aDate = _coerceToDateTime(a['email_date']);
+      final bDate = _coerceToDateTime(b['email_date']);
+      final aMillis = aDate?.millisecondsSinceEpoch ?? 0;
+      final bMillis = bDate?.millisecondsSinceEpoch ?? 0;
+      return bMillis.compareTo(aMillis);
+    });
+
+    return results.take(200).toList(growable: false);
+  }
+
+  DateTime? _coerceToDateTime(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+      return DateTime.tryParse(trimmed);
+    }
+    if (value is num) {
+      final millis = value.toInt();
+      if (millis <= 0) return null;
+      return DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
+    }
+    return null;
+  }
+
+  Future<_MemberMetadata?> _fetchMemberMetadata(
+    supabase.SupabaseClient client,
+    String memberId,
+  ) async {
+    try {
+      final response = await client
+          .from('members')
+          .select('id,name,email')
+          .eq('id', memberId)
+          .limit(1);
+
+      final rows = _normalizeSupabaseList(response);
+      if (rows.isNotEmpty) {
+        final row = rows.first;
+        return _MemberMetadata(
+          id: row['id']?.toString(),
+          name: row['name']?.toString(),
+          email: row['email']?.toString(),
+        );
+      }
+    } catch (error, stack) {
+      Logger.warn('Failed to fetch member metadata for $memberId: $error', trace: stack);
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> _normalizeSupabaseList(dynamic response) {
+    dynamic data = response;
+    if (response is supabase.PostgrestResponse) {
+      data = response.data;
+    } else if (response is Map<String, dynamic> && response.containsKey('data')) {
+      data = response['data'];
+    }
+
+    if (data is List) {
+      return data.where((row) => row is Map).map((row) {
+        final result = <String, dynamic>{};
+        (row as Map).forEach((key, value) {
+          result[key.toString()] = value;
+        });
+        return result;
+      }).toList(growable: false);
+    }
+
     return const <Map<String, dynamic>>[];
   }
 
