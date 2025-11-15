@@ -1523,55 +1523,147 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     try {
-      final rawResponse = await client
+      final sanitizedThreadId = threadId.trim();
+      if (sanitizedThreadId.isEmpty) {
+        throw ArgumentError.value(threadId, 'threadId', 'Thread id cannot be empty');
+      }
+
+      final encodedThreadId = _encodeOrFilterValue(sanitizedThreadId);
+
+      final inboxColumns = [
+        'id',
+        'member_id',
+        'gmail_message_id',
+        'gmail_thread_id',
+        'message_id',
+        'subject',
+        'body_html',
+        'body_text',
+        'snippet',
+        'from_address',
+        'to_address',
+        'cc_address',
+        'label_ids',
+        'in_reply_to',
+        'references_header',
+        'date',
+        'created_at',
+        'synced_at',
+        'is_read',
+      ].join(',');
+
+      final inboxResponse = await client
           .from('email_inbox')
-          .select(
-            'id,'
-            'gmail_message_id,'
-            'gmail_thread_id,'
-            'message_id,'
-            'subject,'
-            'body_html,'
-            'body_text,'
-            'snippet,'
-            'from_address,'
-            'to_address,'
-            'cc_address,'
-            'label_ids,'
-            'in_reply_to,'
-            'references_header,'
-            'date,'
-            'created_at,'
-            'synced_at,'
-            'is_read',
-          )
+          .select(inboxColumns)
           .eq('member_id', memberId)
           .or(
             [
-              'gmail_thread_id.eq.$threadId',
-              'message_id.eq.$threadId',
-              'gmail_message_id.eq.$threadId',
+              'gmail_thread_id.eq.$encodedThreadId',
+              'message_id.eq.$encodedThreadId',
+              'gmail_message_id.eq.$encodedThreadId',
             ].join(','),
           )
           .order('date', ascending: true);
 
-      final List<Map<String, dynamic>> rows =
-          _normalizeSupabaseResponse(rawResponse);
-      for (final row in rows) {
+      final List<Map<String, dynamic>> inboxRows =
+          _normalizeSupabaseResponse(inboxResponse);
+      for (final row in inboxRows) {
+        row['member_id'] ??= memberId;
         row['from_email'] ??= row['from_address'];
         row['to_emails'] ??= row['to_address'];
         row['cc_emails'] ??= row['cc_address'];
-        row['thread_id'] ??= row['gmail_thread_id'];
-        row['email_type'] ??= 'received';
+        row['thread_id'] ??= row['gmail_thread_id'] ?? sanitizedThreadId;
+        row['email_type'] = (row['email_type'] ?? 'received').toString();
+        row['direction'] ??= row['email_type'];
       }
 
-      final messages = rows.map(_mapEmailMessage).toList(growable: false);
+      final sentColumns = [
+        'id',
+        'subject',
+        'body',
+        'sender',
+        'recipient_emails',
+        'cc_emails',
+        'bcc_emails',
+        'created_at',
+        'gmail_message_id',
+        'gmail_thread_id',
+        'message_state',
+        'status',
+        'metadata',
+        'headers',
+        'email_log_members!inner(member_id)',
+      ].join(',');
+
+      final sentResponse = await client
+          .from('email_logs')
+          .select(sentColumns)
+          .eq('email_log_members.member_id', memberId)
+          .or(
+            [
+              'gmail_thread_id.eq.$encodedThreadId',
+              'gmail_message_id.eq.$encodedThreadId',
+            ].join(','),
+          )
+          .order('created_at', ascending: true);
+
+      final List<Map<String, dynamic>> sentRows =
+          _normalizeSupabaseResponse(sentResponse);
+      for (final row in sentRows) {
+        row['member_id'] ??= memberId;
+        row['email_type'] = (row['email_type'] ?? 'sent').toString();
+        row['direction'] ??= row['email_type'];
+        row['email_date'] ??= row['created_at'];
+        row['from_address'] ??= row['sender'];
+        row['thread_id'] ??= row['gmail_thread_id'] ?? sanitizedThreadId;
+        row['gmail_thread_id'] ??= row['thread_id'];
+        row['gmail_message_id'] ??= row['message_id'];
+        row['from_email'] ??= row['from_address'];
+
+        final dynamic recipients = row['recipient_emails'];
+        if (recipients is List) {
+          row['to_address'] =
+              recipients.map((value) => value.toString()).join(', ');
+        } else if (recipients is String) {
+          row['to_address'] ??= recipients;
+        }
+        row['to_emails'] ??= row['to_address'];
+
+        final dynamic ccRecipients = row['cc_emails'];
+        if (ccRecipients is List) {
+          row['cc_address'] =
+              ccRecipients.map((value) => value.toString()).join(', ');
+        } else if (ccRecipients is String) {
+          row['cc_address'] ??= ccRecipients;
+        }
+        row['cc_emails'] ??= row['cc_address'];
+
+        final dynamic bccRecipients = row['bcc_emails'];
+        if (bccRecipients is List) {
+          row['bcc_address'] =
+              bccRecipients.map((value) => value.toString()).join(', ');
+        } else if (bccRecipients is String) {
+          row['bcc_address'] ??= bccRecipients;
+        }
+        row['bcc_emails'] ??= row['bcc_address'];
+      }
+
+      final allRows = <Map<String, dynamic>>[...inboxRows, ...sentRows];
+
+      final messages = allRows.map(_mapEmailMessage).toList(growable: false);
       messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
       return messages;
     } catch (error, stack) {
       Logger.warn('Failed to load email thread $threadId for $memberId: $error', trace: stack);
       throw Exception('Failed to load email thread. Please try again.');
     }
+  }
+
+  String _encodeOrFilterValue(String value) {
+    if (value.isEmpty) {
+      return value;
+    }
+    return Uri.encodeComponent(value);
   }
 
   EmailMessage _mapEmailMessage(Map<String, dynamic> row) {
