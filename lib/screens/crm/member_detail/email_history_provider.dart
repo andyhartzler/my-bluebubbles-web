@@ -1523,7 +1523,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     try {
-      final response = await client
+      final dynamic rawResponse = await client
           .from('email_inbox')
           .select(
             'id,'
