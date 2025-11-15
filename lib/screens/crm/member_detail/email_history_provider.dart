@@ -1523,7 +1523,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     try {
-      final dynamic rawResponse = await client
+      final rawResponse = await client
           .from('email_inbox')
           .select(
             'id,'
@@ -1556,7 +1556,7 @@ class EmailHistoryProvider extends ChangeNotifier {
           .order('date', ascending: true);
 
       final List<Map<String, dynamic>> rows =
-          _normalizeSupabaseResponse(response);
+          _normalizeSupabaseResponse(rawResponse);
       for (final row in rows) {
         row['from_email'] ??= row['from_address'];
         row['to_emails'] ??= row['to_address'];
