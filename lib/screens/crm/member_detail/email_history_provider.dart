@@ -1556,7 +1556,6 @@ class EmailHistoryProvider extends ChangeNotifier {
           )
           .order('date', ascending: true);
 
-      final supabase.PostgrestResponse<dynamic> response = await query;
       final rows = _normalizeSupabaseResponse(response);
       for (final row in rows) {
         row['from_email'] ??= row['from_address'];
