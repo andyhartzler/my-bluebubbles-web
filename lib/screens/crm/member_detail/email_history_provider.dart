@@ -1525,27 +1525,25 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final dynamic rawResponse = await client
           .from('email_inbox')
-          .select<List<Map<String, dynamic>>>(
-            [
-              'id',
-              'gmail_message_id',
-              'gmail_thread_id',
-              'message_id',
-              'subject',
-              'body_html',
-              'body_text',
-              'snippet',
-              'from_address',
-              'to_address',
-              'cc_address',
-              'label_ids',
-              'in_reply_to',
-              'references_header',
-              'date',
-              'created_at',
-              'synced_at',
-              'is_read',
-            ].join(','),
+          .select(
+            'id,'
+            'gmail_message_id,'
+            'gmail_thread_id,'
+            'message_id,'
+            'subject,'
+            'body_html,'
+            'body_text,'
+            'snippet,'
+            'from_address,'
+            'to_address,'
+            'cc_address,'
+            'label_ids,'
+            'in_reply_to,'
+            'references_header,'
+            'date,'
+            'created_at,'
+            'synced_at,'
+            'is_read',
           )
           .eq('member_id', memberId)
           .or(
@@ -1558,7 +1556,7 @@ class EmailHistoryProvider extends ChangeNotifier {
           .order('date', ascending: true);
 
       final List<Map<String, dynamic>> rows =
-          _normalizeSupabaseResponse(rawResponse);
+          _normalizeSupabaseResponse(response);
       for (final row in rows) {
         row['from_email'] ??= row['from_address'];
         row['to_emails'] ??= row['to_address'];
