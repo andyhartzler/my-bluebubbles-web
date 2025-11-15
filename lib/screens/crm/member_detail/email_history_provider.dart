@@ -1012,7 +1012,8 @@ class EmailHistoryProvider extends ChangeNotifier {
           ...normalized,
           'member_id': memberId,
           if (member?.name != null) 'member_name': member!.name,
-          if (member?.email != null) 'member_email': member!.email,
+          if (member?.preferredEmail != null)
+            'member_email': member!.preferredEmail,
           'email_type': 'received',
           'log_id': normalized['id'] ?? normalized['log_id'],
           'email_date': normalized['email_date'] ??
@@ -1067,7 +1068,8 @@ class EmailHistoryProvider extends ChangeNotifier {
           ...normalized,
           'member_id': memberId,
           if (member?.name != null) 'member_name': member!.name,
-          if (member?.email != null) 'member_email': member!.email,
+          if (member?.preferredEmail != null)
+            'member_email': member!.preferredEmail,
           'email_type': 'sent',
           'log_id': normalized['id'] ?? normalized['log_id'],
           'email_date': normalized['created_at'],
@@ -1116,7 +1118,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final response = await client
           .from('members')
-          .select('id,name,email')
+          .select('id,name,email,school_email')
           .eq('id', memberId)
           .limit(1);
 
@@ -1127,6 +1129,7 @@ class EmailHistoryProvider extends ChangeNotifier {
           id: row['id']?.toString(),
           name: row['name']?.toString(),
           email: row['email']?.toString(),
+          schoolEmail: row['school_email']?.toString(),
         );
       }
     } catch (error, stack) {
@@ -1190,10 +1193,11 @@ class EmailHistoryProvider extends ChangeNotifier {
           normalized['member_name'] = member.name;
         }
       }
-      if (member.email != null) {
+      final preferredEmail = member.preferredEmail;
+      if (preferredEmail != null) {
         final currentEmail = normalized['member_email']?.toString() ?? '';
         if (currentEmail.trim().isEmpty) {
-          normalized['member_email'] = member.email;
+          normalized['member_email'] = preferredEmail;
         }
       }
     }
@@ -1323,76 +1327,117 @@ class EmailHistoryProvider extends ChangeNotifier {
     String memberId, {
     _MemberMetadata? member,
   }) async {
-    Future<dynamic> query(List<String> columns) {
-      return client
-          .from('email_inbox')
-          .select(columns.join(','))
-          .eq('member_id', memberId)
-          .order('date', ascending: false)
-          .limit(200);
-    }
+    const primaryColumns = <String>[
+      'id',
+      'member_id',
+      'gmail_message_id',
+      'gmail_thread_id',
+      'message_id',
+      'subject',
+      'from_address',
+      'to_address',
+      'cc_address',
+      'snippet',
+      'body_html',
+      'body_text',
+      'label_ids',
+      'references_header',
+      'in_reply_to',
+      'date',
+      'created_at',
+      'synced_at',
+      'is_read',
+    ];
 
-    dynamic response;
-    try {
-      response = await query(const <String>[
-        'id',
-        'member_id',
-        'gmail_message_id',
-        'gmail_thread_id',
-        'message_id',
-        'subject',
-        'from_address',
-        'to_address',
-        'cc_address',
-        'snippet',
-        'body_html',
-        'body_text',
-        'label_ids',
-        'references_header',
-        'in_reply_to',
-        'date',
-        'created_at',
-        'synced_at',
-        'is_read',
-      ]);
-    } on supabase.PostgrestException catch (error) {
-      if (_isMissingColumnError(error)) {
-        response = await query(const <String>[
-          'id',
-          'member_id',
-          'message_id',
-          'thread_id',
-          'subject',
-          'from_email',
-          'to_emails',
-          'cc_emails',
-          'bcc_emails',
-          'snippet',
-          'body_html',
-          'body_text',
-          'label_ids',
-          'references_header',
-          'in_reply_to_header',
-          'received_at',
-          'created_at',
-          'updated_at',
-          'direction',
-          'message_state',
-        ]);
-      } else {
+    const legacyColumns = <String>[
+      'id',
+      'member_id',
+      'message_id',
+      'thread_id',
+      'subject',
+      'from_email',
+      'to_emails',
+      'cc_emails',
+      'bcc_emails',
+      'snippet',
+      'body_html',
+      'body_text',
+      'label_ids',
+      'references_header',
+      'in_reply_to_header',
+      'received_at',
+      'created_at',
+      'updated_at',
+      'direction',
+      'message_state',
+    ];
+
+    final emailFilter = _buildInboxEmailFilter(member, legacyColumns: false);
+    final legacyEmailFilter = _buildInboxEmailFilter(member, legacyColumns: true);
+
+    Future<List<Map<String, dynamic>>> runQuery({required bool byEmail}) async {
+      if (byEmail && emailFilter == null && legacyEmailFilter == null) {
+        return const <Map<String, dynamic>>[];
+      }
+
+      Future<dynamic> buildQuery({
+        required List<String> columns,
+        required String orderColumn,
+        required bool legacy,
+      }) {
+        final baseBuilder = client.from('email_inbox').select(columns.join(','));
+        dynamic filteredBuilder;
+
+        if (byEmail) {
+          final filter = legacy ? legacyEmailFilter : emailFilter;
+          if (filter == null || filter.isEmpty) {
+            return Future<List<Map<String, dynamic>>>.value(const <Map<String, dynamic>>[]);
+          }
+          filteredBuilder = baseBuilder.or(filter);
+        }
+
+        filteredBuilder ??= baseBuilder.eq('member_id', memberId);
+        return filteredBuilder.order(orderColumn, ascending: false).limit(200);
+      }
+
+      try {
+        final response = await buildQuery(
+          columns: primaryColumns,
+          orderColumn: 'date',
+          legacy: false,
+        );
+        return _normalizeSupabaseResponse(response);
+      } on supabase.PostgrestException catch (error) {
+        if (_isMissingColumnError(error)) {
+          final response = await buildQuery(
+            columns: legacyColumns,
+            orderColumn: 'received_at',
+            legacy: true,
+          );
+          return _normalizeSupabaseResponse(response);
+        }
         rethrow;
       }
     }
 
+    List<Map<String, dynamic>> rawRows = await runQuery(byEmail: false);
+    if (rawRows.isEmpty) {
+      final fallbackRows = await runQuery(byEmail: true);
+      if (fallbackRows.isNotEmpty) {
+        rawRows = fallbackRows;
+      }
+    }
+
     final rows = <Map<String, dynamic>>[];
-    for (final item in _normalizeSupabaseResponse(response)) {
+    final seenIds = <String>{};
+    for (final item in rawRows) {
       final normalized = Map<String, dynamic>.from(item);
       normalized['member_id'] = memberId;
       if (member?.name != null) {
         normalized['member_name'] ??= member!.name;
       }
-      if (member?.email != null) {
-        normalized['member_email'] ??= member!.email;
+      if (member?.preferredEmail != null) {
+        normalized['member_email'] ??= member!.preferredEmail;
       }
       normalized['thread_id'] ??= normalized['gmail_thread_id'];
       normalized['gmail_thread_id'] ??= normalized['thread_id'];
@@ -1419,7 +1464,11 @@ class EmailHistoryProvider extends ChangeNotifier {
       normalized['email_date'] ??= normalized['date'] ??
           normalized['received_at'] ?? normalized['created_at'] ?? normalized['synced_at'];
       normalized['synced_at'] ??= normalized['updated_at'];
-      rows.add(normalized);
+      final uniqueId = normalized['id']?.toString() ??
+          normalized['message_id']?.toString() ?? normalized['gmail_message_id']?.toString();
+      if (uniqueId == null || seenIds.add(uniqueId)) {
+        rows.add(normalized);
+      }
     }
 
     return rows;
@@ -1463,8 +1512,8 @@ class EmailHistoryProvider extends ChangeNotifier {
         if (member?.name != null) {
           normalized['member_name'] ??= member!.name;
         }
-        if (member?.email != null) {
-          normalized['member_email'] ??= member!.email;
+        if (member?.preferredEmail != null) {
+          normalized['member_email'] ??= member!.preferredEmail;
         }
         normalized['email_type'] = (normalized['email_type'] ?? 'sent').toString();
         normalized['direction'] ??= normalized['email_type'];
@@ -1496,7 +1545,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final response = await client
           .from('members')
-          .select('id,name,email')
+          .select('id,name,email,school_email')
           .eq('id', memberId)
           .limit(1);
 
@@ -1508,6 +1557,7 @@ class EmailHistoryProvider extends ChangeNotifier {
           id: row['id']?.toString(),
           name: row['name']?.toString(),
           email: row['email']?.toString(),
+          schoolEmail: row['school_email']?.toString(),
         );
       }
     } catch (error, stack) {
@@ -1740,6 +1790,32 @@ class EmailHistoryProvider extends ChangeNotifier {
       return value;
     }
     return Uri.encodeComponent(value);
+  }
+
+  String? _buildInboxEmailFilter(
+    _MemberMetadata? member, {
+    required bool legacyColumns,
+  }) {
+    final candidates = member?.candidateEmails ?? const <String>[];
+    if (candidates.isEmpty) {
+      return null;
+    }
+
+    final filters = <String>[];
+    final fromColumn = legacyColumns ? 'from_email' : 'from_address';
+    final toColumn = legacyColumns ? 'to_emails' : 'to_address';
+    final ccColumn = legacyColumns ? 'cc_emails' : 'cc_address';
+
+    for (final email in candidates) {
+      final exact = _encodeOrFilterValue(email);
+      filters.add('$fromColumn.ilike.$exact');
+
+      final contains = _encodeOrFilterValue('%$email%');
+      filters.add('$toColumn.ilike.$contains');
+      filters.add('$ccColumn.ilike.$contains');
+    }
+
+    return filters.isEmpty ? null : filters.join(',');
   }
 
   EmailMessage _mapEmailMessage(Map<String, dynamic> row) {
@@ -2122,9 +2198,27 @@ class _MemberMetadata {
     this.id,
     this.name,
     this.email,
+    this.schoolEmail,
   });
 
   final String? id;
   final String? name;
   final String? email;
+  final String? schoolEmail;
+
+  String? get preferredEmail => email ?? schoolEmail;
+
+  List<String> get candidateEmails {
+    final set = LinkedHashSet<String>();
+    void addValue(String? value) {
+      final trimmed = value?.trim();
+      if (trimmed != null && trimmed.isNotEmpty) {
+        set.add(trimmed.toLowerCase());
+      }
+    }
+
+    addValue(email);
+    addValue(schoolEmail);
+    return set.toList(growable: false);
+  }
 }
