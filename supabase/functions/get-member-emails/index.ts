@@ -75,30 +75,26 @@ interface GmailMessageResponse {
 
 interface EmailInboxRecord {
   gmail_message_id: string;
-  gmail_thread_id: string | null;
-  thread_id: string | null;
-  history_id: string | null;
+  gmail_thread_id: string;
+  from_address: string;
+  to_address: string;
+  cc_address: string | null;
+  subject: string;
+  date: string;
   snippet: string | null;
-  subject: string | null;
-  from_address: string | null;
-  from_email: string | null;
-  to_address: string[] | null;
-  to_emails: string[] | null;
-  cc_address: string[] | null;
-  cc_emails: string[] | null;
-  bcc_address: string[] | null;
-  bcc_emails: string[] | null;
-  message_id: string;
-  message_id_header: string | null;
-  references_header: string | null;
+  body_html: string | null;
+  body_text: string | null;
+  message_id: string | null;
   in_reply_to: string | null;
-  in_reply_to_header: string | null;
-  date: string | null;
-  received_at: string | null;
-  internal_date: string | null;
+  references_header: string | null;
   label_ids: string[] | null;
+  is_read: boolean;
   member_id: string | null;
   synced_at: string;
+}
+
+interface SyncOptions {
+  forcedMemberId?: string | null;
 }
 
 interface SupabaseQueryResult<T> {
@@ -252,48 +248,75 @@ export async function resolveMemberId(
   }
 }
 
+function normalizeRequiredAddress(
+  addresses: string[],
+  rawValue: string | null,
+  fallback: string,
+): string {
+  if (addresses.length > 0) {
+    return addresses.join(", ");
+  }
+
+  const trimmed = rawValue?.trim();
+  if (trimmed && trimmed.length > 0) {
+    return trimmed;
+  }
+
+  return fallback;
+}
+
+function normalizeOptionalAddress(addresses: string[], rawValue: string | null): string | null {
+  if (addresses.length > 0) {
+    return addresses.join(", ");
+  }
+
+  const trimmed = rawValue?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : null;
+}
+
 export async function buildEmailInboxRecord(
   supabase: SupabaseClient,
   message: GmailMessageResponse,
   log: ReturnType<typeof logger>,
+  options: SyncOptions = {},
 ): Promise<EmailInboxRecord> {
   const from = extractHeader(message, "From");
   const to = extractHeader(message, "To");
   const cc = extractHeader(message, "Cc");
-  const bcc = extractHeader(message, "Bcc");
   const dateHeader = extractHeader(message, "Date");
 
-  const memberId = await resolveMemberId(supabase, firstEmailAddress(from), log);
+  const fromAddress = firstEmailAddress(from);
+  const memberId =
+    (await resolveMemberId(supabase, fromAddress, log)) ?? options.forcedMemberId ?? null;
   const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : null;
   const internalDate = message.internalDate ? new Date(Number(message.internalDate)).toISOString() : null;
   const toAddresses = parseEmailAddresses(to);
   const ccAddresses = parseEmailAddresses(cc);
-  const bccAddresses = parseEmailAddresses(bcc);
+
+  const resolvedFrom = fromAddress ?? "unknown@unknown.local";
+  const resolvedTo = normalizeRequiredAddress(
+    toAddresses,
+    to,
+    "undisclosed-recipients@unknown.local",
+  );
+  const resolvedCc = normalizeOptionalAddress(ccAddresses, cc);
 
   return {
     gmail_message_id: message.id,
-    gmail_thread_id: message.threadId ?? null,
-    thread_id: message.threadId ?? null,
-    history_id: message.historyId ?? null,
+    gmail_thread_id: message.threadId ?? message.id,
     snippet: message.snippet ?? null,
-    subject: extractHeader(message, "Subject"),
-    from_address: firstEmailAddress(from),
-    from_email: firstEmailAddress(from),
-    to_address: toAddresses.length ? toAddresses : null,
-    to_emails: toAddresses.length ? toAddresses : null,
-    cc_address: ccAddresses.length ? ccAddresses : null,
-    cc_emails: ccAddresses.length ? ccAddresses : null,
-    bcc_address: bccAddresses.length ? bccAddresses : null,
-    bcc_emails: bccAddresses.length ? bccAddresses : null,
-    message_id: message.id,
-    message_id_header: extractHeader(message, "Message-ID"),
+    subject: extractHeader(message, "Subject") ?? "No subject",
+    from_address: resolvedFrom,
+    to_address: resolvedTo,
+    cc_address: resolvedCc,
+    message_id: extractHeader(message, "Message-ID") ?? message.id,
     references_header: extractHeader(message, "References"),
     in_reply_to: extractHeader(message, "In-Reply-To"),
-    in_reply_to_header: extractHeader(message, "In-Reply-To"),
-    date: receivedAt,
-    received_at: receivedAt,
-    internal_date: internalDate,
+    date: receivedAt ?? internalDate ?? new Date().toISOString(),
+    body_html: null,
+    body_text: null,
     label_ids: message.labelIds ?? null,
+    is_read: !(message.labelIds ?? []).includes("UNREAD"),
     member_id: memberId,
     synced_at: new Date().toISOString(),
   };
@@ -312,7 +335,11 @@ async function upsertEmailInboxRecord(
   }
 }
 
-async function syncGmailMessages(supabase: SupabaseClient, log: ReturnType<typeof logger>): Promise<{ processed: number; failures: number }> {
+async function syncGmailMessages(
+  supabase: SupabaseClient,
+  log: ReturnType<typeof logger>,
+  options: SyncOptions = {},
+): Promise<{ processed: number; failures: number }> {
   const accessToken = await getGmailAccessToken();
   let pageToken: string | undefined;
   let processed = 0;
@@ -325,7 +352,21 @@ async function syncGmailMessages(supabase: SupabaseClient, log: ReturnType<typeo
     for (const message of messages) {
       try {
         const fullMessage = await getGmailMessage(accessToken, message.id);
-        const record = await buildEmailInboxRecord(supabase, fullMessage, log);
+        const record = await buildEmailInboxRecord(supabase, fullMessage, log, options);
+
+        if (options.forcedMemberId && record.member_id && record.member_id !== options.forcedMemberId) {
+          log.info("Skipping Gmail message for different member", {
+            gmailMessageId: record.gmail_message_id,
+            memberId: record.member_id,
+            forcedMemberId: options.forcedMemberId,
+          });
+          continue;
+        }
+
+        if (options.forcedMemberId && !record.member_id) {
+          record.member_id = options.forcedMemberId;
+        }
+
         await upsertEmailInboxRecord(supabase, record);
         processed += 1;
       } catch (error) {
@@ -352,6 +393,25 @@ function createSupabaseClient(): SupabaseClient {
   });
 }
 
+function extractMemberId(payload: Record<string, unknown> | null | undefined): string | null {
+  if (!payload) {
+    return null;
+  }
+
+  const candidates = ["memberId", "member_id"] as const;
+  for (const key of candidates) {
+    const value = payload[key];
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function handleRequest(req: Request): Promise<Response> {
   const requestId = crypto.randomUUID();
   const log = logger(requestId);
@@ -373,7 +433,20 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   try {
     const supabase = createSupabaseClient();
-    const { processed, failures } = await syncGmailMessages(supabase, log);
+    let payload: Record<string, unknown> | null = null;
+
+    if (req.headers.get("content-type")?.includes("application/json")) {
+      try {
+        payload = (await req.json()) as Record<string, unknown>;
+      } catch (error) {
+        log.warn("Failed to parse request body", { error: `${error}` });
+      }
+    }
+
+    const forcedMemberId = extractMemberId(payload);
+    const { processed, failures } = await syncGmailMessages(supabase, log, {
+      forcedMemberId,
+    });
 
     log.info("Finished Gmail sync", { processed, failures });
 
