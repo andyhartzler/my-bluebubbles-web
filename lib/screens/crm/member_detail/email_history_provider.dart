@@ -1469,7 +1469,8 @@ class EmailHistoryProvider extends ChangeNotifier {
           .eq('id', memberId)
           .limit(1);
 
-      final rows = _normalizeSupabaseResponse(response);
+      final List<Map<String, dynamic>> rows =
+          _normalizeSupabaseResponse(response);
       if (rows.isNotEmpty) {
         final row = rows.first;
         return _MemberMetadata(
@@ -1557,7 +1558,7 @@ class EmailHistoryProvider extends ChangeNotifier {
           .order('date', ascending: true);
 
       final List<Map<String, dynamic>> rows =
-          _normalizeSupabaseResponse(rawResponse);
+          _normalizeSupabaseResponse(response);
       for (final row in rows) {
         row['from_email'] ??= row['from_address'];
         row['to_emails'] ??= row['to_address'];
