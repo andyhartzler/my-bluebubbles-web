@@ -711,9 +711,8 @@ class EmailHistoryProvider extends ChangeNotifier {
       if (finalEntries.isEmpty) {
         outputEntries = current.entries;
         if (outputEntries.isEmpty) {
-          errorMessage = accumulator.failureMessage ??
-              accumulator.warningMessage ??
-              'Failed to load email history. Please try again.';
+          errorMessage =
+              accumulator.failureMessage ?? accumulator.warningMessage;
         } else {
           errorMessage = accumulator.warningMessage ?? accumulator.failureMessage;
         }
@@ -1002,37 +1001,13 @@ class EmailHistoryProvider extends ChangeNotifier {
     final results = <Map<String, dynamic>>[];
 
     try {
-      final inboxResponse = await client
-          .from('email_inbox')
-          .select(
-            [
-              'id',
-              'member_id',
-              'from_address',
-              'to_address',
-              'cc_address',
-              'subject',
-              'snippet',
-              'body_html',
-              'body_text',
-              'date',
-              'created_at',
-              'gmail_message_id',
-              'gmail_thread_id',
-              'message_id',
-              'in_reply_to',
-              'references_header',
-              'label_ids',
-              'is_read',
-              'synced_at',
-            ].join(','),
-          )
-          .eq('member_id', memberId)
-          .order('date', ascending: false)
-          .limit(200);
+      final inboxRows = await _fetchInboxRows(
+        client,
+        memberId,
+        member: member,
+      );
 
-      for (final item in _normalizeSupabaseList(inboxResponse)) {
-        final normalized = item;
+      for (final normalized in inboxRows) {
         results.add({
           ...normalized,
           'member_id': memberId,
@@ -1040,10 +1015,11 @@ class EmailHistoryProvider extends ChangeNotifier {
           if (member?.email != null) 'member_email': member!.email,
           'email_type': 'received',
           'log_id': normalized['id'] ?? normalized['log_id'],
-          'email_date': normalized['date'] ?? normalized['created_at'] ?? normalized['synced_at'],
-          'to_address': normalized['to_address'],
-          if (normalized.containsKey('cc_address')) 'cc_emails': normalized['cc_address'],
+          'email_date': normalized['email_date'] ??
+              normalized['date'] ?? normalized['synced_at'],
           'from_address': normalized['from_address'],
+          if (normalized.containsKey('to_address')) 'to_address': normalized['to_address'],
+          if (normalized.containsKey('cc_address')) 'cc_emails': normalized['cc_address'],
         });
       }
     } catch (error, stack) {
@@ -1334,39 +1310,79 @@ class EmailHistoryProvider extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  bool _isMissingColumnError(supabase.PostgrestException error) {
+    if (error.code == '42703') {
+      return true;
+    }
+    final message = error.message.toLowerCase();
+    return message.contains('column') && message.contains('does not exist');
+  }
+
   Future<List<Map<String, dynamic>>> _fetchInboxRows(
     supabase.SupabaseClient client,
     String memberId, {
     _MemberMetadata? member,
   }) async {
-    final response = await client
-        .from('email_inbox')
-        .select(
-          [
-            'id',
-            'member_id',
-            'gmail_message_id',
-            'gmail_thread_id',
-            'message_id',
-            'subject',
-            'from_address',
-            'to_address',
-            'cc_address',
-            'snippet',
-            'body_html',
-            'body_text',
-            'label_ids',
-            'references_header',
-            'in_reply_to',
-            'date',
-            'created_at',
-            'synced_at',
-            'is_read',
-          ].join(','),
-        )
-        .eq('member_id', memberId)
-        .order('date', ascending: false)
-        .limit(200);
+    Future<dynamic> query(List<String> columns) {
+      return client
+          .from('email_inbox')
+          .select(columns.join(','))
+          .eq('member_id', memberId)
+          .order('date', ascending: false)
+          .limit(200);
+    }
+
+    dynamic response;
+    try {
+      response = await query(const <String>[
+        'id',
+        'member_id',
+        'gmail_message_id',
+        'gmail_thread_id',
+        'message_id',
+        'subject',
+        'from_address',
+        'to_address',
+        'cc_address',
+        'snippet',
+        'body_html',
+        'body_text',
+        'label_ids',
+        'references_header',
+        'in_reply_to',
+        'date',
+        'created_at',
+        'synced_at',
+        'is_read',
+      ]);
+    } on supabase.PostgrestException catch (error) {
+      if (_isMissingColumnError(error)) {
+        response = await query(const <String>[
+          'id',
+          'member_id',
+          'message_id',
+          'thread_id',
+          'subject',
+          'from_email',
+          'to_emails',
+          'cc_emails',
+          'bcc_emails',
+          'snippet',
+          'body_html',
+          'body_text',
+          'label_ids',
+          'references_header',
+          'in_reply_to_header',
+          'received_at',
+          'created_at',
+          'updated_at',
+          'direction',
+          'message_state',
+        ]);
+      } else {
+        rethrow;
+      }
+    }
 
     final rows = <Map<String, dynamic>>[];
     for (final item in _normalizeSupabaseResponse(response)) {
@@ -1378,16 +1394,31 @@ class EmailHistoryProvider extends ChangeNotifier {
       if (member?.email != null) {
         normalized['member_email'] ??= member!.email;
       }
-      normalized['email_type'] = (normalized['email_type'] ?? 'received').toString();
-      normalized['direction'] ??= normalized['email_type'];
-      normalized['email_date'] ??=
-          normalized['date'] ?? normalized['created_at'] ?? normalized['synced_at'];
       normalized['thread_id'] ??= normalized['gmail_thread_id'];
       normalized['gmail_thread_id'] ??= normalized['thread_id'];
       normalized['gmail_message_id'] ??= normalized['message_id'];
+      normalized['message_id'] ??= normalized['gmail_message_id'];
+      normalized['from_address'] ??= normalized['from_email'];
       normalized['from_email'] ??= normalized['from_address'];
+      normalized['to_address'] ??= normalized['to_emails'] ?? normalized['to'];
       normalized['to_emails'] ??= normalized['to_address'];
+      normalized['cc_address'] ??= normalized['cc_emails'];
       normalized['cc_emails'] ??= normalized['cc_address'];
+      if (normalized['bcc_address'] == null && normalized['bcc_emails'] != null) {
+        normalized['bcc_address'] = normalized['bcc_emails'];
+      }
+      if (normalized['references_header'] == null && normalized['references'] != null) {
+        normalized['references_header'] = normalized['references'];
+      }
+      if (normalized['in_reply_to'] == null && normalized['in_reply_to_header'] != null) {
+        normalized['in_reply_to'] = normalized['in_reply_to_header'];
+      }
+      normalized['email_type'] =
+          (normalized['email_type'] ?? normalized['direction'] ?? 'received').toString();
+      normalized['direction'] ??= normalized['email_type'];
+      normalized['email_date'] ??= normalized['date'] ??
+          normalized['received_at'] ?? normalized['created_at'] ?? normalized['synced_at'];
+      normalized['synced_at'] ??= normalized['updated_at'];
       rows.add(normalized);
     }
 
@@ -1530,51 +1561,96 @@ class EmailHistoryProvider extends ChangeNotifier {
 
       final encodedThreadId = _encodeOrFilterValue(sanitizedThreadId);
 
-      final inboxColumns = [
-        'id',
-        'member_id',
-        'gmail_message_id',
-        'gmail_thread_id',
-        'message_id',
-        'subject',
-        'body_html',
-        'body_text',
-        'snippet',
-        'from_address',
-        'to_address',
-        'cc_address',
-        'label_ids',
-        'in_reply_to',
-        'references_header',
-        'date',
-        'created_at',
-        'synced_at',
-        'is_read',
-      ].join(',');
+      Future<dynamic> queryInbox(List<String> columns, String orderColumn) {
+        return client
+            .from('email_inbox')
+            .select(columns.join(','))
+            .eq('member_id', memberId)
+            .or(
+              [
+                'gmail_thread_id.eq.$encodedThreadId',
+                'message_id.eq.$encodedThreadId',
+                'gmail_message_id.eq.$encodedThreadId',
+              ].join(','),
+            )
+            .order(orderColumn, ascending: true);
+      }
 
-      final inboxResponse = await client
-          .from('email_inbox')
-          .select(inboxColumns)
-          .eq('member_id', memberId)
-          .or(
-            [
-              'gmail_thread_id.eq.$encodedThreadId',
-              'message_id.eq.$encodedThreadId',
-              'gmail_message_id.eq.$encodedThreadId',
-            ].join(','),
-          )
-          .order('date', ascending: true);
+      dynamic inboxResponse;
+      try {
+        inboxResponse = await queryInbox(const <String>[
+          'id',
+          'member_id',
+          'gmail_message_id',
+          'gmail_thread_id',
+          'message_id',
+          'subject',
+          'body_html',
+          'body_text',
+          'snippet',
+          'from_address',
+          'to_address',
+          'cc_address',
+          'label_ids',
+          'in_reply_to',
+          'references_header',
+          'date',
+          'created_at',
+          'synced_at',
+          'is_read',
+        ], 'date');
+      } on supabase.PostgrestException catch (error) {
+        if (_isMissingColumnError(error)) {
+          inboxResponse = await queryInbox(const <String>[
+            'id',
+            'member_id',
+            'message_id',
+            'thread_id',
+            'subject',
+            'body_html',
+            'body_text',
+            'snippet',
+            'from_email',
+            'to_emails',
+            'cc_emails',
+            'label_ids',
+            'in_reply_to_header',
+            'references_header',
+            'received_at',
+            'created_at',
+            'updated_at',
+            'is_read',
+            'direction',
+            'message_state',
+          ], 'received_at');
+        } else {
+          rethrow;
+        }
+      }
 
       final List<Map<String, dynamic>> inboxRows =
           _normalizeSupabaseResponse(inboxResponse);
       for (final row in inboxRows) {
         row['member_id'] ??= memberId;
         row['from_email'] ??= row['from_address'];
+        row['from_address'] ??= row['from_email'];
+        row['gmail_thread_id'] ??= row['thread_id'];
+        row['thread_id'] ??= row['gmail_thread_id'] ?? sanitizedThreadId;
+        row['gmail_message_id'] ??= row['message_id'];
+        row['to_address'] ??= row['to_emails'] ?? row['to'];
         row['to_emails'] ??= row['to_address'];
+        row['cc_address'] ??= row['cc_emails'];
         row['cc_emails'] ??= row['cc_address'];
+        if (row['references_header'] == null && row['references'] != null) {
+          row['references_header'] = row['references'];
+        }
+        if (row['in_reply_to'] == null && row['in_reply_to_header'] != null) {
+          row['in_reply_to'] = row['in_reply_to_header'];
+        }
         row['thread_id'] ??= row['gmail_thread_id'] ?? sanitizedThreadId;
         row['email_type'] = (row['email_type'] ?? 'received').toString();
         row['direction'] ??= row['email_type'];
+        row['date'] ??= row['received_at'];
       }
 
       final sentColumns = [
