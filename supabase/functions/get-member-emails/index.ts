@@ -328,7 +328,7 @@ async function upsertEmailInboxRecord(
 ): Promise<void> {
   const { error } = await supabase
     .from("email_inbox")
-    .upsert(record, { onConflict: "member_id,gmail_message_id" });
+    .upsert(record, { onConflict: "gmail_message_id" });
 
   if (error) {
     throw new Error(`Failed to upsert email_inbox record for ${record.gmail_message_id}: ${error.message}`);
