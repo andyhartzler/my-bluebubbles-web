@@ -120,9 +120,8 @@ class WalletNotificationService {
 
     try {
       final payload = <String, dynamic>{
-        'title': title,
-        'message': message,
-        'target': _targetToBackendValue(target),
+        'notificationTitle': title,
+        'notificationMessage': message,
       };
 
       if (target == WalletNotificationTarget.selectedMembers) {
@@ -133,7 +132,9 @@ class WalletNotificationService {
             'Select at least one member before sending.',
           );
         }
-        payload['member_ids'] = ids;
+        payload['targetMembers'] = ids;
+      } else {
+        payload['targetMembers'] = _targetToBackendValue(target);
       }
 
       final result = await _client.functions.invoke(
