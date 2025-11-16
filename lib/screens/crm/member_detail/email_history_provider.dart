@@ -1479,34 +1479,105 @@ class EmailHistoryProvider extends ChangeNotifier {
     String memberId, {
     _MemberMetadata? member,
   }) async {
-    try {
+    const sentLogColumns = <String>[
+      'id',
+      'subject',
+      'body',
+      'sender',
+      'recipient_emails',
+      'cc_emails',
+      'bcc_emails',
+      'created_at',
+      'gmail_message_id',
+      'gmail_thread_id',
+      'message_state',
+      'status',
+      'metadata',
+      'headers',
+      'member_ids',
+      'error_message',
+    ];
+    final columnList = sentLogColumns.join(',');
+
+    Future<List<Map<String, dynamic>>> runMemberIdQuery() async {
       final response = await client
           .from('email_logs')
-          .select(
-            [
-              'id',
-              'subject',
-              'body',
-              'sender',
-              'recipient_emails',
-              'cc_emails',
-              'bcc_emails',
-              'created_at',
-              'gmail_message_id',
-              'gmail_thread_id',
-              'message_state',
-              'status',
-              'metadata',
-              'headers',
-              'email_log_members!inner(member_id)',
-            ].join(','),
-          )
-          .eq('email_log_members.member_id', memberId)
+          .select(columnList)
+          .contains('member_ids', [memberId])
           .order('created_at', ascending: false)
           .limit(200);
+      return _normalizeSupabaseResponse(response);
+    }
+
+    Future<List<Map<String, dynamic>>> runEmailFallbackQuery() async {
+      final candidates = member?.candidateEmails ?? const <String>[];
+      if (candidates.isEmpty) {
+        return const <Map<String, dynamic>>[];
+      }
+
+      Future<List<Map<String, dynamic>>> queryByEmail(
+        String column,
+        String email,
+      ) async {
+        final response = await client
+            .from('email_logs')
+            .select(columnList)
+            .contains(column, [email])
+            .order('created_at', ascending: false)
+            .limit(200);
+        return _normalizeSupabaseResponse(response);
+      }
+
+      final deduped = <Map<String, dynamic>>[];
+      final seen = <String>{};
+      for (final email in candidates) {
+        for (final column in const ['recipient_emails', 'cc_emails', 'bcc_emails']) {
+          try {
+            final rows = await queryByEmail(column, email);
+            for (final row in rows) {
+              final key = row['id']?.toString() ??
+                  row['gmail_message_id']?.toString() ??
+                  '${row['subject'] ?? ''}-${row['created_at'] ?? ''}';
+              if (seen.add(key)) {
+                deduped.add(row);
+              }
+            }
+          } on supabase.PostgrestException catch (error) {
+            if (_isMissingColumnError(error)) {
+              continue;
+            }
+            rethrow;
+          }
+        }
+      }
+
+      return deduped;
+    }
+
+    try {
+      List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
+      bool shouldRunFallback = false;
+
+      try {
+        rawRows = await runMemberIdQuery();
+        shouldRunFallback = rawRows.isEmpty;
+      } on supabase.PostgrestException catch (error) {
+        if (_isMissingColumnError(error)) {
+          shouldRunFallback = true;
+        } else {
+          rethrow;
+        }
+      }
+
+      if (shouldRunFallback) {
+        final fallbackRows = await runEmailFallbackQuery();
+        if (fallbackRows.isNotEmpty) {
+          rawRows = fallbackRows;
+        }
+      }
 
       final rows = <Map<String, dynamic>>[];
-      for (final item in _normalizeSupabaseResponse(response)) {
+      for (final item in rawRows) {
         final normalized = Map<String, dynamic>.from(item);
         normalized['member_id'] = memberId;
         if (member?.name != null) {
@@ -2101,6 +2172,30 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   @visibleForTesting
   EmailMessage debugMapEmailMessage(Map<String, dynamic> row) => _mapEmailMessage(row);
+
+  @visibleForTesting
+  Future<List<Map<String, dynamic>>> debugFetchSentLogRows(
+    supabase.SupabaseClient client,
+    String memberId, {
+    _MemberMetadata? member,
+  }) {
+    return _fetchSentLogRows(client, memberId, member: member);
+  }
+
+  @visibleForTesting
+  Map<String, dynamic> debugNormalizeHistoryRow(
+    Map<String, dynamic> row,
+    String memberId, {
+    _MemberMetadata? member,
+  }) {
+    return _normalizeHistoryRow(row, memberId, member: member);
+  }
+
+  @visibleForTesting
+  void debugSetState(String memberId, EmailHistoryState state) {
+    _stateByMember[memberId] = state;
+    notifyListeners();
+  }
 }
 
 class _EmailHistoryAccumulator {

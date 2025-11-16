@@ -8,7 +8,9 @@ import 'package:bluebubbles/widgets/email_detail_screen.dart';
 import 'package:bluebubbles/widgets/email_reply_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class FakeEmailHistoryProvider extends EmailHistoryProvider {
   FakeEmailHistoryProvider({
@@ -53,8 +55,22 @@ class FakeEmailHistoryProvider extends EmailHistoryProvider {
   }
 }
 
+class _MockSupabaseClient extends Mock implements supabase.SupabaseClient {}
+
+class _MockPostgrestFilterBuilder extends Mock
+    implements supabase.PostgrestFilterBuilder<dynamic> {}
+
+typedef _OnValueCallback = dynamic Function(dynamic);
+
 void main() {
   final supabaseService = CRMSupabaseService();
+
+  setUpAll(() {
+    registerFallbackValue<String>('');
+    registerFallbackValue<bool>(false);
+    registerFallbackValue<_OnValueCallback>((_) {});
+    registerFallbackValue<Function>(() {});
+  });
 
   setUp(() {
     supabaseService.debugSetInitialized(true);
@@ -224,6 +240,87 @@ void main() {
     expect(capturedReply!.to, contains('member@example.com'));
     expect(capturedReply!.body, 'Thanks for the update!');
     expect(capturedReply!.sendAsHtml, isTrue);
+  });
+
+  testWidgets('sent logs linked by member_ids surface in email tab', (tester) async {
+    final member = _buildMember(email: 'member@example.com');
+    final provider = EmailHistoryProvider(supabaseService: supabaseService);
+    final mockClient = _MockSupabaseClient();
+    final mockQuery = _MockPostgrestFilterBuilder();
+
+    final sentRow = <String, dynamic>{
+      'id': 'log-123',
+      'subject': 'Welcome to the team',
+      'sender': 'info@moyoungdemocrats.org',
+      'recipient_emails': ['member@example.com'],
+      'cc_emails': ['ally@example.com'],
+      'bcc_emails': [],
+      'created_at': '2024-05-01T12:00:00Z',
+      'message_state': 'sent',
+      'status': 'delivered',
+      'gmail_message_id': 'gmail-123',
+      'gmail_thread_id': 'thread-456',
+      'member_ids': [member.id],
+    };
+
+    when(() => mockClient.from('email_logs')).thenReturn(mockQuery);
+    when(() => mockQuery.select(any())).thenReturn(mockQuery);
+    when(() => mockQuery.contains('member_ids', [member.id]))
+        .thenReturn(mockQuery);
+    when(() => mockQuery.order(
+          'created_at',
+          ascending: false,
+          nullsFirst: any<bool>(named: 'nullsFirst'),
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(mockQuery);
+    when(() => mockQuery.limit(
+          200,
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(mockQuery);
+    when(() => mockQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      return Future.value(onValue(<String, dynamic>{'data': [sentRow]}));
+    });
+
+    final rawRows = await provider.debugFetchSentLogRows(mockClient, member.id);
+    expect(rawRows, hasLength(1));
+    verify(() => mockQuery.contains('member_ids', [member.id])).called(1);
+
+    final normalized =
+        provider.debugNormalizeHistoryRow(rawRows.first, member.id);
+    final entry = EmailHistoryEntry.fromMap(normalized);
+
+    provider.debugSetState(
+      member.id,
+      EmailHistoryState(
+        isLoading: false,
+        hasLoaded: true,
+        entries: [entry],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChangeNotifierProvider<EmailHistoryProvider>.value(
+          value: provider,
+          child: EmailHistoryTab(
+            memberId: member.id,
+            memberName: member.name,
+            loadThreadMessages: (_, __) async => const [],
+            onSendReply: (_, __) async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    expect(find.text(entry.subject), findsOneWidget);
+    expect(find.textContaining('member@example.com'), findsWidgets);
   });
 
   test('email mapper handles Supabase schema with participants and timestamps', () {
