@@ -79,7 +79,7 @@ class WalletNotificationService {
     PostgrestFilterBuilder<List<Map<String, dynamic>>> filterQuery = baseQuery;
 
     if (memberIds != null && memberIds.isNotEmpty) {
-      filterQuery = filterQuery.in_('member_id', memberIds);
+      filterQuery = filterQuery.inFilter('member_id', memberIds);
     }
 
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
