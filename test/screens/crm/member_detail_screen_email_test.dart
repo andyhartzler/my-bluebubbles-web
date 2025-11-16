@@ -320,6 +320,19 @@ void main() {
     expect(find.textContaining('member@example.com'), findsWidgets);
   });
 
+  test('inbox fallback filter uses literal wildcards for member emails', () {
+    final provider = EmailHistoryProvider(supabaseService: supabaseService);
+
+    final filter = provider.debugBuildInboxEmailFilter(
+      const ['Member@Example.com'],
+    );
+
+    expect(filter, isNotNull);
+    expect(filter, contains('from_address.ilike.member@example.com'));
+    expect(filter, contains('to_address.ilike.%member@example.com%'));
+    expect(filter, isNot(contains('%25member@example.com%25')));
+  });
+
   test('email mapper handles Supabase schema with participants and timestamps', () {
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
 

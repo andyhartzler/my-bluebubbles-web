@@ -1359,8 +1359,15 @@ class EmailHistoryProvider extends ChangeNotifier {
       'message_state',
     ];
 
-    final emailFilter = _buildInboxEmailFilter(member, legacyColumns: false);
-    final legacyEmailFilter = _buildInboxEmailFilter(member, legacyColumns: true);
+    final candidateEmails = member?.candidateEmails ?? const <String>[];
+    final emailFilter = _buildInboxEmailFilter(
+      candidateEmails,
+      legacyColumns: false,
+    );
+    final legacyEmailFilter = _buildInboxEmailFilter(
+      candidateEmails,
+      legacyColumns: true,
+    );
 
     Future<List<Map<String, dynamic>>> runQuery({required bool byEmail}) async {
       if (byEmail && emailFilter == null && legacyEmailFilter == null) {
@@ -1522,61 +1529,6 @@ class EmailHistoryProvider extends ChangeNotifier {
       member: member,
       mode: _EmailInboxMode.sent,
     );
-  }
-
-  Future<List<Map<String, dynamic>>> _runEmailLogSelect(
-    Future<dynamic> Function(List<String> columns) queryBuilder,
-  ) async {
-    Future<List<Map<String, dynamic>>> run(
-      List<String> baseColumns, {
-      required bool legacySchema,
-    }) async {
-      final response = await queryBuilder(List<String>.from(baseColumns));
-      final rows = _normalizeSupabaseResponse(response);
-      return rows
-          .map(
-            (row) => _normalizeEmailLogRow(row, legacySchema: legacySchema),
-          )
-          .toList(growable: false);
-    }
-
-    try {
-      return await run(_sentLogColumns, legacySchema: false);
-    } on supabase.PostgrestException catch (error) {
-      if (_isMissingColumnError(error)) {
-        return run(_legacySentLogColumns, legacySchema: true);
-      }
-      rethrow;
-    }
-  }
-
-  Map<String, dynamic> _normalizeEmailLogRow(
-    Map<String, dynamic> row, {
-    required bool legacySchema,
-  }) {
-    final normalized = Map<String, dynamic>.from(row);
-
-    if (legacySchema) {
-      normalized['cc_emails'] ??= normalized['cc'];
-      normalized['bcc_emails'] ??= normalized['bcc'];
-    }
-
-    if (normalized['recipient_emails'] == null &&
-        normalized['recipients'] != null) {
-      normalized['recipient_emails'] = normalized['recipients'];
-    }
-
-    if (normalized['member_ids'] == null) {
-      final dynamic linked = normalized['linked_member_ids'];
-      if (linked is List) {
-        normalized['member_ids'] = linked
-            .map((value) => value?.toString())
-            .whereType<String>()
-            .toList(growable: false);
-      }
-    }
-
-    return normalized;
   }
 
   Future<_MemberMetadata?> _loadMemberMetadata(
@@ -1756,18 +1708,21 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
   }
 
-  String _encodeOrFilterValue(String value) {
+  String _escapeOrFilterValue(String value) {
     if (value.isEmpty) {
       return value;
     }
-    return Uri.encodeComponent(value);
+    return value.replaceAll(',', '\\,');
   }
 
   String? _buildInboxEmailFilter(
-    _MemberMetadata? member, {
+    Iterable<String> candidateEmails, {
     required bool legacyColumns,
   }) {
-    final candidates = member?.candidateEmails ?? const <String>[];
+    final candidates = candidateEmails
+        .map((email) => email.trim().toLowerCase())
+        .where((email) => email.isNotEmpty)
+        .toList(growable: false);
     if (candidates.isEmpty) {
       return null;
     }
@@ -1778,10 +1733,10 @@ class EmailHistoryProvider extends ChangeNotifier {
     final ccColumn = legacyColumns ? 'cc_emails' : 'cc_address';
 
     for (final email in candidates) {
-      final exact = _encodeOrFilterValue(email);
+      final exact = _escapeOrFilterValue(email);
       filters.add('$fromColumn.ilike.$exact');
 
-      final contains = _encodeOrFilterValue('%$email%');
+      final contains = _escapeOrFilterValue('%$email%');
       filters.add('$toColumn.ilike.$contains');
       filters.add('$ccColumn.ilike.$contains');
     }
@@ -2145,6 +2100,17 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   @visibleForTesting
   EmailMessage debugMapEmailMessage(Map<String, dynamic> row) => _mapEmailMessage(row);
+
+  @visibleForTesting
+  String? debugBuildInboxEmailFilter(
+    Iterable<String> candidateEmails, {
+    bool legacyColumns = false,
+  }) {
+    return _buildInboxEmailFilter(
+      candidateEmails,
+      legacyColumns: legacyColumns,
+    );
+  }
 
   @visibleForTesting
   Future<List<Map<String, dynamic>>> debugFetchSentLogRows(
