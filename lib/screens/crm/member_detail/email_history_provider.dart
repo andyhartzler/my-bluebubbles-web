@@ -24,6 +24,10 @@ const Set<String> _orgMailboxAddresses = <String>{
   'political-affairs@moyoungdemocrats.org',
 };
 
+enum _EmailInboxMode { received, sent }
+
+enum _EmailDirection { received, sent }
+
 String? _sanitizePreview(String? raw) {
   if (raw == null) return null;
   final trimmed = raw.trim();
@@ -606,6 +610,7 @@ class EmailHistoryProvider extends ChangeNotifier {
           clients.database,
           trimmedMemberId,
           member: memberMetadata,
+          mode: _EmailInboxMode.received,
         ),
       );
 
@@ -690,6 +695,7 @@ class EmailHistoryProvider extends ChangeNotifier {
             clients.database,
             trimmedMemberId,
             member: memberMetadata,
+            mode: _EmailInboxMode.received,
           ),
           recordFailure: false,
         );
@@ -1005,6 +1011,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         client,
         memberId,
         member: member,
+        mode: _EmailInboxMode.received,
       );
 
       for (final normalized in inboxRows) {
@@ -1028,34 +1035,14 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     try {
-      final sentResponse = await client
-          .from('email_logs')
-          .select(
-            [
-              'id',
-              'subject',
-              'body',
-              'sender',
-              'recipient_emails',
-              'cc_emails',
-              'bcc_emails',
-              'created_at',
-              'gmail_message_id',
-              'gmail_thread_id',
-              'message_state',
-              'status',
-              'metadata',
-              'headers',
-              'email_log_members!inner(member_id)',
-            ].join(','),
-          )
-          .eq('email_log_members.member_id', memberId)
-          .order('created_at', ascending: false)
-          .limit(200);
+      final sentRows = await _fetchInboxRows(
+        client,
+        memberId,
+        member: member,
+        mode: _EmailInboxMode.sent,
+      );
 
-      for (final item in _normalizeSupabaseList(sentResponse)) {
-        final normalized = item;
-
+      for (final normalized in sentRows) {
         final dynamic recipients = normalized['recipient_emails'];
         String? toAddress;
         if (recipients is List) {
@@ -1078,7 +1065,7 @@ class EmailHistoryProvider extends ChangeNotifier {
         });
       }
     } catch (error, stack) {
-      Logger.warn('Failed to query email_logs for $memberId: $error', trace: stack);
+      Logger.warn('Failed to query sent email rows for $memberId: $error', trace: stack);
     }
 
     if (results.length <= 200) {
@@ -1313,7 +1300,6 @@ class EmailHistoryProvider extends ChangeNotifier {
         .map(_normalizeViewHistoryRow)
         .toList(growable: false);
   }
-
   bool _isMissingColumnError(supabase.PostgrestException error) {
     if (error.code == '42703') {
       return true;
@@ -1326,6 +1312,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     supabase.SupabaseClient client,
     String memberId, {
     _MemberMetadata? member,
+    _EmailInboxMode mode = _EmailInboxMode.received,
   }) async {
     const primaryColumns = <String>[
       'id',
@@ -1372,8 +1359,15 @@ class EmailHistoryProvider extends ChangeNotifier {
       'message_state',
     ];
 
-    final emailFilter = _buildInboxEmailFilter(member, legacyColumns: false);
-    final legacyEmailFilter = _buildInboxEmailFilter(member, legacyColumns: true);
+    final candidateEmails = member?.candidateEmails ?? const <String>[];
+    final emailFilter = _buildInboxEmailFilter(
+      candidateEmails,
+      legacyColumns: false,
+    );
+    final legacyEmailFilter = _buildInboxEmailFilter(
+      candidateEmails,
+      legacyColumns: true,
+    );
 
     Future<List<Map<String, dynamic>>> runQuery({required bool byEmail}) async {
       if (byEmail && emailFilter == null && legacyEmailFilter == null) {
@@ -1432,6 +1426,15 @@ class EmailHistoryProvider extends ChangeNotifier {
     final seenIds = <String>{};
     for (final item in rawRows) {
       final normalized = Map<String, dynamic>.from(item);
+      final direction = _classifyInboxDirection(normalized);
+      if (mode == _EmailInboxMode.sent && direction != _EmailDirection.sent) {
+        continue;
+      }
+      if (mode == _EmailInboxMode.received &&
+          direction != _EmailDirection.received) {
+        continue;
+      }
+      final directionLabel = direction == _EmailDirection.sent ? 'sent' : 'received';
       normalized['member_id'] = memberId;
       if (member?.name != null) {
         normalized['member_name'] ??= member!.name;
@@ -1458,8 +1461,7 @@ class EmailHistoryProvider extends ChangeNotifier {
       if (normalized['in_reply_to'] == null && normalized['in_reply_to_header'] != null) {
         normalized['in_reply_to'] = normalized['in_reply_to_header'];
       }
-      normalized['email_type'] =
-          (normalized['email_type'] ?? normalized['direction'] ?? 'received').toString();
+      normalized['email_type'] ??= directionLabel;
       normalized['direction'] ??= normalized['email_type'];
       normalized['email_date'] ??= normalized['date'] ??
           normalized['received_at'] ?? normalized['created_at'] ?? normalized['synced_at'];
@@ -1479,63 +1481,12 @@ class EmailHistoryProvider extends ChangeNotifier {
     String memberId, {
     _MemberMetadata? member,
   }) async {
-    try {
-      final response = await client
-          .from('email_logs')
-          .select(
-            [
-              'id',
-              'subject',
-              'body',
-              'sender',
-              'recipient_emails',
-              'cc_emails',
-              'bcc_emails',
-              'created_at',
-              'gmail_message_id',
-              'gmail_thread_id',
-              'message_state',
-              'status',
-              'metadata',
-              'headers',
-              'email_log_members!inner(member_id)',
-            ].join(','),
-          )
-          .eq('email_log_members.member_id', memberId)
-          .order('created_at', ascending: false)
-          .limit(200);
-
-      final rows = <Map<String, dynamic>>[];
-      for (final item in _normalizeSupabaseResponse(response)) {
-        final normalized = Map<String, dynamic>.from(item);
-        normalized['member_id'] = memberId;
-        if (member?.name != null) {
-          normalized['member_name'] ??= member!.name;
-        }
-        if (member?.preferredEmail != null) {
-          normalized['member_email'] ??= member!.preferredEmail;
-        }
-        normalized['email_type'] = (normalized['email_type'] ?? 'sent').toString();
-        normalized['direction'] ??= normalized['email_type'];
-        normalized['email_date'] ??= normalized['created_at'];
-        normalized['from_address'] ??= normalized['sender'];
-
-        final dynamic recipients = normalized['recipient_emails'];
-        if (recipients is List) {
-          normalized['to_address'] =
-              recipients.map((value) => value.toString()).join(', ');
-        } else if (recipients is String) {
-          normalized['to_address'] ??= recipients;
-        }
-
-        rows.add(normalized);
-      }
-
-      return rows;
-    } catch (error, stack) {
-      Logger.warn('Failed to fetch sent email logs for $memberId: $error', trace: stack);
-      return const <Map<String, dynamic>>[];
-    }
+    return _fetchInboxRows(
+      client,
+      memberId,
+      member: member,
+      mode: _EmailInboxMode.sent,
+    );
   }
 
   Future<_MemberMetadata?> _loadMemberMetadata(
@@ -1698,83 +1649,13 @@ class EmailHistoryProvider extends ChangeNotifier {
           row['in_reply_to'] = row['in_reply_to_header'];
         }
         row['thread_id'] ??= row['gmail_thread_id'] ?? sanitizedThreadId;
-        row['email_type'] = (row['email_type'] ?? 'received').toString();
+        final direction = _classifyInboxDirection(row);
+        final directionLabel = direction == _EmailDirection.sent ? 'sent' : 'received';
+        row['email_type'] = directionLabel;
         row['direction'] ??= row['email_type'];
         row['date'] ??= row['received_at'];
       }
-
-      final sentColumns = [
-        'id',
-        'subject',
-        'body',
-        'sender',
-        'recipient_emails',
-        'cc_emails',
-        'bcc_emails',
-        'created_at',
-        'gmail_message_id',
-        'gmail_thread_id',
-        'message_state',
-        'status',
-        'metadata',
-        'headers',
-        'email_log_members!inner(member_id)',
-      ].join(',');
-
-      final sentResponse = await client
-          .from('email_logs')
-          .select(sentColumns)
-          .eq('email_log_members.member_id', memberId)
-          .or(
-            [
-              'gmail_thread_id.eq.$encodedThreadId',
-              'gmail_message_id.eq.$encodedThreadId',
-            ].join(','),
-          )
-          .order('created_at', ascending: true);
-
-      final List<Map<String, dynamic>> sentRows =
-          _normalizeSupabaseResponse(sentResponse);
-      for (final row in sentRows) {
-        row['member_id'] ??= memberId;
-        row['email_type'] = (row['email_type'] ?? 'sent').toString();
-        row['direction'] ??= row['email_type'];
-        row['email_date'] ??= row['created_at'];
-        row['from_address'] ??= row['sender'];
-        row['thread_id'] ??= row['gmail_thread_id'] ?? sanitizedThreadId;
-        row['gmail_thread_id'] ??= row['thread_id'];
-        row['gmail_message_id'] ??= row['message_id'];
-        row['from_email'] ??= row['from_address'];
-
-        final dynamic recipients = row['recipient_emails'];
-        if (recipients is List) {
-          row['to_address'] =
-              recipients.map((value) => value.toString()).join(', ');
-        } else if (recipients is String) {
-          row['to_address'] ??= recipients;
-        }
-        row['to_emails'] ??= row['to_address'];
-
-        final dynamic ccRecipients = row['cc_emails'];
-        if (ccRecipients is List) {
-          row['cc_address'] =
-              ccRecipients.map((value) => value.toString()).join(', ');
-        } else if (ccRecipients is String) {
-          row['cc_address'] ??= ccRecipients;
-        }
-        row['cc_emails'] ??= row['cc_address'];
-
-        final dynamic bccRecipients = row['bcc_emails'];
-        if (bccRecipients is List) {
-          row['bcc_address'] =
-              bccRecipients.map((value) => value.toString()).join(', ');
-        } else if (bccRecipients is String) {
-          row['bcc_address'] ??= bccRecipients;
-        }
-        row['bcc_emails'] ??= row['bcc_address'];
-      }
-
-      final allRows = <Map<String, dynamic>>[...inboxRows, ...sentRows];
+      final allRows = List<Map<String, dynamic>>.from(inboxRows);
 
       final messages = allRows.map(_mapEmailMessage).toList(growable: false);
       messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
@@ -1785,18 +1666,21 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
   }
 
-  String _encodeOrFilterValue(String value) {
+  String _escapeOrFilterValue(String value) {
     if (value.isEmpty) {
       return value;
     }
-    return Uri.encodeComponent(value);
+    return value.replaceAll(',', '\\,');
   }
 
   String? _buildInboxEmailFilter(
-    _MemberMetadata? member, {
+    Iterable<String> candidateEmails, {
     required bool legacyColumns,
   }) {
-    final candidates = member?.candidateEmails ?? const <String>[];
+    final candidates = candidateEmails
+        .map((email) => email.trim().toLowerCase())
+        .where((email) => email.isNotEmpty)
+        .toList(growable: false);
     if (candidates.isEmpty) {
       return null;
     }
@@ -1807,15 +1691,56 @@ class EmailHistoryProvider extends ChangeNotifier {
     final ccColumn = legacyColumns ? 'cc_emails' : 'cc_address';
 
     for (final email in candidates) {
-      final exact = _encodeOrFilterValue(email);
+      final exact = _escapeOrFilterValue(email);
       filters.add('$fromColumn.ilike.$exact');
 
-      final contains = _encodeOrFilterValue('%$email%');
+      final contains = _escapeOrFilterValue('%$email%');
       filters.add('$toColumn.ilike.$contains');
       filters.add('$ccColumn.ilike.$contains');
     }
 
     return filters.isEmpty ? null : filters.join(',');
+  }
+
+  _EmailDirection _classifyInboxDirection(Map<String, dynamic> row) {
+    final candidates = <dynamic>[
+      row['direction'],
+      row['message_direction'],
+      row['email_type'],
+      row['message_state'],
+    ];
+
+    for (final candidate in candidates) {
+      final normalized = candidate?.toString().toLowerCase().trim();
+      if (normalized == null || normalized.isEmpty) {
+        continue;
+      }
+      if (normalized.contains('sent') ||
+          normalized.contains('outbound') ||
+          normalized.contains('outgoing')) {
+        return _EmailDirection.sent;
+      }
+      if (normalized.contains('received') ||
+          normalized.contains('inbound') ||
+          normalized.contains('incoming')) {
+        return _EmailDirection.received;
+      }
+    }
+
+    final fromAddress =
+        _extractPrimaryEmail(row['from_address'] ?? row['from_email'] ?? row['from']);
+    if (fromAddress != null && _isOrgEmailAddress(fromAddress)) {
+      return _EmailDirection.sent;
+    }
+
+    final toAddress = _extractPrimaryEmail(
+      row['to_address'] ?? row['to_emails'] ?? row['to'],
+    );
+    if (toAddress != null && _isOrgEmailAddress(toAddress)) {
+      return _EmailDirection.received;
+    }
+
+    return _EmailDirection.received;
   }
 
   EmailMessage _mapEmailMessage(Map<String, dynamic> row) {
@@ -1986,6 +1911,10 @@ class EmailHistoryProvider extends ChangeNotifier {
       addSeed(seed);
     }
 
+    for (final seed in _orgMailboxAddresses) {
+      addSeed(seed);
+    }
+
     if (knownOrgEmailAddresses != null) {
       for (final candidate in knownOrgEmailAddresses) {
         addSeed(candidate);
@@ -2014,6 +1943,34 @@ class EmailHistoryProvider extends ChangeNotifier {
         _knownOrgEmailDomains.add(domain);
       }
     }
+  }
+
+  String? _extractPrimaryEmail(dynamic value) {
+    if (value == null) return null;
+    if (value is EmailParticipant) {
+      return _normalizeEmail(value.address);
+    }
+    if (value is List) {
+      for (final entry in value) {
+        final normalized = _extractPrimaryEmail(entry);
+        if (normalized != null) {
+          return normalized;
+        }
+      }
+      return null;
+    }
+    if (value is Map) {
+      final participant = _parseParticipant(value);
+      if (participant != null) {
+        return _normalizeEmail(participant.address);
+      }
+      return null;
+    }
+    final participant = _parseParticipant(value);
+    if (participant != null) {
+      return _normalizeEmail(participant.address);
+    }
+    return _normalizeEmail(value.toString());
   }
 
   String? _normalizeEmail(String? address) {
@@ -2101,6 +2058,41 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   @visibleForTesting
   EmailMessage debugMapEmailMessage(Map<String, dynamic> row) => _mapEmailMessage(row);
+
+  @visibleForTesting
+  String? debugBuildInboxEmailFilter(
+    Iterable<String> candidateEmails, {
+    bool legacyColumns = false,
+  }) {
+    return _buildInboxEmailFilter(
+      candidateEmails,
+      legacyColumns: legacyColumns,
+    );
+  }
+
+  @visibleForTesting
+  Future<List<Map<String, dynamic>>> debugFetchSentLogRows(
+    supabase.SupabaseClient client,
+    String memberId, {
+    _MemberMetadata? member,
+  }) {
+    return _fetchSentLogRows(client, memberId, member: member);
+  }
+
+  @visibleForTesting
+  Map<String, dynamic> debugNormalizeHistoryRow(
+    Map<String, dynamic> row,
+    String memberId, {
+    _MemberMetadata? member,
+  }) {
+    return _normalizeHistoryRow(row, memberId, member: member);
+  }
+
+  @visibleForTesting
+  void debugSetState(String memberId, EmailHistoryState state) {
+    _stateByMember[memberId] = state;
+    notifyListeners();
+  }
 }
 
 class _EmailHistoryAccumulator {
