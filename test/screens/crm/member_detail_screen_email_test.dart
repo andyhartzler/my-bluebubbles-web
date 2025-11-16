@@ -242,34 +242,31 @@ void main() {
     expect(capturedReply!.sendAsHtml, isTrue);
   });
 
-  testWidgets('sent logs linked by member_ids surface in email tab', (tester) async {
+  testWidgets('email_inbox rows marked as sent surface in email tab', (tester) async {
     final member = _buildMember(email: 'member@example.com');
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
     final mockClient = _MockSupabaseClient();
     final mockQuery = _MockPostgrestFilterBuilder();
 
     final sentRow = <String, dynamic>{
-      'id': 'log-123',
+      'id': 'inbox-123',
       'subject': 'Welcome to the team',
-      'sender': 'info@moyoungdemocrats.org',
-      'recipient_emails': ['member@example.com'],
-      'cc_emails': ['ally@example.com'],
-      'bcc_emails': [],
-      'created_at': '2024-05-01T12:00:00Z',
-      'message_state': 'sent',
-      'status': 'delivered',
+      'from_address': 'info@moyoungdemocrats.org',
+      'to_address': 'member@example.com',
+      'cc_address': 'ally@example.com',
+      'bcc_address': null,
+      'date': '2024-05-01T12:00:00Z',
+      'direction': 'sent',
       'gmail_message_id': 'gmail-123',
       'gmail_thread_id': 'thread-456',
-      'member_ids': [member.id],
     };
 
-    when(() => mockClient.from('email_logs')).thenReturn(mockQuery);
+    when(() => mockClient.from('email_inbox')).thenReturn(mockQuery);
     when(() => mockQuery.select(any())).thenReturn(mockQuery);
-    when(() => mockQuery.contains('member_ids', [member.id]))
-        .thenReturn(mockQuery);
+    when(() => mockQuery.eq('member_id', member.id)).thenReturn(mockQuery);
     when(() => mockQuery.order(
-          'created_at',
-          ascending: false,
+          any<String>(),
+          ascending: any<bool>(named: 'ascending'),
           nullsFirst: any<bool>(named: 'nullsFirst'),
           referencedTable: any<String?>(named: 'referencedTable'),
         )).thenReturn(mockQuery);
@@ -288,7 +285,7 @@ void main() {
 
     final rawRows = await provider.debugFetchSentLogRows(mockClient, member.id);
     expect(rawRows, hasLength(1));
-    verify(() => mockQuery.contains('member_ids', [member.id])).called(1);
+    verify(() => mockQuery.eq('member_id', member.id)).called(1);
 
     final normalized =
         provider.debugNormalizeHistoryRow(rawRows.first, member.id);
