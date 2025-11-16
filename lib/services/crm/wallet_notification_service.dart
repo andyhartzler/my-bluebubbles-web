@@ -75,8 +75,7 @@ class WalletNotificationService {
             registered_at
           )
         ''')
-        .order('apple_wallet_generated_at', ascending: false)
-        .filter('apple_wallet_pass_serial', 'not.is', null);
+        .order('apple_wallet_generated_at', ascending: false);
 
     if (limit > 0) {
       query = query.limit(limit);
@@ -95,7 +94,9 @@ class WalletNotificationService {
     }
 
     final response = await query;
-    final data = _coerceList(response);
+    final data = _coerceList(response)
+        .where((row) => row['apple_wallet_pass_serial'] != null)
+        .toList(growable: false);
     return data
         .map((row) => WalletPassMember.fromJson(row))
         .toList(growable: false);
