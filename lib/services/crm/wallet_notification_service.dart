@@ -52,7 +52,7 @@ class WalletNotificationService {
   }) async {
     if (!isReady) return const [];
 
-    var query = _client
+    PostgrestFilterBuilder<List<Map<String, dynamic>>> query = _client
         .from('membership_cards')
         .select('''
           id,
