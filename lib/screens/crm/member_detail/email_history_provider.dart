@@ -1469,6 +1469,48 @@ class EmailHistoryProvider extends ChangeNotifier {
     return rows;
   }
 
+  static const List<String> _sentLogColumns = <String>[
+    'id',
+    'subject',
+    'body',
+    'html',
+    'sender',
+    'reply_to',
+    'recipient_emails',
+    'cc_emails',
+    'bcc_emails',
+    'created_at',
+    'gmail_message_id',
+    'gmail_thread_id',
+    'message_state',
+    'status',
+    'metadata',
+    'headers',
+    'member_ids',
+    'error_message',
+  ];
+
+  static const List<String> _legacySentLogColumns = <String>[
+    'id',
+    'subject',
+    'body',
+    'html',
+    'sender',
+    'reply_to',
+    'recipient_emails',
+    'cc',
+    'bcc',
+    'created_at',
+    'gmail_message_id',
+    'gmail_thread_id',
+    'message_state',
+    'status',
+    'metadata',
+    'headers',
+    'linked_member_ids',
+    'error_message',
+  ];
+
   Future<List<Map<String, dynamic>>> _fetchSentLogRows(
     supabase.SupabaseClient client,
     String memberId, {
@@ -1480,6 +1522,61 @@ class EmailHistoryProvider extends ChangeNotifier {
       member: member,
       mode: _EmailInboxMode.sent,
     );
+  }
+
+  Future<List<Map<String, dynamic>>> _runEmailLogSelect(
+    Future<dynamic> Function(List<String> columns) queryBuilder,
+  ) async {
+    Future<List<Map<String, dynamic>>> run(
+      List<String> baseColumns, {
+      required bool legacySchema,
+    }) async {
+      final response = await queryBuilder(List<String>.from(baseColumns));
+      final rows = _normalizeSupabaseResponse(response);
+      return rows
+          .map(
+            (row) => _normalizeEmailLogRow(row, legacySchema: legacySchema),
+          )
+          .toList(growable: false);
+    }
+
+    try {
+      return await run(_sentLogColumns, legacySchema: false);
+    } on supabase.PostgrestException catch (error) {
+      if (_isMissingColumnError(error)) {
+        return run(_legacySentLogColumns, legacySchema: true);
+      }
+      rethrow;
+    }
+  }
+
+  Map<String, dynamic> _normalizeEmailLogRow(
+    Map<String, dynamic> row, {
+    required bool legacySchema,
+  }) {
+    final normalized = Map<String, dynamic>.from(row);
+
+    if (legacySchema) {
+      normalized['cc_emails'] ??= normalized['cc'];
+      normalized['bcc_emails'] ??= normalized['bcc'];
+    }
+
+    if (normalized['recipient_emails'] == null &&
+        normalized['recipients'] != null) {
+      normalized['recipient_emails'] = normalized['recipients'];
+    }
+
+    if (normalized['member_ids'] == null) {
+      final dynamic linked = normalized['linked_member_ids'];
+      if (linked is List) {
+        normalized['member_ids'] = linked
+            .map((value) => value?.toString())
+            .whereType<String>()
+            .toList(growable: false);
+      }
+    }
+
+    return normalized;
   }
 
   Future<_MemberMetadata?> _loadMemberMetadata(
