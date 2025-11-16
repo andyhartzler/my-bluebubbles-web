@@ -1476,6 +1476,48 @@ class EmailHistoryProvider extends ChangeNotifier {
     return rows;
   }
 
+  static const List<String> _sentLogColumns = <String>[
+    'id',
+    'subject',
+    'body',
+    'html',
+    'sender',
+    'reply_to',
+    'recipient_emails',
+    'cc_emails',
+    'bcc_emails',
+    'created_at',
+    'gmail_message_id',
+    'gmail_thread_id',
+    'message_state',
+    'status',
+    'metadata',
+    'headers',
+    'member_ids',
+    'error_message',
+  ];
+
+  static const List<String> _legacySentLogColumns = <String>[
+    'id',
+    'subject',
+    'body',
+    'html',
+    'sender',
+    'reply_to',
+    'recipient_emails',
+    'cc',
+    'bcc',
+    'created_at',
+    'gmail_message_id',
+    'gmail_thread_id',
+    'message_state',
+    'status',
+    'metadata',
+    'headers',
+    'linked_member_ids',
+    'error_message',
+  ];
+
   Future<List<Map<String, dynamic>>> _fetchSentLogRows(
     supabase.SupabaseClient client,
     String memberId, {
