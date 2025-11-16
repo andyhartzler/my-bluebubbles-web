@@ -1708,6 +1708,14 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
   }
 
+  String _encodeOrFilterValue(String value) {
+    final sanitized = value.trim();
+    if (sanitized.isEmpty) {
+      return sanitized;
+    }
+    return _escapeOrFilterValue(sanitized);
+  }
+
   String _escapeOrFilterValue(String value) {
     if (value.isEmpty) {
       return value;
