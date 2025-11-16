@@ -76,7 +76,7 @@ class WalletNotificationService {
           )
         ''')
         .order('apple_wallet_generated_at', ascending: false)
-        .filter('apple_wallet_pass_serial', 'is', null, negated: true);
+        .not('apple_wallet_pass_serial', 'is', null);
 
     if (limit > 0) {
       query = query.limit(limit);
