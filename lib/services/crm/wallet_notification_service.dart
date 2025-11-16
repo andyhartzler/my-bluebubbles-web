@@ -52,7 +52,7 @@ class WalletNotificationService {
   }) async {
     if (!isReady) return const [];
 
-    var query = _client
+    final PostgrestFilterBuilder<List<Map<String, dynamic>>> baseQuery = _client
         .from('membership_cards')
         .select('''
           id,
@@ -74,26 +74,30 @@ class WalletNotificationService {
             id,
             registered_at
           )
-        ''')
-        .order('apple_wallet_generated_at', ascending: false);
+        ''');
 
-    if (limit > 0) {
-      query = query.limit(limit);
-    }
+    PostgrestFilterBuilder<List<Map<String, dynamic>>> filterQuery = baseQuery;
 
     if (memberIds != null && memberIds.isNotEmpty) {
-      query = query.in_('member_id', memberIds);
+      filterQuery = filterQuery.inFilter('member_id', memberIds);
     }
 
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
       final sanitized = _escapeSearch(searchQuery.trim());
       final pattern = '%$sanitized%';
-      query = query.or(
+      filterQuery = filterQuery.or(
         'members.name.ilike.$pattern,members.email.ilike.$pattern',
       );
     }
 
-    final response = await query;
+    PostgrestTransformBuilder<List<Map<String, dynamic>>> request = filterQuery
+        .order('apple_wallet_generated_at', ascending: false);
+
+    if (limit > 0) {
+      request = request.limit(limit);
+    }
+
+    final response = await request;
     final data = _coerceList(response)
         .where((row) => row['apple_wallet_pass_serial'] != null)
         .toList(growable: false);
