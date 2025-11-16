@@ -1028,34 +1028,17 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     try {
-      final sentResponse = await client
-          .from('email_logs')
-          .select(
-            [
-              'id',
-              'subject',
-              'body',
-              'sender',
-              'recipient_emails',
-              'cc_emails',
-              'bcc_emails',
-              'created_at',
-              'gmail_message_id',
-              'gmail_thread_id',
-              'message_state',
-              'status',
-              'metadata',
-              'headers',
-              'email_log_members!inner(member_id)',
-            ].join(','),
-          )
-          .eq('email_log_members.member_id', memberId)
-          .order('created_at', ascending: false)
-          .limit(200);
+      final sentRows = await _runEmailLogSelect((columns) {
+        final selectColumns = <String>[...columns, 'email_log_members!inner(member_id)'];
+        return client
+            .from('email_logs')
+            .select(selectColumns.join(','))
+            .eq('email_log_members.member_id', memberId)
+            .order('created_at', ascending: false)
+            .limit(200);
+      });
 
-      for (final item in _normalizeSupabaseList(sentResponse)) {
-        final normalized = item;
-
+      for (final normalized in sentRows) {
         final dynamic recipients = normalized['recipient_emails'];
         String? toAddress;
         if (recipients is List) {
@@ -1474,39 +1457,146 @@ class EmailHistoryProvider extends ChangeNotifier {
     return rows;
   }
 
+  static const List<String> _sentLogColumns = <String>[
+    'id',
+    'subject',
+    'body',
+    'html',
+    'sender',
+    'reply_to',
+    'recipient_emails',
+    'cc_emails',
+    'bcc_emails',
+    'created_at',
+    'gmail_message_id',
+    'gmail_thread_id',
+    'message_state',
+    'status',
+    'metadata',
+    'headers',
+    'member_ids',
+    'error_message',
+  ];
+
+  static const List<String> _legacySentLogColumns = <String>[
+    'id',
+    'subject',
+    'body',
+    'html',
+    'sender',
+    'reply_to',
+    'recipient_emails',
+    'cc',
+    'bcc',
+    'created_at',
+    'gmail_message_id',
+    'gmail_thread_id',
+    'message_state',
+    'status',
+    'metadata',
+    'headers',
+    'linked_member_ids',
+    'error_message',
+  ];
+
   Future<List<Map<String, dynamic>>> _fetchSentLogRows(
     supabase.SupabaseClient client,
     String memberId, {
     _MemberMetadata? member,
   }) async {
+    Future<List<Map<String, dynamic>>> runMemberIdQuery() {
+      return _runEmailLogSelect((columns) {
+        final selectColumns = columns.join(',');
+        return client
+            .from('email_logs')
+            .select(selectColumns)
+            .contains('member_ids', [memberId])
+            .order('created_at', ascending: false)
+            .limit(200);
+      });
+    }
+
+    Future<List<Map<String, dynamic>>> runEmailFallbackQuery() async {
+      final candidates = member?.candidateEmails ?? const <String>[];
+      if (candidates.isEmpty) {
+        return const <Map<String, dynamic>>[];
+      }
+
+      Future<List<Map<String, dynamic>>> queryByEmail(
+        List<String> columnOptions,
+        String email,
+      ) async {
+        for (final column in columnOptions) {
+          try {
+            return await _runEmailLogSelect((columns) {
+              final selectColumns = columns.join(',');
+              return client
+                  .from('email_logs')
+                  .select(selectColumns)
+                  .contains(column, [email])
+                  .order('created_at', ascending: false)
+                  .limit(200);
+            });
+          } on supabase.PostgrestException catch (error) {
+            if (_isMissingColumnError(error)) {
+              continue;
+            }
+            rethrow;
+          }
+        }
+        return const <Map<String, dynamic>>[];
+      }
+
+      final deduped = <Map<String, dynamic>>[];
+      final seen = <String>{};
+      const fallbackColumns = <List<String>>[
+        ['recipient_emails'],
+        ['cc_emails', 'cc'],
+        ['bcc_emails', 'bcc'],
+      ];
+
+      for (final email in candidates) {
+        for (final columnOptions in fallbackColumns) {
+          final rows = await queryByEmail(columnOptions, email);
+          if (rows.isEmpty) continue;
+          for (final row in rows) {
+            final key = row['id']?.toString() ??
+                row['gmail_message_id']?.toString() ??
+                '${row['subject'] ?? ''}-${row['created_at'] ?? ''}';
+            if (seen.add(key)) {
+              deduped.add(row);
+            }
+          }
+        }
+      }
+
+      return deduped;
+    }
+
     try {
-      final response = await client
-          .from('email_logs')
-          .select(
-            [
-              'id',
-              'subject',
-              'body',
-              'sender',
-              'recipient_emails',
-              'cc_emails',
-              'bcc_emails',
-              'created_at',
-              'gmail_message_id',
-              'gmail_thread_id',
-              'message_state',
-              'status',
-              'metadata',
-              'headers',
-              'email_log_members!inner(member_id)',
-            ].join(','),
-          )
-          .eq('email_log_members.member_id', memberId)
-          .order('created_at', ascending: false)
-          .limit(200);
+      List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
+      bool shouldRunFallback = false;
+
+      try {
+        rawRows = await runMemberIdQuery();
+        shouldRunFallback = rawRows.isEmpty;
+      } on supabase.PostgrestException catch (error) {
+        if (_isMissingColumnError(error)) {
+          shouldRunFallback = true;
+        } else {
+          rethrow;
+        }
+      }
+
+      if (shouldRunFallback) {
+        final fallbackRows = await runEmailFallbackQuery();
+        if (fallbackRows.isNotEmpty) {
+          rawRows = fallbackRows;
+        }
+      }
 
       final rows = <Map<String, dynamic>>[];
-      for (final item in _normalizeSupabaseResponse(response)) {
+      for (final item in rawRows) {
         final normalized = Map<String, dynamic>.from(item);
         normalized['member_id'] = memberId;
         if (member?.name != null) {
@@ -1536,6 +1626,61 @@ class EmailHistoryProvider extends ChangeNotifier {
       Logger.warn('Failed to fetch sent email logs for $memberId: $error', trace: stack);
       return const <Map<String, dynamic>>[];
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _runEmailLogSelect(
+    Future<dynamic> Function(List<String> columns) queryBuilder,
+  ) async {
+    Future<List<Map<String, dynamic>>> run(
+      List<String> baseColumns, {
+      required bool legacySchema,
+    }) async {
+      final response = await queryBuilder(List<String>.from(baseColumns));
+      final rows = _normalizeSupabaseResponse(response);
+      return rows
+          .map(
+            (row) => _normalizeEmailLogRow(row, legacySchema: legacySchema),
+          )
+          .toList(growable: false);
+    }
+
+    try {
+      return await run(_sentLogColumns, legacySchema: false);
+    } on supabase.PostgrestException catch (error) {
+      if (_isMissingColumnError(error)) {
+        return run(_legacySentLogColumns, legacySchema: true);
+      }
+      rethrow;
+    }
+  }
+
+  Map<String, dynamic> _normalizeEmailLogRow(
+    Map<String, dynamic> row, {
+    required bool legacySchema,
+  }) {
+    final normalized = Map<String, dynamic>.from(row);
+
+    if (legacySchema) {
+      normalized['cc_emails'] ??= normalized['cc'];
+      normalized['bcc_emails'] ??= normalized['bcc'];
+    }
+
+    if (normalized['recipient_emails'] == null &&
+        normalized['recipients'] != null) {
+      normalized['recipient_emails'] = normalized['recipients'];
+    }
+
+    if (normalized['member_ids'] == null) {
+      final dynamic linked = normalized['linked_member_ids'];
+      if (linked is List) {
+        normalized['member_ids'] = linked
+            .map((value) => value?.toString())
+            .whereType<String>()
+            .toList(growable: false);
+      }
+    }
+
+    return normalized;
   }
 
   Future<_MemberMetadata?> _loadMemberMetadata(
@@ -1703,38 +1848,20 @@ class EmailHistoryProvider extends ChangeNotifier {
         row['date'] ??= row['received_at'];
       }
 
-      final sentColumns = [
-        'id',
-        'subject',
-        'body',
-        'sender',
-        'recipient_emails',
-        'cc_emails',
-        'bcc_emails',
-        'created_at',
-        'gmail_message_id',
-        'gmail_thread_id',
-        'message_state',
-        'status',
-        'metadata',
-        'headers',
-        'email_log_members!inner(member_id)',
-      ].join(',');
-
-      final sentResponse = await client
-          .from('email_logs')
-          .select(sentColumns)
-          .eq('email_log_members.member_id', memberId)
-          .or(
-            [
-              'gmail_thread_id.eq.$encodedThreadId',
-              'gmail_message_id.eq.$encodedThreadId',
-            ].join(','),
-          )
-          .order('created_at', ascending: true);
-
-      final List<Map<String, dynamic>> sentRows =
-          _normalizeSupabaseResponse(sentResponse);
+      final sentRows = await _runEmailLogSelect((columns) {
+        final selectColumns = <String>[...columns, 'email_log_members!inner(member_id)'];
+        return client
+            .from('email_logs')
+            .select(selectColumns.join(','))
+            .eq('email_log_members.member_id', memberId)
+            .or(
+              [
+                'gmail_thread_id.eq.$encodedThreadId',
+                'gmail_message_id.eq.$encodedThreadId',
+              ].join(','),
+            )
+            .order('created_at', ascending: true);
+      });
       for (final row in sentRows) {
         row['member_id'] ??= memberId;
         row['email_type'] = (row['email_type'] ?? 'sent').toString();
@@ -2101,6 +2228,30 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   @visibleForTesting
   EmailMessage debugMapEmailMessage(Map<String, dynamic> row) => _mapEmailMessage(row);
+
+  @visibleForTesting
+  Future<List<Map<String, dynamic>>> debugFetchSentLogRows(
+    supabase.SupabaseClient client,
+    String memberId, {
+    _MemberMetadata? member,
+  }) {
+    return _fetchSentLogRows(client, memberId, member: member);
+  }
+
+  @visibleForTesting
+  Map<String, dynamic> debugNormalizeHistoryRow(
+    Map<String, dynamic> row,
+    String memberId, {
+    _MemberMetadata? member,
+  }) {
+    return _normalizeHistoryRow(row, memberId, member: member);
+  }
+
+  @visibleForTesting
+  void debugSetState(String memberId, EmailHistoryState state) {
+    _stateByMember[memberId] = state;
+    notifyListeners();
+  }
 }
 
 class _EmailHistoryAccumulator {

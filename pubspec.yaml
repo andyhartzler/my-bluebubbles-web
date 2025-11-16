@@ -238,6 +238,7 @@ dev_dependencies:
   objectbox_generator: any
   flutter_test:
     sdk: flutter
+  mocktail: ^1.0.3
 
 flutter_icons:
   android: true
