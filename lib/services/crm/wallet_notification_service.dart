@@ -137,7 +137,7 @@ class WalletNotificationService {
       }
 
       final result = await _client.functions.invoke(
-        'wallet-notification-dispatch',
+        'send-general-wallet-notification',
         body: payload,
       );
 
