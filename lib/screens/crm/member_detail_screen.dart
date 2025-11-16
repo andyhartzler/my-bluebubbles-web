@@ -7,6 +7,7 @@ import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/wallet_pass_member.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/screens/crm/member_detail/email_history_tab.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
@@ -17,6 +18,7 @@ import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/services/crm/wallet_notification_service.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:collection/collection.dart';
@@ -27,6 +29,13 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 
 enum _SocialPlatform { instagram, tiktok, x }
+
+class _WalletNotificationDraft {
+  const _WalletNotificationDraft({required this.title, required this.message});
+
+  final String title;
+  final String message;
+}
 
 /// Detailed view of a single member
 class MemberDetailScreen extends StatefulWidget {
@@ -48,6 +57,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final CRMEmailService _emailService = CRMEmailService.instance;
   final MeetingRepository _meetingRepository = MeetingRepository();
   final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
+  final WalletNotificationService _walletService =
+      WalletNotificationService.instance;
   late Member _member;
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _reportNotesController = TextEditingController();
@@ -65,6 +76,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final Set<String> _deletingReportIds = <String>{};
   String? _reportComposerError;
   bool _refreshingMember = false;
+  WalletPassMember? _walletPass;
+  bool _loadingWalletPass = false;
+  bool _sendingWalletPush = false;
+  String? _walletPassError;
 
   static const String _reportsBucket = 'member-documents';
 
@@ -89,6 +104,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     'CRM Metadata': [Color(0xFF232526), Color(0xFF414345)],
   };
 
+  static const LinearGradient _walletPassGradient = LinearGradient(
+    colors: [Color(0xFF0F4C75), Color(0xFF3282B8)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const Color _walletAccentColor = Color(0xFF0F4C75);
+
   @override
   void initState() {
     super.initState();
@@ -99,6 +122,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       _hasLoadedAttendance = true;
       _loadMeetingAttendance();
       _fetchLatestMember();
+      _loadWalletPassInfo();
     }
   }
 
@@ -510,6 +534,9 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           }
         });
         _memberLookup.cacheMember(refreshed);
+        if (_walletService.isReady) {
+          unawaited(_loadWalletPassInfo());
+        }
         if (showFeedback) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Member refreshed')),
@@ -536,6 +563,34 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   }
 
   Future<void> _refreshMember() => _fetchLatestMember(showFeedback: true);
+
+  Future<void> _loadWalletPassInfo() async {
+    if (!_walletService.isReady || _loadingWalletPass) return;
+
+    setState(() {
+      _loadingWalletPass = true;
+      _walletPassError = null;
+    });
+
+    try {
+      final members = await _walletService.fetchPassMembers(
+        memberIds: [_member.id],
+        limit: 1,
+      );
+      if (!mounted) return;
+      setState(() {
+        _walletPass = members.isNotEmpty ? members.first : null;
+        _loadingWalletPass = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _walletPass = null;
+        _walletPassError = error.toString();
+        _loadingWalletPass = false;
+      });
+    }
+  }
 
   Future<void> _loadMeetingAttendance() async {
     if (!_crmReady) return;
@@ -1564,6 +1619,140 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
   }
 
+  Future<void> _sendWalletPushToMember() async {
+    if (!_walletService.isReady || _sendingWalletPush) return;
+
+    final pass = _walletPass;
+    if (pass == null || !pass.hasPass) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This member does not have an active wallet pass yet.'),
+        ),
+      );
+      return;
+    }
+
+    final draft = await _promptWalletNotificationDraft();
+    if (draft == null || !mounted) return;
+
+    setState(() => _sendingWalletPush = true);
+
+    WalletNotificationResult result;
+    try {
+      result = await _walletService.sendNotification(
+        target: WalletNotificationTarget.selectedMembers,
+        title: draft.title,
+        message: draft.message,
+        memberIds: [_member.id],
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _sendingWalletPush = false);
+      }
+    }
+
+    if (!mounted) return;
+
+    if (result.success) {
+      final delivered = result.delivered;
+      final deliveredText = delivered > 0
+          ? ' Delivered to $delivered device${delivered == 1 ? '' : 's'}.'
+          : '';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Notification sent to ${_member.name}.$deliveredText'),
+        ),
+      );
+    } else {
+      final message = result.message ?? 'Unknown error';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to send notification: $message'),
+        ),
+      );
+    }
+  }
+
+  Future<_WalletNotificationDraft?> _promptWalletNotificationDraft() async {
+    final titleController = TextEditingController();
+    final messageController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<_WalletNotificationDraft>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Notify ${_member.name}'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Notification title',
+                      hintText: 'Your title here',
+                    ),
+                    autofocus: true,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Enter a notification title';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: messageController,
+                    decoration: const InputDecoration(
+                      labelText: 'Notification message',
+                      hintText: 'Your message here',
+                    ),
+                    minLines: 3,
+                    maxLines: 5,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Enter a notification message';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(
+                  context,
+                  _WalletNotificationDraft(
+                    title: titleController.text.trim(),
+                    message: messageController.text.trim(),
+                  ),
+                );
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
+    );
+
+    titleController.dispose();
+    messageController.dispose();
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_crmReady && !_hasLoadedAttendance) {
@@ -1703,7 +1892,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final legacySchool =
         (college == null && highSchool == null) ? _cleanText(_member.schoolName) : null;
 
+    final walletSection = _buildWalletPassSection();
+
     final sections = <Widget?>[
+      walletSection,
       _buildOptionalSection('Contact Information', [
         _copyRow('Phone', primaryPhone, copyValue: phoneCopyValue),
         _copyRow('Email', email),
@@ -2151,6 +2343,198 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final visible = rows.whereType<Widget>().toList();
     if (visible.isEmpty) return null;
     return _buildSection(title, visible);
+  }
+
+  Widget? _buildWalletPassSection() {
+    if (!_walletService.isReady) return null;
+
+    final pass = _walletPass;
+    Widget body;
+    if (_loadingWalletPass) {
+      body = Row(
+        children: const [
+          SizedBox(
+            height: 22,
+            width: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.4,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Loading wallet pass details…',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+        ],
+      );
+    } else if (_walletPassError != null) {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Unable to load wallet pass info right now.',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _walletPassError!,
+            style: const TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _loadWalletPassInfo,
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
+            child: const Text('Try again'),
+          ),
+        ],
+      );
+    } else if (pass == null) {
+      body = const Text(
+        'No wallet pass has been generated for this member yet.',
+        style: TextStyle(color: Colors.white70),
+      );
+    } else {
+      final summary = pass.isActive
+          ? 'Active pass on file.'
+          : 'Pass found but not currently active.';
+      final registrationSummary = pass.isRegistered
+          ? 'Registered on ${pass.registrationCount} device${pass.registrationCount == 1 ? '' : 's'}.'
+          : 'Not registered for push notifications yet.';
+      body = Text(
+        '$summary $registrationSummary',
+        style: const TextStyle(color: Colors.white70),
+      );
+    }
+
+    final canSendPush =
+        pass != null && pass.hasPass && !_loadingWalletPass && _walletPassError == null;
+
+    final children = <Widget>[
+      Row(
+        children: [
+          const Icon(Icons.wallet_giftcard_outlined, color: Colors.white),
+          const SizedBox(width: 8),
+          const Text(
+            'Wallet Pass Status',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: _loadWalletPassInfo,
+            icon: _loadingWalletPass
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            color: Colors.white,
+            tooltip: 'Refresh wallet pass data',
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      body,
+    ];
+
+    if (!_loadingWalletPass && _walletPassError == null && pass != null) {
+      children.addAll([
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildWalletStatusChip('Pass Generated', pass.hasPass),
+            _buildWalletStatusChip('Active', pass.isActive),
+            _buildWalletStatusChip('Push Registered', pass.isRegistered),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if ((pass.passSerial ?? '').isNotEmpty)
+          Text(
+            'Pass serial: ${pass.passSerial}',
+            style: const TextStyle(color: Colors.white70),
+          ),
+        if (pass.passGeneratedAt != null)
+          Text(
+            'Generated ${_formatDate(pass.passGeneratedAt!)}',
+            style: const TextStyle(color: Colors.white70),
+          ),
+        Text(
+          'Registered devices: ${pass.registrationCount}',
+          style: const TextStyle(color: Colors.white70),
+        ),
+      ]);
+    }
+
+    children.add(const SizedBox(height: 16));
+    children.add(
+      Align(
+        alignment: Alignment.centerRight,
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: _walletAccentColor,
+          ),
+          onPressed: canSendPush && !_sendingWalletPush ? _sendWalletPushToMember : null,
+          icon: _sendingWalletPush
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    valueColor: AlwaysStoppedAnimation<Color>(_walletAccentColor),
+                  ),
+                )
+              : const Icon(Icons.notifications_active_outlined),
+          label: Text(_sendingWalletPush ? 'Sending…' : 'Send Push Notification'),
+        ),
+      ),
+    );
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: const BoxDecoration(gradient: _walletPassGradient),
+        padding: const EdgeInsets.all(20),
+        child: DefaultTextStyle.merge(
+          style: const TextStyle(color: Colors.white),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWalletStatusChip(String label, bool isActive) {
+    final background = Colors.white.withOpacity(isActive ? 0.18 : 0.08);
+    final borderColor = Colors.white.withOpacity(isActive ? 0.9 : 0.45);
+    final icon = isActive ? Icons.check_circle : Icons.radio_button_unchecked;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(label),
+        ],
+      ),
+    );
   }
 
   Widget _buildProfilePhoto() {

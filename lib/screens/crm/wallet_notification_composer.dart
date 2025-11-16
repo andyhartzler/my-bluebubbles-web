@@ -4,6 +4,9 @@ import 'package:bluebubbles/models/crm/wallet_pass_member.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_controller.dart';
 import 'package:bluebubbles/services/crm/wallet_notification_service.dart';
 
+const List<Color> _walletGradient = [Color(0xFF0F4C75), Color(0xFF3282B8)];
+const String _kFilterAnyValue = '__wallet_filter_any__';
+
 class WalletNotificationComposer extends StatefulWidget {
   const WalletNotificationComposer({
     super.key,
@@ -173,22 +176,30 @@ class _WalletNotificationComposerState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Target',
+              'Send to: All or select members',
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: WalletNotificationTarget.values.map((target) {
-                final label = _targetLabel(target);
-                return ChoiceChip(
-                  label: Text(label),
-                  selected: _controller.target == target,
-                  onSelected: (_) => _controller.setTarget(target),
-                );
-              }).toList(),
+              children: [
+                for (final target in WalletNotificationTarget.values)
+                  ChoiceChip(
+                    label: Text(_targetLabel(target)),
+                    selected: _controller.target == target,
+                    onSelected: (_) => _controller.setTarget(target),
+                  ),
+              ],
             ),
+            if (_controller.target == WalletNotificationTarget.selectedMembers) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Narrow your audience by Congressional District, County, School, or Chapter, '
+                'then select members manually or tap "Select visible" after filtering.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
           ],
         ),
       ),
@@ -201,19 +212,19 @@ class _WalletNotificationComposerState
         label: 'Total Passes',
         value: _controller.totalCount.toString(),
         icon: Icons.credit_card,
-        color: Colors.blue.shade50,
+        gradient: _walletGradient,
       ),
       _CountCard(
         label: 'Active',
         value: _controller.activeCount.toString(),
         icon: Icons.verified,
-        color: Colors.green.shade50,
+        gradient: _walletGradient,
       ),
       _CountCard(
         label: 'Push Registered',
         value: _controller.registeredCount.toString(),
         icon: Icons.notifications_active,
-        color: Colors.orange.shade50,
+        gradient: _walletGradient,
       ),
     ];
 
@@ -245,6 +256,13 @@ class _WalletNotificationComposerState
   Widget _buildMemberPicker(BuildContext context, {required bool shrinkWrapList}) {
     final theme = Theme.of(context);
     final members = _controller.members;
+    final showFilters =
+        _controller.target == WalletNotificationTarget.selectedMembers;
+    final hasAnyFilterOptions = _controller.countyOptions.isNotEmpty ||
+        _controller.districtOptions.isNotEmpty ||
+        _controller.schoolOptions.isNotEmpty ||
+        _controller.chapterOptions.isNotEmpty;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -274,6 +292,49 @@ class _WalletNotificationComposerState
                 ),
               ],
             ),
+            if (showFilters && hasAnyFilterOptions) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _FilterDropdown(
+                    label: 'CD',
+                    value: _controller.selectedDistrictFilter,
+                    options: _controller.districtOptions,
+                    onChanged: _controller.updateDistrictFilter,
+                  ),
+                  _FilterDropdown(
+                    label: 'County',
+                    value: _controller.selectedCountyFilter,
+                    options: _controller.countyOptions,
+                    onChanged: _controller.updateCountyFilter,
+                  ),
+                  _FilterDropdown(
+                    label: 'School',
+                    value: _controller.selectedSchoolFilter,
+                    options: _controller.schoolOptions,
+                    onChanged: _controller.updateSchoolFilter,
+                  ),
+                  _FilterDropdown(
+                    label: 'Chapter',
+                    value: _controller.selectedChapterFilter,
+                    options: _controller.chapterOptions,
+                    onChanged: _controller.updateChapterFilter,
+                  ),
+                ],
+              ),
+              if (_controller.hasMemberFilters)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _controller.clearMemberFilters,
+                    icon: const Icon(Icons.filter_alt_off),
+                    label: const Text('Clear filters'),
+                  ),
+                ),
+              const Divider(),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _searchController,
@@ -406,12 +467,17 @@ class _WalletNotificationComposerState
     final snackBar = SnackBar(
       content: Text(
         result.success
-            ? 'Notification sent to ~${result.delivered} members.'
+            ? _successMessage(result)
             : 'Unable to send notification: ${result.message ?? 'Unknown error'}',
       ),
       backgroundColor: result.success ? colorScheme.primary : colorScheme.error,
     );
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
+
+    if (result.success) {
+      _titleController.clear();
+      _messageController.clear();
+    }
   }
 
   Widget _buildPlaceholder(
@@ -453,7 +519,7 @@ class _WalletNotificationComposerState
       case WalletNotificationTarget.registeredDevices:
         return 'Push registered';
       case WalletNotificationTarget.selectedMembers:
-        return 'Selected (${_controller.selectedCount})';
+        return 'Select members (${_controller.selectedCount})';
     }
   }
 
@@ -466,8 +532,21 @@ class _WalletNotificationComposerState
       case WalletNotificationTarget.registeredDevices:
         return 'push-registered members';
       case WalletNotificationTarget.selectedMembers:
-        return '${_controller.selectedCount} selected';
+        return 'Select members (${_controller.selectedCount})';
     }
+  }
+
+  String _successMessage(WalletNotificationResult result) {
+    if (result.delivered > 0) {
+      return 'Notification sent to ~${result.delivered} members.';
+    }
+
+    final estimate = _controller.estimatedRecipientCount;
+    if (estimate > 0) {
+      return 'Notification sent to ~$estimate members.';
+    }
+
+    return 'Notification sent successfully.';
   }
 }
 
@@ -476,40 +555,51 @@ class _CountCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
-    this.color,
+    required this.gradient,
   });
 
   final String label;
   final String value;
   final IconData icon;
-  final Color? color;
+  final List<Color> gradient;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final textTheme = Theme.of(context).textTheme;
     return Card(
-      color: color,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Icon(icon, color: theme.colorScheme.primary),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: theme.textTheme.bodyMedium,
-                ),
-                Text(
-                  value,
-                  style: theme.textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ],
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: gradient),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -594,11 +684,72 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      label: Text(label),
-      backgroundColor: color,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
+    final gradientColors =
+        color != null ? [color!, color!] : _walletGradient;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: gradientColors),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterDropdown extends StatelessWidget {
+  const _FilterDropdown({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String? value;
+  final List<String> options;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (options.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final effectiveValue = value ?? _kFilterAnyValue;
+    return SizedBox(
+      width: 220,
+      child: DropdownButtonFormField<String>(
+        value: effectiveValue,
+        decoration: InputDecoration(labelText: label),
+        items: [
+          const DropdownMenuItem(
+            value: _kFilterAnyValue,
+            child: Text('Any'),
+          ),
+          ...options.map(
+            (option) => DropdownMenuItem(
+              value: option,
+              child: Text(option),
+            ),
+          ),
+        ],
+        onChanged: (selected) {
+          if (selected == null || selected == _kFilterAnyValue) {
+            onChanged(null);
+          } else {
+            onChanged(selected);
+          }
+        },
+      ),
     );
   }
 }
