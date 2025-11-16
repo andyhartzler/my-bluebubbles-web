@@ -3,6 +3,7 @@ import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/wallet_pass_member.dart';
 import 'package:bluebubbles/services/crm/wallet_notification_service.dart';
 
@@ -18,6 +19,16 @@ class WalletNotificationController extends ChangeNotifier {
   final List<WalletPassMember> _members = [];
   List<WalletPassMember> _visibleMembers = const <WalletPassMember>[];
   final LinkedHashSet<String> _selectedMemberIds = LinkedHashSet();
+
+  List<String> _countyOptions = const <String>[];
+  List<String> _districtOptions = const <String>[];
+  List<String> _schoolOptions = const <String>[];
+  List<String> _chapterOptions = const <String>[];
+
+  String? _selectedCounty;
+  String? _selectedDistrict;
+  String? _selectedSchool;
+  String? _selectedChapter;
 
   WalletNotificationTarget _target = WalletNotificationTarget.allPassHolders;
   bool _loading = false;
@@ -37,6 +48,31 @@ class WalletNotificationController extends ChangeNotifier {
   int get registeredCount =>
       _members.where((member) => member.isRegistered).length;
   bool get isServiceReady => _service.isReady;
+  List<String> get countyOptions => List.unmodifiable(_countyOptions);
+  List<String> get districtOptions => List.unmodifiable(_districtOptions);
+  List<String> get schoolOptions => List.unmodifiable(_schoolOptions);
+  List<String> get chapterOptions => List.unmodifiable(_chapterOptions);
+  String? get selectedCountyFilter => _selectedCounty;
+  String? get selectedDistrictFilter => _selectedDistrict;
+  String? get selectedSchoolFilter => _selectedSchool;
+  String? get selectedChapterFilter => _selectedChapter;
+  bool get hasMemberFilters =>
+      (_selectedCounty ?? '').isNotEmpty ||
+      (_selectedDistrict ?? '').isNotEmpty ||
+      (_selectedSchool ?? '').isNotEmpty ||
+      (_selectedChapter ?? '').isNotEmpty;
+  int get estimatedRecipientCount {
+    switch (_target) {
+      case WalletNotificationTarget.allPassHolders:
+        return totalCount;
+      case WalletNotificationTarget.activePasses:
+        return activeCount;
+      case WalletNotificationTarget.registeredDevices:
+        return registeredCount;
+      case WalletNotificationTarget.selectedMembers:
+        return selectedCount;
+    }
+  }
 
   bool canSend({required String title, required String message}) {
     if (title.trim().isEmpty || message.trim().isEmpty) {
@@ -54,7 +90,7 @@ class WalletNotificationController extends ChangeNotifier {
 
   void updateSearch(String query) {
     _searchTerm = query.trim().toLowerCase();
-    _applySearchFilter();
+    _applyMemberFilters();
     notifyListeners();
   }
 
@@ -84,6 +120,52 @@ class WalletNotificationController extends ChangeNotifier {
     for (final member in _visibleMembers) {
       _selectedMemberIds.add(member.member.id);
     }
+    notifyListeners();
+  }
+
+  void updateCountyFilter(String? county) {
+    final normalizedValue = (county ?? '').trim();
+    final normalized = normalizedValue.isEmpty ? null : normalizedValue;
+    if (_selectedCounty == normalized) return;
+    _selectedCounty = normalized;
+    _applyMemberFilters();
+    notifyListeners();
+  }
+
+  void updateDistrictFilter(String? district) {
+    final normalizedValue = (district ?? '').trim();
+    final normalized = normalizedValue.isEmpty ? null : normalizedValue;
+    if (_selectedDistrict == normalized) return;
+    _selectedDistrict = normalized;
+    _applyMemberFilters();
+    notifyListeners();
+  }
+
+  void updateSchoolFilter(String? school) {
+    final normalizedValue = (school ?? '').trim();
+    final normalized = normalizedValue.isEmpty ? null : normalizedValue;
+    if (_selectedSchool == normalized) return;
+    _selectedSchool = normalized;
+    _applyMemberFilters();
+    notifyListeners();
+  }
+
+  void updateChapterFilter(String? chapter) {
+    final normalizedValue = (chapter ?? '').trim();
+    final normalized = normalizedValue.isEmpty ? null : normalizedValue;
+    if (_selectedChapter == normalized) return;
+    _selectedChapter = normalized;
+    _applyMemberFilters();
+    notifyListeners();
+  }
+
+  void clearMemberFilters() {
+    if (!hasMemberFilters) return;
+    _selectedCounty = null;
+    _selectedDistrict = null;
+    _selectedSchool = null;
+    _selectedChapter = null;
+    _applyMemberFilters();
     notifyListeners();
   }
 
@@ -150,8 +232,9 @@ class WalletNotificationController extends ChangeNotifier {
       _members
         ..clear()
         ..addAll(merged);
+      _refreshFilterOptions();
       _pruneSelection();
-      _applySearchFilter();
+      _applyMemberFilters();
       _applyInitialSelections();
     } catch (error) {
       _errorMessage = 'Failed to load wallet pass holders: $error';
@@ -191,18 +274,108 @@ class WalletNotificationController extends ChangeNotifier {
     _selectedMemberIds.removeWhere((id) => !validIds.contains(id));
   }
 
-  void _applySearchFilter() {
-    if (_searchTerm.isEmpty) {
-      _visibleMembers = List<WalletPassMember>.from(_members);
-      return;
+  void _applyMemberFilters() {
+    Iterable<WalletPassMember> filtered = _members;
+
+    if (_searchTerm.isNotEmpty) {
+      filtered = filtered.where((member) {
+        final searchable =
+            '${member.member.name} ${member.member.email ?? ''} ${member.member.phone ?? ''}'
+                .toLowerCase();
+        return searchable.contains(_searchTerm);
+      });
     }
 
-    _visibleMembers = _members.where((member) {
-      final searchable =
-          '${member.member.name} ${member.member.email ?? ''} ${member.member.phone ?? ''}'
-              .toLowerCase();
-      return searchable.contains(_searchTerm);
-    }).toList(growable: false);
+    if (_selectedCounty != null) {
+      filtered = filtered.where(
+        (member) => _memberCountyLabel(member) == _selectedCounty,
+      );
+    }
+
+    if (_selectedDistrict != null) {
+      filtered = filtered.where(
+        (member) => _memberDistrictLabel(member) == _selectedDistrict,
+      );
+    }
+
+    if (_selectedSchool != null) {
+      filtered = filtered.where(
+        (member) => _memberSchoolLabel(member) == _selectedSchool,
+      );
+    }
+
+    if (_selectedChapter != null) {
+      filtered = filtered.where(
+        (member) => _memberChapterLabel(member) == _selectedChapter,
+      );
+    }
+
+    _visibleMembers = filtered.toList(growable: false);
+  }
+
+  void _refreshFilterOptions() {
+    _countyOptions = _collectOptions(_memberCountyLabel);
+    _districtOptions = _collectOptions(_memberDistrictLabel);
+    _schoolOptions = _collectOptions(_memberSchoolLabel);
+    _chapterOptions = _collectOptions(_memberChapterLabel);
+
+    if (_selectedCounty != null && !_countyOptions.contains(_selectedCounty)) {
+      _selectedCounty = null;
+    }
+    if (_selectedDistrict != null &&
+        !_districtOptions.contains(_selectedDistrict)) {
+      _selectedDistrict = null;
+    }
+    if (_selectedSchool != null && !_schoolOptions.contains(_selectedSchool)) {
+      _selectedSchool = null;
+    }
+    if (_selectedChapter != null && !_chapterOptions.contains(_selectedChapter)) {
+      _selectedChapter = null;
+    }
+  }
+
+  List<String> _collectOptions(
+    String? Function(WalletPassMember member) extractor,
+  ) {
+    final set = <String>{};
+    for (final member in _members) {
+      final label = extractor(member);
+      if (label != null && label.trim().isNotEmpty) {
+        set.add(label.trim());
+      }
+    }
+    final list = set.toList(growable: false)
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
+
+  String? _memberCountyLabel(WalletPassMember member) {
+    return Member.normalizeCountyLabel(member.member.county);
+  }
+
+  String? _memberDistrictLabel(WalletPassMember member) {
+    return Member.formatDistrictLabel(member.member.congressionalDistrict);
+  }
+
+  String? _memberSchoolLabel(WalletPassMember member) {
+    final candidates = [
+      member.member.schoolName,
+      member.member.highSchool,
+      member.member.college,
+    ];
+    for (final value in candidates) {
+      final normalized = Member.normalizeText(value);
+      if (normalized != null && normalized.isNotEmpty) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  String? _memberChapterLabel(WalletPassMember member) {
+    return Member.normalizeText(
+      member.member.chapterName ?? member.member.currentChapterMember,
+    );
   }
 
   @override
