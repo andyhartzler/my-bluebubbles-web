@@ -1525,10 +1525,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     bool usingLegacyColumns = false;
 
     supabase.PostgrestFilterBuilder<List<Map<String, dynamic>>> buildBaseQuery() {
-      return client
-          .from('email_logs')
-          .select(selectList)
-          .order('created_at', ascending: false);
+      return client.from('email_logs').select(selectList);
     }
 
     List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
@@ -1536,6 +1533,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final response = await buildBaseQuery()
           .contains('member_ids', <String>[memberId])
+          .order('created_at', ascending: false)
           .limit(limit);
       rawRows = _normalizeSupabaseResponse(response);
     } on supabase.PostgrestException catch (error) {
