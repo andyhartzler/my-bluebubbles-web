@@ -588,6 +588,19 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final _MemberMetadata? memberMetadata =
           await _loadMemberMetadata(clients.database, trimmedMemberId);
+      if (memberMetadata == null) {
+        Logger.debug(
+          'Email history: no metadata found for $trimmedMemberId (candidate emails=0).',
+        );
+      } else {
+        Logger.debug(
+          'Email history: metadata for $trimmedMemberId => '
+          'name=${memberMetadata.name ?? 'n/a'}, '
+          'email=${memberMetadata.email ?? 'n/a'}, '
+          'schoolEmail=${memberMetadata.schoolEmail ?? 'n/a'}, '
+          'candidateEmails=${memberMetadata.candidateEmails}',
+        );
+      }
 
       final accumulator = _EmailHistoryAccumulator(
         memberId: trimmedMemberId,
@@ -647,11 +660,16 @@ class EmailHistoryProvider extends ChangeNotifier {
 
       final initialEntries = accumulator.snapshot(limit: 200);
       if (initialEntries.isNotEmpty) {
+        _logParseFailures(
+          memberId: trimmedMemberId,
+          phase: 'interim',
+          accumulator: accumulator,
+        );
         _stateByMember[memberId] = EmailHistoryState(
           isLoading: true,
           hasLoaded: true,
           entries: initialEntries,
-          error: accumulator.warningMessage,
+          error: accumulator.warningMessage ?? accumulator.parseFailureMessage,
         );
         notifyListeners();
       }
@@ -726,28 +744,15 @@ class EmailHistoryProvider extends ChangeNotifier {
         );
       }
 
-      final finalEntries = accumulator.snapshot(limit: 200);
-      List<EmailHistoryEntry> outputEntries;
-      String? errorMessage;
+      _logParseFailures(
+        memberId: trimmedMemberId,
+        phase: 'final',
+        accumulator: accumulator,
+      );
 
-      if (finalEntries.isEmpty) {
-        outputEntries = current.entries;
-        if (outputEntries.isEmpty) {
-          errorMessage =
-              accumulator.failureMessage ?? accumulator.warningMessage;
-        } else {
-          errorMessage = accumulator.warningMessage ?? accumulator.failureMessage;
-        }
-      } else {
-        outputEntries = finalEntries;
-        errorMessage = accumulator.warningMessage;
-      }
-
-      _stateByMember[memberId] = EmailHistoryState(
-        isLoading: false,
-        hasLoaded: true,
-        entries: outputEntries,
-        error: errorMessage,
+      _stateByMember[memberId] = _buildFinalStateFromAccumulator(
+        current: current,
+        accumulator: accumulator,
       );
     } catch (error, stack) {
       Logger.warn('Failed to load email history for $memberId: $error', trace: stack);
@@ -1382,6 +1387,12 @@ class EmailHistoryProvider extends ChangeNotifier {
       legacyColumns: true,
     );
 
+    Logger.debug(
+      'Email history: inbox query setup for $memberId '
+      '(candidateEmails=${candidateEmails.length}) '
+      'mode=$mode filter=$emailFilter legacyFilter=$legacyEmailFilter',
+    );
+
     Future<List<Map<String, dynamic>>> runQuery({required bool byEmail}) async {
       if (byEmail && emailFilter == null && legacyEmailFilter == null) {
         return const <Map<String, dynamic>>[];
@@ -1566,6 +1577,20 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     final candidateEmails = member?.candidateEmails ?? const <String>[];
+    final sentLogFilter = _buildSentLogRecipientFilter(
+      candidateEmails,
+      legacyColumns: false,
+    );
+    final legacySentLogFilter = _buildSentLogRecipientFilter(
+      candidateEmails,
+      legacyColumns: true,
+    );
+
+    Logger.debug(
+      'Email history: sent log query setup for $memberId '
+      '(candidateEmails=${candidateEmails.length}) '
+      'filter=$sentLogFilter legacyFilter=$legacySentLogFilter',
+    );
     List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
 
     try {
@@ -1595,6 +1620,7 @@ class EmailHistoryProvider extends ChangeNotifier {
             candidateEmails: candidateEmails,
             limit: limit,
             legacyColumns: true,
+            filter: legacySentLogFilter,
           );
         } else {
           rethrow;
@@ -1609,6 +1635,11 @@ class EmailHistoryProvider extends ChangeNotifier {
           candidateEmails: candidateEmails,
           limit: limit,
           legacyColumns: usingLegacyColumns,
+          filter: usingLegacyColumns ? legacySentLogFilter : sentLogFilter,
+        );
+        Logger.debug(
+          'Email history: email_logs fallback for $memberId returned '
+          '${fallbackRows.length} rows.',
         );
         if (fallbackRows.isNotEmpty) {
           rawRows = fallbackRows;
@@ -1655,8 +1686,9 @@ class EmailHistoryProvider extends ChangeNotifier {
     required Iterable<String> candidateEmails,
     required int limit,
     required bool legacyColumns,
+    String? filter,
   }) async {
-    final filter = _buildSentLogRecipientFilter(
+    filter ??= _buildSentLogRecipientFilter(
       candidateEmails,
       legacyColumns: legacyColumns,
     );
@@ -2411,6 +2443,86 @@ class EmailHistoryProvider extends ChangeNotifier {
     return participants;
   }
 
+  void _logParseFailures({
+    required String memberId,
+    required String phase,
+    required _EmailHistoryAccumulator accumulator,
+  }) {
+    final failed = accumulator.parseFailureCount;
+    if (failed == 0) {
+      return;
+    }
+    final parsed = accumulator.parsedRowCount;
+    final total = accumulator.totalProcessedRowCount;
+    Logger.warn(
+      'Email history $phase load parsed $parsed row(s) with '
+      '$failed parse failure(s) for $memberId (total processed: $total).',
+    );
+  }
+
+  EmailHistoryState _buildFinalStateFromAccumulator({
+    required EmailHistoryState current,
+    required _EmailHistoryAccumulator accumulator,
+  }) {
+    final finalEntries = accumulator.snapshot(limit: 200);
+    List<EmailHistoryEntry> outputEntries;
+    String? errorMessage;
+
+    if (finalEntries.isEmpty) {
+      outputEntries = current.entries;
+      if (outputEntries.isEmpty) {
+        errorMessage = accumulator.failureMessage ??
+            accumulator.warningMessage ??
+            accumulator.parseFailureMessage;
+      } else {
+        errorMessage = accumulator.warningMessage ??
+            accumulator.failureMessage ??
+            accumulator.parseFailureMessage;
+      }
+    } else {
+      outputEntries = finalEntries;
+      errorMessage =
+          accumulator.warningMessage ?? accumulator.parseFailureMessage;
+    }
+
+    return EmailHistoryState(
+      isLoading: false,
+      hasLoaded: true,
+      entries: outputEntries,
+      error: errorMessage,
+    );
+  }
+
+  @visibleForTesting
+  EmailHistoryState debugBuildStateFromRows({
+    required String memberId,
+    required Iterable<Map<String, dynamic>> rows,
+    List<EmailHistoryEntry> existingEntries = const <EmailHistoryEntry>[],
+    Map<String, dynamic> Function(Map<String, dynamic>)? normalizeRow,
+  }) {
+    final accumulator = _EmailHistoryAccumulator(
+      memberId: memberId,
+      normalizeRow: normalizeRow ?? (row) => row,
+    )..addExisting(existingEntries);
+
+    accumulator.addRows(rows);
+
+    _logParseFailures(
+      memberId: memberId,
+      phase: 'debug',
+      accumulator: accumulator,
+    );
+
+    return _buildFinalStateFromAccumulator(
+      current: EmailHistoryState(
+        isLoading: false,
+        hasLoaded: existingEntries.isNotEmpty,
+        entries: existingEntries,
+      ),
+      accumulator: accumulator,
+    );
+  }
+
   @visibleForTesting
   EmailMessage debugMapEmailMessage(Map<String, dynamic> row) => _mapEmailMessage(row);
 
@@ -2491,6 +2603,9 @@ class _EmailHistoryAccumulator {
   final Map<String, EmailHistoryEntry> _entriesById;
   final List<String> _blockingFailures = <String>[];
   final List<String> _warnings = <String>[];
+  final List<String> _parseFailureSummaries = <String>[];
+  int _parsedRowCount = 0;
+  int _parseFailureCount = 0;
   final Map<String, dynamic> Function(Map<String, dynamic>) _normalizeRow;
 
   void addExisting(List<EmailHistoryEntry> entries) {
@@ -2501,16 +2616,28 @@ class _EmailHistoryAccumulator {
   }
 
   void addRows(Iterable<Map<String, dynamic>> rows) {
+    var added = 0;
+    var failed = 0;
     for (final row in rows) {
       try {
         final normalized = _normalizeRow(Map<String, dynamic>.from(row));
         final entry = EmailHistoryEntry.fromMap(normalized);
         final key = _normalizeKey(entry.id, fallback: normalized.hashCode.toString());
         _entriesById[key] = entry;
+        _parsedRowCount += 1;
       } catch (error, stack) {
+        _parseFailureCount += 1;
+        final summary = _describeParseFailure(error);
+        if (summary != null && _parseFailureSummaries.length < 3) {
+          _parseFailureSummaries.add(summary);
+        }
         Logger.warn('Failed to parse email history row for $memberId: $error', trace: stack);
       }
     }
+    Logger.debug(
+      'Email history: accumulator processed ${rows.length} rows for '
+      '$memberId (added=$added, failed=$failed).',
+    );
   }
 
   void addFailure(String? message) {
@@ -2545,6 +2672,26 @@ class _EmailHistoryAccumulator {
 
   String? get warningMessage => _warnings.isEmpty ? null : _warnings.join(' ');
 
+  String? get parseFailureMessage {
+    if (_parseFailureCount == 0) return null;
+    final buffer = StringBuffer('Failed to parse $_parseFailureCount email history row');
+    if (_parseFailureCount != 1) {
+      buffer.write('s');
+    }
+    buffer.write('.');
+    if (_parseFailureSummaries.isNotEmpty) {
+      buffer.write(' ');
+      buffer.write(_parseFailureSummaries.join(' '));
+    }
+    return buffer.toString();
+  }
+
+  int get parsedRowCount => _parsedRowCount;
+
+  int get parseFailureCount => _parseFailureCount;
+
+  int get totalProcessedRowCount => _parsedRowCount + _parseFailureCount;
+
   String _normalizeKey(String value, {String? fallback}) {
     final trimmed = value.trim();
     if (trimmed.isNotEmpty) {
@@ -2557,6 +2704,13 @@ class _EmailHistoryAccumulator {
     if (value == null) return null;
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  String? _describeParseFailure(Object error) {
+    final description = error.toString();
+    if (description.isEmpty) return null;
+    final firstLine = description.split('\n').first.trim();
+    return firstLine.isEmpty ? null : firstLine;
   }
 }
 
