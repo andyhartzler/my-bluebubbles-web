@@ -80,9 +80,9 @@ void main() {
     supabaseService.debugSetInitialized(false);
   });
 
-  Member _buildMember({String? email}) {
+  Member _buildMember({String? id, String? email}) {
     return Member(
-      id: 'member-1',
+      id: id ?? 'member-1',
       name: 'Test Member',
       email: email,
     );
@@ -243,7 +243,10 @@ void main() {
   });
 
   testWidgets('email_logs rows surface in email tab', (tester) async {
-    final member = _buildMember(email: 'member@example.com');
+    final member = _buildMember(
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      email: 'member@example.com',
+    );
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
     final mockClient = _MockSupabaseClient();
     final mockQuery = _MockPostgrestFilterBuilder();
@@ -253,8 +256,8 @@ void main() {
       'subject': 'Welcome to the team',
       'sender': 'info@moyoungdemocrats.org',
       'recipient_emails': ['member@example.com'],
-      'cc_emails': ['ally@example.com'],
-      'bcc_emails': ['bcc@example.com'],
+      'cc': ['ally@example.com'],
+      'bcc': ['bcc@example.com'],
       'created_at': '2024-05-01T12:00:00Z',
       'status': 'delivered',
       'gmail_message_id': 'gmail-123',
@@ -263,7 +266,7 @@ void main() {
 
     when(() => mockClient.from('email_logs')).thenReturn(mockQuery);
     when(() => mockQuery.select(any())).thenReturn(mockQuery);
-    when(() => mockQuery.filter('member_ids', 'cs', any<String>()))
+    when(() => mockQuery.contains('member_ids', [member.id]))
         .thenReturn(mockQuery);
     when(() => mockQuery.order(
           any<String>(),
@@ -293,8 +296,7 @@ void main() {
     final rawRows =
         await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
     expect(rawRows, hasLength(1));
-    verify(() => mockQuery.filter('member_ids', 'cs', '{${member.id}}'))
-        .called(1);
+    verify(() => mockQuery.contains('member_ids', [member.id])).called(1);
 
     final normalized =
         provider.debugNormalizeHistoryRow(rawRows.first, member.id);
@@ -367,8 +369,8 @@ void main() {
       'subject': 'Follow up',
       'sender': 'info@moyoungdemocrats.org',
       'recipient_emails': ['member@example.com'],
-      'cc_emails': ['cc@example.com'],
-      'bcc_emails': [],
+      'cc': ['cc@example.com'],
+      'bcc': [],
       'created_at': '2024-05-02T08:00:00Z',
       'status': 'sent',
     };
@@ -413,6 +415,211 @@ void main() {
     final entry = EmailHistoryEntry.fromMap(normalized);
     expect(entry.to, contains('member@example.com'));
     expect(entry.cc, contains('cc@example.com'));
+  });
+
+  test('sent log recipient fallback merges rows even when member_ids match', () async {
+    final member = _buildMember(email: 'member@example.com');
+    final provider = EmailHistoryProvider(supabaseService: supabaseService);
+    final mockClient = _MockSupabaseClient();
+    final primaryQuery = _MockPostgrestFilterBuilder();
+    final fallbackQuery = _MockPostgrestFilterBuilder();
+    int fromCalls = 0;
+
+    when(() => mockClient.from('email_logs')).thenAnswer((_) {
+      return fromCalls++ == 0 ? primaryQuery : fallbackQuery;
+    });
+
+    final primaryRow = <String, dynamic>{
+      'id': 'log-primary',
+      'subject': 'Primary hit',
+      'sender': 'info@moyoungdemocrats.org',
+      'recipient_emails': ['member@example.com'],
+      'created_at': '2024-05-01T08:00:00Z',
+      'status': 'sent',
+    };
+
+    when(() => primaryQuery.select(any())).thenReturn(primaryQuery);
+    when(() => primaryQuery.contains('member_ids', [member.id])).thenReturn(primaryQuery);
+    when(() => primaryQuery.order(
+          any<String>(),
+          ascending: any<bool>(named: 'ascending'),
+          nullsFirst: any<bool>(named: 'nullsFirst'),
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(primaryQuery);
+    when(() => primaryQuery.limit(
+          200,
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(primaryQuery);
+    when(() => primaryQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      return Future.value(onValue(<String, dynamic>{'data': [primaryRow]}));
+    });
+
+    final fallbackRow = <String, dynamic>{
+      'id': 'log-fallback',
+      'subject': 'Recipient hit',
+      'sender': 'info@moyoungdemocrats.org',
+      'recipient_emails': ['member@example.com', 'ally@example.com'],
+      'created_at': '2024-05-02T08:00:00Z',
+      'status': 'sent',
+    };
+
+    when(() => fallbackQuery.select(any())).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.order(
+          any<String>(),
+          ascending: any<bool>(named: 'ascending'),
+          nullsFirst: any<bool>(named: 'nullsFirst'),
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.limit(
+          200,
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.or(any())).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      return Future.value(onValue(<String, dynamic>{'data': [fallbackRow]}));
+    });
+
+    final metadata = provider.debugCreateMemberMetadata(
+      id: member.id,
+      name: member.name,
+      email: member.email,
+    );
+
+    final rows =
+        await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
+
+    expect(rows.map((row) => row['id']).toSet(), equals({'log-primary', 'log-fallback'}));
+    verify(() => fallbackQuery.or(contains('recipient_emails.cs.{"member@example.com"}')))
+        .called(1);
+  });
+
+  test('inbox queries merge member_id and email filters', () async {
+    final member = _buildMember(email: 'member@example.com');
+    final provider = EmailHistoryProvider(supabaseService: supabaseService);
+    final mockClient = _MockSupabaseClient();
+    final primaryQuery = _MockPostgrestFilterBuilder();
+    final fallbackQuery = _MockPostgrestFilterBuilder();
+    int fromCalls = 0;
+
+    when(() => mockClient.from('email_inbox')).thenAnswer((_) {
+      return fromCalls++ == 0 ? primaryQuery : fallbackQuery;
+    });
+
+    final primaryRow = <String, dynamic>{
+      'id': 'inbox-primary',
+      'member_id': member.id,
+      'subject': 'Primary received',
+      'from_address': 'friend@example.com',
+      'to_address': 'member@example.com',
+      'direction': 'received',
+      'date': '2024-05-01T08:00:00Z',
+    };
+    final fallbackRow = <String, dynamic>{
+      'id': 'inbox-fallback',
+      'member_id': member.id,
+      'subject': 'Email filter match',
+      'from_address': 'friend@example.com',
+      'to_address': 'member@example.com',
+      'direction': 'received',
+      'date': '2024-05-02T08:00:00Z',
+    };
+
+    when(() => primaryQuery.select(any())).thenReturn(primaryQuery);
+    when(() => primaryQuery.eq('member_id', member.id)).thenReturn(primaryQuery);
+    when(() => primaryQuery.order(
+          any<String>(),
+          ascending: any<bool>(named: 'ascending'),
+          nullsFirst: any<bool>(named: 'nullsFirst'),
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(primaryQuery);
+    when(() => primaryQuery.limit(
+          200,
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(primaryQuery);
+    when(() => primaryQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      return Future.value(onValue(<String, dynamic>{'data': [primaryRow]}));
+    });
+
+    when(() => fallbackQuery.select(any())).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.or(any())).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.order(
+          any<String>(),
+          ascending: any<bool>(named: 'ascending'),
+          nullsFirst: any<bool>(named: 'nullsFirst'),
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.limit(
+          200,
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      return Future.value(onValue(<String, dynamic>{'data': [fallbackRow]}));
+    });
+
+    final metadata = provider.debugCreateMemberMetadata(
+      id: member.id,
+      name: member.name,
+      email: member.email,
+    );
+
+    final rows = await provider.debugFetchInboxRows(
+      mockClient,
+      member.id,
+      member: metadata,
+    );
+
+    expect(rows.map((row) => row['id']).toSet(), equals({'inbox-primary', 'inbox-fallback'}));
+    verify(() => fallbackQuery.or(contains('member@example.com'))).called(1);
+  });
+
+  test('accumulator surfaces parse failures for UI warnings', () {
+    final provider = EmailHistoryProvider(supabaseService: supabaseService);
+
+    final rows = <Map<String, dynamic>>[
+      {
+        'id': 'good',
+        'subject': 'Hello',
+        'status': 'sent',
+        'to_emails': ['member@example.com'],
+        'sent_at': '2024-05-01T00:00:00Z',
+      },
+      {'id': 'bad'},
+    ];
+
+    final message = provider.debugAccumulateRows(
+      memberId: 'member-1',
+      rows: rows,
+      normalizeRow: (row) {
+        if (row['id'] == 'bad') {
+          throw const FormatException('Illegal RegExp pattern (?i');
+        }
+        return row;
+      },
+    );
+
+    expect(message, isNotNull);
+    expect(message, contains('Some emails could not be loaded.'));
+    expect(message, contains('FormatException'));
   });
 
   test('inbox fallback filter uses literal wildcards for member emails', () {
@@ -524,6 +731,24 @@ void main() {
     final entry = EmailHistoryEntry.fromMap(map);
 
     expect(entry.cc, isEmpty);
+    expect(entry.bcc, isEmpty);
+  });
+
+  test('history entry ignores null recipients in Supabase payloads', () {
+    final map = <String, dynamic>{
+      'email_id': 'log-314',
+      'subject': 'Null defense',
+      'status': 'sent',
+      'recipient_emails': ['member@example.com', null, ''],
+      'cc': [null, 'helper@example.com'],
+      'bcc': [null],
+      'created_at': '2024-04-01T00:00:00Z',
+    };
+
+    final entry = EmailHistoryEntry.fromMap(map);
+
+    expect(entry.to, equals(['member@example.com']));
+    expect(entry.cc, equals(['helper@example.com']));
     expect(entry.bcc, isEmpty);
   });
 }
