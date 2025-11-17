@@ -141,6 +141,75 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     return buffer.toString();
   }
 
+  Iterable<String> _collectSignatureKeys(String channelKey, [String? participantKey]) sync* {
+    if (channelKey.isNotEmpty) {
+      yield channelKey;
+    }
+    if (participantKey != null && participantKey.isNotEmpty && participantKey != channelKey) {
+      yield participantKey;
+    }
+  }
+
+  List<String> _buildSendSignatures({
+    required Iterable<String> keys,
+    required List<PlatformFile> attachments,
+    required String text,
+    required String subject,
+    String? effectId,
+  }) {
+    return [
+      for (final key in keys)
+        if (key.isNotEmpty)
+          _buildSendSignature(
+            channelKey: key,
+            attachments: attachments,
+            text: text,
+            subject: subject,
+            effectId: effectId,
+          ),
+    ];
+  }
+
+  bool _shouldBlockAnySignature(Iterable<String> signatures) {
+    for (final signature in signatures) {
+      if (_shouldBlockSend(signature)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _markSendSignatures(Iterable<String> signatures) {
+    for (final signature in signatures) {
+      _markSendSignature(signature);
+    }
+  }
+
+  String? _buildParticipantSignatureFromAddresses(Iterable<String> addresses) {
+    final normalized = addresses
+        .map(_normalizeAddressForMatching)
+        .whereType<String>()
+        .toList()
+      ..sort();
+    if (normalized.isEmpty) return null;
+    return 'participants:${normalized.join(',')}';
+  }
+
+  String? _buildParticipantSignatureForChat(Chat? chat) {
+    if (chat == null) return null;
+    if (chat.participants.isEmpty) {
+      final identifier = chat.chatIdentifier ?? chat.guid;
+      return identifier == null ? null : 'participants:$identifier';
+    }
+    final addresses = chat.participants.map((participant) => participant.address).whereType<String>();
+    return _buildParticipantSignatureFromAddresses(addresses);
+  }
+
+  String? _buildParticipantSignatureFromSelected() {
+    if (selectedContacts.isEmpty) return null;
+    return _buildParticipantSignatureFromAddresses(selectedContacts.map((c) => c.address));
+  }
+
   bool _shouldBlockSend(String signature) {
     final now = DateTime.now();
     _recentSendSignatures.removeWhere(
@@ -636,15 +705,16 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     final text = textController.text.trimRight();
     final subject = subjectController.text.trimRight();
     final channelKey = chat.guid ?? chat.chatIdentifier ?? 'unknown';
-    final signature = _buildSendSignature(
-      channelKey: channelKey,
+    final participantSignature = _buildParticipantSignatureForChat(chat);
+    final sendSignatures = _buildSendSignatures(
+      keys: _collectSignatureKeys(channelKey, participantSignature),
       attachments: attachments,
       text: text,
       subject: subject,
       effectId: effect,
     );
 
-    if (_shouldBlockSend(signature)) {
+    if (_shouldBlockAnySignature(sendSignatures)) {
       Logger.warn(
         'ChatCreatorSend: prevented duplicate payload for chat ${chat.guid}',
         tag: 'ChatCreatorSend',
@@ -746,7 +816,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       }
     }
 
-    _markSendSignature(signature);
+    _markSendSignatures(sendSignatures);
     if (controller != null) {
       controller.replyToMessage = null;
       controller.pickedAttachments.clear();
@@ -817,14 +887,18 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         .map((e) => e.address.isEmail ? e.address : cleansePhoneNumber(e.address))
         .toList();
     final channelKey = 'new:${participants.join(',')}';
-    final signature = _buildSendSignature(
-      channelKey: channelKey,
-      attachments: List<PlatformFile>.from(_composerAttachments),
-      text: textController.text.trimRight(),
-      subject: subjectController.text.trimRight(),
+    final participantSignature = _buildParticipantSignatureFromSelected();
+    final attachments = List<PlatformFile>.from(_composerAttachments);
+    final text = textController.text.trimRight();
+    final subject = subjectController.text.trimRight();
+    final sendSignatures = _buildSendSignatures(
+      keys: _collectSignatureKeys(channelKey, participantSignature),
+      attachments: attachments,
+      text: text,
+      subject: subject,
       effectId: _effect,
     );
-    if (_shouldBlockSend(signature)) {
+    if (_shouldBlockAnySignature(sendSignatures)) {
       if (mounted) {
         showSnackbar('Duplicate message', 'You just sent that message.');
       }
@@ -914,7 +988,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       }
 
       await _completeSend(newChat);
-      _markSendSignature(signature);
+      _markSendSignatures(sendSignatures);
     } catch (error, stack) {
       Logger.warn('Failed to create chat', error: error, trace: stack);
 
@@ -930,7 +1004,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       if (recovered != null) {
         createCompleter?.complete();
         await _completeSend(recovered);
-        _markSendSignature(signature);
+        _markSendSignatures(sendSignatures);
         return;
       }
 
