@@ -2602,22 +2602,7 @@ class EmailHistoryProvider extends ChangeNotifier {
   }
 
   @visibleForTesting
-  Future<List<Map<String, dynamic>>> debugFetchInboxRows(
-    supabase.SupabaseClient client,
-    String memberId, {
-    _MemberMetadata? member,
-    _EmailInboxMode mode = _EmailInboxMode.received,
-  }) {
-    return _fetchInboxRows(
-      client,
-      memberId,
-      member: member,
-      mode: mode,
-    );
-  }
-
-  @visibleForTesting
-  Future<List<Map<String, dynamic>>> debugFetchSentLogRows(
+  Future<List<Map<String, dynamic>>> debugRunSentLogQuery(
     supabase.SupabaseClient client,
     String memberId, {
     _MemberMetadata? member,
@@ -2626,7 +2611,7 @@ class EmailHistoryProvider extends ChangeNotifier {
   }
 
   @visibleForTesting
-  Future<List<Map<String, dynamic>>> debugFetchInboxRows(
+  Future<List<Map<String, dynamic>>> debugRunInboxQuery(
     supabase.SupabaseClient client,
     String memberId, {
     _MemberMetadata? member,

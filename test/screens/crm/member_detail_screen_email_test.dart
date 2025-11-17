@@ -294,7 +294,7 @@ void main() {
     );
 
     final rawRows =
-        await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
+        await provider.debugRunSentLogQuery(mockClient, member.id, member: metadata);
     expect(rawRows, hasLength(1));
     verify(() => mockQuery.contains('member_ids', [member.id])).called(1);
 
@@ -523,7 +523,7 @@ void main() {
     );
 
     final rows =
-        await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
+        await provider.debugRunSentLogQuery(mockClient, member.id, member: metadata);
 
     expect(rows, hasLength(1));
     verify(() =>
@@ -616,7 +616,7 @@ void main() {
     );
 
     final rows =
-        await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
+        await provider.debugRunSentLogQuery(mockClient, member.id, member: metadata);
 
     expect(rows.map((row) => row['id']).toSet(), equals({'log-primary', 'log-fallback'}));
     verify(() => fallbackQuery.or(contains('recipient_emails.cs.{"member@example.com"}')))
@@ -702,7 +702,7 @@ void main() {
       email: member.email,
     );
 
-    final rows = await provider.debugFetchInboxRows(
+    final rows = await provider.debugRunInboxQuery(
       mockClient,
       member.id,
       member: metadata,
