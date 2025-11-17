@@ -88,8 +88,14 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   bool _showEmojiPicker = false;
 
   bool canCreateGroupChats = ss.canCreateGroupChatSync();
-  String? _lastSendSignature;
-  DateTime? _lastSendAt;
+  static const Duration _channelLockWindow = Duration(seconds: 6);
+  static const int _channelLockCacheLimit = 50;
+  static final Map<String, DateTime> _channelLocks = {};
+
+  static const Duration _sendSignatureWindow = Duration(seconds: 3);
+  static const int _sendSignatureCacheLimit = 50;
+
+  final Map<String, DateTime> _recentSendSignatures = {};
   bool _sendPipelineActive = false;
 
   void _clearComposer() {
@@ -136,16 +142,53 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   }
 
   bool _shouldBlockSend(String signature) {
-    final lastSignature = _lastSendSignature;
-    final lastAt = _lastSendAt;
-    if (lastSignature == null || lastAt == null) return false;
-    return lastSignature == signature &&
-        DateTime.now().difference(lastAt) < const Duration(seconds: 2);
+    final now = DateTime.now();
+    _recentSendSignatures.removeWhere(
+      (key, timestamp) => now.difference(timestamp) > _sendSignatureWindow,
+    );
+    final lastAt = _recentSendSignatures[signature];
+    if (lastAt == null) return false;
+    return now.difference(lastAt) <= _sendSignatureWindow;
   }
 
   void _markSendSignature(String signature) {
-    _lastSendSignature = signature;
-    _lastSendAt = DateTime.now();
+    if (_recentSendSignatures.length >= _sendSignatureCacheLimit) {
+      final entries = _recentSendSignatures.entries.toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      for (var i = 0; i < entries.length - _sendSignatureCacheLimit + 1; i++) {
+        _recentSendSignatures.remove(entries[i].key);
+      }
+    }
+    _recentSendSignatures[signature] = DateTime.now();
+  }
+
+  void _pruneChannelLocks() {
+    final now = DateTime.now();
+    _channelLocks.removeWhere(
+      (key, timestamp) => now.difference(timestamp) > _channelLockWindow,
+    );
+    if (_channelLocks.length <= _channelLockCacheLimit) return;
+    final entries = _channelLocks.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    final overflow = _channelLocks.length - _channelLockCacheLimit;
+    for (var i = 0; i < overflow; i++) {
+      _channelLocks.remove(entries[i].key);
+    }
+  }
+
+  bool _tryLockChannel(String key) {
+    if (key.isEmpty) return true;
+    _pruneChannelLocks();
+    if (_channelLocks.containsKey(key)) {
+      return false;
+    }
+    _channelLocks[key] = DateTime.now();
+    return true;
+  }
+
+  void _releaseChannelLock(String key) {
+    if (key.isEmpty) return;
+    _channelLocks.remove(key);
   }
 
   @override
@@ -715,11 +758,21 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   Future<bool> _sendToExistingChat(Chat? chat, String? effect) async {
     if (chat == null) return false;
 
+    final channelKey = chat.guid ?? chat.chatIdentifier ?? '';
+    if (!_tryLockChannel(channelKey)) {
+      Logger.warn('ChatCreatorSend: channel $channelKey is locked, skipping duplicate send request', tag: 'ChatCreatorSend');
+      if (mounted) {
+        showSnackbar('Still sending', 'Please wait for the previous message to finish sending.');
+      }
+      return true;
+    }
+
     if (_sendPipelineActive) {
       Logger.warn('ChatCreatorSend: ignoring send request while a previous payload is still processing', tag: 'ChatCreatorSend');
       if (mounted) {
         showSnackbar('Still sending', 'Please wait for the previous message to finish sending.');
       }
+      _releaseChannelLock(channelKey);
       return true;
     }
 
@@ -742,6 +795,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       return false;
     } finally {
       _sendPipelineActive = false;
+      _releaseChannelLock(channelKey);
     }
   }
 
@@ -762,8 +816,9 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     final participants = selectedContacts
         .map((e) => e.address.isEmail ? e.address : cleansePhoneNumber(e.address))
         .toList();
+    final channelKey = 'new:${participants.join(',')}';
     final signature = _buildSendSignature(
-      channelKey: 'new:${participants.join(',')}',
+      channelKey: channelKey,
       attachments: List<PlatformFile>.from(_composerAttachments),
       text: textController.text.trimRight(),
       subject: subjectController.text.trimRight(),
@@ -775,11 +830,19 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       }
       return;
     }
+    if (!_tryLockChannel(channelKey)) {
+      Logger.warn('ChatCreatorSend: new chat pipeline already running for $channelKey', tag: 'ChatCreatorSend');
+      if (mounted) {
+        showSnackbar('Still sending', 'Please wait for the previous message to finish sending.');
+      }
+      return;
+    }
     if (_sendPipelineActive) {
       Logger.warn('ChatCreatorSend: ignoring new chat request while a previous payload is still processing', tag: 'ChatCreatorSend');
       if (mounted) {
         showSnackbar('Still sending', 'Please wait for the previous message to finish sending.');
       }
+      _releaseChannelLock(channelKey);
       return;
     }
     _sendPipelineActive = true;
@@ -927,6 +990,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     }
     finally {
       _sendPipelineActive = false;
+      _releaseChannelLock(channelKey);
     }
   }
 
