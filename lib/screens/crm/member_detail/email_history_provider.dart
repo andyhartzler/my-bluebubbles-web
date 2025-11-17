@@ -1532,7 +1532,7 @@ class EmailHistoryProvider extends ChangeNotifier {
 
     final encodedMemberId = _encodeArrayContainsValue(
       memberId,
-      wrapInQuotes: false,
+      wrapInQuotes: _looksLikeUuid(memberId),
     );
 
     try {
@@ -1729,6 +1729,17 @@ class EmailHistoryProvider extends ChangeNotifier {
     escaped = escaped.replaceAll('{', '\\{').replaceAll('}', '\\}');
     final inner = wrapInQuotes ? '"$escaped"' : escaped;
     return '{$inner}';
+  }
+
+  bool _looksLikeUuid(String value) {
+    final trimmed = value.trim();
+    if (trimmed.length != 36) {
+      return false;
+    }
+    final uuidPattern = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\$',
+    );
+    return uuidPattern.hasMatch(trimmed);
   }
 
   List<String> _normalizeRecipientAddresses(dynamic value) {

@@ -80,9 +80,9 @@ void main() {
     supabaseService.debugSetInitialized(false);
   });
 
-  Member _buildMember({String? email}) {
+  Member _buildMember({String? id, String? email}) {
     return Member(
-      id: 'member-1',
+      id: id ?? 'member-1',
       name: 'Test Member',
       email: email,
     );
@@ -243,7 +243,10 @@ void main() {
   });
 
   testWidgets('email_logs rows surface in email tab', (tester) async {
-    final member = _buildMember(email: 'member@example.com');
+    final member = _buildMember(
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      email: 'member@example.com',
+    );
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
     final mockClient = _MockSupabaseClient();
     final mockQuery = _MockPostgrestFilterBuilder();
@@ -293,7 +296,7 @@ void main() {
     final rawRows =
         await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
     expect(rawRows, hasLength(1));
-    verify(() => mockQuery.filter('member_ids', 'cs', '{${member.id}}'))
+    verify(() => mockQuery.filter('member_ids', 'cs', '{"${member.id}"}'))
         .called(1);
 
     final normalized =
