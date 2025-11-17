@@ -83,6 +83,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   bool _searchingBcc = false;
   bool _mailMergeEnabled = false;
   String? _errorMessage;
+  late String _selectedFromEmail;
 
   List<Map<String, dynamic>> _bodyDeltaJson = const <Map<String, dynamic>>[];
   String _bodyHtml = '';
@@ -144,6 +145,14 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     _bodyController.addListener(_handleBodyChanged);
     _filter = widget.initialFilter ?? MessageFilter();
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
+    final senders = CRMConfig.allowedSenderEmails;
+    if (senders.contains(CRMConfig.defaultSenderEmail)) {
+      _selectedFromEmail = CRMConfig.defaultSenderEmail;
+    } else if (senders.isNotEmpty) {
+      _selectedFromEmail = senders.first;
+    } else {
+      _selectedFromEmail = CRMConfig.defaultSenderEmail;
+    }
     if (_filter.chapterName != null && _filter.chapterName!.isNotEmpty) {
       _mode = _RecipientMode.chapter;
     }
@@ -762,7 +771,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         subject: subject,
         htmlBody: htmlBody,
         textBody: textBody,
-        fromEmail: CRMConfig.defaultSenderEmail,
+        fromEmail: _selectedFromEmail,
         fromName: fromName.isEmpty ? null : fromName,
         replyTo: replyTo.isEmpty ? null : replyTo,
         cc: recipients.ccEmails.isEmpty ? null : recipients.ccEmails,
@@ -1101,6 +1110,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
 
   Widget _buildComposeCard() {
     final bool canEdit = _hasRecipients && !_sending;
+    final fromOptions = CRMConfig.allowedSenderEmails;
 
     return Card(
       child: Padding(
@@ -1136,14 +1146,28 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'From: ${CRMConfig.defaultSenderEmail} (default sender)',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                ?.copyWith(color: Theme.of(context).hintColor),
+            DropdownButtonFormField<String>(
+              value: fromOptions.contains(_selectedFromEmail)
+                  ? _selectedFromEmail
+                  : (fromOptions.isNotEmpty ? fromOptions.first : _selectedFromEmail),
+              items: fromOptions
+                  .map(
+                    (email) => DropdownMenuItem<String>(
+                      value: email,
+                      child: Text(email),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: canEdit
+                  ? (value) {
+                      if (value == null || value == _selectedFromEmail) return;
+                      setState(() => _selectedFromEmail = value);
+                    }
+                  : null,
+              decoration: const InputDecoration(
+                labelText: 'Send From Email',
+                helperText: 'Choose the organization mailbox this email should come from.',
+                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
@@ -1201,43 +1225,42 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     final locale = Localizations.maybeLocaleOf(context) ?? const Locale('en');
     final sharedConfigurations = quill.QuillSharedConfigurations(locale: locale);
 
-    final toolbar = SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: quill.QuillSimpleToolbar(
-        configurations: quill.QuillSimpleToolbarConfigurations(
-          controller: _bodyController,
-          sharedConfigurations: sharedConfigurations,
-          multiRowsDisplay: false,
-          showDividers: false,
-          showFontFamily: false,
-          showFontSize: true,
-          showBoldButton: true,
-          showItalicButton: true,
-          showUnderLineButton: true,
-          showStrikeThrough: false,
-          showInlineCode: false,
-          showColorButton: false,
-          showBackgroundColorButton: false,
-          showClearFormat: false,
-          showAlignmentButtons: false,
-          showHeaderStyle: false,
-          showListNumbers: false,
-          showListBullets: false,
-          showListCheck: false,
-          showCodeBlock: false,
-          showQuote: false,
-          showIndent: false,
-          showSearchButton: false,
-          showSubscript: false,
-          showSuperscript: false,
-          showUndo: true,
-          showRedo: true,
-          showLink: true,
-          toolbarIconAlignment: WrapAlignment.start,
-          toolbarIconCrossAlignment: WrapCrossAlignment.center,
-          axis: Axis.horizontal,
+    final selectionStyle = _bodyController.getSelectionStyle();
+    final attributes = selectionStyle.attributes;
+    final boldActive = attributes.containsKey(quill.Attribute.bold.key);
+    final italicActive = attributes.containsKey(quill.Attribute.italic.key);
+    final underlineActive = attributes.containsKey(quill.Attribute.underline.key);
+    final linkActive = attributes.containsKey(quill.Attribute.link.key);
+
+    final toolbar = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _FormatChip(
+          icon: Icons.format_bold,
+          label: 'Bold',
+          selected: boldActive,
+          onPressed: isEnabled ? () => _toggleInlineFormat(quill.Attribute.bold) : null,
         ),
-      ),
+        _FormatChip(
+          icon: Icons.format_italic,
+          label: 'Italic',
+          selected: italicActive,
+          onPressed: isEnabled ? () => _toggleInlineFormat(quill.Attribute.italic) : null,
+        ),
+        _FormatChip(
+          icon: Icons.format_underline,
+          label: 'Underline',
+          selected: underlineActive,
+          onPressed: isEnabled ? () => _toggleInlineFormat(quill.Attribute.underline) : null,
+        ),
+        _FormatChip(
+          icon: Icons.link,
+          label: 'Hyperlink',
+          selected: linkActive,
+          onPressed: isEnabled ? _promptForLink : null,
+        ),
+      ],
     );
 
     final toolbarContainer = Container(
@@ -1298,6 +1321,80 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         ),
       ],
     );
+  }
+
+  void _toggleInlineFormat(quill.Attribute attribute) {
+    if (_sending) return;
+    final selection = _bodyController.selection;
+    if (!selection.isValid) return;
+    final currentStyle = _bodyController.getSelectionStyle();
+    final isActive = currentStyle.attributes.containsKey(attribute.key);
+    final removal = quill.Attribute.clone(attribute, null);
+    _bodyController.formatSelection(isActive ? removal : attribute);
+  }
+
+  Future<void> _promptForLink() async {
+    if (_sending) return;
+    final selection = _bodyController.selection;
+    if (!selection.isValid || selection.isCollapsed) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select text before adding a hyperlink.')),
+      );
+      return;
+    }
+
+    final currentStyle = _bodyController.getSelectionStyle();
+    final existingLink =
+        currentStyle.attributes[quill.Attribute.link.key]?.value?.toString() ?? '';
+    final controller = TextEditingController(text: existingLink);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Insert hyperlink'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'URL',
+              hintText: 'https://example.com',
+            ),
+            autofocus: true,
+            keyboardType: TextInputType.url,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            if (existingLink.isNotEmpty)
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(''),
+                child: const Text('Remove link'),
+              ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (result == null) {
+      return;
+    }
+
+    final trimmed = result.trim();
+    if (trimmed.isEmpty) {
+      final removal = quill.Attribute.clone(quill.Attribute.link, null);
+      _bodyController.formatSelection(removal);
+    } else {
+      _bodyController.formatSelection(quill.LinkAttribute(trimmed));
+    }
   }
 
   void _handleBodyChanged() {
@@ -2066,4 +2163,31 @@ class _MergeFieldDefinition {
     required this.label,
     required this.description,
   });
+}
+
+class _FormatChip extends StatelessWidget {
+  const _FormatChip({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: FilterChip(
+        avatar: Icon(icon, size: 18),
+        label: Text(label),
+        selected: selected,
+        onSelected: onPressed == null ? null : (_) => onPressed!(),
+      ),
+    );
+  }
 }

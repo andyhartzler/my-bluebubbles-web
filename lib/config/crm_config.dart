@@ -71,6 +71,24 @@ class CRMConfig {
   /// Default sender mailbox used for CRM-driven email flows.
   static const String defaultSenderEmail = 'info@moyoungdemocrats.org';
 
+  /// Canonical list of organization-managed mailboxes that can be used as a
+  /// "send as" address inside the CRM email composer.
+  static const List<String> defaultSenderChoices = [
+    'info@moyoungdemocrats.org',
+    'andrew@moyoungdemocrats.org',
+    'collegedems@moyoungdemocrats.org',
+    'comms@moyoungdemocrats.org',
+    'creators@moyoungdemocrats.org',
+    'events@moyoungdemocrats.org',
+    'eboard@moyoungdemocrats.org',
+    'fundraising@moyoungdemocrats.org',
+    'highschool@moyoungdemocrats.org',
+    'members@moyoungdemocrats.org',
+    'membership@moyoungdemocrats.org',
+    'policy@moyoungdemocrats.org',
+    'political-affairs@moyoungdemocrats.org',
+  ];
+
   /// Default snippet appended to mail merge campaigns to respect opt-out laws.
   static const String defaultEmailOptOutSnippet =
       'We respect your inbox. If you no longer wish to receive updates, click '
@@ -107,5 +125,18 @@ class CRMConfig {
     addSeeds(dotenv.env['NEXT_PUBLIC_CRM_ORG_MAILBOXES']);
 
     return List<String>.unmodifiable(seeds);
+  }
+
+  /// All sender addresses that may be selected inside the bulk email composer.
+  /// Includes the curated defaults plus any addresses injected via
+  /// configuration/environment variables.
+  static List<String> get allowedSenderEmails {
+    final allowed = <String>{
+      defaultSenderEmail,
+      ...defaultSenderChoices,
+      ...orgEmailAddresses,
+    };
+    final sorted = allowed.toList()..sort((a, b) => a.compareTo(b));
+    return List<String>.unmodifiable(sorted);
   }
 }
