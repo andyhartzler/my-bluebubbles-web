@@ -242,28 +242,28 @@ void main() {
     expect(capturedReply!.sendAsHtml, isTrue);
   });
 
-  testWidgets('email_inbox rows marked as sent surface in email tab', (tester) async {
+  testWidgets('email_logs rows surface in email tab', (tester) async {
     final member = _buildMember(email: 'member@example.com');
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
     final mockClient = _MockSupabaseClient();
     final mockQuery = _MockPostgrestFilterBuilder();
 
     final sentRow = <String, dynamic>{
-      'id': 'inbox-123',
+      'id': 'log-123',
       'subject': 'Welcome to the team',
-      'from_address': 'info@moyoungdemocrats.org',
-      'to_address': 'member@example.com',
-      'cc_address': 'ally@example.com',
-      'bcc_address': null,
-      'date': '2024-05-01T12:00:00Z',
-      'direction': 'sent',
+      'sender': 'info@moyoungdemocrats.org',
+      'recipient_emails': ['member@example.com'],
+      'cc_emails': ['ally@example.com'],
+      'bcc_emails': ['bcc@example.com'],
+      'created_at': '2024-05-01T12:00:00Z',
+      'status': 'delivered',
       'gmail_message_id': 'gmail-123',
       'gmail_thread_id': 'thread-456',
     };
 
-    when(() => mockClient.from('email_inbox')).thenReturn(mockQuery);
+    when(() => mockClient.from('email_logs')).thenReturn(mockQuery);
     when(() => mockQuery.select(any())).thenReturn(mockQuery);
-    when(() => mockQuery.eq('member_id', member.id)).thenReturn(mockQuery);
+    when(() => mockQuery.contains('member_ids', [member.id])).thenReturn(mockQuery);
     when(() => mockQuery.order(
           any<String>(),
           ascending: any<bool>(named: 'ascending'),
@@ -283,9 +283,16 @@ void main() {
       return Future.value(onValue(<String, dynamic>{'data': [sentRow]}));
     });
 
-    final rawRows = await provider.debugFetchSentLogRows(mockClient, member.id);
+    final metadata = provider.debugCreateMemberMetadata(
+      id: member.id,
+      name: member.name,
+      email: member.email,
+    );
+
+    final rawRows =
+        await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
     expect(rawRows, hasLength(1));
-    verify(() => mockQuery.eq('member_id', member.id)).called(1);
+    verify(() => mockQuery.contains('member_ids', [member.id])).called(1);
 
     final normalized =
         provider.debugNormalizeHistoryRow(rawRows.first, member.id);
@@ -318,6 +325,91 @@ void main() {
 
     expect(find.text(entry.subject), findsOneWidget);
     expect(find.textContaining('member@example.com'), findsWidgets);
+  });
+
+  test('sent log fallback queries by recipient emails when no member_ids present', () async {
+    final member = _buildMember(email: 'member@example.com');
+    final provider = EmailHistoryProvider(supabaseService: supabaseService);
+    final mockClient = _MockSupabaseClient();
+    final primaryQuery = _MockPostgrestFilterBuilder();
+    final fallbackQuery = _MockPostgrestFilterBuilder();
+    int fromCalls = 0;
+
+    when(() => mockClient.from('email_logs')).thenAnswer((_) {
+      return fromCalls++ == 0 ? primaryQuery : fallbackQuery;
+    });
+
+    when(() => primaryQuery.select(any())).thenReturn(primaryQuery);
+    when(() => primaryQuery.contains('member_ids', [member.id])).thenReturn(primaryQuery);
+    when(() => primaryQuery.order(
+          any<String>(),
+          ascending: any<bool>(named: 'ascending'),
+          nullsFirst: any<bool>(named: 'nullsFirst'),
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(primaryQuery);
+    when(() => primaryQuery.limit(
+          200,
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(primaryQuery);
+    when(() => primaryQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      return Future.value(onValue(const <String, dynamic>{'data': []}));
+    });
+
+    final fallbackRow = <String, dynamic>{
+      'id': 'log-999',
+      'subject': 'Follow up',
+      'sender': 'info@moyoungdemocrats.org',
+      'recipient_emails': ['member@example.com'],
+      'cc_emails': ['cc@example.com'],
+      'bcc_emails': [],
+      'created_at': '2024-05-02T08:00:00Z',
+      'status': 'sent',
+    };
+
+    when(() => fallbackQuery.select(any())).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.order(
+          any<String>(),
+          ascending: any<bool>(named: 'ascending'),
+          nullsFirst: any<bool>(named: 'nullsFirst'),
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.limit(
+          200,
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.or(any())).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      return Future.value(onValue(<String, dynamic>{'data': [fallbackRow]}));
+    });
+
+    final metadata = provider.debugCreateMemberMetadata(
+      id: member.id,
+      name: member.name,
+      email: member.email,
+    );
+
+    final rows =
+        await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
+
+    expect(rows, hasLength(1));
+    verify(() => fallbackQuery.or(contains('recipient_emails.cs.{"member@example.com"}')))
+        .called(1);
+    verifyNever(() => fallbackQuery.contains(any(), any()));
+
+    final normalized = provider.debugNormalizeHistoryRow(rows.first, member.id);
+    final entry = EmailHistoryEntry.fromMap(normalized);
+    expect(entry.to, contains('member@example.com'));
+    expect(entry.cc, contains('cc@example.com'));
   });
 
   test('inbox fallback filter uses literal wildcards for member emails', () {
