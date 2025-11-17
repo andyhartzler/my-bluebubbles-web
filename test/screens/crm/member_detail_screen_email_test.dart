@@ -417,6 +417,91 @@ void main() {
     expect(entry.cc, contains('cc@example.com'));
   });
 
+  test('sent log fallback merges recipient results even when primary rows exist', () async {
+    final member = _buildMember(email: 'member@example.com');
+    final provider = EmailHistoryProvider(supabaseService: supabaseService);
+    final mockClient = _MockSupabaseClient();
+    final primaryQuery = _MockPostgrestFilterBuilder();
+    final fallbackQuery = _MockPostgrestFilterBuilder();
+    int fromCalls = 0;
+
+    when(() => mockClient.from('email_logs')).thenAnswer((_) {
+      return fromCalls++ == 0 ? primaryQuery : fallbackQuery;
+    });
+
+    when(() => primaryQuery.select(any())).thenReturn(primaryQuery);
+    when(() => primaryQuery.contains('member_ids', [member.id])).thenReturn(primaryQuery);
+    when(() => primaryQuery.order(
+          any<String>(),
+          ascending: any<bool>(named: 'ascending'),
+          nullsFirst: any<bool>(named: 'nullsFirst'),
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(primaryQuery);
+    when(() => primaryQuery.limit(
+          200,
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(primaryQuery);
+    when(() => primaryQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      final primaryRow = <String, dynamic>{
+        'id': 'log-primary',
+        'subject': 'Primary match',
+        'sender': 'info@moyoungdemocrats.org',
+        'recipient_emails': ['ally@example.com'],
+        'member_ids': [member.id],
+        'created_at': '2024-05-01T08:00:00Z',
+        'status': 'sent',
+      };
+      return Future.value(onValue(<String, dynamic>{'data': [primaryRow]}));
+    });
+
+    when(() => fallbackQuery.select(any())).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.order(
+          any<String>(),
+          ascending: any<bool>(named: 'ascending'),
+          nullsFirst: any<bool>(named: 'nullsFirst'),
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.limit(
+          200,
+          referencedTable: any<String?>(named: 'referencedTable'),
+        )).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.or(any())).thenReturn(fallbackQuery);
+    when(() => fallbackQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      final fallbackRow = <String, dynamic>{
+        'id': 'log-fallback',
+        'subject': 'Recipient only',
+        'sender': 'info@moyoungdemocrats.org',
+        'recipient_emails': ['member@example.com'],
+        'created_at': '2024-05-02T08:00:00Z',
+        'status': 'sent',
+      };
+      return Future.value(onValue(<String, dynamic>{'data': [fallbackRow]}));
+    });
+
+    final metadata = provider.debugCreateMemberMetadata(
+      id: member.id,
+      name: member.name,
+      email: member.email,
+    );
+
+    final rows =
+        await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
+
+    expect(rows.map((row) => row['id']).toSet(), containsAll(['log-primary', 'log-fallback']));
+    verify(() => fallbackQuery.or(contains('recipient_emails.cs.{"member@example.com"}')))
+        .called(1);
+  });
+
   test('inbox fallback filter uses literal wildcards for member emails', () {
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
 

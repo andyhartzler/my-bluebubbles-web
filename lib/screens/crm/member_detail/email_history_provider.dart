@@ -1544,7 +1544,10 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     final candidateEmails = member?.candidateEmails ?? const <String>[];
-    List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> rawRows = <Map<String, dynamic>>[];
+    int primaryCount = 0;
+    int fallbackCount = 0;
+    bool recipientFallbackExecutedDuringPrimary = false;
 
     try {
       try {
@@ -1552,10 +1555,14 @@ class EmailHistoryProvider extends ChangeNotifier {
             .contains('member_ids', <String>[memberId])
             .order('created_at', ascending: false)
             .limit(limit);
-        rawRows = _normalizeSupabaseResponse(response);
+        rawRows = List<Map<String, dynamic>>.from(
+          _normalizeSupabaseResponse(response),
+          growable: true,
+        );
+        primaryCount = rawRows.length;
         Logger.debug(
-          'Email history: email_logs member_id filter returned ' 
-          '${rawRows.length} rows for $memberId.',
+          'Email history: email_logs member_id filter returned '
+          '$primaryCount rows for $memberId.',
         );
       } on supabase.PostgrestException catch (error, stack) {
         if (_isMissingColumnError(error)) {
@@ -1566,20 +1573,25 @@ class EmailHistoryProvider extends ChangeNotifier {
             'Falling back to recipient filters: ${error.message}',
             trace: stack,
           );
-          rawRows = await _querySentLogsByRecipients(
-            client,
-            memberId: memberId,
-            selectList: selectList,
-            candidateEmails: candidateEmails,
-            limit: limit,
-            legacyColumns: true,
+          rawRows = List<Map<String, dynamic>>.from(
+            await _querySentLogsByRecipients(
+              client,
+              memberId: memberId,
+              selectList: selectList,
+              candidateEmails: candidateEmails,
+              limit: limit,
+              legacyColumns: true,
+            ),
+            growable: true,
           );
+          fallbackCount += rawRows.length;
+          recipientFallbackExecutedDuringPrimary = true;
         } else {
           rethrow;
         }
       }
 
-      if (rawRows.isEmpty) {
+      if (candidateEmails.isNotEmpty && !recipientFallbackExecutedDuringPrimary) {
         final fallbackRows = await _querySentLogsByRecipients(
           client,
           memberId: memberId,
@@ -1588,8 +1600,23 @@ class EmailHistoryProvider extends ChangeNotifier {
           limit: limit,
           legacyColumns: usingLegacyColumns,
         );
+        fallbackCount += fallbackRows.length;
         if (fallbackRows.isNotEmpty) {
-          rawRows = fallbackRows;
+          final seenIds = <String>{
+            for (final row in rawRows)
+              if (row['id'] != null) row['id'].toString(),
+          };
+          for (final fallbackRow in fallbackRows) {
+            final fallbackValue = fallbackRow['id'];
+            final fallbackId = fallbackValue == null ? null : fallbackValue.toString();
+            if (fallbackId != null && seenIds.contains(fallbackId)) {
+              continue;
+            }
+            rawRows.add(fallbackRow);
+            if (fallbackId != null) {
+              seenIds.add(fallbackId);
+            }
+          }
         }
       }
     } on supabase.PostgrestException catch (error, stack) {
@@ -1607,8 +1634,9 @@ class EmailHistoryProvider extends ChangeNotifier {
     );
 
     Logger.debug(
-      'Email history: returning ${normalized.length} sent email rows for '
-      '$memberId (legacySchema=$usingLegacyColumns).',
+      'Email history: member_id query returned $primaryCount rows and '
+      'recipient fallback returned $fallbackCount rows for $memberId '
+      '(${normalized.length} combined, legacySchema=$usingLegacyColumns).',
     );
 
     if (normalized.length <= limit) {
