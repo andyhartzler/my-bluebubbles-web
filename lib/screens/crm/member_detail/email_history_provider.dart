@@ -1027,7 +1027,9 @@ class EmailHistoryProvider extends ChangeNotifier {
               normalized['date'] ?? normalized['synced_at'],
           'from_address': normalized['from_address'],
           if (normalized.containsKey('to_address')) 'to_address': normalized['to_address'],
-          if (normalized.containsKey('cc_address')) 'cc_emails': normalized['cc_address'],
+          if (normalized.containsKey('cc_address') &&
+              !normalized.containsKey('cc_emails'))
+            'cc_emails': normalized['cc_address'],
         });
       }
     } catch (error, stack) {
@@ -1035,22 +1037,13 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     try {
-      final sentRows = await _fetchInboxRows(
+      final sentRows = await _fetchSentLogRows(
         client,
         memberId,
         member: member,
-        mode: _EmailInboxMode.sent,
       );
 
       for (final normalized in sentRows) {
-        final dynamic recipients = normalized['recipient_emails'];
-        String? toAddress;
-        if (recipients is List) {
-          toAddress = recipients.map((e) => e.toString()).join(', ');
-        } else if (recipients is String) {
-          toAddress = recipients;
-        }
-
         results.add({
           ...normalized,
           'member_id': memberId,
@@ -1059,9 +1052,13 @@ class EmailHistoryProvider extends ChangeNotifier {
             'member_email': member!.preferredEmail,
           'email_type': 'sent',
           'log_id': normalized['id'] ?? normalized['log_id'],
-          'email_date': normalized['created_at'],
-          'from_address': normalized['sender'],
-          if (toAddress != null) 'to_address': toAddress,
+          'email_date': normalized['email_date'] ?? normalized['created_at'],
+          if (!normalized.containsKey('from_address') && normalized['sender'] != null)
+            'from_address': normalized['sender'],
+          if (!normalized.containsKey('to_address') &&
+              normalized['recipient_emails'] is Iterable)
+            'to_address':
+                (normalized['recipient_emails'] as Iterable).map((e) => e.toString()).join(', '),
         });
       }
     } catch (error, stack) {
@@ -1523,12 +1520,221 @@ class EmailHistoryProvider extends ChangeNotifier {
     String memberId, {
     _MemberMetadata? member,
   }) async {
-    return _fetchInboxRows(
-      client,
+    const int limit = 200;
+    String selectList = _sentLogColumns.join(',');
+    bool usingLegacyColumns = false;
+
+    supabase.PostgrestFilterBuilder<List<Map<String, dynamic>>> buildBaseQuery() {
+      return client.from('email_logs').select(selectList);
+    }
+
+    List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
+
+    try {
+      final response = await buildBaseQuery()
+          .contains('member_ids', <String>[memberId])
+          .order('created_at', ascending: false)
+          .limit(limit);
+      rawRows = _normalizeSupabaseResponse(response);
+    } on supabase.PostgrestException catch (error) {
+      if (_isMissingColumnError(error)) {
+        usingLegacyColumns = true;
+        selectList = _legacySentLogColumns.join(',');
+        rawRows = await _querySentLogsByRecipients(
+          client,
+          selectList: selectList,
+          candidateEmails: member?.candidateEmails ?? const <String>[],
+          limit: limit,
+          legacyColumns: true,
+        );
+      } else {
+        rethrow;
+      }
+    }
+
+    if (rawRows.isEmpty) {
+      final fallbackRows = await _querySentLogsByRecipients(
+        client,
+        selectList: selectList,
+        candidateEmails: member?.candidateEmails ?? const <String>[],
+        limit: limit,
+        legacyColumns: usingLegacyColumns,
+      );
+      if (fallbackRows.isNotEmpty) {
+        rawRows = fallbackRows;
+      }
+    }
+
+    final normalized = _normalizeSentLogRows(
+      rawRows,
       memberId,
       member: member,
-      mode: _EmailInboxMode.sent,
     );
+
+    if (normalized.length <= limit) {
+      return normalized;
+    }
+
+    normalized.sort((a, b) {
+      final aDate = _coerceToDateTime(a['email_date'] ?? a['created_at']);
+      final bDate = _coerceToDateTime(b['email_date'] ?? b['created_at']);
+      final aMillis = aDate?.millisecondsSinceEpoch ?? 0;
+      final bMillis = bDate?.millisecondsSinceEpoch ?? 0;
+      return bMillis.compareTo(aMillis);
+    });
+
+    return normalized.take(limit).toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> _querySentLogsByRecipients(
+    supabase.SupabaseClient client, {
+    required String selectList,
+    required Iterable<String> candidateEmails,
+    required int limit,
+    required bool legacyColumns,
+  }) async {
+    final filter = _buildSentLogRecipientFilter(
+      candidateEmails,
+      legacyColumns: legacyColumns,
+    );
+    if (filter == null) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    final response = await client
+        .from('email_logs')
+        .select(selectList)
+        .or(filter)
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return _normalizeSupabaseResponse(response);
+  }
+
+  List<Map<String, dynamic>> _normalizeSentLogRows(
+    Iterable<Map<String, dynamic>> rows,
+    String memberId, {
+    _MemberMetadata? member,
+  }) {
+    final normalizedRows = <Map<String, dynamic>>[];
+    final seenIds = <String>{};
+
+    for (final row in rows) {
+      final normalized = <String, dynamic>{};
+      row.forEach((key, value) {
+        normalized[key.toString()] = value;
+      });
+
+      normalized['member_id'] = memberId;
+      if (member?.name != null) {
+        normalized['member_name'] ??= member!.name;
+      }
+      if (member?.preferredEmail != null) {
+        normalized['member_email'] ??= member!.preferredEmail;
+      }
+
+      normalized['log_id'] ??= normalized['id'];
+      normalized['gmail_thread_id'] ??= normalized['thread_id'];
+      normalized['thread_id'] ??= normalized['gmail_thread_id'];
+      normalized['gmail_message_id'] ??= normalized['message_id'];
+      normalized['message_id'] ??= normalized['gmail_message_id'];
+      normalized['from_address'] ??= normalized['sender'] ?? normalized['from_email'];
+      normalized['from_email'] ??= normalized['from_address'];
+
+      final toList = _normalizeRecipientAddresses(
+        normalized['recipient_emails'] ??
+            normalized['to_emails'] ??
+            normalized['to_address'] ??
+            normalized['to'],
+      );
+      if (toList.isNotEmpty) {
+        normalized['recipient_emails'] = toList;
+        normalized['to_emails'] = toList;
+        normalized['to_address'] ??= toList.join(', ');
+      }
+
+      final ccList = _normalizeRecipientAddresses(
+        normalized['cc_emails'] ?? normalized['cc'],
+      );
+      if (ccList.isNotEmpty) {
+        normalized['cc_emails'] = ccList;
+        normalized['cc_address'] ??= ccList.join(', ');
+      }
+
+      final bccList = _normalizeRecipientAddresses(
+        normalized['bcc_emails'] ?? normalized['bcc'],
+      );
+      if (bccList.isNotEmpty) {
+        normalized['bcc_emails'] = bccList;
+        normalized['bcc_address'] ??= bccList.join(', ');
+      }
+
+      normalized['body_text'] ??= normalized['body'];
+      normalized['body_html'] ??= normalized['html'];
+      normalized['direction'] ??= 'sent';
+      normalized['email_type'] ??= 'sent';
+      normalized['message_state'] ??= normalized['status'];
+      normalized['email_date'] ??= normalized['created_at'];
+      normalized['synced_at'] ??= normalized['updated_at'];
+
+      final uniqueId = normalized['gmail_message_id']?.toString() ??
+          normalized['message_id']?.toString() ??
+          normalized['id']?.toString();
+      if (uniqueId == null || seenIds.add(uniqueId)) {
+        normalizedRows.add(normalized);
+      }
+    }
+
+    return normalizedRows;
+  }
+
+  String? _buildSentLogRecipientFilter(
+    Iterable<String> candidateEmails, {
+    required bool legacyColumns,
+  }) {
+    final values = candidateEmails
+        .map((email) => email.trim().toLowerCase())
+        .where((email) => email.isNotEmpty)
+        .toList(growable: false);
+    if (values.isEmpty) {
+      return null;
+    }
+
+    final filterColumns = legacyColumns
+        ? const ['recipient_emails', 'cc', 'bcc']
+        : const ['recipient_emails', 'cc_emails', 'bcc_emails'];
+
+    final clauses = <String>[];
+    for (final email in values) {
+      final encoded = _encodeArrayContainsValue(email);
+      for (final column in filterColumns) {
+        clauses.add('$column.cs.$encoded');
+      }
+    }
+
+    return clauses.isEmpty ? null : clauses.join(',');
+  }
+
+  String _encodeArrayContainsValue(String value) {
+    final escaped = value.replaceAll('"', '\\"');
+    return '{"$escaped"}';
+  }
+
+  List<String> _normalizeRecipientAddresses(dynamic value) {
+    final participants = _parseParticipants(value);
+    if (participants.isEmpty) {
+      return const <String>[];
+    }
+
+    final addresses = LinkedHashSet<String>();
+    for (final participant in participants) {
+      final normalized = _normalizeEmail(participant.address) ?? participant.address.trim();
+      if (normalized.isNotEmpty) {
+        addresses.add(normalized);
+      }
+    }
+
+    return addresses.toList(growable: false);
   }
 
   Future<_MemberMetadata?> _loadMemberMetadata(
@@ -2136,6 +2342,21 @@ class EmailHistoryProvider extends ChangeNotifier {
     _MemberMetadata? member,
   }) {
     return _normalizeHistoryRow(row, memberId, member: member);
+  }
+
+  @visibleForTesting
+  _MemberMetadata debugCreateMemberMetadata({
+    String? id,
+    String? name,
+    String? email,
+    String? schoolEmail,
+  }) {
+    return _MemberMetadata(
+      id: id,
+      name: name,
+      email: email,
+      schoolEmail: schoolEmail,
+    );
   }
 
   @visibleForTesting
