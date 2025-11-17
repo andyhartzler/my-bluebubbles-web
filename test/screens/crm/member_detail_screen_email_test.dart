@@ -80,9 +80,9 @@ void main() {
     supabaseService.debugSetInitialized(false);
   });
 
-  Member _buildMember({String? email}) {
+  Member _buildMember({String? id, String? email}) {
     return Member(
-      id: 'member-1',
+      id: id ?? 'member-1',
       name: 'Test Member',
       email: email,
     );
@@ -243,7 +243,10 @@ void main() {
   });
 
   testWidgets('email_logs rows surface in email tab', (tester) async {
-    final member = _buildMember(email: 'member@example.com');
+    final member = _buildMember(
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      email: 'member@example.com',
+    );
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
     final mockClient = _MockSupabaseClient();
     final mockQuery = _MockPostgrestFilterBuilder();
@@ -253,8 +256,8 @@ void main() {
       'subject': 'Welcome to the team',
       'sender': 'info@moyoungdemocrats.org',
       'recipient_emails': ['member@example.com'],
-      'cc_emails': ['ally@example.com'],
-      'bcc_emails': ['bcc@example.com'],
+      'cc': ['ally@example.com'],
+      'bcc': ['bcc@example.com'],
       'created_at': '2024-05-01T12:00:00Z',
       'status': 'delivered',
       'gmail_message_id': 'gmail-123',
@@ -263,7 +266,7 @@ void main() {
 
     when(() => mockClient.from('email_logs')).thenReturn(mockQuery);
     when(() => mockQuery.select(any())).thenReturn(mockQuery);
-    when(() => mockQuery.filter('member_ids', 'cs', any<String>()))
+    when(() => mockQuery.contains('member_ids', [member.id]))
         .thenReturn(mockQuery);
     when(() => mockQuery.order(
           any<String>(),
@@ -293,8 +296,7 @@ void main() {
     final rawRows =
         await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
     expect(rawRows, hasLength(1));
-    verify(() => mockQuery.filter('member_ids', 'cs', '{${member.id}}'))
-        .called(1);
+    verify(() => mockQuery.contains('member_ids', [member.id])).called(1);
 
     final normalized =
         provider.debugNormalizeHistoryRow(rawRows.first, member.id);
@@ -367,8 +369,8 @@ void main() {
       'subject': 'Follow up',
       'sender': 'info@moyoungdemocrats.org',
       'recipient_emails': ['member@example.com'],
-      'cc_emails': ['cc@example.com'],
-      'bcc_emails': [],
+      'cc': ['cc@example.com'],
+      'bcc': [],
       'created_at': '2024-05-02T08:00:00Z',
       'status': 'sent',
     };
@@ -524,6 +526,24 @@ void main() {
     final entry = EmailHistoryEntry.fromMap(map);
 
     expect(entry.cc, isEmpty);
+    expect(entry.bcc, isEmpty);
+  });
+
+  test('history entry ignores null recipients in Supabase payloads', () {
+    final map = <String, dynamic>{
+      'email_id': 'log-314',
+      'subject': 'Null defense',
+      'status': 'sent',
+      'recipient_emails': ['member@example.com', null, ''],
+      'cc': [null, 'helper@example.com'],
+      'bcc': [null],
+      'created_at': '2024-04-01T00:00:00Z',
+    };
+
+    final entry = EmailHistoryEntry.fromMap(map);
+
+    expect(entry.to, equals(['member@example.com']));
+    expect(entry.cc, equals(['helper@example.com']));
     expect(entry.bcc, isEmpty);
   });
 }

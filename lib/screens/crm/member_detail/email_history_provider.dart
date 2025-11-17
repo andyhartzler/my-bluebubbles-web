@@ -159,30 +159,42 @@ class EmailHistoryEntry {
     }
 
     List<String> parseRecipients(dynamic value) {
-      if (value is List) {
-        return value
-            .map((item) => item.toString())
-            .map((item) => item.trim())
-            .where((item) => item.isNotEmpty)
-            .toList(growable: false);
+      if (value == null) {
+        return const <String>[];
       }
-      if (value is String) {
-        final trimmed = value.trim();
-        if (trimmed.isEmpty) return const [];
-        return trimmed
-            .split(',')
-            .map((item) => item.trim())
-            .where((item) => item.isNotEmpty)
-            .toList(growable: false);
+      if (value is EmailParticipant) {
+        final normalized = value.address.trim();
+        return normalized.isEmpty ? const <String>[] : <String>[normalized];
+      }
+      if (value is Iterable) {
+        final results = <String>[];
+        for (final item in value) {
+          final parsed = parseRecipients(item);
+          if (parsed.isNotEmpty) {
+            results.addAll(parsed);
+          }
+        }
+        return results;
       }
       if (value is Map) {
         final entries = <String>[];
         for (final dynamic item in value.values) {
-          entries.addAll(parseRecipients(item));
+          final parsed = parseRecipients(item);
+          if (parsed.isNotEmpty) {
+            entries.addAll(parsed);
+          }
         }
         return entries;
       }
-      return const [];
+      final trimmed = value.toString().trim();
+      if (trimmed.isEmpty || trimmed.toLowerCase() == 'null') {
+        return const <String>[];
+      }
+      return trimmed
+          .split(',')
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty && item.toLowerCase() != 'null')
+          .toList(growable: false);
     }
 
     final normalized = map.map<String, dynamic>(
@@ -520,6 +532,12 @@ class EmailHistoryProvider extends ChangeNotifier {
   final Set<String> _knownOrgEmailAddresses;
   final Set<String> _knownOrgEmailDomains;
 
+  String? _lastSentLogFilter;
+  String? _lastLegacySentLogFilter;
+
+  String? get sentLogFilter => _lastSentLogFilter;
+  String? get legacySentLogFilter => _lastLegacySentLogFilter;
+
   EmailHistoryState stateForMember(String memberId) {
     return _stateByMember.putIfAbsent(memberId, EmailHistoryState.initial);
   }
@@ -593,6 +611,10 @@ class EmailHistoryProvider extends ChangeNotifier {
       }) async {
         try {
           final rows = await loader();
+          Logger.debug(
+            'Email history: $label returned ${rows.length} rows for '
+            '$trimmedMemberId.',
+          );
           if (rows.isNotEmpty) {
             accumulator.addRows(rows);
           }
@@ -1475,27 +1497,7 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   static const List<String> _sentLogColumns = <String>[
     'id',
-    'subject',
-    'body',
-    'html',
-    'sender',
-    'reply_to',
-    'recipient_emails',
-    'cc_emails',
-    'bcc_emails',
     'created_at',
-    'gmail_message_id',
-    'gmail_thread_id',
-    'message_state',
-    'status',
-    'metadata',
-    'headers',
-    'member_ids',
-    'error_message',
-  ];
-
-  static const List<String> _legacySentLogColumns = <String>[
-    'id',
     'subject',
     'body',
     'html',
@@ -1504,13 +1506,32 @@ class EmailHistoryProvider extends ChangeNotifier {
     'recipient_emails',
     'cc',
     'bcc',
-    'created_at',
     'gmail_message_id',
     'gmail_thread_id',
-    'message_state',
+    'in_reply_to',
     'status',
-    'metadata',
-    'headers',
+    'member_ids',
+    'error_message',
+    'attachments',
+    'variables',
+  ];
+
+  static const List<String> _legacySentLogColumns = <String>[
+    'id',
+    'created_at',
+    'subject',
+    'body',
+    'html',
+    'sender',
+    'reply_to',
+    'recipient_emails',
+    'cc',
+    'bcc',
+    'gmail_message_id',
+    'gmail_thread_id',
+    'message_id',
+    'thread_id',
+    'status',
     'linked_member_ids',
     'error_message',
   ];
@@ -1528,52 +1549,72 @@ class EmailHistoryProvider extends ChangeNotifier {
       return client.from('email_logs').select(selectList);
     }
 
+    final candidateEmails = member?.candidateEmails ?? const <String>[];
     List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
 
-    final encodedMemberId = _encodeArrayContainsValue(
-      memberId,
-      wrapInQuotes: false,
-    );
-
     try {
-      final response = await buildBaseQuery()
-          .filter('member_ids', 'cs', encodedMemberId)
-          .order('created_at', ascending: false)
-          .limit(limit);
-      rawRows = _normalizeSupabaseResponse(response);
-    } on supabase.PostgrestException catch (error) {
-      if (_isMissingColumnError(error)) {
-        usingLegacyColumns = true;
-        selectList = _legacySentLogColumns.join(',');
-        rawRows = await _querySentLogsByRecipients(
-          client,
-          selectList: selectList,
-          candidateEmails: member?.candidateEmails ?? const <String>[],
-          limit: limit,
-          legacyColumns: true,
+      try {
+        final response = await buildBaseQuery()
+            .contains('member_ids', <String>[memberId])
+            .order('created_at', ascending: false)
+            .limit(limit);
+        rawRows = _normalizeSupabaseResponse(response);
+        Logger.debug(
+          'Email history: email_logs member_id filter returned ' 
+          '${rawRows.length} rows for $memberId.',
         );
-      } else {
-        rethrow;
+      } on supabase.PostgrestException catch (error, stack) {
+        if (_isMissingColumnError(error)) {
+          usingLegacyColumns = true;
+          selectList = _legacySentLogColumns.join(',');
+          Logger.warn(
+            'Email history: email_logs schema mismatch for $memberId. ' 
+            'Falling back to recipient filters: ${error.message}',
+            trace: stack,
+          );
+          rawRows = await _querySentLogsByRecipients(
+            client,
+            memberId: memberId,
+            selectList: selectList,
+            candidateEmails: candidateEmails,
+            limit: limit,
+            legacyColumns: true,
+          );
+        } else {
+          rethrow;
+        }
       }
-    }
 
-    if (rawRows.isEmpty) {
-      final fallbackRows = await _querySentLogsByRecipients(
-        client,
-        selectList: selectList,
-        candidateEmails: member?.candidateEmails ?? const <String>[],
-        limit: limit,
-        legacyColumns: usingLegacyColumns,
-      );
-      if (fallbackRows.isNotEmpty) {
-        rawRows = fallbackRows;
+      if (rawRows.isEmpty) {
+        final fallbackRows = await _querySentLogsByRecipients(
+          client,
+          memberId: memberId,
+          selectList: selectList,
+          candidateEmails: candidateEmails,
+          limit: limit,
+          legacyColumns: usingLegacyColumns,
+        );
+        if (fallbackRows.isNotEmpty) {
+          rawRows = fallbackRows;
+        }
       }
+    } on supabase.PostgrestException catch (error, stack) {
+      Logger.warn('Failed to query email_logs for $memberId: ${error.message}', trace: stack);
+      return const <Map<String, dynamic>>[];
+    } catch (error, stack) {
+      Logger.warn('Unexpected failure querying email_logs for $memberId: $error', trace: stack);
+      return const <Map<String, dynamic>>[];
     }
 
     final normalized = _normalizeSentLogRows(
       rawRows,
       memberId,
       member: member,
+    );
+
+    Logger.debug(
+      'Email history: returning ${normalized.length} sent email rows for '
+      '$memberId (legacySchema=$usingLegacyColumns).',
     );
 
     if (normalized.length <= limit) {
@@ -1593,6 +1634,7 @@ class EmailHistoryProvider extends ChangeNotifier {
 
   Future<List<Map<String, dynamic>>> _querySentLogsByRecipients(
     supabase.SupabaseClient client, {
+    required String memberId,
     required String selectList,
     required Iterable<String> candidateEmails,
     required int limit,
@@ -1602,18 +1644,44 @@ class EmailHistoryProvider extends ChangeNotifier {
       candidateEmails,
       legacyColumns: legacyColumns,
     );
+
+    if (legacyColumns) {
+      _lastLegacySentLogFilter = filter;
+    } else {
+      _lastSentLogFilter = filter;
+    }
+
     if (filter == null) {
       return const <Map<String, dynamic>>[];
     }
 
-    final response = await client
-        .from('email_logs')
-        .select(selectList)
-        .or(filter)
-        .order('created_at', ascending: false)
-        .limit(limit);
+    try {
+      final response = await client
+          .from('email_logs')
+          .select(selectList)
+          .or(filter)
+          .order('created_at', ascending: false)
+          .limit(limit);
 
-    return _normalizeSupabaseResponse(response);
+      final rows = _normalizeSupabaseResponse(response);
+      Logger.debug(
+        'Email history: email_logs recipient fallback returned ' 
+        '${rows.length} rows for $memberId (legacySchema=$legacyColumns).',
+      );
+      return rows;
+    } on supabase.PostgrestException catch (error, stack) {
+      Logger.warn(
+        'Failed to query email_logs recipients for $memberId: ${error.message}',
+        trace: stack,
+      );
+    } catch (error, stack) {
+      Logger.warn(
+        'Unexpected failure querying email_logs recipients for $memberId: $error',
+        trace: stack,
+      );
+    }
+
+    return const <Map<String, dynamic>>[];
   }
 
   List<Map<String, dynamic>> _normalizeSentLogRows(
@@ -1707,7 +1775,7 @@ class EmailHistoryProvider extends ChangeNotifier {
 
     final filterColumns = legacyColumns
         ? const ['recipient_emails', 'cc', 'bcc']
-        : const ['recipient_emails', 'cc_emails', 'bcc_emails'];
+        : const ['recipient_emails', 'cc', 'bcc'];
 
     final clauses = <String>[];
     for (final email in values) {
@@ -1729,6 +1797,17 @@ class EmailHistoryProvider extends ChangeNotifier {
     escaped = escaped.replaceAll('{', '\\{').replaceAll('}', '\\}');
     final inner = wrapInQuotes ? '"$escaped"' : escaped;
     return '{$inner}';
+  }
+
+  bool _looksLikeUuid(String value) {
+    final trimmed = value.trim();
+    if (trimmed.length != 36) {
+      return false;
+    }
+    final uuidPattern = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    );
+    return uuidPattern.hasMatch(trimmed);
   }
 
   List<String> _normalizeRecipientAddresses(dynamic value) {
