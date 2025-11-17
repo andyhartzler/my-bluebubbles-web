@@ -1535,7 +1535,8 @@ class EmailHistoryProvider extends ChangeNotifier {
     List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
 
     try {
-      final response = await buildBaseQuery().contains('member_ids', [memberId]);
+      final response = await buildBaseQuery()
+          .filter('member_ids', 'cs', '{${memberId}}');
       rawRows = _normalizeSupabaseResponse(response);
     } on supabase.PostgrestException catch (error) {
       if (_isMissingColumnError(error)) {
