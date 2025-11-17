@@ -1417,12 +1417,6 @@ class EmailHistoryProvider extends ChangeNotifier {
       'legacyFilter=${legacyEmailFilter ?? 'none'}',
     );
 
-    Logger.debug(
-      'Email history: inbox query setup for $memberId '
-      '(candidateEmails=${candidateEmails.length}) '
-      'mode=$mode filter=$emailFilter legacyFilter=$legacyEmailFilter',
-    );
-
     Future<List<Map<String, dynamic>>> runQuery({required bool byEmail}) async {
       if (byEmail && emailFilter == null && legacyEmailFilter == null) {
         return const <Map<String, dynamic>>[];
@@ -1503,11 +1497,6 @@ class EmailHistoryProvider extends ChangeNotifier {
         'Email history: Inbox email filter skipped for $memberId (mode=$mode) '
         'because no candidate emails are available.',
       );
-    }
-
-    addRows(memberRows);
-    if (emailRows.isNotEmpty) {
-      addRows(emailRows);
     }
 
     final rows = <Map<String, dynamic>>[];
@@ -2709,6 +2698,9 @@ class _EmailHistoryAccumulator {
   final List<String> _warnings = <String>[];
   final List<String> _parseFailures = <String>[];
   final Map<String, dynamic> Function(Map<String, dynamic>) _normalizeRow;
+  int _parsedRowCount = 0;
+  int _parseFailureCount = 0;
+  int _totalProcessedRowCount = 0;
 
   void addExisting(List<EmailHistoryEntry> entries) {
     for (final entry in entries) {
@@ -2739,9 +2731,14 @@ class _EmailHistoryAccumulator {
         Logger.warn('Failed to parse email history row for $memberId: $error', trace: stack);
       }
     }
+    _parsedRowCount += successCount;
+    _parseFailureCount += failCount;
+    _totalProcessedRowCount += rows.length;
     Logger.debug(
       'Email history accumulator: Processed $successCount success, '
-      '$failCount failed for $memberId.',
+      '$failCount failed for $memberId. '
+      'Cumulative: parsed=$_parsedRowCount, failures=$_parseFailureCount, '
+      'total=$_totalProcessedRowCount.',
     );
   }
 
@@ -2784,6 +2781,12 @@ class _EmailHistoryAccumulator {
     final message = _parseFailures.take(3).join(' ');
     return 'Some emails could not be loaded. $message';
   }
+
+  int get parseFailureCount => _parseFailureCount;
+
+  int get parsedRowCount => _parsedRowCount;
+
+  int get totalProcessedRowCount => _totalProcessedRowCount;
 
   String _normalizeKey(String value, {String? fallback}) {
     final trimmed = value.trim();
