@@ -588,6 +588,19 @@ class EmailHistoryProvider extends ChangeNotifier {
     try {
       final _MemberMetadata? memberMetadata =
           await _loadMemberMetadata(clients.database, trimmedMemberId);
+      if (memberMetadata == null) {
+        Logger.debug(
+          'Email history: no metadata found for $trimmedMemberId (candidate emails=0).',
+        );
+      } else {
+        Logger.debug(
+          'Email history: metadata for $trimmedMemberId => '
+          'name=${memberMetadata.name ?? 'n/a'}, '
+          'email=${memberMetadata.email ?? 'n/a'}, '
+          'schoolEmail=${memberMetadata.schoolEmail ?? 'n/a'}, '
+          'candidateEmails=${memberMetadata.candidateEmails}',
+        );
+      }
 
       final accumulator = _EmailHistoryAccumulator(
         memberId: trimmedMemberId,
@@ -1374,6 +1387,12 @@ class EmailHistoryProvider extends ChangeNotifier {
       legacyColumns: true,
     );
 
+    Logger.debug(
+      'Email history: inbox query setup for $memberId '
+      '(candidateEmails=${candidateEmails.length}) '
+      'mode=$mode filter=$emailFilter legacyFilter=$legacyEmailFilter',
+    );
+
     Future<List<Map<String, dynamic>>> runQuery({required bool byEmail}) async {
       if (byEmail && emailFilter == null && legacyEmailFilter == null) {
         return const <Map<String, dynamic>>[];
@@ -1420,8 +1439,16 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     List<Map<String, dynamic>> rawRows = await runQuery(byEmail: false);
+    Logger.debug(
+      'Email history: inbox member_id query for $memberId returned '
+      '${rawRows.length} rows.',
+    );
     if (rawRows.isEmpty) {
       final fallbackRows = await runQuery(byEmail: true);
+      Logger.debug(
+        'Email history: inbox candidate-email fallback for $memberId returned '
+        '${fallbackRows.length} rows.',
+      );
       if (fallbackRows.isNotEmpty) {
         rawRows = fallbackRows;
       }
@@ -1536,6 +1563,20 @@ class EmailHistoryProvider extends ChangeNotifier {
     }
 
     final candidateEmails = member?.candidateEmails ?? const <String>[];
+    final sentLogFilter = _buildSentLogRecipientFilter(
+      candidateEmails,
+      legacyColumns: false,
+    );
+    final legacySentLogFilter = _buildSentLogRecipientFilter(
+      candidateEmails,
+      legacyColumns: true,
+    );
+
+    Logger.debug(
+      'Email history: sent log query setup for $memberId '
+      '(candidateEmails=${candidateEmails.length}) '
+      'filter=$sentLogFilter legacyFilter=$legacySentLogFilter',
+    );
     List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
 
     try {
@@ -1565,6 +1606,7 @@ class EmailHistoryProvider extends ChangeNotifier {
             candidateEmails: candidateEmails,
             limit: limit,
             legacyColumns: true,
+            filter: legacySentLogFilter,
           );
         } else {
           rethrow;
@@ -1579,6 +1621,11 @@ class EmailHistoryProvider extends ChangeNotifier {
           candidateEmails: candidateEmails,
           limit: limit,
           legacyColumns: usingLegacyColumns,
+          filter: usingLegacyColumns ? legacySentLogFilter : sentLogFilter,
+        );
+        Logger.debug(
+          'Email history: email_logs fallback for $memberId returned '
+          '${fallbackRows.length} rows.',
         );
         if (fallbackRows.isNotEmpty) {
           rawRows = fallbackRows;
@@ -1625,8 +1672,9 @@ class EmailHistoryProvider extends ChangeNotifier {
     required Iterable<String> candidateEmails,
     required int limit,
     required bool legacyColumns,
+    String? filter,
   }) async {
-    final filter = _buildSentLogRecipientFilter(
+    filter ??= _buildSentLogRecipientFilter(
       candidateEmails,
       legacyColumns: legacyColumns,
     );
@@ -2539,6 +2587,8 @@ class _EmailHistoryAccumulator {
   }
 
   void addRows(Iterable<Map<String, dynamic>> rows) {
+    var added = 0;
+    var failed = 0;
     for (final row in rows) {
       try {
         final normalized = _normalizeRow(Map<String, dynamic>.from(row));
@@ -2555,6 +2605,10 @@ class _EmailHistoryAccumulator {
         Logger.warn('Failed to parse email history row for $memberId: $error', trace: stack);
       }
     }
+    Logger.debug(
+      'Email history: accumulator processed ${rows.length} rows for '
+      '$memberId (added=$added, failed=$failed).',
+    );
   }
 
   void addFailure(String? message) {
