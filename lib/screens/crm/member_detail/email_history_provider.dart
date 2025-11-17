@@ -1427,12 +1427,34 @@ class EmailHistoryProvider extends ChangeNotifier {
       }
     }
 
-    List<Map<String, dynamic>> rawRows = await runQuery(byEmail: false);
-    if (rawRows.isEmpty) {
-      final fallbackRows = await runQuery(byEmail: true);
-      if (fallbackRows.isNotEmpty) {
-        rawRows = fallbackRows;
+    final memberRows = await runQuery(byEmail: false);
+    Logger.debug(
+      'Email history: email_inbox member_id filter returned '
+      '${memberRows.length} rows for $memberId.',
+    );
+
+    List<Map<String, dynamic>> emailRows = const <Map<String, dynamic>>[];
+    final shouldQueryByEmail =
+        candidateEmails.isNotEmpty && (emailFilter != null || legacyEmailFilter != null);
+    if (shouldQueryByEmail) {
+      emailRows = await runQuery(byEmail: true);
+    }
+
+    final rawRows = <Map<String, dynamic>>[];
+    final seenRawIds = <String>{};
+    void addRows(List<Map<String, dynamic>> rows) {
+      for (final row in rows) {
+        final rawId = row['id']?.toString();
+        if (rawId != null && !seenRawIds.add(rawId)) {
+          continue;
+        }
+        rawRows.add(row);
       }
+    }
+
+    addRows(memberRows);
+    if (emailRows.isNotEmpty) {
+      addRows(emailRows);
     }
 
     final rows = <Map<String, dynamic>>[];
@@ -2400,6 +2422,21 @@ class EmailHistoryProvider extends ChangeNotifier {
     return _buildInboxEmailFilter(
       candidateEmails,
       legacyColumns: legacyColumns,
+    );
+  }
+
+  @visibleForTesting
+  Future<List<Map<String, dynamic>>> debugFetchInboxRows(
+    supabase.SupabaseClient client,
+    String memberId, {
+    _MemberMetadata? member,
+    _EmailInboxMode mode = _EmailInboxMode.received,
+  }) {
+    return _fetchInboxRows(
+      client,
+      memberId,
+      member: member,
+      mode: mode,
     );
   }
 
