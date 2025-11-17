@@ -1524,7 +1524,7 @@ class EmailHistoryProvider extends ChangeNotifier {
     String selectList = _sentLogColumns.join(',');
     bool usingLegacyColumns = false;
 
-    supabase.PostgrestFilterBuilder<dynamic> buildBaseQuery() {
+    supabase.PostgrestTransformBuilder<dynamic> buildBaseQuery() {
       return client
           .from('email_logs')
           .select(selectList)
