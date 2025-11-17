@@ -378,6 +378,8 @@ class _EmailHistoryTile extends StatelessWidget {
       subtitle.add(Text(
         preview,
         style: theme.textTheme.bodyMedium,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
       ));
     }
 
@@ -434,8 +436,8 @@ class _EmailHistoryTile extends StatelessWidget {
     if (recipients.isEmpty) return null;
     final theme = Theme.of(context);
     final baseStyle = theme.textTheme.bodyMedium;
-    return RichText(
-      text: TextSpan(
+    return Text.rich(
+      TextSpan(
         style: baseStyle,
         children: [
           TextSpan(
@@ -445,6 +447,8 @@ class _EmailHistoryTile extends StatelessWidget {
           TextSpan(text: recipients.join(', ')),
         ],
       ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
