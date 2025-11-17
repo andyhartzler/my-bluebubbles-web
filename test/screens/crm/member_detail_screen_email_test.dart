@@ -331,6 +331,126 @@ void main() {
     expect(find.textContaining('member@example.com'), findsWidgets);
   });
 
+  testWidgets('email_inbox rows merge member_id and email filters', (tester) async {
+    final member = _buildMember(
+      id: 'member-merge',
+      email: 'member@example.com',
+    );
+    final provider = EmailHistoryProvider(supabaseService: supabaseService);
+    final mockClient = _MockSupabaseClient();
+    final memberQuery = _MockPostgrestFilterBuilder();
+    final emailQuery = _MockPostgrestFilterBuilder();
+    int fromCalls = 0;
+
+    when(() => mockClient.from('email_inbox')).thenAnswer((_) {
+      return fromCalls++ == 0 ? memberQuery : emailQuery;
+    });
+
+    void setupCommonQuery(_MockPostgrestFilterBuilder builder) {
+      when(() => builder.select(any())).thenReturn(builder);
+      when(() => builder.order(
+            any<String>(),
+            ascending: any<bool>(named: 'ascending'),
+            nullsFirst: any<bool>(named: 'nullsFirst'),
+            referencedTable: any<String?>(named: 'referencedTable'),
+          )).thenReturn(builder);
+      when(() => builder.limit(
+            200,
+            referencedTable: any<String?>(named: 'referencedTable'),
+          )).thenReturn(builder);
+    }
+
+    setupCommonQuery(memberQuery);
+    setupCommonQuery(emailQuery);
+
+    when(() => memberQuery.eq('member_id', member.id)).thenReturn(memberQuery);
+
+    final memberRow = <String, dynamic>{
+      'id': 'inbox-member',
+      'subject': 'Message from lookup',
+      'from_address': 'organizer@moyoungdemocrats.org',
+      'to_address': 'member@example.com',
+      'date': '2024-05-01T10:00:00Z',
+      'direction': 'received',
+    };
+
+    when(() => memberQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      return Future.value(onValue(<String, dynamic>{'data': [memberRow]}));
+    });
+
+    when(() => emailQuery.or(any())).thenReturn(emailQuery);
+
+    final emailRow = <String, dynamic>{
+      'id': 'inbox-email',
+      'subject': 'Message from email filter',
+      'from_address': 'ally@example.com',
+      'to_address': 'member@example.com',
+      'date': '2024-05-02T12:00:00Z',
+      'direction': 'received',
+    };
+
+    when(() => emailQuery.then<dynamic>(
+              any<_OnValueCallback>(),
+              onError: any<Function>(named: 'onError'),
+            ))
+        .thenAnswer((invocation) {
+      final onValue = invocation.positionalArguments.first as _OnValueCallback;
+      return Future.value(onValue(<String, dynamic>{'data': [emailRow]}));
+    });
+
+    final metadata = provider.debugCreateMemberMetadata(
+      id: member.id,
+      name: member.name,
+      email: member.email,
+    );
+
+    final inboxRows = await provider.debugFetchInboxRows(
+      mockClient,
+      member.id,
+      member: metadata,
+    );
+
+    expect(inboxRows.map((row) => row['id']), containsAll(['inbox-member', 'inbox-email']));
+
+    final entries = inboxRows
+        .map((row) => provider.debugNormalizeHistoryRow(row, member.id, member: metadata))
+        .map(EmailHistoryEntry.fromMap)
+        .toList();
+
+    provider.debugSetState(
+      member.id,
+      EmailHistoryState(
+        isLoading: false,
+        hasLoaded: true,
+        entries: entries,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChangeNotifierProvider<EmailHistoryProvider>.value(
+          value: provider,
+          child: EmailHistoryTab(
+            memberId: member.id,
+            memberName: member.name,
+            loadThreadMessages: (_, __) async => const [],
+            onSendReply: (_, __) async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    expect(find.text('Message from lookup'), findsOneWidget);
+    expect(find.text('Message from email filter'), findsOneWidget);
+  });
+
   test('sent log fallback queries by recipient emails when no member_ids present', () async {
     final member = _buildMember(email: 'member@example.com');
     final provider = EmailHistoryProvider(supabaseService: supabaseService);
