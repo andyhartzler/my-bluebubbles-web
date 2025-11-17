@@ -88,6 +88,8 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   bool _showEmojiPicker = false;
 
   bool canCreateGroupChats = ss.canCreateGroupChatSync();
+  String? _lastSendSignature;
+  DateTime? _lastSendAt;
 
   void _clearComposer() {
     final empty = const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
@@ -104,6 +106,45 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     _showEmojiPicker = false;
     if (!mounted) return;
     setState(() {});
+  }
+
+  String _buildSendSignature({
+    required String channelKey,
+    required List<PlatformFile> attachments,
+    required String text,
+    required String subject,
+    String? effectId,
+  }) {
+    final buffer = StringBuffer(channelKey)
+      ..write('|')
+      ..write(text)
+      ..write('|')
+      ..write(subject)
+      ..write('|')
+      ..write(effectId ?? '')
+      ..write('|')
+      ..write(attachments.length);
+    for (final file in attachments) {
+      buffer
+        ..write('|')
+        ..write(file.name)
+        ..write(':')
+        ..write(file.size);
+    }
+    return buffer.toString();
+  }
+
+  bool _shouldBlockSend(String signature) {
+    final lastSignature = _lastSendSignature;
+    final lastAt = _lastSendAt;
+    if (lastSignature == null || lastAt == null) return false;
+    return lastSignature == signature &&
+        DateTime.now().difference(lastAt) < const Duration(seconds: 2);
+  }
+
+  void _markSendSignature(String signature) {
+    _lastSendSignature = signature;
+    _lastSendAt = DateTime.now();
   }
 
   @override
@@ -550,6 +591,25 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     final attachments = List<PlatformFile>.from(_composerAttachments);
     final text = textController.text.trimRight();
     final subject = subjectController.text.trimRight();
+    final channelKey = chat.guid ?? chat.chatIdentifier ?? 'unknown';
+    final signature = _buildSendSignature(
+      channelKey: channelKey,
+      attachments: attachments,
+      text: text,
+      subject: subject,
+      effectId: effect,
+    );
+
+    if (_shouldBlockSend(signature)) {
+      Logger.warn(
+        'ChatCreatorSend: prevented duplicate payload for chat ${chat.guid}',
+        tag: 'ChatCreatorSend',
+      );
+      if (mounted) {
+        showSnackbar('Duplicate message', 'You just sent that message.');
+      }
+      return;
+    }
 
     Logger.info(
       'ChatCreatorSend: queue start for chat ${chat.guid} (attachments: ${attachments.length}, textLength: ${text.length}, subjectLength: ${subject.length}, hasController: ${controller != null}, hasSendFunc: ${controller?.sendFunc != null})',
@@ -642,6 +702,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       }
     }
 
+    _markSendSignature(signature);
     if (controller != null) {
       controller.replyToMessage = null;
       controller.pickedAttachments.clear();
@@ -690,6 +751,19 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     final participants = selectedContacts
         .map((e) => e.address.isEmail ? e.address : cleansePhoneNumber(e.address))
         .toList();
+    final signature = _buildSendSignature(
+      channelKey: 'new:${participants.join(',')}',
+      attachments: List<PlatformFile>.from(_composerAttachments),
+      text: textController.text.trimRight(),
+      subject: subjectController.text.trimRight(),
+      effectId: _effect,
+    );
+    if (_shouldBlockSend(signature)) {
+      if (mounted) {
+        showSnackbar('Duplicate message', 'You just sent that message.');
+      }
+      return;
+    }
     final method = iMessage ? 'iMessage' : 'SMS';
 
     if (mounted) {
@@ -758,6 +832,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       }
 
       await _completeSend(newChat);
+      _markSendSignature(signature);
     } catch (error, stack) {
       Logger.warn('Failed to create chat', error: error, trace: stack);
 
@@ -773,6 +848,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       if (recovered != null) {
         createCompleter?.complete();
         await _completeSend(recovered);
+        _markSendSignature(signature);
         return;
       }
 
