@@ -1329,7 +1329,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     if (!selection.isValid) return;
     final currentStyle = _bodyController.getSelectionStyle();
     final isActive = currentStyle.attributes.containsKey(attribute.key);
-    _bodyController.formatSelection(isActive ? attribute.unset : attribute);
+    final removal = quill.Attribute.clone(attribute, null);
+    _bodyController.formatSelection(isActive ? removal : attribute);
   }
 
   Future<void> _promptForLink() async {
@@ -1389,9 +1390,10 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
 
     final trimmed = result.trim();
     if (trimmed.isEmpty) {
-      _bodyController.formatSelection(quill.Attribute.link.unset);
+      final removal = quill.Attribute.clone(quill.Attribute.link, null);
+      _bodyController.formatSelection(removal);
     } else {
-      _bodyController.formatSelection(quill.Attribute.link.fromString(trimmed));
+      _bodyController.formatSelection(quill.LinkAttribute(trimmed));
     }
   }
 
