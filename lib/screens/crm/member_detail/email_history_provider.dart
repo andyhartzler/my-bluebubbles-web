@@ -1524,19 +1524,19 @@ class EmailHistoryProvider extends ChangeNotifier {
     String selectList = _sentLogColumns.join(',');
     bool usingLegacyColumns = false;
 
-    supabase.PostgrestTransformBuilder<dynamic> buildBaseQuery() {
+    supabase.PostgrestFilterBuilder<List<Map<String, dynamic>>> buildBaseQuery() {
       return client
           .from('email_logs')
           .select(selectList)
-          .order('created_at', ascending: false)
-          .limit(limit);
+          .order('created_at', ascending: false);
     }
 
     List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
 
     try {
       final response = await buildBaseQuery()
-          .filter('member_ids', 'cs', '{${memberId}}');
+          .contains('member_ids', <String>[memberId])
+          .limit(limit);
       rawRows = _normalizeSupabaseResponse(response);
     } on supabase.PostgrestException catch (error) {
       if (_isMissingColumnError(error)) {
