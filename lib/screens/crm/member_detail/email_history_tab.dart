@@ -378,6 +378,8 @@ class _EmailHistoryTile extends StatelessWidget {
       subtitle.add(Text(
         preview,
         style: theme.textTheme.bodyMedium,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
       ));
     }
 
@@ -434,8 +436,8 @@ class _EmailHistoryTile extends StatelessWidget {
     if (recipients.isEmpty) return null;
     final theme = Theme.of(context);
     final baseStyle = theme.textTheme.bodyMedium;
-    return RichText(
-      text: TextSpan(
+    return Text.rich(
+      TextSpan(
         style: baseStyle,
         children: [
           TextSpan(
@@ -445,6 +447,8 @@ class _EmailHistoryTile extends StatelessWidget {
           TextSpan(text: recipients.join(', ')),
         ],
       ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
@@ -619,17 +623,20 @@ String? _sanitizeEmailPreview(String? raw) {
   if (trimmed.isEmpty) return null;
 
   final withBreaks = trimmed
-      .replaceAll(RegExp(r'(?i)<br\s*/?>'), '\n')
+      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
       .replaceAll(
-        RegExp(r'(?i)</(div|p|section|article|header|footer|table|tbody|tr)>'),
+        RegExp(
+          r'</(div|p|section|article|header|footer|table|tbody|tr)>',
+          caseSensitive: false,
+        ),
         '\n\n',
       )
-      .replaceAll(RegExp(r'(?i)</?(ul|ol)>'), '\n\n')
-      .replaceAll(RegExp(r'(?i)</li>'), '\n')
-      .replaceAll(RegExp(r'(?i)<li[^>]*>'), '\n• ');
+      .replaceAll(RegExp(r'</?(ul|ol)>', caseSensitive: false), '\n\n')
+      .replaceAll(RegExp(r'</li>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '\n• ');
 
   final withoutCodeBlocks = withBreaks.replaceAll(
-    RegExp(r'(?is)<(script|style)[^>]*>.*?</\1>'),
+    RegExp(r'<(script|style)[^>]*>.*?</\1>', caseSensitive: false, dotAll: true),
     '',
   );
 
