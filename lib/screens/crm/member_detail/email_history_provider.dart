@@ -1530,9 +1530,14 @@ class EmailHistoryProvider extends ChangeNotifier {
 
     List<Map<String, dynamic>> rawRows = const <Map<String, dynamic>>[];
 
+    final encodedMemberId = _encodeArrayContainsValue(
+      memberId,
+      wrapInQuotes: false,
+    );
+
     try {
       final response = await buildBaseQuery()
-          .contains('member_ids', <String>[memberId])
+          .filter('member_ids', 'cs', encodedMemberId)
           .order('created_at', ascending: false)
           .limit(limit);
       rawRows = _normalizeSupabaseResponse(response);
@@ -1715,9 +1720,15 @@ class EmailHistoryProvider extends ChangeNotifier {
     return clauses.isEmpty ? null : clauses.join(',');
   }
 
-  String _encodeArrayContainsValue(String value) {
-    final escaped = value.replaceAll('"', '\\"');
-    return '{"$escaped"}';
+  String _encodeArrayContainsValue(
+    String value, {
+    bool wrapInQuotes = true,
+  }) {
+    var escaped = value.replaceAll('\\', '\\\\');
+    escaped = escaped.replaceAll('"', '\\"');
+    escaped = escaped.replaceAll('{', '\\{').replaceAll('}', '\\}');
+    final inner = wrapInQuotes ? '"$escaped"' : escaped;
+    return '{$inner}';
   }
 
   List<String> _normalizeRecipientAddresses(dynamic value) {

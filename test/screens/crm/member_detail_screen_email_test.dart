@@ -263,7 +263,8 @@ void main() {
 
     when(() => mockClient.from('email_logs')).thenReturn(mockQuery);
     when(() => mockQuery.select(any())).thenReturn(mockQuery);
-    when(() => mockQuery.contains('member_ids', [member.id])).thenReturn(mockQuery);
+    when(() => mockQuery.filter('member_ids', 'cs', any<String>()))
+        .thenReturn(mockQuery);
     when(() => mockQuery.order(
           any<String>(),
           ascending: any<bool>(named: 'ascending'),
@@ -292,7 +293,8 @@ void main() {
     final rawRows =
         await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
     expect(rawRows, hasLength(1));
-    verify(() => mockQuery.contains('member_ids', [member.id])).called(1);
+    verify(() => mockQuery.filter('member_ids', 'cs', '{${member.id}}'))
+        .called(1);
 
     final normalized =
         provider.debugNormalizeHistoryRow(rawRows.first, member.id);
@@ -402,9 +404,10 @@ void main() {
         await provider.debugFetchSentLogRows(mockClient, member.id, member: metadata);
 
     expect(rows, hasLength(1));
-    verify(() => fallbackQuery.or(contains('recipient_emails.cs.{"member@example.com"}')))
+    verify(() =>
+            fallbackQuery.or(contains('recipient_emails.cs.{"member@example.com"}')))
         .called(1);
-    verifyNever(() => fallbackQuery.contains(any(), any()));
+    verifyNever(() => fallbackQuery.filter(any(), any(), any()));
 
     final normalized = provider.debugNormalizeHistoryRow(rows.first, member.id);
     final entry = EmailHistoryEntry.fromMap(normalized);
