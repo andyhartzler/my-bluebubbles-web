@@ -90,6 +90,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   bool canCreateGroupChats = ss.canCreateGroupChatSync();
   String? _lastSendSignature;
   DateTime? _lastSendAt;
+  bool _sendPipelineActive = false;
 
   void _clearComposer() {
     final empty = const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
@@ -714,7 +715,16 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   Future<bool> _sendToExistingChat(Chat? chat, String? effect) async {
     if (chat == null) return false;
 
+    if (_sendPipelineActive) {
+      Logger.warn('ChatCreatorSend: ignoring send request while a previous payload is still processing', tag: 'ChatCreatorSend');
+      if (mounted) {
+        showSnackbar('Still sending', 'Please wait for the previous message to finish sending.');
+      }
+      return true;
+    }
+
     try {
+      _sendPipelineActive = true;
       Logger.info('ChatCreatorSend: attempting to send to existing chat ${chat.guid}', tag: 'ChatCreatorSend');
       await _primeConversationController(chat);
       if (_composerAttachments.isEmpty &&
@@ -724,14 +734,15 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         return true;
       }
       await _queueComposerContent(chat, effect: effect);
+      Logger.info('ChatCreatorSend: send pipeline completed for chat ${chat.guid}', tag: 'ChatCreatorSend');
+      await _completeSend(chat);
+      return true;
     } catch (e, stack) {
       Logger.warn('Failed to send message via existing chat', error: e, trace: stack);
       return false;
+    } finally {
+      _sendPipelineActive = false;
     }
-
-    Logger.info('ChatCreatorSend: send pipeline completed for chat ${chat.guid}', tag: 'ChatCreatorSend');
-    await _completeSend(chat);
-    return true;
   }
 
   Future<void> _createNewChat(Chat? previousChat, String? _effect) async {
@@ -764,6 +775,14 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       }
       return;
     }
+    if (_sendPipelineActive) {
+      Logger.warn('ChatCreatorSend: ignoring new chat request while a previous payload is still processing', tag: 'ChatCreatorSend');
+      if (mounted) {
+        showSnackbar('Still sending', 'Please wait for the previous message to finish sending.');
+      }
+      return;
+    }
+    _sendPipelineActive = true;
     final method = iMessage ? 'iMessage' : 'SMS';
 
     if (mounted) {
@@ -905,6 +924,9 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       if (!(createCompleter?.isCompleted ?? true)) {
         createCompleter?.completeError(error);
       }
+    }
+    finally {
+      _sendPipelineActive = false;
     }
   }
 
