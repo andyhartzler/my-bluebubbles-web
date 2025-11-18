@@ -5,13 +5,16 @@ import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/chapter_document.dart';
+import 'package:bluebubbles/models/crm/email_template.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/services/crm/chapter_repository.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
+import 'package:bluebubbles/services/crm/email_template_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
+import 'package:bluebubbles/widgets/email_template_picker.dart';
 
 import 'editors/chapter_edit_sheet.dart';
 import 'bulk_email_screen.dart';
@@ -32,6 +35,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   final MemberRepository _memberRepository = MemberRepository();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
   final CRMMessageService _messageService = CRMMessageService.instance;
+  final EmailTemplateRepository _emailTemplateRepository = EmailTemplateRepository();
 
   bool _loading = true;
   List<Member> _members = [];
@@ -39,6 +43,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   late Chapter _chapter;
   bool _openingBulkMessage = false;
   bool _openingBulkEmail = false;
+  bool _browsingTemplates = false;
   bool _sendingIntro = false;
   bool _uploadingDocument = false;
 
@@ -188,6 +193,47 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   }
 
   Future<void> _handleEmailChapter() async {
+    await _launchBulkEmail();
+  }
+
+  Future<void> _handleBrowseTemplates() async {
+    if (!_crmReady || _browsingTemplates || _openingBulkEmail) return;
+
+    setState(() => _browsingTemplates = true);
+
+    try {
+      final templates = await _emailTemplateRepository.getActiveTemplates();
+      if (!mounted) return;
+
+      if (templates.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No email templates are available yet.')),
+        );
+        return;
+      }
+
+      final selection = await showEmailTemplatePicker(
+        context: context,
+        templates: templates,
+      );
+
+      if (!mounted || selection == null) return;
+      await _launchBulkEmail(template: selection);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load templates: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _browsingTemplates = false);
+      } else {
+        _browsingTemplates = false;
+      }
+    }
+  }
+
+  Future<void> _launchBulkEmail({EmailTemplate? template}) async {
     if (!_crmReady || _openingBulkEmail) return;
 
     final filter = MessageFilter(chapterName: _chapter.chapterName);
@@ -211,6 +257,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
           builder: (_) => BulkEmailScreen(
             initialFilter: filter,
             initialManualEmails: manualEmails.isEmpty ? null : manualEmails,
+            initialTemplate: template,
           ),
         ),
       );
@@ -649,6 +696,13 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                   icon: const Icon(Icons.email_outlined),
                   label: const Text('Email Chapter'),
                   onPressed: _openingBulkEmail ? null : _handleEmailChapter,
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.description_outlined),
+                  label: const Text('Email Templates'),
+                  onPressed: (_browsingTemplates || _openingBulkEmail)
+                      ? null
+                      : () => _handleBrowseTemplates(),
                 ),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.campaign_outlined),
