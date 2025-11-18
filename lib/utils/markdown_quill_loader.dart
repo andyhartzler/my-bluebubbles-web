@@ -1,8 +1,8 @@
+import 'package:dart_quill_delta/dart_quill_delta.dart' as dq;
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:markdown/markdown.dart' as md;
-import 'package:quill_delta/quill_delta.dart' as delta;
 
 class MarkdownQuillLoader {
   static quill.Document fromMarkdown(String markdown) {
@@ -24,7 +24,7 @@ class MarkdownQuillLoader {
     builder.buildFromNodes(fragment.nodes);
     final generated = builder.toDelta();
     if (generated.isEmpty) {
-      final fallback = delta.Delta()..insert('\n');
+      final fallback = dq.Delta()..insert('\n');
       return quill.Document.fromDelta(fallback);
     }
     return quill.Document.fromDelta(generated);
@@ -32,7 +32,7 @@ class MarkdownQuillLoader {
 }
 
 class _HtmlDeltaBuilder {
-  final delta.Delta _delta = delta.Delta();
+  final dq.Delta _delta = dq.Delta();
   bool _endsWithNewline = false;
 
   void buildFromNodes(List<dom.Node> nodes, {Map<String, dynamic>? inlineStyle}) {
@@ -45,7 +45,7 @@ class _HtmlDeltaBuilder {
     }
   }
 
-  delta.Delta toDelta() {
+  dq.Delta toDelta() {
     if (!_endsWithNewline) {
       _insertBlockBreak();
     }

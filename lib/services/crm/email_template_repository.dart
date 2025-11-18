@@ -18,17 +18,13 @@ class EmailTemplateRepository {
     }
 
     try {
-      final query = _readClient
-          .from('email_templates')
-          .select()
-          .eq('active', true)
-          .order('template_name', ascending: true);
+      var query = _readClient.from('email_templates').select().eq('active', true);
 
       if (audience != null && audience.isNotEmpty) {
-        query.eq('audience', audience);
+        query = query.eq('audience', audience);
       }
 
-      final response = await query;
+      final response = await query.order('template_name', ascending: true);
       if (response is! List) {
         return const [];
       }
