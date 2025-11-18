@@ -719,9 +719,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         'ChatCreatorSend: prevented duplicate payload for chat ${chat.guid}',
         tag: 'ChatCreatorSend',
       );
-      if (mounted) {
-        showSnackbar('Duplicate message', 'You just sent that message.');
-      }
+      _clearComposer();
       return;
     }
 
@@ -899,9 +897,11 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       effectId: _effect,
     );
     if (_shouldBlockAnySignature(sendSignatures)) {
-      if (mounted) {
-        showSnackbar('Duplicate message', 'You just sent that message.');
-      }
+      Logger.warn(
+        'ChatCreatorSend: prevented duplicate payload for new chat $channelKey',
+        tag: 'ChatCreatorSend',
+      );
+      _clearComposer();
       return;
     }
     if (!_tryLockChannel(channelKey)) {
