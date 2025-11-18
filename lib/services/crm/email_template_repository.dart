@@ -18,14 +18,14 @@ class EmailTemplateRepository {
     }
 
     try {
-      var query = _readClient
+      final query = _readClient
           .from('email_templates')
           .select()
           .eq('active', true)
           .order('template_name', ascending: true);
 
       if (audience != null && audience.isNotEmpty) {
-        query = query.eq('audience', audience);
+        query.eq('audience', audience);
       }
 
       final response = await query;
