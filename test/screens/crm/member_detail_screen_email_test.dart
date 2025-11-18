@@ -106,7 +106,7 @@ void main() {
     expect(emailButton.onPressed, isNull);
   });
 
-  testWidgets('compose dialog enforces subject and HTML body', (tester) async {
+  testWidgets('compose dialog enforces subject and message body', (tester) async {
     final member = _buildMember(email: 'test@example.com');
 
     await tester.pumpWidget(
@@ -123,19 +123,37 @@ void main() {
     await tester.tap(find.byTooltip('Send Email'));
     await tester.pumpAndSettle();
 
-    ElevatedButton sendButton() =>
-        tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Send Email'));
+    final sendButton = find.widgetWithText(FilledButton, 'Send reply');
 
-    expect(sendButton().onPressed, isNull);
-
-    await tester.enterText(find.byKey(const ValueKey('crm_email_subject_field')), 'Welcome');
-    await tester.pump();
-    expect(sendButton().onPressed, isNull);
-
-    await tester.enterText(find.byKey(const ValueKey('crm_email_html_field')), '<p>Hello!</p>');
+    await tester.tap(sendButton);
     await tester.pump();
 
-    expect(sendButton().onPressed, isNotNull);
+    expect(find.text('Subject is required'), findsOneWidget);
+    expect(find.text('Message body is required.'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Subject'),
+      'Welcome',
+    );
+    await tester.pump();
+
+    await tester.tap(sendButton);
+    await tester.pump();
+    expect(find.text('Message body is required.'), findsOneWidget);
+
+    final editorFinder = find.descendant(
+      of: find.byKey(const ValueKey('email_reply_editor')),
+      matching: find.byType(EditableText),
+    );
+
+    await tester.tap(editorFinder);
+    await tester.enterText(editorFinder, 'Hello!');
+    await tester.pump();
+
+    await tester.tap(sendButton);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
   });
 
   testWidgets('tapping history entry opens reply flow and sends via handler',
@@ -226,10 +244,14 @@ void main() {
       find.widgetWithText(TextFormField, 'Subject'),
       'Re: Welcome to the movement',
     );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Message'),
-      'Thanks for the update!',
+    final editorFinder = find.descendant(
+      of: find.byKey(const ValueKey('email_reply_editor')),
+      matching: find.byType(EditableText),
     );
+
+    await tester.tap(editorFinder);
+    await tester.enterText(editorFinder, 'Thanks for the update!');
+    await tester.pump();
 
     await tester.tap(find.widgetWithText(FilledButton, 'Send reply'));
     await tester.pumpAndSettle();
@@ -238,8 +260,8 @@ void main() {
     expect(capturedThreadId, entry.threadId);
     expect(capturedReply, isNotNull);
     expect(capturedReply!.to, contains('member@example.com'));
-    expect(capturedReply!.body, 'Thanks for the update!');
-    expect(capturedReply!.sendAsHtml, isTrue);
+    expect(capturedReply!.htmlBody, '<p>Thanks for the update!</p>');
+    expect(capturedReply!.plainTextBody, 'Thanks for the update!');
   });
 
   testWidgets('email_logs rows surface in email tab', (tester) async {
