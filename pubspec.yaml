@@ -82,7 +82,8 @@ dependencies:
   flutter_map_marker_popup: ^7.0.0
   flutter_markdown: ^0.7.2+1
   flutter_html: 3.0.0-beta.2
-  flutter_quill: ^9.3.3
+  flutter_quill: ^11.5.0
+  dart_quill_delta: ^10.0.0
   flutter_slidable: ^3.1.0
   flutter_staggered_grid_view: ^0.7.0
   flutter_svg: ^2.0.10+1
@@ -205,6 +206,7 @@ dependencies:
     path: packages/windows_taskbar_stub
   logger: ^2.4.0
   archive: ^3.6.1
+  markdown: ^7.1.1
   in_app_review:
     path: packages/in_app_review_stub
   pull_down_button: ^0.10.1

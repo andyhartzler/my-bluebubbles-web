@@ -88,6 +88,15 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
   bool _showEmojiPicker = false;
 
   bool canCreateGroupChats = ss.canCreateGroupChatSync();
+  static const Duration _channelLockWindow = Duration(seconds: 6);
+  static const int _channelLockCacheLimit = 50;
+  static final Map<String, DateTime> _channelLocks = {};
+
+  static const Duration _sendSignatureWindow = Duration(seconds: 3);
+  static const int _sendSignatureCacheLimit = 50;
+
+  final Map<String, DateTime> _recentSendSignatures = {};
+  bool _sendPipelineActive = false;
 
   void _clearComposer() {
     final empty = const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
@@ -104,6 +113,157 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     _showEmojiPicker = false;
     if (!mounted) return;
     setState(() {});
+  }
+
+  String _buildSendSignature({
+    required String channelKey,
+    required List<PlatformFile> attachments,
+    required String text,
+    required String subject,
+    String? effectId,
+  }) {
+    final buffer = StringBuffer(channelKey)
+      ..write('|')
+      ..write(text)
+      ..write('|')
+      ..write(subject)
+      ..write('|')
+      ..write(effectId ?? '')
+      ..write('|')
+      ..write(attachments.length);
+    for (final file in attachments) {
+      buffer
+        ..write('|')
+        ..write(file.name)
+        ..write(':')
+        ..write(file.size);
+    }
+    return buffer.toString();
+  }
+
+  Iterable<String> _collectSignatureKeys(String channelKey, [String? participantKey]) sync* {
+    if (channelKey.isNotEmpty) {
+      yield channelKey;
+    }
+    if (participantKey != null && participantKey.isNotEmpty && participantKey != channelKey) {
+      yield participantKey;
+    }
+  }
+
+  List<String> _buildSendSignatures({
+    required Iterable<String> keys,
+    required List<PlatformFile> attachments,
+    required String text,
+    required String subject,
+    String? effectId,
+  }) {
+    return [
+      for (final key in keys)
+        if (key.isNotEmpty)
+          _buildSendSignature(
+            channelKey: key,
+            attachments: attachments,
+            text: text,
+            subject: subject,
+            effectId: effectId,
+          ),
+    ];
+  }
+
+  bool _shouldBlockAnySignature(Iterable<String> signatures) {
+    for (final signature in signatures) {
+      if (_shouldBlockSend(signature)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _markSendSignatures(Iterable<String> signatures) {
+    for (final signature in signatures) {
+      _markSendSignature(signature);
+    }
+  }
+
+  void _unmarkSendSignatures(Iterable<String> signatures) {
+    for (final signature in signatures) {
+      _recentSendSignatures.remove(signature);
+    }
+  }
+
+  String? _buildParticipantSignatureFromAddresses(Iterable<String> addresses) {
+    final normalized = addresses
+        .map(_normalizeAddressForMatching)
+        .whereType<String>()
+        .toList()
+      ..sort();
+    if (normalized.isEmpty) return null;
+    return 'participants:${normalized.join(',')}';
+  }
+
+  String? _buildParticipantSignatureForChat(Chat? chat) {
+    if (chat == null) return null;
+    if (chat.participants.isEmpty) {
+      final identifier = chat.chatIdentifier ?? chat.guid;
+      return identifier == null ? null : 'participants:$identifier';
+    }
+    final addresses = chat.participants.map((participant) => participant.address).whereType<String>();
+    return _buildParticipantSignatureFromAddresses(addresses);
+  }
+
+  String? _buildParticipantSignatureFromSelected() {
+    if (selectedContacts.isEmpty) return null;
+    return _buildParticipantSignatureFromAddresses(selectedContacts.map((c) => c.address));
+  }
+
+  bool _shouldBlockSend(String signature) {
+    final now = DateTime.now();
+    _recentSendSignatures.removeWhere(
+      (key, timestamp) => now.difference(timestamp) > _sendSignatureWindow,
+    );
+    final lastAt = _recentSendSignatures[signature];
+    if (lastAt == null) return false;
+    return now.difference(lastAt) <= _sendSignatureWindow;
+  }
+
+  void _markSendSignature(String signature) {
+    if (_recentSendSignatures.length >= _sendSignatureCacheLimit) {
+      final entries = _recentSendSignatures.entries.toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      for (var i = 0; i < entries.length - _sendSignatureCacheLimit + 1; i++) {
+        _recentSendSignatures.remove(entries[i].key);
+      }
+    }
+    _recentSendSignatures[signature] = DateTime.now();
+  }
+
+  void _pruneChannelLocks() {
+    final now = DateTime.now();
+    _channelLocks.removeWhere(
+      (key, timestamp) => now.difference(timestamp) > _channelLockWindow,
+    );
+    if (_channelLocks.length <= _channelLockCacheLimit) return;
+    final entries = _channelLocks.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    final overflow = _channelLocks.length - _channelLockCacheLimit;
+    for (var i = 0; i < overflow; i++) {
+      _channelLocks.remove(entries[i].key);
+    }
+  }
+
+  bool _tryLockChannel(String key) {
+    if (key.isEmpty) return true;
+    _pruneChannelLocks();
+    if (_channelLocks.containsKey(key)) {
+      return false;
+    }
+    _channelLocks[key] = DateTime.now();
+    return true;
+  }
+
+  void _releaseChannelLock(String key) {
+    if (key.isEmpty) return;
+    _channelLocks.remove(key);
   }
 
   @override
@@ -541,7 +701,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     controller.subjectTextController.text = subjectController.text;
   }
 
-  Future<void> _queueComposerContent(Chat chat, {String? effect}) async {
+  Future<List<String>?> _queueComposerContent(Chat chat, {String? effect}) async {
     final controller = fakeController.value;
     final replyTuple = controller?.replyToMessage;
     final replyGuid = replyTuple?.item1.threadOriginatorGuid ?? replyTuple?.item1.guid;
@@ -550,96 +710,121 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     final attachments = List<PlatformFile>.from(_composerAttachments);
     final text = textController.text.trimRight();
     final subject = subjectController.text.trimRight();
+    final channelKey = chat.guid ?? chat.chatIdentifier ?? 'unknown';
+    final participantSignature = _buildParticipantSignatureForChat(chat);
+    final sendSignatures = _buildSendSignatures(
+      keys: _collectSignatureKeys(channelKey, participantSignature),
+      attachments: attachments,
+      text: text,
+      subject: subject,
+      effectId: effect,
+    );
+
+    if (_shouldBlockAnySignature(sendSignatures)) {
+      Logger.warn(
+        'ChatCreatorSend: prevented duplicate payload for chat ${chat.guid}',
+        tag: 'ChatCreatorSend',
+      );
+      _clearComposer();
+      return null;
+    }
+
+    _markSendSignatures(sendSignatures);
 
     Logger.info(
       'ChatCreatorSend: queue start for chat ${chat.guid} (attachments: ${attachments.length}, textLength: ${text.length}, subjectLength: ${subject.length}, hasController: ${controller != null}, hasSendFunc: ${controller?.sendFunc != null})',
       tag: 'ChatCreatorSend',
     );
 
-    if (controller != null && controller.sendFunc != null) {
-      controller.pickedAttachments.assignAll(attachments);
-      controller.textController.text = text;
-      controller.subjectTextController.text = subject;
+    try {
+      if (controller != null && controller.sendFunc != null) {
+        controller.pickedAttachments.assignAll(attachments);
+        controller.textController.text = text;
+        controller.subjectTextController.text = subject;
 
-      Logger.info('ChatCreatorSend: dispatching via controller.send for chat ${chat.guid}', tag: 'ChatCreatorSend');
-      await controller.send(
-        attachments,
-        text,
-        subject,
-        attachments.isEmpty ? replyGuid : null,
-        attachments.isEmpty ? replyPart : null,
-        effect,
-        false,
-      );
-    } else {
-      for (final file in attachments) {
-        final message = Message(
-          text: '',
-          dateCreated: DateTime.now(),
-          hasAttachments: true,
-          isFromMe: true,
-          handleId: 0,
-          attachments: [
-            Attachment(
-              isOutgoing: true,
-              mimeType: mime(file.path ?? file.name) ?? 'application/octet-stream',
-              uti: 'public.data',
-              bytes: file.bytes,
-              transferName: file.name,
-              totalBytes: file.size,
-            ),
-          ],
+        Logger.info('ChatCreatorSend: dispatching via controller.send for chat ${chat.guid}', tag: 'ChatCreatorSend');
+        await controller.send(
+          attachments,
+          text,
+          subject,
+          attachments.isEmpty ? replyGuid : null,
+          attachments.isEmpty ? replyPart : null,
+          effect,
+          false,
         );
+      } else {
+        for (final file in attachments) {
+          final message = Message(
+            text: '',
+            dateCreated: DateTime.now(),
+            hasAttachments: true,
+            isFromMe: true,
+            handleId: 0,
+            attachments: [
+              Attachment(
+                isOutgoing: true,
+                mimeType: mime(file.path ?? file.name) ?? 'application/octet-stream',
+                uti: 'public.data',
+                bytes: file.bytes,
+                transferName: file.name,
+                totalBytes: file.size,
+              ),
+            ],
+          );
 
-        message.chat.target = chat;
-        message.generateTempGuid();
-        final attachment = message.attachments.first;
-        if (attachment != null) {
-          attachment.guid = message.guid;
-          attachment.bytes = file.bytes;
-          attachment.totalBytes = file.size;
+          message.chat.target = chat;
+          message.generateTempGuid();
+          final attachment = message.attachments.first;
+          if (attachment != null) {
+            attachment.guid = message.guid;
+            attachment.bytes = file.bytes;
+            attachment.totalBytes = file.size;
+          }
+
+          Logger.info(
+            'ChatCreatorSend: queueing attachment ${file.name} (${file.size} bytes) for chat ${chat.guid}',
+            tag: 'ChatCreatorSend',
+          );
+
+          await outq.queue(OutgoingItem(
+            type: QueueType.sendAttachment,
+            chat: chat,
+            message: message,
+            customArgs: const {'audio': false},
+          ));
         }
 
-        Logger.info(
-          'ChatCreatorSend: queueing attachment ${file.name} (${file.size} bytes) for chat ${chat.guid}',
-          tag: 'ChatCreatorSend',
-        );
+        if (text.isNotEmpty || subject.isNotEmpty) {
+          final message = Message(
+            text: text.isEmpty && subject.isNotEmpty ? subject : text,
+            subject: text.isEmpty && subject.isNotEmpty ? null : subject,
+            threadOriginatorGuid: attachments.isEmpty ? replyGuid : null,
+            threadOriginatorPart: attachments.isEmpty && replyPart != null ? '$replyPart:0:0' : null,
+            expressiveSendStyleId: effect,
+            dateCreated: DateTime.now(),
+            hasAttachments: false,
+            isFromMe: true,
+            handleId: 0,
+          );
 
-        await outq.queue(OutgoingItem(
-          type: QueueType.sendAttachment,
-          chat: chat,
-          message: message,
-          customArgs: const {'audio': false},
-        ));
+          message.chat.target = chat;
+          message.generateTempGuid();
+
+          Logger.info(
+            'ChatCreatorSend: queueing text payload (length: ${message.text?.length ?? 0}) for chat ${chat.guid}',
+            tag: 'ChatCreatorSend',
+          );
+
+          await outq.queue(OutgoingItem(
+            type: QueueType.sendMessage,
+            chat: chat,
+            message: message,
+          ));
+        }
       }
-
-      if (text.isNotEmpty || subject.isNotEmpty) {
-        final message = Message(
-          text: text.isEmpty && subject.isNotEmpty ? subject : text,
-          subject: text.isEmpty && subject.isNotEmpty ? null : subject,
-          threadOriginatorGuid: attachments.isEmpty ? replyGuid : null,
-          threadOriginatorPart: attachments.isEmpty && replyPart != null ? '$replyPart:0:0' : null,
-          expressiveSendStyleId: effect,
-          dateCreated: DateTime.now(),
-          hasAttachments: false,
-          isFromMe: true,
-          handleId: 0,
-        );
-
-        message.chat.target = chat;
-        message.generateTempGuid();
-
-        Logger.info(
-          'ChatCreatorSend: queueing text payload (length: ${message.text?.length ?? 0}) for chat ${chat.guid}',
-          tag: 'ChatCreatorSend',
-        );
-
-        await outq.queue(OutgoingItem(
-          type: QueueType.sendMessage,
-          chat: chat,
-          message: message,
-        ));
-      }
+    } catch (error) {
+      _unmarkSendSignatures(sendSignatures);
+      rethrow;
     }
 
     if (controller != null) {
@@ -648,12 +833,34 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       controller.textController.clear();
       controller.subjectTextController.clear();
     }
+
+    return sendSignatures;
   }
 
   Future<bool> _sendToExistingChat(Chat? chat, String? effect) async {
     if (chat == null) return false;
 
+    final channelKey = chat.guid ?? chat.chatIdentifier ?? '';
+    if (!_tryLockChannel(channelKey)) {
+      Logger.warn('ChatCreatorSend: channel $channelKey is locked, skipping duplicate send request', tag: 'ChatCreatorSend');
+      if (mounted) {
+        showSnackbar('Still sending', 'Please wait for the previous message to finish sending.');
+      }
+      return true;
+    }
+
+    if (_sendPipelineActive) {
+      Logger.warn('ChatCreatorSend: ignoring send request while a previous payload is still processing', tag: 'ChatCreatorSend');
+      if (mounted) {
+        showSnackbar('Still sending', 'Please wait for the previous message to finish sending.');
+      }
+      _releaseChannelLock(channelKey);
+      return true;
+    }
+
+    List<String>? activeSendSignatures;
     try {
+      _sendPipelineActive = true;
       Logger.info('ChatCreatorSend: attempting to send to existing chat ${chat.guid}', tag: 'ChatCreatorSend');
       await _primeConversationController(chat);
       if (_composerAttachments.isEmpty &&
@@ -662,15 +869,23 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         showSnackbar('Error', 'Add a message or attachment to send.');
         return true;
       }
-      await _queueComposerContent(chat, effect: effect);
+      activeSendSignatures = await _queueComposerContent(chat, effect: effect);
+      if (activeSendSignatures == null) {
+        return true;
+      }
+      Logger.info('ChatCreatorSend: send pipeline completed for chat ${chat.guid}', tag: 'ChatCreatorSend');
+      await _completeSend(chat);
+      return true;
     } catch (e, stack) {
       Logger.warn('Failed to send message via existing chat', error: e, trace: stack);
       return false;
+    } finally {
+      if (activeSendSignatures != null) {
+        _unmarkSendSignatures(activeSendSignatures);
+      }
+      _sendPipelineActive = false;
+      _releaseChannelLock(channelKey);
     }
-
-    Logger.info('ChatCreatorSend: send pipeline completed for chat ${chat.guid}', tag: 'ChatCreatorSend');
-    await _completeSend(chat);
-    return true;
   }
 
   Future<void> _createNewChat(Chat? previousChat, String? _effect) async {
@@ -690,6 +905,45 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     final participants = selectedContacts
         .map((e) => e.address.isEmail ? e.address : cleansePhoneNumber(e.address))
         .toList();
+    final channelKey = 'new:${participants.join(',')}';
+    final participantSignature = _buildParticipantSignatureFromSelected();
+    final attachments = List<PlatformFile>.from(_composerAttachments);
+    final text = textController.text.trimRight();
+    final subject = subjectController.text.trimRight();
+    final sendSignatures = _buildSendSignatures(
+      keys: _collectSignatureKeys(channelKey, participantSignature),
+      attachments: attachments,
+      text: text,
+      subject: subject,
+      effectId: _effect,
+    );
+    if (_shouldBlockAnySignature(sendSignatures)) {
+      Logger.warn(
+        'ChatCreatorSend: prevented duplicate payload for new chat $channelKey',
+        tag: 'ChatCreatorSend',
+      );
+      _clearComposer();
+      return;
+    }
+    var sendSignaturesMarked = false;
+    if (!_tryLockChannel(channelKey)) {
+      Logger.warn('ChatCreatorSend: new chat pipeline already running for $channelKey', tag: 'ChatCreatorSend');
+      if (mounted) {
+        showSnackbar('Still sending', 'Please wait for the previous message to finish sending.');
+      }
+      return;
+    }
+    if (_sendPipelineActive) {
+      Logger.warn('ChatCreatorSend: ignoring new chat request while a previous payload is still processing', tag: 'ChatCreatorSend');
+      if (mounted) {
+        showSnackbar('Still sending', 'Please wait for the previous message to finish sending.');
+      }
+      _releaseChannelLock(channelKey);
+      return;
+    }
+    _markSendSignatures(sendSignatures);
+    sendSignaturesMarked = true;
+    _sendPipelineActive = true;
     final method = iMessage ? 'iMessage' : 'SMS';
 
     if (mounted) {
@@ -829,6 +1083,13 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       if (!(createCompleter?.isCompleted ?? true)) {
         createCompleter?.completeError(error);
       }
+    }
+    finally {
+      _sendPipelineActive = false;
+      if (sendSignaturesMarked) {
+        _unmarkSendSignatures(sendSignatures);
+      }
+      _releaseChannelLock(channelKey);
     }
   }
 
