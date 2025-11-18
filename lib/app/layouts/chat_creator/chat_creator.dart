@@ -827,6 +827,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       rethrow;
     }
 
+    _markSendSignatures(sendSignatures);
     if (controller != null) {
       controller.replyToMessage = null;
       controller.pickedAttachments.clear();
@@ -1012,6 +1013,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       }
 
       await _completeSend(newChat);
+      _markSendSignatures(sendSignatures);
     } catch (error, stack) {
       Logger.warn('Failed to create chat', error: error, trace: stack);
 
@@ -1027,6 +1029,7 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
       if (recovered != null) {
         createCompleter?.complete();
         await _completeSend(recovered);
+        _markSendSignatures(sendSignatures);
         return;
       }
 
