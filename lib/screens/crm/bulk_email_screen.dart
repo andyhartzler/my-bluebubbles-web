@@ -6,16 +6,22 @@ import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
+import 'package:bluebubbles/models/crm/email_template.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/services/crm/crm_email_service.dart';
+import 'package:bluebubbles/services/crm/email_template_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/utils/markdown_quill_loader.dart';
+import 'package:bluebubbles/utils/quill_html_converter.dart';
+import 'package:bluebubbles/widgets/email_template_picker.dart';
 
 enum _RecipientMode {
   manual,
@@ -34,11 +40,13 @@ class BulkEmailScreen extends StatefulWidget {
     this.initialFilter,
     this.initialManualMembers,
     this.initialManualEmails,
+    this.initialTemplate,
   }) : super(key: key);
 
   final MessageFilter? initialFilter;
   final List<Member>? initialManualMembers;
   final List<String>? initialManualEmails;
+  final EmailTemplate? initialTemplate;
 
   @override
   State<BulkEmailScreen> createState() => _BulkEmailScreenState();
@@ -47,10 +55,11 @@ class BulkEmailScreen extends StatefulWidget {
 class _BulkEmailScreenState extends State<BulkEmailScreen> {
   final MemberRepository _memberRepo = MemberRepository();
   final CRMEmailService _emailService = CRMEmailService.instance;
+  final EmailTemplateRepository _templateRepository = EmailTemplateRepository();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
 
   final TextEditingController _subjectController = TextEditingController();
-  late final quill.QuillController _bodyController;
+  late quill.QuillController _bodyController;
   final FocusNode _bodyFocusNode = FocusNode();
   final ScrollController _bodyScrollController = ScrollController();
   final TextEditingController _fromNameController = TextEditingController();
@@ -72,6 +81,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   final List<String> _manualEmails = [];
   final List<String> _ccManualEmails = [];
   final List<String> _bccManualEmails = [];
+  final List<EmailTemplate> _templates = [];
 
   MessageFilter _filter = MessageFilter();
   _RecipientMode _mode = _RecipientMode.manual;
@@ -82,14 +92,16 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   bool _searchingCc = false;
   bool _searchingBcc = false;
   bool _mailMergeEnabled = false;
+  bool _loadingTemplates = false;
   String? _errorMessage;
+  String? _templateLoadError;
   late String _selectedFromEmail;
+  EmailTemplate? _appliedTemplate;
+  String? _pendingTemplateKey;
 
   List<Map<String, dynamic>> _bodyDeltaJson = const <Map<String, dynamic>>[];
   String _bodyHtml = '';
   String _bodyPlainText = '';
-  final HtmlEscape _htmlTextEscape = const HtmlEscape();
-  final HtmlEscape _htmlAttributeEscape = const HtmlEscape(HtmlEscapeMode.attribute);
 
   List<Member> _previewMembers = [];
   List<String> _previewManualEmails = [];
@@ -167,12 +179,19 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         }
       }
     }
+    _pendingTemplateKey = widget.initialTemplate?.templateKey;
     _searchController.addListener(_onSearchChanged);
     _ccSearchController.addListener(_onCcSearchChanged);
     _bccSearchController.addListener(_onBccSearchChanged);
     if (_crmReady) {
       _loadFilterOptions();
       _updatePreview();
+      _loadTemplates();
+    }
+    if (widget.initialTemplate != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _applyTemplate(widget.initialTemplate!, skipConfirmation: true);
+      });
     }
   }
 
@@ -1111,6 +1130,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   Widget _buildComposeCard() {
     final bool canEdit = _hasRecipients && !_sending;
     final fromOptions = CRMConfig.allowedSenderEmails;
+    final bool templateActionsEnabled = !_sending;
 
     return Card(
       child: Padding(
@@ -1136,6 +1156,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
                 ),
               ),
             if (!_hasRecipients) const SizedBox(height: 12),
+            _buildTemplateBanner(templateActionsEnabled),
+            const SizedBox(height: 12),
             TextField(
               controller: _subjectController,
               enabled: canEdit,
@@ -1212,6 +1234,116 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTemplateBanner(bool templatesEnabled) {
+    final theme = Theme.of(context);
+    final template = _appliedTemplate;
+    final subtitle = _templateLoadError ??
+        (template != null
+            ? '${template.templateTypeLabel} • ${template.audienceLabel}'
+            : 'Browse approved copy to speed up outreach.');
+
+    final infoColor = _templateLoadError != null
+        ? theme.colorScheme.error
+        : theme.textTheme.bodySmall?.color?.withOpacity(0.8);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.45),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.description_outlined, color: theme.colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      template?.templateName ?? 'No template selected',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(color: infoColor),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Reload templates',
+                onPressed: (!_crmReady || _loadingTemplates)
+                    ? null
+                    : () => _loadTemplates(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: templatesEnabled ? () => _handleBrowseTemplates() : null,
+                icon: const Icon(Icons.folder_open),
+                label: Text(template == null ? 'Browse templates' : 'Change template'),
+              ),
+              if (template != null)
+                TextButton(
+                  onPressed: templatesEnabled ? _clearTemplateSelection : null,
+                  child: const Text('Clear template'),
+                ),
+              if (_loadingTemplates)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    ),
+                    SizedBox(width: 8),
+                    Text('Loading…'),
+                  ],
+                ),
+            ],
+          ),
+          if (template == null && !_loadingTemplates && _templates.isEmpty && _templateLoadError == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                'No templates found. Add entries to the email_templates table to populate this list.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          if (template != null && template.variables.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: template.variables
+                    .map(
+                      (variable) => Chip(
+                        label: Text('{${variable.trim()}}'),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1410,7 +1542,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         )
         .toList(growable: false);
     final plainText = document.toPlainText().trim();
-    final html = _generateHtmlFromDelta(deltaJson, plainText);
+    final html = QuillHtmlConverter.generateHtml(deltaJson, plainText);
 
     void updateValues() {
       _bodyDeltaJson = deltaJson;
@@ -1425,226 +1557,135 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     }
   }
 
-  String _generateHtmlFromDelta(
-    List<Map<String, dynamic>> deltaJson,
-    String plainText,
-  ) {
-    if (plainText.isEmpty && !_deltaContainsEmbeds(deltaJson)) {
-      return '';
+  Future<void> _loadTemplates() async {
+    if (!_crmReady) return;
+
+    setState(() {
+      _loadingTemplates = true;
+      _templateLoadError = null;
+    });
+
+    try {
+      final templates = await _templateRepository.getActiveTemplates();
+      if (!mounted) return;
+      setState(() {
+        _templates
+          ..clear()
+          ..addAll(templates);
+        _loadingTemplates = false;
+      });
+      if (_pendingTemplateKey != null && _appliedTemplate == null) {
+        final match = templates.firstWhereOrNull(
+          (template) => template.templateKey == _pendingTemplateKey,
+        );
+        if (match != null) {
+          await _applyTemplate(match, skipConfirmation: true);
+        }
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingTemplates = false;
+        _templateLoadError = 'Failed to load templates: $error';
+      });
     }
-    return _deltaToHtml(deltaJson);
   }
 
-  bool _deltaContainsEmbeds(List<Map<String, dynamic>> deltaJson) {
-    for (final operation in deltaJson) {
-      if (operation['insert'] is Map<String, dynamic>) {
-        return true;
-      }
+  Future<void> _handleBrowseTemplates() async {
+    if (!_crmReady || _sending) return;
+
+    if (_templates.isEmpty && !_loadingTemplates) {
+      await _loadTemplates();
     }
-    return false;
+
+    if (!mounted) return;
+
+    if (_templates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No templates are available yet.')),
+      );
+      return;
+    }
+
+    final selection = await showEmailTemplatePicker(
+      context: context,
+      templates: _templates,
+      initiallySelected: _appliedTemplate,
+    );
+
+    if (selection != null) {
+      await _applyTemplate(selection);
+    }
   }
 
-  String _deltaToHtml(List<Map<String, dynamic>> deltaJson) {
-    final buffer = StringBuffer();
-    final currentLine = <String>[];
-
-    void flushLine(Map<String, dynamic>? blockAttributes) {
-      final content = currentLine.join();
-      final hasVisibleContent =
-          currentLine.any((segment) => segment.trim().isNotEmpty);
-      final blockTag = _blockTagForAttributes(blockAttributes);
-      final inner = hasVisibleContent ? content : '<br>';
-      if (blockTag != null) {
-        buffer.write('<$blockTag>$inner</$blockTag>');
-      } else {
-        buffer.write('<p>$inner</p>');
-      }
-      currentLine.clear();
-    }
-
-    for (final operation in deltaJson) {
-      final insert = operation['insert'];
-      final rawAttributes =
-          (operation['attributes'] as Map?)?.cast<String, dynamic>();
-
-      if (insert is String) {
-        var remaining = insert;
-        while (true) {
-          final newlineIndex = remaining.indexOf('\n');
-          if (newlineIndex == -1) {
-            if (remaining.isNotEmpty) {
-              currentLine.add(
-                _applyInlineStyles(
-                  remaining,
-                  _extractInlineAttributes(rawAttributes),
-                ),
-              );
-            }
-            break;
-          }
-
-          final segment = remaining.substring(0, newlineIndex);
-          currentLine.add(
-            _applyInlineStyles(
-              segment,
-              _extractInlineAttributes(rawAttributes),
+  Future<void> _applyTemplate(
+    EmailTemplate template, {
+    bool skipConfirmation = false,
+  }) async {
+    if (!skipConfirmation) {
+      final hasSubject = _subjectController.text.trim().isNotEmpty;
+      final hasBody = _bodyController.document.toPlainText().trim().isNotEmpty;
+      if (hasSubject || hasBody) {
+        final shouldReplace = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Replace current message?'),
+            content: const Text(
+              'Applying a template will replace the current subject and message body.',
             ),
-          );
-          flushLine(_extractBlockAttributes(rawAttributes));
-          remaining = remaining.substring(newlineIndex + 1);
-          if (remaining.isEmpty) {
-            break;
-          }
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Apply Template'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldReplace != true) {
+          return;
         }
-      } else if (insert is Map<String, dynamic>) {
-        final embedHtml = _convertEmbedToHtml(insert, rawAttributes);
-        if (embedHtml != null) {
-          currentLine.add(embedHtml);
-        }
       }
     }
 
-    if (currentLine.isNotEmpty) {
-      flushLine(null);
-    }
+    final document = MarkdownQuillLoader.fromMarkdown(template.body);
+    _resetBodyController(document);
 
-    return buffer.toString();
+    final subject = template.subject;
+    _subjectController
+      ..text = subject
+      ..selection = TextSelection.collapsed(offset: subject.length);
+
+    setState(() {
+      _appliedTemplate = template;
+      _pendingTemplateKey = template.templateKey;
+    });
   }
 
-  Map<String, dynamic>? _extractInlineAttributes(
-    Map<String, dynamic>? attributes,
-  ) {
-    if (attributes == null || attributes.isEmpty) {
-      return null;
-    }
-
-    const inlineKeys = {
-      'bold',
-      'italic',
-      'underline',
-      'strike',
-      'link',
-      'size',
-    };
-
-    final result = <String, dynamic>{};
-    for (final entry in attributes.entries) {
-      if (inlineKeys.contains(entry.key)) {
-        result[entry.key] = entry.value;
-      }
-    }
-
-    return result.isEmpty ? null : result;
+  void _clearTemplateSelection() {
+    setState(() {
+      _appliedTemplate = null;
+      _pendingTemplateKey = null;
+    });
   }
 
-  Map<String, dynamic>? _extractBlockAttributes(
-    Map<String, dynamic>? attributes,
-  ) {
-    if (attributes == null || attributes.isEmpty) {
-      return null;
-    }
-
-    const blockKeys = {'header'};
-    final result = <String, dynamic>{};
-    for (final entry in attributes.entries) {
-      if (blockKeys.contains(entry.key)) {
-        result[entry.key] = entry.value;
-      }
-    }
-
-    return result.isEmpty ? null : result;
+  void _resetBodyController(quill.Document document) {
+    _bodyController.removeListener(_handleBodyChanged);
+    _bodyController.dispose();
+    final length = document.length;
+    _bodyController = quill.QuillController(
+      document: document,
+      selection: TextSelection.collapsed(offset: length > 0 ? length - 1 : 0),
+    );
+    _bodyController.addListener(_handleBodyChanged);
+    _captureEditorState(triggerSetState: false);
   }
 
-  String? _blockTagForAttributes(Map<String, dynamic>? attributes) {
-    if (attributes == null) {
-      return null;
-    }
 
-    final header = attributes['header'];
-    if (header is int && header >= 1 && header <= 6) {
-      return 'h$header';
-    }
-
-    return null;
-  }
-
-  String _applyInlineStyles(
-    String text,
-    Map<String, dynamic>? attributes,
-  ) {
-    if (text.isEmpty) {
-      return '';
-    }
-
-    var styledText = _htmlTextEscape.convert(text);
-    if (attributes == null || attributes.isEmpty) {
-      return styledText;
-    }
-
-    final isBold = attributes['bold'] == true;
-    final isItalic = attributes['italic'] == true;
-    final isUnderline = attributes['underline'] == true;
-    final link = attributes['link'];
-    final fontSize = _fontSizeCssValue(attributes['size']);
-
-    if (isBold) {
-      styledText = '<strong>$styledText</strong>';
-    }
-    if (isItalic) {
-      styledText = '<em>$styledText</em>';
-    }
-    if (isUnderline) {
-      styledText = '<u>$styledText</u>';
-    }
-    if (fontSize != null) {
-      styledText = '<span style="font-size: $fontSize;">$styledText</span>';
-    }
-
-    if (link is String && link.isNotEmpty) {
-      final safeLink = _htmlAttributeEscape.convert(link);
-      styledText = '<a href="$safeLink">$styledText</a>';
-    }
-
-    return styledText;
-  }
-
-  String? _fontSizeCssValue(dynamic size) {
-    if (size is String) {
-      switch (size) {
-        case 'small':
-          return '0.75em';
-        case 'large':
-          return '1.5em';
-        case 'huge':
-          return '2em';
-        default:
-          final trimmed = size.trim();
-          if (trimmed.isEmpty) {
-            return null;
-          }
-          final unitPattern =
-              RegExp(r'^[0-9]+(\.[0-9]+)?(px|em|rem|%)$');
-          if (unitPattern.hasMatch(trimmed)) {
-            return trimmed;
-          }
-      }
-    } else if (size is num) {
-      return '${size}px';
-    }
-    return null;
-  }
-
-  String? _convertEmbedToHtml(
-    Map<String, dynamic> embed,
-    Map<String, dynamic>? _attributes,
-  ) {
-    final imageSource = embed['image'];
-    if (imageSource is String && imageSource.isNotEmpty) {
-      final safeSource = _htmlAttributeEscape.convert(imageSource);
-      return '<img src="$safeSource" />';
-    }
-    return null;
-  }
 
   Widget _buildCarbonCopyCard() {
     return Card(
