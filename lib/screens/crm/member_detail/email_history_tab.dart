@@ -195,11 +195,11 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
     await CRMEmailService().sendEmailReply(
       threadId: threadId,
       to: trimmedTo,
-      body: data.body,
+      htmlBody: data.htmlBody,
+      textBody: data.plainTextBody,
       subject: data.subject,
       cc: trimmedCc.isEmpty ? null : trimmedCc,
       bcc: trimmedBcc.isEmpty ? null : trimmedBcc,
-      sendAsHtml: data.sendAsHtml,
     );
   }
 

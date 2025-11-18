@@ -217,11 +217,11 @@ class CRMEmailService {
   Future<CRMEmailResult> sendEmailReply({
     required String threadId,
     required List<String> to,
-    required String body,
+    required String htmlBody,
+    required String textBody,
     String? subject,
     List<String>? cc,
     List<String>? bcc,
-    bool sendAsHtml = true,
   }) async {
     final trimmedThreadId = threadId.trim();
     if (trimmedThreadId.isEmpty) {
@@ -233,8 +233,9 @@ class CRMEmailService {
       throw CRMEmailException('At least one recipient email is required.');
     }
 
-    final trimmedBody = body.trim();
-    if (trimmedBody.isEmpty) {
+    final trimmedHtml = htmlBody.trim();
+    final trimmedText = textBody.trim();
+    if (trimmedHtml.isEmpty && trimmedText.isEmpty) {
       throw CRMEmailException('Reply body cannot be empty.');
     }
 
@@ -258,13 +259,13 @@ class CRMEmailService {
       payload['bcc'] = bccList.length == 1 ? bccList.first : bccList;
     }
 
-    if (sendAsHtml) {
-      payload['htmlBody'] = trimmedBody;
-      payload['textBody'] = trimmedBody;
-    } else {
-      payload['textBody'] = trimmedBody;
-      payload['htmlBody'] = _convertPlainTextToHtml(trimmedBody);
-    }
+    final resolvedHtml =
+        trimmedHtml.isEmpty ? _convertPlainTextToHtml(trimmedText) : trimmedHtml;
+    final resolvedText =
+        trimmedText.isEmpty ? _stripHtmlTags(resolvedHtml) : trimmedText;
+
+    payload['htmlBody'] = resolvedHtml;
+    payload['textBody'] = resolvedText;
 
     final supabaseService = CRMSupabaseService();
     if (!supabaseService.isInitialized) {
@@ -435,5 +436,10 @@ class CRMEmailService {
         .map((paragraph) =>
             '<p>${paragraph.replaceAll('\n', '<br>')}</p>')
         .join();
+  }
+
+  String _stripHtmlTags(String html) {
+    final withoutTags = html.replaceAll(RegExp(r'<[^>]*>'), ' ');
+    return withoutTags.replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 }
