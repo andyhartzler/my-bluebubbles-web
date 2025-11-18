@@ -495,14 +495,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "9.0.1"
-  dart_quill_delta:
-    dependency: "direct main"
-    description:
-      name: dart_quill_delta
-      sha256: bddb0b2948bd5b5a328f1651764486d162c59a8ccffd4c63e8b2c5e44be1dac4
-      url: "https://pub.dev"
-    source: hosted
-    version: "10.8.3"
   dart_style:
     dependency: transitive
     description:
