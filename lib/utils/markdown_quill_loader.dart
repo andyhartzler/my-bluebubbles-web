@@ -1,5 +1,5 @@
 import 'package:flutter_quill/flutter_quill.dart' as quill;
-import 'package:quill_delta/quill_delta.dart' as delta;
+import 'package:dart_quill_delta/dart_quill_delta.dart' as delta;
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:markdown/markdown.dart' as md;
