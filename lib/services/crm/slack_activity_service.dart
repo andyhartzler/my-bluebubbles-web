@@ -112,6 +112,12 @@ class SlackActivityService {
         .eq('id', memberId);
 
     await client
+        .from('slack_messages')
+        .update({'member_id': memberId})
+        .eq('slack_user_id', slackUser.slackUserId)
+        .isFilter('member_id', null);
+
+    await client
         .from('slack_users_unmatched')
         .delete()
         .eq('slack_user_id', slackUser.slackUserId);
