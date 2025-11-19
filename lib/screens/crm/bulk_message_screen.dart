@@ -15,6 +15,7 @@ import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 enum _RecipientMode {
   manual,
+  allMembers,
   county,
   district,
   highSchool,
@@ -67,6 +68,23 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   List<String> _chapters = [];
   List<String> _chapterStatuses = [];
 
+  MessageFilter get _activeFilter {
+    if (_mode == _RecipientMode.allMembers) {
+      return _filter.copyWithOverrides(
+        clearCounty: true,
+        clearCongressionalDistrict: true,
+        clearHighSchool: true,
+        clearCollege: true,
+        clearChapterName: true,
+        clearChapterStatus: true,
+        clearCommittees: true,
+        clearMinAge: true,
+        maxAge: CRMConfig.maxVisibleMemberAge,
+      );
+    }
+    return _filter;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -118,7 +136,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   Future<void> _updatePreview() async {
     if (!_crmReady) return;
 
-    final hasFilters = _filter.hasActiveFilters;
+    final activeFilter = _activeFilter;
+    final hasFilters = activeFilter.hasActiveFilters;
 
     if (!hasFilters && _selectedMembers.isEmpty) {
       setState(() {
@@ -142,7 +161,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       }
 
       if (hasFilters) {
-        final members = await _messageService.getFilteredMembers(_filter);
+        final members = await _messageService.getFilteredMembers(activeFilter);
         for (final member in members) {
           addMember(member);
         }
@@ -240,6 +259,17 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       _mode = mode;
       switch (mode) {
         case _RecipientMode.manual:
+          _filter = _filter.copyWithOverrides(
+            clearCounty: true,
+            clearCongressionalDistrict: true,
+            clearHighSchool: true,
+            clearCollege: true,
+            clearChapterName: true,
+            clearChapterStatus: true,
+            clearCommittees: true,
+          );
+          break;
+        case _RecipientMode.allMembers:
           _filter = _filter.copyWithOverrides(
             clearCounty: true,
             clearCongressionalDistrict: true,
@@ -375,7 +405,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
 
     try {
       final results = await _messageService.sendBulkMessages(
-        filter: _filter,
+        filter: _activeFilter,
         messageText: _messageController.text,
         onProgress: (current, total) {
           if (!mounted) return;
@@ -458,7 +488,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
 
     try {
       final results = await _messageService.sendIntroToFilteredMembers(
-        _filter,
+        _activeFilter,
         onProgress: (current, total) {
           if (!mounted) return;
           setState(() {
@@ -626,6 +656,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
               runSpacing: 8,
               children: [
                 _buildModeChip(_RecipientMode.manual, 'Manual', Icons.person_add_alt_1),
+                _buildModeChip(_RecipientMode.allMembers, 'All Members', Icons.people_alt_outlined),
                 _buildModeChip(_RecipientMode.county, 'County', Icons.map_outlined),
                 _buildModeChip(_RecipientMode.district, 'District', Icons.apartment_outlined),
                 _buildModeChip(_RecipientMode.highSchool, 'High Schools', Icons.school_outlined),
@@ -660,6 +691,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
 
   Widget _buildModeSelector() {
     switch (_mode) {
+      case _RecipientMode.allMembers:
+        return _buildAllMembersInfo();
       case _RecipientMode.county:
         return _buildCountyDropdown();
       case _RecipientMode.district:
@@ -677,6 +710,21 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       case _RecipientMode.manual:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildAllMembersInfo() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        'Send to every contactable member currently visible in the directory. '
+        'Members older than ${CRMConfig.maxVisibleMemberAge} are excluded automatically.',
+      ),
+    );
   }
 
   Widget _buildManualSelectionSection() {
