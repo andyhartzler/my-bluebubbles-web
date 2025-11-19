@@ -68,6 +68,10 @@ class CRMConfig {
   static const int messagesPerMinute = 30;
   static const Duration messageDelay = Duration(seconds: 2);
 
+  /// Maximum age for members that appear in the main directory experience.
+  /// Used anywhere the UI needs to automatically exclude "aged out" members.
+  static const int maxVisibleMemberAge = 36;
+
   /// Default sender mailbox used for CRM-driven email flows.
   static const String defaultSenderEmail = 'info@moyoungdemocrats.org';
 

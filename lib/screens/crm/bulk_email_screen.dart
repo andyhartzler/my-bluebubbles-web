@@ -25,6 +25,7 @@ import 'package:bluebubbles/widgets/email_template_picker.dart';
 
 enum _RecipientMode {
   manual,
+  allMembers,
   county,
   district,
   highSchool,
@@ -119,6 +120,23 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   List<String> _colleges = [];
   List<String> _chapters = [];
   List<String> _chapterStatuses = [];
+
+  MessageFilter get _activeFilter {
+    if (_mode == _RecipientMode.allMembers) {
+      return _filter.copyWithOverrides(
+        clearCounty: true,
+        clearCongressionalDistrict: true,
+        clearHighSchool: true,
+        clearCollege: true,
+        clearChapterName: true,
+        clearChapterStatus: true,
+        clearCommittees: true,
+        clearMinAge: true,
+        maxAge: CRMConfig.maxVisibleMemberAge,
+      );
+    }
+    return _filter;
+  }
 
   static const List<_MergeFieldDefinition> _mergeFieldDefinitions = [
     _MergeFieldDefinition(
@@ -258,7 +276,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   Future<void> _updatePreview() async {
     if (!_crmReady) return;
 
-    final hasFilters = _filter.hasActiveFilters;
+    final filter = _activeFilter;
+    final hasFilters = filter.hasActiveFilters;
     final hasManualRecipients = _selectedMembers.isNotEmpty || _manualEmails.isNotEmpty;
 
     if (!hasFilters && !hasManualRecipients) {
@@ -287,7 +306,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
           missingEmails++;
           return;
         }
-        if (_filter.excludeOptedOut && member.optOut) {
+        if (filter.excludeOptedOut && member.optOut) {
           return;
         }
         combined[member.id] = member;
@@ -295,20 +314,22 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
 
       if (hasFilters) {
         final response = await _memberRepo.getAllMembers(
-          county: _filter.county,
-          congressionalDistrict: _filter.congressionalDistrict,
-          committees: _filter.committees,
-          highSchool: _filter.highSchool,
-          college: _filter.college,
-          chapterName: _filter.chapterName,
-          chapterStatus: _filter.chapterStatus,
-          optedOut: _filter.excludeOptedOut ? false : null,
+          county: filter.county,
+          congressionalDistrict: filter.congressionalDistrict,
+          committees: filter.committees,
+          highSchool: filter.highSchool,
+          college: filter.college,
+          chapterName: filter.chapterName,
+          chapterStatus: filter.chapterStatus,
+          minAge: filter.minAge,
+          maxAge: filter.maxAge,
+          optedOut: filter.excludeOptedOut ? false : null,
         );
 
         var members = response.members;
-        if (_filter.excludeRecentlyContacted) {
+        if (filter.excludeRecentlyContacted) {
           final threshold = DateTime.now().subtract(
-            _filter.recentContactThreshold ?? const Duration(days: 7),
+            filter.recentContactThreshold ?? const Duration(days: 7),
           );
           members = members
               .where((member) => member.lastContacted == null || member.lastContacted!.isBefore(threshold))
@@ -852,6 +873,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     List<Member> bccMembers,
     List<String> bccEmails,
   })> _resolveRecipients() async {
+    final filter = _activeFilter;
     final LinkedHashMap<String, Member> members = LinkedHashMap();
     final LinkedHashMap<String, String> emailMap = LinkedHashMap();
     final LinkedHashMap<String, Member> ccMemberMap = LinkedHashMap();
@@ -910,7 +932,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       if (email == null) {
         return;
       }
-      if (_filter.excludeOptedOut && member.optOut) {
+      if (filter.excludeOptedOut && member.optOut) {
         return;
       }
       members[member.id] = member;
@@ -943,22 +965,24 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       addBccEmail(email);
     }
 
-    if (_filter.hasActiveFilters) {
+    if (filter.hasActiveFilters) {
       final response = await _memberRepo.getAllMembers(
-        county: _filter.county,
-        congressionalDistrict: _filter.congressionalDistrict,
-        committees: _filter.committees,
-        highSchool: _filter.highSchool,
-        college: _filter.college,
-        chapterName: _filter.chapterName,
-        chapterStatus: _filter.chapterStatus,
-        optedOut: _filter.excludeOptedOut ? false : null,
+        county: filter.county,
+        congressionalDistrict: filter.congressionalDistrict,
+        committees: filter.committees,
+        highSchool: filter.highSchool,
+        college: filter.college,
+        chapterName: filter.chapterName,
+        chapterStatus: filter.chapterStatus,
+        minAge: filter.minAge,
+        maxAge: filter.maxAge,
+        optedOut: filter.excludeOptedOut ? false : null,
       );
 
       var membersList = response.members;
-      if (_filter.excludeRecentlyContacted) {
+      if (filter.excludeRecentlyContacted) {
         final threshold = DateTime.now().subtract(
-          _filter.recentContactThreshold ?? const Duration(days: 7),
+          filter.recentContactThreshold ?? const Duration(days: 7),
         );
         membersList = membersList
             .where((member) => member.lastContacted == null || member.lastContacted!.isBefore(threshold))
@@ -2064,6 +2088,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   Widget _buildRecipientsCard() {
     final modeChips = [
       _buildModeChip(_RecipientMode.manual, 'Manual', Icons.person_add_alt_1),
+      _buildModeChip(_RecipientMode.allMembers, 'All Members', Icons.people_alt_outlined),
       _buildModeChip(_RecipientMode.county, 'County', Icons.map_outlined),
       _buildModeChip(_RecipientMode.district, 'District', Icons.apartment_outlined),
       _buildModeChip(_RecipientMode.highSchool, 'High School', Icons.school_outlined),
@@ -2240,6 +2265,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
 
   Widget _buildModeSelector() {
     switch (_mode) {
+      case _RecipientMode.allMembers:
+        return _buildAllMembersInfo();
       case _RecipientMode.manual:
         return const SizedBox.shrink();
       case _RecipientMode.county:
@@ -2306,6 +2333,21 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
           }),
         );
     }
+  }
+
+  Widget _buildAllMembersInfo() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        'Send to every member with a valid email address. '
+        'Members older than ${CRMConfig.maxVisibleMemberAge} are excluded automatically.',
+      ),
+    );
   }
 
   Widget _buildDropdown({
