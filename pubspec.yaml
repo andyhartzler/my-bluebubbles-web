@@ -69,7 +69,8 @@ dependencies:
     path: packages/flutter_displaymode_stub
   flutter_dotenv: ^5.1.0
   # NEW CRM DEPENDENCIES
-  supabase_flutter: ^2.3.4
+  supabase_flutter: ^2.6.0
+  supabase: ^2.6.0
   fl_chart: ^0.66.0
   flutter_image_compress: ^2.2.0
   flutter_improved_scrolling: ^0.0.3
