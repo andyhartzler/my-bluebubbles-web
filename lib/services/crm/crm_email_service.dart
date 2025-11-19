@@ -439,9 +439,25 @@ class CRMEmailService {
   }
 
   String _convertPlainTextToHtml(String text) {
-    final escaped = const HtmlEscape().convert(text);
-    final withBreaks = escaped.replaceAll('\n', '<br>');
-    return '<p>$withBreaks</p>';
+    final normalized = text.replaceAll('\r\n', '\n').trim();
+    if (normalized.isEmpty) {
+      return '<p></p>';
+    }
+
+    final escaped = const HtmlEscape().convert(normalized);
+    final paragraphs = escaped.split(RegExp(r'\n{2,}'));
+    final buffer = StringBuffer();
+
+    for (final paragraph in paragraphs) {
+      final trimmedParagraph = paragraph.trim();
+      if (trimmedParagraph.isEmpty) {
+        continue;
+      }
+      final withLineBreaks = trimmedParagraph.replaceAll('\n', '<br>');
+      buffer.write('<p>$withLineBreaks</p>');
+    }
+
+    return buffer.isEmpty ? '<p></p>' : buffer.toString();
   }
 
   String _stripHtmlTags(String html) {
