@@ -773,14 +773,6 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     final fromName = _fromNameController.text.trim();
     final replyTo = _replyToController.text.trim();
     final bool mailMergeEnabled = _mailMergeEnabled;
-    final List<String> mergeTokens =
-        mailMergeEnabled ? _resolveMergeTokens() : const <String>[];
-    final Map<String, dynamic>? mergeVariables = mailMergeEnabled
-        ? {
-            'optOutSnippet': CRMConfig.defaultEmailOptOutSnippet,
-            if (mergeTokens.isNotEmpty) 'placeholders': mergeTokens,
-          }
-        : null;
 
     _captureEditorState(triggerSetState: false);
     final htmlBody = _bodyHtml.isNotEmpty ? _bodyHtml : null;
@@ -810,6 +802,12 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         }
       }
 
+      final recipientPayloads = _buildRecipientPayloads(
+        emails: recipients.emails,
+        members: recipients.members,
+        mailMergeEnabled: mailMergeEnabled,
+      );
+
       await _emailService.sendEmail(
         to: recipients.emails,
         subject: subject,
@@ -820,8 +818,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         replyTo: replyTo.isEmpty ? null : replyTo,
         cc: recipients.ccEmails.isEmpty ? null : recipients.ccEmails,
         bcc: recipients.bccEmails.isEmpty ? null : recipients.bccEmails,
-        mailMerge: mailMergeEnabled,
-        variables: mergeVariables,
+        recipients: recipientPayloads,
         attachments: attachments,
       );
 
@@ -1016,6 +1013,127 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     );
   }
 
+  List<CRMEmailRecipientPayload> _buildRecipientPayloads({
+    required List<String> emails,
+    required List<Member> members,
+    required bool mailMergeEnabled,
+  }) {
+    if (emails.isEmpty) {
+      return const [];
+    }
+
+    final memberByEmail = <String, Member>{};
+    for (final member in members) {
+      final email = _normalizeEmail(member.preferredEmail);
+      if (email == null) {
+        continue;
+      }
+      memberByEmail[email.toLowerCase()] = member;
+    }
+
+    return emails
+        .map(
+          (email) => CRMEmailRecipientPayload(
+            email: email,
+            variables: mailMergeEnabled
+                ? _buildRecipientVariables(
+                    email: email,
+                    member: memberByEmail[email.toLowerCase()],
+                  )
+                : null,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Map<String, dynamic> _buildRecipientVariables({
+    required String email,
+    Member? member,
+  }) {
+    final variables = <String, dynamic>{'email': email};
+
+    final fullName = _resolveRecipientFullName(member, email);
+    if (fullName != null && fullName.isNotEmpty) {
+      variables['full_name'] = fullName;
+    }
+
+    final firstName = _resolveRecipientFirstName(member, fullName, email);
+    if (firstName != null && firstName.isNotEmpty) {
+      variables['first_name'] = firstName;
+    }
+
+    final chapterName = member?.chapterName?.trim();
+    if (chapterName != null && chapterName.isNotEmpty) {
+      variables['chapter_name'] = chapterName;
+    }
+
+    return variables;
+  }
+
+  String? _resolveRecipientFullName(Member? member, String email) {
+    final memberName = member?.name;
+    final trimmed = memberName?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) {
+      return trimmed;
+    }
+    return _deriveNameFromEmail(email);
+  }
+
+  String? _resolveRecipientFirstName(
+    Member? member,
+    String? resolvedFullName,
+    String email,
+  ) {
+    final rawName = member?.name;
+    final trimmedRawName = rawName?.trim();
+    final source = (trimmedRawName != null && trimmedRawName.isNotEmpty)
+        ? trimmedRawName
+        : resolvedFullName ?? _deriveNameFromEmail(email);
+    if (source == null) {
+      return null;
+    }
+    final trimmed = source.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.isEmpty) {
+      return null;
+    }
+    return _capitalizeWord(parts.first);
+  }
+
+  String? _deriveNameFromEmail(String email) {
+    final atIndex = email.indexOf('@');
+    if (atIndex <= 0) {
+      return null;
+    }
+    final localPart = email.substring(0, atIndex);
+    final normalized = localPart.replaceAll(RegExp(r'[._-]+'), ' ').trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    final words = normalized
+        .split(RegExp(r'\s+'))
+        .map(_capitalizeWord)
+        .where((word) => word.isNotEmpty)
+        .toList(growable: false);
+    if (words.isEmpty) {
+      return null;
+    }
+    return words.join(' ');
+  }
+
+  String _capitalizeWord(String word) {
+    if (word.isEmpty) {
+      return word;
+    }
+    if (word.length == 1) {
+      return word.toUpperCase();
+    }
+    return word.substring(0, 1).toUpperCase() + word.substring(1);
+  }
+
   void _setMode(_RecipientMode mode) {
     if (_mode == mode) return;
     setState(() => _mode = mode);
@@ -1060,33 +1178,6 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     if (!_bodyFocusNode.hasFocus) {
       _bodyFocusNode.requestFocus();
     }
-  }
-
-  List<String> _resolveMergeTokens() {
-    final tokens = <String>{};
-
-    void addTokensFromText(String? value) {
-      if (value == null || value.isEmpty) return;
-      for (final match in _mergeTokenRegex.allMatches(value)) {
-        final normalized = _normalizeMergeToken(match.group(0));
-        if (normalized != null) {
-          tokens.add(normalized);
-        }
-      }
-    }
-
-    addTokensFromText(_bodyController.document.toPlainText());
-    addTokensFromText(_bodyHtml);
-    addTokensFromText(CRMConfig.defaultEmailOptOutSnippet);
-
-    for (final variable in _appliedTemplate?.variables ?? const <String>[]) {
-      final normalized = _normalizeMergeToken(variable);
-      if (normalized != null) {
-        tokens.add(normalized);
-      }
-    }
-
-    return tokens.toList()..sort();
   }
 
   bool _templateRequiresMailMerge(EmailTemplate template) {

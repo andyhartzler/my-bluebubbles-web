@@ -53,6 +53,22 @@ class CRMEmailResult {
   });
 }
 
+/// Personalized recipient payload used by the Supabase email relay.
+class CRMEmailRecipientPayload {
+  final String email;
+  final Map<String, dynamic>? variables;
+
+  const CRMEmailRecipientPayload({
+    required this.email,
+    this.variables,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'email': email,
+        if (variables != null && variables!.isNotEmpty) 'variables': variables,
+      };
+}
+
 /// Service responsible for sending transactional emails through the
 /// Supabase-hosted Gmail relay.
 class CRMEmailService {
@@ -75,12 +91,13 @@ class CRMEmailService {
     String? replyTo,
     List<String>? cc,
     List<String>? bcc,
-    bool mailMerge = false,
-    Map<String, dynamic>? variables,
+    List<CRMEmailRecipientPayload>? recipients,
     List<CRMEmailAttachment> attachments = const [],
   }) async {
-    final recipients = _sanitizeEmails(to);
-    if (recipients.isEmpty) {
+    final fallbackEmails = _sanitizeEmails(to);
+    final personalizedRecipients =
+        _buildRecipientPayloads(fallbackEmails: fallbackEmails, customRecipients: recipients);
+    if (personalizedRecipients.isEmpty) {
       throw CRMEmailException('At least one recipient email is required.');
     }
 
@@ -100,9 +117,9 @@ class CRMEmailService {
         trimmedHtml.isNotEmpty ? trimmedHtml : _convertPlainTextToHtml(trimmedText);
 
     final payload = <String, dynamic>{
-      'to': recipients.length == 1 ? recipients.first : recipients,
       'subject': trimmedSubject,
       'htmlBody': resolvedHtml,
+      'recipients': personalizedRecipients.map((recipient) => recipient.toJson()).toList(),
     };
 
     final ccList = _sanitizeEmails(cc);
@@ -132,14 +149,6 @@ class CRMEmailService {
     final singleReplyTo = _sanitizeSingleEmail(replyTo);
     if (singleReplyTo != null) {
       payload['replyTo'] = singleReplyTo;
-    }
-
-    if (mailMerge) {
-      payload['mailMerge'] = true;
-    }
-
-    if (variables != null && variables.isNotEmpty) {
-      payload['variables'] = variables;
     }
 
     if (attachments.isNotEmpty) {
@@ -345,8 +354,6 @@ class CRMEmailService {
     String? replyTo,
     List<String>? cc,
     List<String>? bcc,
-    bool mailMerge = false,
-    Map<String, dynamic>? variables,
     List<CRMEmailAttachment> attachments = const [],
   }) async {
     final memberEmails = members
@@ -360,6 +367,9 @@ class CRMEmailService {
       throw CRMEmailException('No member email addresses available.');
     }
 
+    final personalizedRecipients =
+        memberEmails.map((email) => CRMEmailRecipientPayload(email: email)).toList();
+
     return sendEmail(
       to: memberEmails,
       subject: subject,
@@ -370,8 +380,7 @@ class CRMEmailService {
       replyTo: replyTo,
       cc: cc,
       bcc: bcc,
-      mailMerge: mailMerge,
-      variables: variables,
+      recipients: personalizedRecipients,
       attachments: attachments,
     );
   }
@@ -430,16 +439,70 @@ class CRMEmailService {
   }
 
   String _convertPlainTextToHtml(String text) {
-    final escaped = const HtmlEscape().convert(text);
+    final normalized = text.replaceAll('\r\n', '\n').trim();
+    if (normalized.isEmpty) {
+      return '<p></p>';
+    }
+
+    final escaped = const HtmlEscape().convert(normalized);
     final paragraphs = escaped.split(RegExp(r'\n{2,}'));
-    return paragraphs
-        .map((paragraph) =>
-            '<p>${paragraph.replaceAll('\n', '<br>')}</p>')
-        .join();
+    final buffer = StringBuffer();
+
+    for (final paragraph in paragraphs) {
+      final trimmedParagraph = paragraph.trim();
+      if (trimmedParagraph.isEmpty) {
+        continue;
+      }
+      final withLineBreaks = trimmedParagraph.replaceAll('\n', '<br>');
+      buffer.write('<p>$withLineBreaks</p>');
+    }
+
+    return buffer.isEmpty ? '<p></p>' : buffer.toString();
   }
 
   String _stripHtmlTags(String html) {
     final withoutTags = html.replaceAll(RegExp(r'<[^>]*>'), ' ');
     return withoutTags.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  List<CRMEmailRecipientPayload> _buildRecipientPayloads({
+    required List<String> fallbackEmails,
+    List<CRMEmailRecipientPayload>? customRecipients,
+  }) {
+    final seen = <String>{};
+    final normalized = <CRMEmailRecipientPayload>[];
+
+    void addRecipient(String email, Map<String, dynamic>? variables) {
+      final sanitized = _sanitizeSingleEmail(email);
+      if (sanitized == null) {
+        return;
+      }
+      final lower = sanitized.toLowerCase();
+      if (!seen.add(lower)) {
+        return;
+      }
+      normalized.add(
+        CRMEmailRecipientPayload(
+          email: sanitized,
+          variables: variables == null || variables.isEmpty
+              ? null
+              : Map<String, dynamic>.from(variables),
+        ),
+      );
+    }
+
+    if (customRecipients != null) {
+      for (final recipient in customRecipients) {
+        addRecipient(recipient.email, recipient.variables);
+      }
+    }
+
+    if (normalized.isEmpty) {
+      for (final email in fallbackEmails) {
+        addRecipient(email, null);
+      }
+    }
+
+    return normalized;
   }
 }
