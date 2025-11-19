@@ -441,23 +441,11 @@ class CRMEmailService {
   String _convertPlainTextToHtml(String text) {
     final normalized = text.replaceAll('\r\n', '\n').trim();
     if (normalized.isEmpty) {
-      return '<p></p>';
+      return '<div></div>';
     }
 
     final escaped = const HtmlEscape().convert(normalized);
-    final paragraphs = escaped.split(RegExp(r'\n{2,}'));
-    final buffer = StringBuffer();
-
-    for (final paragraph in paragraphs) {
-      final trimmedParagraph = paragraph.trim();
-      if (trimmedParagraph.isEmpty) {
-        continue;
-      }
-      final withLineBreaks = trimmedParagraph.replaceAll('\n', '<br>');
-      buffer.write('<p>$withLineBreaks</p>');
-    }
-
-    return buffer.isEmpty ? '<p></p>' : buffer.toString();
+    return '<div style="white-space:pre-line;margin:0;">$escaped</div>';
   }
 
   String _stripHtmlTags(String html) {
