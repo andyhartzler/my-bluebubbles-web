@@ -34,6 +34,10 @@ class QuillHtmlConverter {
     final currentLine = <String>[];
 
     void flushLine(Map<String, dynamic>? blockAttributes) {
+      // Gmail ignores inline margin styles on <p> tags which caused every
+      // newline to render as a double-spaced paragraph. Using <div> keeps the
+      // visual intent (single spaced lines) while still supporting inline
+      // formatting from the editor.
       const defaultLineStyle = ' style="margin: 0; line-height: 1.6;"';
       final content = currentLine.join();
       final hasVisibleContent =
@@ -43,7 +47,7 @@ class QuillHtmlConverter {
       if (blockTag != null) {
         buffer.write('<$blockTag$defaultLineStyle>$inner</$blockTag>');
       } else {
-        buffer.write('<p$defaultLineStyle>$inner</p>');
+        buffer.write('<div$defaultLineStyle>$inner</div>');
       }
       currentLine.clear();
     }
