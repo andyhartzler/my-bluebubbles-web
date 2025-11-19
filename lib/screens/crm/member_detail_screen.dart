@@ -12,6 +12,7 @@ import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/screens/crm/member_detail/email_history_tab.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/editors/member_edit_sheet.dart';
+import 'package:bluebubbles/screens/crm/member_detail/slack_activity_tab.dart';
 import 'package:bluebubbles/services/crm/crm_email_service.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
@@ -1819,7 +1820,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               ),
             )
           : DefaultTabController(
-              length: 2,
+              length: 3,
               child: Column(
                 children: [
                   Material(
@@ -1833,6 +1834,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                       tabs: const [
                         Tab(icon: Icon(Icons.account_circle_outlined), text: 'Overview'),
                         Tab(icon: Icon(Icons.email_outlined), text: 'Emails'),
+                        Tab(icon: Icon(Icons.chat_bubble_outline), text: 'Slack'),
                       ],
                     ),
                   ),
@@ -1844,6 +1846,9 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                           memberId: _member.id,
                           memberName: _member.name,
                           memberEmail: _member.preferredEmail,
+                        ),
+                        SlackActivityTab(
+                          memberId: _member.id,
                         ),
                       ],
                     ),
