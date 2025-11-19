@@ -439,13 +439,17 @@ class CRMEmailService {
   }
 
   String _convertPlainTextToHtml(String text) {
-    final normalized = text.replaceAll('\r\n', '\n').trim();
+    final normalized = text
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .trim();
     if (normalized.isEmpty) {
       return '<div></div>';
     }
 
     final escaped = const HtmlEscape().convert(normalized);
-    return '<div style="white-space:pre-line;margin:0;">$escaped</div>';
+    final withBreaks = escaped.replaceAll('\n', '<br>');
+    return '<div style="margin:0;">$withBreaks</div>';
   }
 
   String _stripHtmlTags(String html) {
