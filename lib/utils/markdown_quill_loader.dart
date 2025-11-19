@@ -145,18 +145,28 @@ class _HtmlDeltaBuilder {
   }
 
   void _insertText(String text, Map<String, dynamic>? inlineStyle) {
-    if (text.trim().isEmpty) {
+    if (text.isEmpty) {
       return;
     }
-    final normalized = text.replaceAll(RegExp(r'\s+'), ' ');
-    if (normalized.isEmpty) {
-      return;
-    }
+
+    final normalized = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final segments = normalized.split('\n');
     final attributes = inlineStyle == null || inlineStyle.isEmpty
         ? null
         : Map<String, dynamic>.from(inlineStyle);
-    _delta.insert(normalized, attributes);
-    _endsWithNewline = normalized.endsWith('\n');
+
+    for (var i = 0; i < segments.length; i++) {
+      final segment = segments[i];
+      final cleaned = segment.replaceAll(RegExp(r'[ \t]+'), ' ');
+      if (cleaned.isNotEmpty) {
+        _delta.insert(cleaned, attributes);
+        _endsWithNewline = cleaned.endsWith('\n');
+      }
+
+      if (i < segments.length - 1) {
+        _insertLineBreak();
+      }
+    }
   }
 
   void _insertLineBreak() {

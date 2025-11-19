@@ -149,6 +149,9 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     ),
   ];
 
+  static final RegExp _mergeTokenRegex =
+      RegExp(r'(\{\{\s*[^{}]+\s*\}\}|\{\s*[^{}]+\s*\})');
+
   @override
   void initState() {
     super.initState();
@@ -749,11 +752,12 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     final fromName = _fromNameController.text.trim();
     final replyTo = _replyToController.text.trim();
     final bool mailMergeEnabled = _mailMergeEnabled;
+    final List<String> mergeTokens =
+        mailMergeEnabled ? _resolveMergeTokens() : const <String>[];
     final Map<String, dynamic>? mergeVariables = mailMergeEnabled
         ? {
             'optOutSnippet': CRMConfig.defaultEmailOptOutSnippet,
-            'placeholders':
-                _mergeFieldDefinitions.map((definition) => definition.token).toList(),
+            if (mergeTokens.isNotEmpty) 'placeholders': mergeTokens,
           }
         : null;
 
@@ -1034,6 +1038,56 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     }
   }
 
+  List<String> _resolveMergeTokens() {
+    final tokens = <String>{};
+
+    void addTokensFromText(String? value) {
+      if (value == null || value.isEmpty) return;
+      for (final match in _mergeTokenRegex.allMatches(value)) {
+        final normalized = _normalizeMergeToken(match.group(0));
+        if (normalized != null) {
+          tokens.add(normalized);
+        }
+      }
+    }
+
+    addTokensFromText(_bodyController.document.toPlainText());
+    addTokensFromText(_bodyHtml);
+    addTokensFromText(CRMConfig.defaultEmailOptOutSnippet);
+
+    for (final variable in _appliedTemplate?.variables ?? const <String>[]) {
+      final normalized = _normalizeMergeToken(variable);
+      if (normalized != null) {
+        tokens.add(normalized);
+      }
+    }
+
+    return tokens.toList()..sort();
+  }
+
+  bool _templateRequiresMailMerge(EmailTemplate template) {
+    return template.variables.isNotEmpty || _mergeTokenRegex.hasMatch(template.body);
+  }
+
+  String _formatTemplateVariable(String variable) {
+    return _normalizeMergeToken(variable) ?? variable;
+  }
+
+  String? _normalizeMergeToken(String? raw) {
+    if (raw == null) return null;
+    var trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.startsWith('{{') && trimmed.endsWith('}}')) {
+      trimmed = trimmed.substring(2, trimmed.length - 2).trim();
+    } else if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      trimmed = trimmed.substring(1, trimmed.length - 1).trim();
+    }
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return '{{${trimmed}}}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1214,6 +1268,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
             const SizedBox(height: 12),
             _buildMessageEditor(),
             const SizedBox(height: 12),
+            _buildMailMergeSection(),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -1337,7 +1393,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
                 children: template.variables
                     .map(
                       (variable) => Chip(
-                        label: Text('{${variable.trim()}}'),
+                        label: Text(_formatTemplateVariable(variable)),
                       ),
                     )
                     .toList(),
@@ -1451,6 +1507,81 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
             child: editor,
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildMailMergeSection() {
+    final theme = Theme.of(context);
+    final template = _appliedTemplate;
+    final templateVariables = template?.variables ?? const <String>[];
+    final requiresTemplateMerge =
+        template != null && _templateRequiresMailMerge(template);
+
+    final mergeFieldChips = _mergeFieldDefinitions
+        .map(
+          (definition) => Tooltip(
+            message: '${definition.token}\n${definition.description}',
+            child: ActionChip(
+              avatar: const Icon(Icons.short_text, size: 18),
+              label: Text(definition.label),
+              onPressed: _mailMergeEnabled && !_sending
+                  ? () => _insertMergeField(definition.token)
+                  : null,
+            ),
+          ),
+        )
+        .toList(growable: false);
+
+    final templateChips = templateVariables
+        .map((variable) => Chip(label: Text(_formatTemplateVariable(variable))))
+        .toList(growable: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Personalize with mail merge'),
+          subtitle: const Text(
+            'Automatically replace merge fields like {{first_name}} for each recipient.',
+          ),
+          value: _mailMergeEnabled,
+          onChanged: _sending ? null : _toggleMailMerge,
+        ),
+        if (_mailMergeEnabled) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Insert merge fields',
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          if (mergeFieldChips.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: mergeFieldChips,
+            ),
+          if (templateChips.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Template variables',
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: templateChips,
+            ),
+          ],
+        ] else if (requiresTemplateMerge) ...[
+          const SizedBox(height: 8),
+          Text(
+            'This template contains merge fields. Enable mail merge to fill them automatically before sending.',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+          ),
+        ],
       ],
     );
   }
@@ -1660,10 +1791,16 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       ..text = subject
       ..selection = TextSelection.collapsed(offset: subject.length);
 
+    final requiresMailMerge = _templateRequiresMailMerge(template);
+
     setState(() {
       _appliedTemplate = template;
       _pendingTemplateKey = template.templateKey;
     });
+
+    if (requiresMailMerge && !_mailMergeEnabled) {
+      _toggleMailMerge(true);
+    }
   }
 
   void _clearTemplateSelection() {
