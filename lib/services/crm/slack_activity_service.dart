@@ -60,10 +60,9 @@ class SlackActivityService {
     }
 
     final trimmed = searchQuery?.trim();
-    final PostgrestFilterBuilder<List<Map<String, dynamic>>> request =
-        _supabase.client
-            .from('slack_users_unmatched')
-            .select<List<Map<String, dynamic>>>()
+    final PostgrestFilterBuilder<dynamic> request = _supabase.client
+        .from('slack_users_unmatched')
+        .select()
         .eq('manually_rejected', false)
         .order('created_at', ascending: false);
 
@@ -74,7 +73,8 @@ class SlackActivityService {
     }
 
     final response = await request;
-    final rows = response as List<dynamic>? ?? const [];
+    final List<dynamic> rows =
+        response is List ? List<dynamic>.from(response) : <dynamic>[];
 
     return rows
         .map((row) => SlackUnmatchedUser.fromJson(
