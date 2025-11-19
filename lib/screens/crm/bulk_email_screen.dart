@@ -176,6 +176,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     _bodyController = quill.QuillController.basic();
     _captureEditorState(triggerSetState: false);
     _bodyController.addListener(_handleBodyChanged);
+    _subjectController.addListener(_handleSubjectChanged);
     _filter = widget.initialFilter ?? MessageFilter();
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
     final senders = CRMConfig.allowedSenderEmails;
@@ -218,6 +219,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
 
   @override
   void dispose() {
+    _subjectController.removeListener(_handleSubjectChanged);
     _subjectController.dispose();
     _bodyController.removeListener(_handleBodyChanged);
     _bodyController.dispose();
@@ -1152,6 +1154,15 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     });
   }
 
+  void _handleSubjectChanged() {
+    if (_mailMergeEnabled) {
+      return;
+    }
+    if (_containsMergeToken(_subjectController.text)) {
+      _toggleMailMerge(true);
+    }
+  }
+
   void _insertMergeField(String token) {
     if (_sending || !_mailMergeEnabled) return;
 
@@ -1201,6 +1212,26 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       return null;
     }
     return '{{${trimmed}}}';
+  }
+
+  bool _contentHasMergeTokens({String? plainText, String? html}) {
+    if (_containsMergeToken(_subjectController.text)) {
+      return true;
+    }
+    if (plainText != null && plainText.isNotEmpty && _containsMergeToken(plainText)) {
+      return true;
+    }
+    if (html != null && html.isNotEmpty && _containsMergeToken(html)) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _containsMergeToken(String? text) {
+    if (text == null || text.trim().isEmpty) {
+      return false;
+    }
+    return _mergeTokenRegex.hasMatch(text);
   }
 
   @override
@@ -1789,6 +1820,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         .toList(growable: false);
     final plainText = document.toPlainText().trim();
     final html = QuillHtmlConverter.generateHtml(deltaJson, plainText);
+    final shouldEnableMailMerge =
+        !_mailMergeEnabled && _contentHasMergeTokens(plainText: plainText, html: html);
 
     void updateValues() {
       _bodyDeltaJson = deltaJson;
@@ -1800,6 +1833,10 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       setState(updateValues);
     } else {
       updateValues();
+    }
+
+    if (shouldEnableMailMerge) {
+      _toggleMailMerge(true);
     }
   }
 
