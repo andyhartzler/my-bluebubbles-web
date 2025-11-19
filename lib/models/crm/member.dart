@@ -13,6 +13,7 @@ class Member {
   final String? email;
   final String? phone;
   final String? phoneE164; // KEY FIELD - links to Handle.address
+  final String? slackUserId;
   final DateTime? dateOfBirth;
   final String? preferredPronouns;
   final String? genderIdentity;
@@ -83,6 +84,7 @@ class Member {
     this.email,
     this.phone,
     this.phoneE164,
+    this.slackUserId,
     this.dateOfBirth,
     this.preferredPronouns,
     this.genderIdentity,
@@ -361,6 +363,7 @@ class Member {
       email: _normalizeText(json['email']),
       phone: _normalizeText(json['phone']),
       phoneE164: _normalizeText(json['phone_e164']),
+      slackUserId: _normalizeText(json['slack_user_id']),
       dateOfBirth: json['date_of_birth'] != null
           ? DateTime.parse(json['date_of_birth'] as String)
           : null,
@@ -455,6 +458,7 @@ class Member {
       'email': email,
       'phone': phone,
       'phone_e164': phoneE164,
+      'slack_user_id': slackUserId,
       'date_of_birth': dateOfBirth?.toIso8601String().split('T').first,
       'preferred_pronouns': preferredPronouns,
       'gender_identity': genderIdentity,
@@ -565,6 +569,7 @@ class Member {
     String? email,
     String? phone,
     String? phoneE164,
+    String? slackUserId,
     DateTime? dateOfBirth,
     String? preferredPronouns,
     String? genderIdentity,
@@ -635,6 +640,7 @@ class Member {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       phoneE164: phoneE164 ?? this.phoneE164,
+      slackUserId: slackUserId ?? this.slackUserId,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       preferredPronouns: preferredPronouns ?? this.preferredPronouns,
       genderIdentity: genderIdentity ?? this.genderIdentity,
