@@ -188,3 +188,40 @@ class SlackActivityResult {
   final SlackActivityStatistics? statistics;
   final int totalMessages;
 }
+
+class SlackUnmatchedUser {
+  const SlackUnmatchedUser({
+    required this.slackUserId,
+    this.email,
+    this.displayName,
+    this.realName,
+    this.notes,
+    this.manuallyRejected = false,
+    this.createdAt,
+  });
+
+  factory SlackUnmatchedUser.fromJson(Map<String, dynamic> json) {
+    return SlackUnmatchedUser(
+      slackUserId: json['slack_user_id'] as String? ?? '',
+      email: json['slack_email'] as String?,
+      displayName: json['slack_display_name'] as String?,
+      realName: json['slack_real_name'] as String?,
+      notes: json['notes'] as String?,
+      manuallyRejected: json['manually_rejected'] as bool? ?? false,
+      createdAt: _parseDate(json['created_at']),
+    );
+  }
+
+  final String slackUserId;
+  final String? email;
+  final String? displayName;
+  final String? realName;
+  final String? notes;
+  final bool manuallyRejected;
+  final DateTime? createdAt;
+
+  String? get usernameDisplay =>
+      displayName != null && displayName!.isNotEmpty ? '@$displayName' : null;
+
+  String get primaryLabel => realName ?? displayName ?? slackUserId;
+}

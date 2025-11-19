@@ -1848,7 +1848,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                           memberEmail: _member.preferredEmail,
                         ),
                         SlackActivityTab(
-                          memberId: _member.id,
+                          member: _member,
+                          onLinked: () => _fetchLatestMember(showFeedback: false),
                         ),
                       ],
                     ),

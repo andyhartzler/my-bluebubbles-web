@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/slack_activity.dart';
+import 'package:bluebubbles/screens/crm/member_detail/slack_user_search_screen.dart';
 import 'package:bluebubbles/services/crm/slack_activity_service.dart';
 
 class SlackActivityTab extends StatefulWidget {
-  const SlackActivityTab({super.key, required this.memberId});
+  const SlackActivityTab({
+    super.key,
+    required this.member,
+    this.onLinked,
+  });
 
-  final String memberId;
+  final Member member;
+  final Future<void> Function()? onLinked;
 
   @override
   State<SlackActivityTab> createState() => _SlackActivityTabState();
@@ -26,6 +33,7 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
   int _offset = 0;
   static const int _pageSize = 50;
   bool _hasMore = false;
+  bool _linkingSlackAccount = false;
 
   @override
   void initState() {
@@ -40,9 +48,9 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
     });
 
     try {
-      final profileFuture = _slackService.fetchSlackProfile(widget.memberId);
+      final profileFuture = _slackService.fetchSlackProfile(widget.member.id);
       final activity = await _slackService.fetchMemberMessages(
-        memberId: widget.memberId,
+        memberId: widget.member.id,
         limit: _pageSize,
         offset: 0,
       );
@@ -81,7 +89,7 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
 
     try {
       final activity = await _slackService.fetchMemberMessages(
-        memberId: widget.memberId,
+        memberId: widget.member.id,
         limit: _pageSize,
         offset: _offset,
       );
@@ -193,6 +201,7 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
   Widget _buildProfileCard(BuildContext context) {
     final profile = _profile;
     final theme = Theme.of(context);
+    final shouldShowLinkButton = widget.member.slackUserId == null;
 
     return Card(
       child: Padding(
@@ -226,6 +235,26 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
                       'No Slack profile is linked to this member yet.',
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
                     ),
+                  if (shouldShowLinkButton)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12.0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: _linkingSlackAccount ? null : _openSlackLinker,
+                          icon: _linkingSlackAccount
+                              ? const SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.link),
+                          label: Text(
+                            _linkingSlackAccount ? 'Opening…' : 'Link Slack Account',
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -233,6 +262,29 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
         ),
       ),
     );
+  }
+
+  Future<void> _openSlackLinker() async {
+    setState(() => _linkingSlackAccount = true);
+    try {
+      final linked = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (context) => SlackUserSearchScreen(member: widget.member),
+        ),
+      );
+
+      if (linked == true) {
+        final callback = widget.onLinked;
+        if (callback != null) {
+          await callback();
+        }
+        await _loadInitial();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _linkingSlackAccount = false);
+      }
+    }
   }
 
   Widget _buildStatisticsCard(BuildContext context) {
