@@ -34,15 +34,16 @@ class QuillHtmlConverter {
     final currentLine = <String>[];
 
     void flushLine(Map<String, dynamic>? blockAttributes) {
+      const defaultLineStyle = ' style="margin: 0; line-height: 1.6;"';
       final content = currentLine.join();
       final hasVisibleContent =
           currentLine.any((segment) => segment.trim().isNotEmpty);
       final blockTag = _blockTagForAttributes(blockAttributes);
       final inner = hasVisibleContent ? content : '<br>';
       if (blockTag != null) {
-        buffer.write('<$blockTag>$inner</$blockTag>');
+        buffer.write('<$blockTag$defaultLineStyle>$inner</$blockTag>');
       } else {
-        buffer.write('<p>$inner</p>');
+        buffer.write('<p$defaultLineStyle>$inner</p>');
       }
       currentLine.clear();
     }
