@@ -428,7 +428,7 @@ class _EventsScreenState extends State<EventsScreen> {
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
