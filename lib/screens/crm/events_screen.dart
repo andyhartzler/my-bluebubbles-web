@@ -31,7 +31,7 @@ class _EventsScreenState extends State<EventsScreen> {
   String? _statusFilter;
   String? _typeFilter;
   bool _showUpcoming = true;
-  bool _showPast = false;
+  bool _showPast = true;
 
   @override
   void initState() {
@@ -134,59 +134,75 @@ class _EventsScreenState extends State<EventsScreen> {
     final dateFormat = DateFormat.yMMMd().add_jm();
 
     return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      elevation: 4,
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: InkWell(
         onTap: () => _openEvent(event),
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      event.title,
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  _buildStatusChip(event.status),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                dateFormat.format(event.eventDate),
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-              if (event.location?.isNotEmpty == true) ...[
-                const SizedBox(height: 6),
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [_unityBlue, _momentumBlue],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Row(
                   children: [
-                    const Icon(Icons.place_outlined, size: 18),
-                    const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        event.location!,
-                        style: theme.textTheme.bodyMedium,
+                        event.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    _buildStatusChip(event.status),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  dateFormat.format(event.eventDate),
+                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                ),
+                if (event.location?.isNotEmpty == true) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.place_outlined, size: 18, color: Colors.white70),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          event.location!,
+                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    _buildInfoChip(Icons.category_outlined, event.eventType ?? 'Other'),
+                    _buildInfoChip(Icons.event_available_outlined, event.rsvpEnabled ? 'RSVPs on' : 'RSVPs off'),
+                    _buildInfoChip(Icons.verified_outlined, event.checkinEnabled ? 'Check-in on' : 'Check-in off'),
                   ],
                 ),
               ],
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                children: [
-                  _buildInfoChip(Icons.category_outlined, event.eventType ?? 'Other'),
-                  _buildInfoChip(Icons.event_available_outlined, event.rsvpEnabled ? 'RSVPs on' : 'RSVPs off'),
-                  _buildInfoChip(Icons.verified_outlined, event.checkinEnabled ? 'Check-in on' : 'Check-in off'),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -197,15 +213,18 @@ class _EventsScreenState extends State<EventsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: _unityBlue.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: _unityBlue),
+          Icon(icon, size: 16, color: Colors.white),
           const SizedBox(width: 6),
-          Text(label),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white),
+          ),
         ],
       ),
     );
@@ -263,7 +282,6 @@ class _EventsScreenState extends State<EventsScreen> {
           selected: _showUpcoming,
           onSelected: (value) => setState(() {
             _showUpcoming = value;
-            if (value) _showPast = false;
           }),
           selectedColor: _momentumBlue.withOpacity(0.18),
         ),
@@ -272,7 +290,6 @@ class _EventsScreenState extends State<EventsScreen> {
           selected: _showPast,
           onSelected: (value) => setState(() {
             _showPast = value;
-            if (value) _showUpcoming = false;
           }),
           selectedColor: _justicePurple.withOpacity(0.18),
         ),
@@ -287,7 +304,7 @@ class _EventsScreenState extends State<EventsScreen> {
               _statusFilter = null;
               _typeFilter = null;
               _showUpcoming = true;
-              _showPast = false;
+              _showPast = true;
               _searchController.clear();
             });
             _loadEvents();
@@ -317,50 +334,99 @@ class _EventsScreenState extends State<EventsScreen> {
     }
 
     final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: theme.colorScheme.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Events',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: _unityBlue,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Icon(Icons.event_available_outlined, color: _momentumBlue),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Manage events, check-in attendees, and keep RSVPs organized.',
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 20),
-              _buildFilters(),
-              const SizedBox(height: 12),
-              Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _error != null
-                        ? Center(child: Text(_error!))
-                        : _events.isEmpty
-                            ? const Center(child: Text('No events found.'))
-                            : ListView.separated(
-                                itemCount: _events.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                                itemBuilder: (context, index) => _buildEventCard(_events[index]),
-                              ),
-              ),
-            ],
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(child: Text(_error!));
+    }
+
+    return Container(
+      color: Colors.black,
+      child: SafeArea(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
           ),
+          slivers: <Widget>[
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _momentumBlue,
+                      ),
+                      child: const Icon(
+                        Icons.event_available_outlined,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Events',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          'View upcoming and past gatherings.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              sliver: const SliverToBoxAdapter(child: SizedBox(height: 18)),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              sliver: SliverToBoxAdapter(
+                child: _buildFilters(),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              sliver: _events.isEmpty
+                  ? const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Text(
+                          'No events found.',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    )
+                  : SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final event = _events[index];
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              bottom: index == _events.length - 1 ? 0 : 12,
+                            ),
+                            child: _buildEventCard(event),
+                          );
+                        },
+                        childCount: _events.length,
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );
