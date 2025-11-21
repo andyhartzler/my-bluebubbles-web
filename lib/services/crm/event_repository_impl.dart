@@ -194,12 +194,61 @@ class EventRepository {
     });
   }
 
+  Future<Member?> previewMemberByUUID(String memberUUID) async {
+    if (!isReady) return null;
+
+    final uuidRegex = RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+      caseSensitive: false,
+    );
+
+    if (!uuidRegex.hasMatch(memberUUID.trim())) return null;
+
+    final memberData = await _readClient
+        .from('members')
+        .select('id,name,email,phone,phone_e164,date_joined')
+        .eq('id', memberUUID)
+        .maybeSingle();
+
+    if (memberData == null) return null;
+    return Member.fromJson(memberData as Map<String, dynamic>);
+  }
+
+  Future<Member?> previewMemberByPhone(String phoneNumber) async {
+    if (!isReady) return null;
+    final candidates = buildPhoneLookupCandidates(phoneNumber);
+    if (candidates.isEmpty) return null;
+
+    for (final candidate in candidates) {
+      final data = await _readClient
+          .from('members')
+          .select('id,name,email,phone,phone_e164,date_joined')
+          .or('phone.eq.$candidate,phone_e164.eq.$candidate')
+          .limit(1);
+      if (data is List && data.isNotEmpty) {
+        return Member.fromJson(data.first as Map<String, dynamic>);
+      }
+    }
+    return null;
+  }
+
   Future<EventAttendee?> checkInByMemberUUID({
     required String eventId,
     required String memberUUID,
   }) async {
     if (!isReady) return null;
 
+    // Validate UUID format before querying database
+    final uuidRegex = RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+      caseSensitive: false,
+    );
+
+    if (!uuidRegex.hasMatch(memberUUID.trim())) {
+      throw Exception('Invalid QR code format. Please scan a valid membership card.');
+    }
+
+    // First, verify the member exists in the members table
     final memberData = await _readClient
         .from('members')
         .select('id,name,email,phone,date_joined')
@@ -207,9 +256,10 @@ class EventRepository {
         .maybeSingle();
 
     if (memberData == null) {
-      throw Exception('Member not found with UUID: $memberUUID');
+      throw Exception('Member not found. Please ensure this is a valid membership card.');
     }
 
+    // Check if they already have an attendee record for this event
     final existing = await _readClient
         .from('event_attendees')
         .select('*, members:member_id(*)')
@@ -220,26 +270,30 @@ class EventRepository {
     if (existing != null) {
       final attendee = EventAttendee.fromJson(existing as Map<String, dynamic>);
 
+      // If already checked in, return existing record
       if (attendee.checkedIn) {
         return attendee;
       }
 
+      // Update existing RSVP to checked in
       final now = DateTime.now();
       await _writeClient
           .from('event_attendees')
           .update({
             'checked_in': true,
             'checked_in_at': now.toUtc().toIso8601String(),
-            'checked_in_by': 'qr_scan',
+            'checked_in_by': 'qr_code',
           })
           .eq('id', attendee.id);
 
       return attendee.copyWith(
         checkedIn: true,
         checkedInAt: now,
+        checkedInBy: 'qr_code',
       );
     }
 
+    // Member exists but hasn't RSVP'd - create walk-in attendee record
     final now = DateTime.now();
     final payload = {
       'event_id': eventId,
@@ -248,7 +302,7 @@ class EventRepository {
       'guest_count': 0,
       'checked_in': true,
       'checked_in_at': now.toUtc().toIso8601String(),
-      'checked_in_by': 'qr_scan',
+      'checked_in_by': 'qr_code',
     };
 
     return _insertAttendee(payload);
@@ -398,5 +452,117 @@ class EventRepository {
         .select('*, members:member_id(*)')
         .single();
     return EventAttendee.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<EventAttendee> updateCheckInStatus({
+    required String attendeeId,
+    required bool checkedIn,
+  }) async {
+    final now = DateTime.now();
+    final response = await _writeClient
+        .from('event_attendees')
+        .update({
+          'checked_in': checkedIn,
+          'checked_in_at': checkedIn ? now.toUtc().toIso8601String() : null,
+          'checked_in_by': checkedIn ? 'manual' : null,
+        })
+        .eq('id', attendeeId)
+        .select('*, members:member_id(*)')
+        .single();
+
+    return EventAttendee.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<EventAttendee> addAttendee({
+    required String eventId,
+    String? memberId,
+    String? guestName,
+    String? guestEmail,
+    String? guestPhone,
+    int guestCount = 0,
+    String rsvpStatus = 'attending',
+    bool checkedIn = false,
+    bool sendRsvpConfirmation = false,
+  }) async {
+    final payload = {
+      'event_id': eventId,
+      'member_id': memberId,
+      'guest_name': guestName,
+      'guest_email': guestEmail,
+      'guest_phone': guestPhone,
+      'guest_count': guestCount,
+      'rsvp_status': rsvpStatus,
+      'checked_in': checkedIn,
+      'checked_in_at': checkedIn ? DateTime.now().toUtc().toIso8601String() : null,
+      'checked_in_by': checkedIn ? 'manual' : null,
+    };
+
+    final attendee = await _insertAttendee(payload);
+
+    if (sendRsvpConfirmation && guestPhone != null && guestPhone.isNotEmpty) {
+      final registrationLink =
+          'https://events.moyoungdemocrats.org/events/$eventId/register?phone=${Uri.encodeComponent(guestPhone)}';
+      await CRMMessageService.instance.sendRegistrationLink(
+        phoneNumber: guestPhone,
+        eventName: attendee.displayName,
+        registrationLink: registrationLink,
+      );
+    }
+
+    return attendee;
+  }
+
+  Future<Event> uploadEventImage({
+    required String eventId,
+    required PlatformFile file,
+    required bool isSocialShare,
+  }) async {
+    if (!isReady) {
+      throw Exception('CRM not configured');
+    }
+
+    final bytes = await _resolveFileBytes(file);
+    final extension = p.extension(file.name);
+    final contentType = lookupMimeType(file.name) ?? 'application/octet-stream';
+    final now = DateTime.now().toUtc();
+    final path = 'event_$eventId/${isSocialShare ? 'social_share' : 'website_image'}-${now.millisecondsSinceEpoch}$extension';
+
+    await _writeClient.storage.from('events').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+
+    final publicUrl = _writeClient.storage.from('events').getPublicUrl(path);
+    final metadata = {
+      'storage_bucket': 'events',
+      'storage_path': path,
+      'storage_url': publicUrl,
+      'file_name': file.name,
+      'content_type': contentType,
+      'uploaded_at': now.toIso8601String(),
+    };
+
+    final response = await _writeClient
+        .from('events')
+        .update({isSocialShare ? 'social_share_image' : 'website_image': metadata})
+        .eq('id', eventId)
+        .select('*')
+        .single();
+
+    return Event.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<Uint8List> _resolveFileBytes(PlatformFile file) async {
+    if (file.bytes != null) {
+      return file.bytes!;
+    }
+
+    if (file.path != null) {
+      final ioFile = File(file.path!);
+      return await ioFile.readAsBytes();
+    }
+
+    throw Exception('No file data available for upload');
   }
 }
