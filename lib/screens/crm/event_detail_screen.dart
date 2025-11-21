@@ -1,14 +1,27 @@
 import 'dart:async';
 
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:universal_html/html.dart' as html;
+import 'package:url_launcher/url_launcher.dart';
+import 'package:file_picker/file_picker.dart' as file_picker;
 
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/database/global/platform_file.dart'
+    as bluebubbles_file;
 import 'package:bluebubbles/models/crm/event.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
+import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
+const _sunriseGold = Color(0xFFFDB813);
 const _justicePurple = Color(0xFF6A1B9A);
 const _grassrootsGreen = Color(0xFF43A047);
 
@@ -25,6 +38,9 @@ enum _AttendeeFilter { all, checkedIn, notCheckedIn, members, guests }
 
 class _EventDetailScreenState extends State<EventDetailScreen> with TickerProviderStateMixin {
   final EventRepository _repository = EventRepository();
+  final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
+
+  late Event _currentEvent;
 
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
@@ -32,6 +48,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   late TextEditingController _locationAddressController;
   late TextEditingController _maxAttendeesController;
   late TextEditingController _phoneController;
+  late TextEditingController _eventDateDisplayController;
+  late TextEditingController _eventEndDateDisplayController;
 
   DateTime? _eventDate;
   DateTime? _eventEndDate;
@@ -40,6 +58,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   String _status = 'draft';
   bool _rsvpEnabled = true;
   bool _checkinEnabled = false;
+  bool _editingDetails = false;
 
   bool _saving = false;
   bool _loadingAttendees = false;
@@ -52,6 +71,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   @override
   void initState() {
     super.initState();
+    _currentEvent = widget.initialEvent;
     final event = widget.initialEvent;
     _titleController = TextEditingController(text: event.title);
     _descriptionController = TextEditingController(text: event.description ?? '');
@@ -61,6 +81,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       text: event.maxAttendees != null ? event.maxAttendees.toString() : '',
     );
     _phoneController = TextEditingController();
+    _eventDateDisplayController = TextEditingController();
+    _eventEndDateDisplayController = TextEditingController();
     _eventDate = event.eventDate;
     _eventEndDate = event.eventEndDate;
     _rsvpDeadline = event.rsvpDeadline;
@@ -68,6 +90,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _status = event.status;
     _rsvpEnabled = event.rsvpEnabled;
     _checkinEnabled = event.checkinEnabled;
+    _editingDetails = event.id == null;
+
+    _syncDateDisplays();
 
     if (event.id != null) {
       _loadAttendees();
@@ -83,8 +108,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _locationAddressController.dispose();
     _maxAttendeesController.dispose();
     _phoneController.dispose();
+    _eventDateDisplayController.dispose();
+    _eventEndDateDisplayController.dispose();
     _attendeeSub?.cancel();
     super.dispose();
+  }
+
+  void _syncDateDisplays() {
+    final formatter = DateFormat.yMMMd().add_jm();
+    _eventDateDisplayController.text =
+        _eventDate != null ? formatter.format(_eventDate!.toLocal()) : '';
+    _eventEndDateDisplayController.text =
+        _eventEndDate != null ? formatter.format(_eventEndDate!.toLocal()) : '';
   }
 
   Event _buildEventFromForm({String? id}) {
@@ -105,6 +140,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       createdBy: widget.initialEvent.createdBy,
       createdAt: widget.initialEvent.createdAt,
       updatedAt: DateTime.now(),
+      socialShareImage: _currentEvent.socialShareImage,
+      websiteImage: _currentEvent.websiteImage,
     );
   }
 
@@ -128,6 +165,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       if (!mounted) return;
       setState(() {
         _saving = false;
+        _currentEvent = saved;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -141,6 +179,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
           ),
         );
       } else {
+        setState(() => _editingDetails = false);
         _loadAttendees();
         _startAttendeeStream();
       }
@@ -153,15 +192,61 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     }
   }
 
+  Future<void> _pickAndUploadImage({required bool isSocialShare}) async {
+    if (_currentEvent.id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Save the event before uploading images.')),
+      );
+      return;
+    }
+
+    final result = await file_picker.FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      withData: true,
+      type: file_picker.FileType.custom,
+      allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
+    );
+
+    if (result == null || result.files.isEmpty) return;
+
+    setState(() => _saving = true);
+    try {
+      final pickedFile = result.files.first;
+      final platformFile = bluebubbles_file.PlatformFile(
+        path: pickedFile.path,
+        name: pickedFile.name,
+        size: pickedFile.size,
+        bytes: pickedFile.bytes,
+      );
+
+      final updated = await _repository.uploadEventImage(
+        eventId: _currentEvent.id!,
+        file: platformFile,
+        isSocialShare: isSocialShare,
+      );
+      if (!mounted) return;
+      setState(() {
+        _currentEvent = updated;
+        _saving = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed to upload image: $e')));
+    }
+  }
+
   Future<void> _loadAttendees() async {
-    if (widget.initialEvent.id == null) return;
+    final eventId = _currentEvent.id;
+    if (eventId == null) return;
     setState(() {
       _loadingAttendees = true;
       _attendeeError = null;
     });
 
     try {
-      final attendees = await _repository.fetchAttendees(widget.initialEvent.id!);
+      final attendees = await _repository.fetchAttendees(eventId);
       if (!mounted) return;
       setState(() {
         _attendees = attendees;
@@ -177,10 +262,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   }
 
   void _startAttendeeStream() {
-    if (widget.initialEvent.id == null) return;
+    final eventId = _currentEvent.id;
+    if (eventId == null) return;
 
     _attendeeSub?.cancel();
-    _attendeeSub = _repository.watchAttendees(widget.initialEvent.id!).listen(
+    _attendeeSub = _repository.watchAttendees(eventId).listen(
       (attendees) {
         if (!mounted) return;
         setState(() {
@@ -201,6 +287,44 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     if (widget.initialEvent.id == null) return;
     final phone = _phoneController.text.trim();
     if (phone.isEmpty) return;
+
+    setState(() => _loadingAttendees = true);
+    final member = await _repository.previewMemberByPhone(phone);
+    if (!mounted) return;
+    setState(() => _loadingAttendees = false);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Confirm check-in'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (member != null) ...[
+                Text(member.name ?? 'Member'),
+                if (member.email != null) Text(member.email!),
+                if (member.phone != null) Text(member.phone!),
+              ] else ...[
+                const Text('No member record found.'),
+                const SizedBox(height: 8),
+                Text('Send RSVP confirmation to $phone?'),
+              ]
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
 
     setState(() => _loadingAttendees = true);
     final attendee = await _repository.checkInByPhone(
@@ -238,6 +362,42 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       );
 
       if (scannedCode == null || !mounted) return;
+      setState(() => _loadingAttendees = true);
+      final member = await _repository.previewMemberByUUID(scannedCode.trim());
+      if (!mounted) return;
+      setState(() => _loadingAttendees = false);
+
+      if (member == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid membership card'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Check in member?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(member.name ?? 'Member'),
+              if (member.email != null) Text(member.email!),
+              if (member.phone != null) Text(member.phone!),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm')),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
 
       setState(() => _loadingAttendees = true);
 
@@ -264,7 +424,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         final time = DateFormat.jm().format(attendee.checkedInAt!.toLocal());
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${attendee.displayName} checked in at $time'),
+            content: Text('✓ ${attendee.displayName} checked in at $time'),
             backgroundColor: _grassrootsGreen,
             duration: const Duration(seconds: 2),
           ),
@@ -275,28 +435,22 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
       setState(() => _loadingAttendees = false);
 
+      // Clean up error message formatting
+      String errorMessage = e.toString();
+      if (errorMessage.contains('Exception:')) {
+        errorMessage = errorMessage.split('Exception:').last.trim();
+      }
+      if (errorMessage.contains('PostgrestException')) {
+        errorMessage = 'Database error: Please try again or contact support.';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
+          content: Text(errorMessage),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
         ),
       );
-    }
-  }
-
-  Future<void> _manualCheckIn(EventAttendee attendee) async {
-    setState(() => _loadingAttendees = true);
-    try {
-      final updated = await _repository.manualCheckIn(attendee.id);
-      if (!mounted) return;
-      setState(() => _loadingAttendees = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('${updated.displayName} checked in.')));
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loadingAttendees = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to check in attendee: $e')));
     }
   }
 
@@ -326,6 +480,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       } else {
         _eventDate = result;
       }
+      _syncDateDisplays();
     });
   }
 
@@ -381,6 +536,552 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     }).toList();
   }
 
+  Future<void> _toggleCheckInStatus(EventAttendee attendee, bool checkedIn) async {
+    setState(() => _loadingAttendees = true);
+    try {
+      final updated = await _repository.updateCheckInStatus(
+        attendeeId: attendee.id,
+        checkedIn: checkedIn,
+      );
+      if (!mounted) return;
+      setState(() {
+        _attendees = _attendees.map((a) => a.id == updated.id ? updated : a).toList();
+        _loadingAttendees = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingAttendees = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update check-in: $e')),
+      );
+    }
+  }
+
+  Future<void> _showMemberProfile(EventAttendee attendee) async {
+    final member = attendee.member;
+    if (member == null) return;
+
+    _memberLookup.cacheMember(member);
+    await Navigator.of(context, rootNavigator: true).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(
+          child: MemberDetailScreen(member: member),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAddAttendeeDialog() async {
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final phoneController = TextEditingController();
+    final memberIdController = TextEditingController();
+    final guestCountController = TextEditingController(text: '0');
+    bool checkInNow = false;
+    bool sendConfirmation = false;
+
+    final formKey = GlobalKey<FormState>();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add attendee'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: memberIdController,
+                    decoration: const InputDecoration(labelText: 'Member UUID (optional)'),
+                    validator: (value) {
+                      if (value != null && value.isNotEmpty) {
+                        final uuidRegex = RegExp(
+                          r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+                          caseSensitive: false,
+                        );
+                        if (!uuidRegex.hasMatch(value.trim())) {
+                          return 'Enter a valid UUID';
+                        }
+                      }
+                      return null;
+                    },
+                  ),
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                    validator: (value) {
+                      if ((value == null || value.trim().isEmpty) && memberIdController.text.isEmpty) {
+                        return 'Name required for guests';
+                      }
+                      return null;
+                    },
+                  ),
+                  TextFormField(
+                    controller: emailController,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                  ),
+                  TextFormField(
+                    controller: phoneController,
+                    decoration: const InputDecoration(labelText: 'Phone'),
+                  ),
+                  TextFormField(
+                    controller: guestCountController,
+                    decoration: const InputDecoration(labelText: 'Guest Count'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  CheckboxListTile(
+                    value: checkInNow,
+                    onChanged: (value) => setDialogState(() => checkInNow = value ?? false),
+                    title: const Text('Check in immediately'),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  CheckboxListTile(
+                    value: sendConfirmation,
+                    onChanged: (value) => setDialogState(() => sendConfirmation = value ?? false),
+                    title: const Text('Send RSVP confirmation'),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() ?? false) {
+                  Navigator.pop(context, true);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true) {
+      nameController.dispose();
+      emailController.dispose();
+      phoneController.dispose();
+      memberIdController.dispose();
+      guestCountController.dispose();
+      return;
+    }
+
+    setState(() => _loadingAttendees = true);
+
+    try {
+      final eventId = _currentEvent.id!;
+      final attendee = await _repository.addAttendee(
+        eventId: eventId,
+        memberId: memberIdController.text.trim().isEmpty ? null : memberIdController.text.trim(),
+        guestName: nameController.text.trim().isEmpty ? null : nameController.text.trim(),
+        guestEmail: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
+        guestPhone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
+        guestCount: int.tryParse(guestCountController.text) ?? 0,
+        checkedIn: checkInNow,
+        sendRsvpConfirmation: sendConfirmation,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _attendees = [attendee, ..._attendees];
+        _loadingAttendees = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingAttendees = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed to add attendee: $e')));
+    } finally {
+      nameController.dispose();
+      emailController.dispose();
+      phoneController.dispose();
+      memberIdController.dispose();
+      guestCountController.dispose();
+    }
+  }
+
+  Widget _buildAttendeeCard(EventAttendee attendee) {
+    final subtitle = attendee.member != null
+        ? 'Member • ${attendee.member?.email ?? attendee.member?.phone ?? ''}'
+        : 'Guest • ${attendee.guestEmail ?? attendee.guestPhone ?? ''}';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(attendee.displayName, style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 4),
+                      Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                Column(
+                  children: [
+                    Switch(
+                      value: attendee.checkedIn,
+                      onChanged: (value) => _toggleCheckInStatus(attendee, value),
+                      activeColor: _grassrootsGreen,
+                    ),
+                    Text(attendee.checkedIn ? 'Checked in' : 'Pending'),
+                  ],
+                )
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                Chip(
+                  avatar: const Icon(Icons.event, size: 18),
+                  label: Text(attendee.rsvpStatus.toUpperCase()),
+                ),
+                if (attendee.guestCount != null)
+                  Chip(label: Text('Guests: ${attendee.guestCount}')),
+                if (attendee.checkedInAt != null)
+                  Chip(
+                    label: Text('Checked in at ${DateFormat.jm().format(attendee.checkedInAt!.toLocal())}'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (attendee.member != null)
+                  TextButton.icon(
+                    onPressed: () => _showMemberProfile(attendee),
+                    icon: const Icon(Icons.account_circle_outlined),
+                    label: const Text('View member'),
+                  ),
+                const Spacer(),
+                if (attendee.checkedIn)
+                  TextButton(
+                    onPressed: () => _toggleCheckInStatus(attendee, false),
+                    child: const Text('Undo check-in'),
+                  ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendeesTab() {
+    final attendees = _filteredAttendees();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Search attendees',
+                ),
+                onChanged: (value) => setState(() => _attendeeSearch = value),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: _loadingAttendees ? null : _showAddAttendeeDialog,
+              icon: const Icon(Icons.person_add_alt_1),
+              label: const Text('Add attendee'),
+              style: ElevatedButton.styleFrom(backgroundColor: _unityBlue, foregroundColor: Colors.white),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          children: [
+            ChoiceChip(
+              label: const Text('All'),
+              selected: _attendeeFilter == _AttendeeFilter.all,
+              onSelected: (_) => setState(() => _attendeeFilter = _AttendeeFilter.all),
+            ),
+            ChoiceChip(
+              label: const Text('Checked in'),
+              selected: _attendeeFilter == _AttendeeFilter.checkedIn,
+              onSelected: (_) => setState(() => _attendeeFilter = _AttendeeFilter.checkedIn),
+            ),
+            ChoiceChip(
+              label: const Text('Not checked in'),
+              selected: _attendeeFilter == _AttendeeFilter.notCheckedIn,
+              onSelected: (_) => setState(() => _attendeeFilter = _AttendeeFilter.notCheckedIn),
+            ),
+            ChoiceChip(
+              label: const Text('Members'),
+              selected: _attendeeFilter == _AttendeeFilter.members,
+              onSelected: (_) => setState(() => _attendeeFilter = _AttendeeFilter.members),
+            ),
+            ChoiceChip(
+              label: const Text('Guests'),
+              selected: _attendeeFilter == _AttendeeFilter.guests,
+              onSelected: (_) => setState(() => _attendeeFilter = _AttendeeFilter.guests),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_attendeeError != null)
+          Text(
+            _attendeeError!,
+            style: const TextStyle(color: Colors.red),
+          ),
+        if (_loadingAttendees)
+          const LinearProgressIndicator(),
+        const SizedBox(height: 8),
+        Expanded(
+          child: attendees.isEmpty
+              ? const Center(child: Text('No attendees yet'))
+              : ListView.builder(
+                  itemCount: attendees.length,
+                  itemBuilder: (context, index) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: _buildAttendeeCard(attendees[index]),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageUploadSection() {
+    final socialName = _currentEvent.socialShareImage?['file_name'] ?? 'No image uploaded';
+    final websiteName = _currentEvent.websiteImage?['file_name'] ?? 'No image uploaded';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: ListTile(
+                title: const Text('Social share image'),
+                subtitle: Text(socialName),
+                trailing: ElevatedButton.icon(
+                  onPressed: _currentEvent.id == null ? null : () => _pickAndUploadImage(isSocialShare: true),
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Upload'),
+                  style: ElevatedButton.styleFrom(backgroundColor: _momentumBlue, foregroundColor: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: ListTile(
+                title: const Text('Website image'),
+                subtitle: Text(websiteName),
+                trailing: ElevatedButton.icon(
+                  onPressed: _currentEvent.id == null ? null : () => _pickAndUploadImage(isSocialShare: false),
+                  icon: const Icon(Icons.upload_rounded),
+                  label: const Text('Upload'),
+                  style: ElevatedButton.styleFrom(backgroundColor: _unityBlue, foregroundColor: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_currentEvent.id == null)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12.0),
+            child: Text('Save the event to enable uploads.', style: TextStyle(color: Colors.red)),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMapCard() {
+    final address = _currentEvent.locationAddress;
+    if (address == null || address.isEmpty) return const SizedBox.shrink();
+
+    final mapsUri = Uri.https('maps.apple.com', '/', {
+      'q': address,
+    });
+    final embedUri = mapsUri.replace(queryParameters: {...mapsUri.queryParameters, 'output': 'embed'});
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 240,
+            child: _AppleMapsEmbed(embedUri: embedUri, launchUri: mapsUri),
+          ),
+          ListTile(
+            leading: const Icon(Icons.map_outlined, color: _unityBlue),
+            title: Text(address, maxLines: 2, overflow: TextOverflow.ellipsis),
+            subtitle: const Text('Open full map in Apple Maps'),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () => launchUrl(mapsUri, mode: LaunchMode.externalApplication),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverviewTab() {
+    if (_editingDetails || _currentEvent.id == null) {
+      return _buildForm();
+    }
+
+    final dateFormat = DateFormat.yMMMd().add_jm();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              icon: const Icon(Icons.edit, color: Colors.white),
+              tooltip: 'Edit event',
+              onPressed: () => setState(() => _editingDetails = true),
+            ),
+          ),
+          Card(
+            color: Colors.transparent,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Ink(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_unityBlue, _momentumBlue],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _currentEvent.title,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_currentEvent.description != null)
+                      Text(
+                        _currentEvent.description!,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today_outlined, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Text(
+                          dateFormat.format(_currentEvent.eventDate.toLocal()),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                    if (_currentEvent.eventEndDate != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.more_time_outlined, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Text(
+                            dateFormat.format(_currentEvent.eventEndDate!.toLocal()),
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (_currentEvent.location != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.place_outlined, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _currentEvent.location!,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (_currentEvent.eventType != null) ...[
+                      const SizedBox(height: 8),
+                      Chip(
+                        label: Text(
+                          _currentEvent.eventType!.toUpperCase(),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        backgroundColor: Colors.white24,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Chip(
+                          label: Text(
+                            _currentEvent.rsvpEnabled ? 'RSVPs enabled' : 'RSVPs disabled',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: Colors.white24,
+                        ),
+                        Chip(
+                          label: Text(
+                            _currentEvent.checkinEnabled ? 'Check-in on' : 'Check-in off',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: Colors.white24,
+                        ),
+                        Chip(
+                          label: Text(
+                            _currentEvent.status.toUpperCase(),
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: Colors.white24,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildMapCard(),
+          const SizedBox(height: 12),
+          _buildImageUploadSection(),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStats() {
     final stats = EventStats.fromAttendees(_attendees);
     final theme = Theme.of(context);
@@ -390,17 +1091,30 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
+            gradient: LinearGradient(
+              colors: [color.withOpacity(0.9), color.withOpacity(0.6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: color),
+              Icon(icon, color: Colors.white),
               const SizedBox(height: 10),
-              Text(label, style: theme.textTheme.labelLarge?.copyWith(color: color)),
+              Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(color: Colors.white70),
+              ),
               const SizedBox(height: 4),
-              Text(value, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                value,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+              ),
             ],
           ),
         ),
@@ -501,108 +1215,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     );
   }
 
-  Widget _buildAttendeeList() {
-    final filtered = _filteredAttendees();
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.people_outline, color: _unityBlue),
-            const SizedBox(width: 8),
-            Text('Attendees', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const Spacer(),
-            DropdownButton<_AttendeeFilter>(
-              value: _attendeeFilter,
-              onChanged: (value) => setState(() => _attendeeFilter = value ?? _AttendeeFilter.all),
-              items: const [
-                DropdownMenuItem(value: _AttendeeFilter.all, child: Text('All')),
-                DropdownMenuItem(value: _AttendeeFilter.checkedIn, child: Text('Checked In')),
-                DropdownMenuItem(value: _AttendeeFilter.notCheckedIn, child: Text('Not Checked In')),
-                DropdownMenuItem(value: _AttendeeFilter.members, child: Text('Members Only')),
-                DropdownMenuItem(value: _AttendeeFilter.guests, child: Text('Guests Only')),
-              ],
-            ),
-            const SizedBox(width: 10),
-            SizedBox(
-              width: 220,
-              child: TextField(
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: 'Search attendees',
-                ),
-                onChanged: (value) => setState(() => _attendeeSearch = value.trim()),
-              ),
-            )
-          ],
-        ),
-        const SizedBox(height: 10),
-        if (_loadingAttendees)
-          const LinearProgressIndicator(minHeight: 2)
-        else if (_attendeeError != null)
-          Text(_attendeeError!, style: const TextStyle(color: Colors.red))
-        else if (filtered.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('No attendees yet.'),
-          )
-        else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: filtered.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final attendee = filtered[index];
-              return ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                tileColor: attendee.checkedIn ? _grassrootsGreen.withOpacity(0.08) : null,
-                leading: Icon(
-                  attendee.checkedIn ? Icons.check_circle : Icons.radio_button_unchecked,
-                  color: attendee.checkedIn ? _grassrootsGreen : theme.colorScheme.onSurfaceVariant,
-                ),
-                title: Text(attendee.displayName),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (attendee.member != null)
-                      Text(attendee.member!.email ?? 'Member')
-                    else if (attendee.guestEmail != null)
-                      Text(attendee.guestEmail!)
-                    else if (attendee.guestPhone != null)
-                      Text(attendee.guestPhone!),
-                    if (attendee.checkedInAt != null)
-                      Text('Checked in at ${DateFormat.jm().format(attendee.checkedInAt!.toLocal())}'),
-                  ],
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (attendee.totalDonated != null)
-                      Chip(
-                        label: Text('\$${attendee.totalDonated!.toStringAsFixed(0)}'),
-                        avatar: const Icon(Icons.volunteer_activism, size: 18),
-                      ),
-                    if (attendee.isRecurringDonor == true)
-                      const Padding(
-                        padding: EdgeInsets.only(left: 6.0),
-                        child: Chip(label: Text('Recurring'), avatar: Icon(Icons.repeat, size: 16)),
-                      ),
-                    const SizedBox(width: 6),
-                    Checkbox(
-                      value: attendee.checkedIn,
-                      onChanged: attendee.checkedIn ? null : (_) => _manualCheckIn(attendee),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-      ],
-    );
-  }
-
   Widget _buildForm() {
     final dateFormat = DateFormat.yMMMd().add_jm();
 
@@ -632,18 +1244,26 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                 Expanded(
                   child: TextField(
                     readOnly: true,
+                    controller: _eventDateDisplayController,
                     onTap: () => _pickDateTime(isEndDate: false),
                     decoration: _decor('Event Date & Time')
-                        .copyWith(hintText: _eventDate != null ? dateFormat.format(_eventDate!) : 'Select'),
+                        .copyWith(
+                      hintText: 'Select start',
+                      suffixIcon: const Icon(Icons.calendar_today_outlined),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
                     readOnly: true,
+                    controller: _eventEndDateDisplayController,
                     onTap: () => _pickDateTime(isEndDate: true),
                     decoration: _decor('End Date & Time')
-                        .copyWith(hintText: _eventEndDate != null ? dateFormat.format(_eventEndDate!) : 'Optional'),
+                        .copyWith(
+                      hintText: 'Optional end time',
+                      suffixIcon: const Icon(Icons.schedule_outlined),
+                    ),
                   ),
                 ),
               ],
@@ -666,6 +1286,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            _buildImageUploadSection(),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -748,54 +1370,183 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final hasEventId = widget.initialEvent.id != null;
+    final tabCount = hasEventId ? 3 : 1;
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
+        backgroundColor: Colors.black,
         elevation: 0,
-        title: Text(widget.initialEvent.id == null ? 'Create Event' : widget.initialEvent.title),
+        title: Text(
+          _currentEvent.id == null ? 'Create Event' : _currentEvent.title,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SafeArea(
         child: DefaultTabController(
-          length: hasEventId ? 2 : 1,
-          child: Column(
-            children: [
-              if (hasEventId)
-                const TabBar(
-                  labelColor: _unityBlue,
-                  tabs: [
-                    Tab(text: 'Details'),
-                    Tab(text: 'Check-In'),
-                  ],
-                ),
-              Expanded(
-                child: TabBarView(
-                  physics: const NeverScrollableScrollPhysics(),
+          length: tabCount,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Card(
+                color: Colors.black,
+                margin: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                elevation: 6,
+                child: Column(
                   children: [
-                    _buildForm(),
                     if (hasEventId)
-                      SingleChildScrollView(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildStats(),
-                            const SizedBox(height: 16),
-                            _buildPhoneLookupCard(),
-                            const SizedBox(height: 16),
-                            _buildAttendeeList(),
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [_unityBlue, _momentumBlue],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                        ),
+                        child: const TabBar(
+                          indicatorColor: _sunriseGold,
+                          labelColor: Colors.white,
+                          unselectedLabelColor: Colors.white70,
+                          tabs: [
+                            Tab(text: 'Details'),
+                            Tab(text: 'Attendees'),
+                            Tab(text: 'Check-In'),
                           ],
                         ),
                       ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: TabBarView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: [
+                            if (hasEventId)
+                              _buildOverviewTab()
+                            else
+                              _buildForm(),
+                            if (hasEventId)
+                              Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: _buildAttendeesTab(),
+                              ),
+                            if (hasEventId)
+                              SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildStats(),
+                                    const SizedBox(height: 16),
+                                    _buildPhoneLookupCard(),
+                                    const SizedBox(height: 16),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _AppleMapsEmbed extends StatefulWidget {
+  const _AppleMapsEmbed({required this.embedUri, required this.launchUri});
+
+  final Uri embedUri;
+  final Uri launchUri;
+
+  @override
+  State<_AppleMapsEmbed> createState() => _AppleMapsEmbedState();
+}
+
+class _AppleMapsEmbedState extends State<_AppleMapsEmbed> {
+  static const String _viewType = 'event-apple-maps-view';
+  static bool _registered = false;
+  static final Map<int, html.IFrameElement> _iframes = <int, html.IFrameElement>{};
+
+  int? _viewId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _ensureRegistered();
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_viewId != null) {
+      _iframes.remove(_viewId!);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!kIsWeb) {
+      return InkWell(
+        onTap: () => launchUrl(widget.launchUri, mode: LaunchMode.externalApplication),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_unityBlue, _momentumBlue],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: const Center(
+            child: Icon(Icons.map_outlined, color: Colors.white, size: 64),
+          ),
+        ),
+      );
+    }
+
+    return HtmlElementView(
+      viewType: _viewType,
+      onPlatformViewCreated: (int viewId) {
+        _viewId = viewId;
+        _setSource();
+      },
+    );
+  }
+
+  void _ensureRegistered() {
+    if (_registered) return;
+
+    // ignore: undefined_prefixed_name
+    ui.platformViewRegistry.registerViewFactory(
+      _viewType,
+      (int viewId) {
+        final element = html.IFrameElement()
+          ..style.border = '0'
+          ..allowFullscreen = true
+          ..src = widget.embedUri.toString();
+        _iframes[viewId] = element;
+        return element;
+      },
+    );
+
+    _registered = true;
+  }
+
+  void _setSource() {
+    if (!kIsWeb || _viewId == null) return;
+
+    final element = _iframes[_viewId!];
+    if (element != null) {
+      element.src = widget.embedUri.toString();
+    }
   }
 }

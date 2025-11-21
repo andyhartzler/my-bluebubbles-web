@@ -25,12 +25,23 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
   void _onDetect(BarcodeCapture capture) async {
     if (_isProcessing) return;
-    
+
     final List<Barcode> barcodes = capture.barcodes;
     if (barcodes.isEmpty) return;
 
     final String? code = barcodes.first.rawValue;
     if (code == null || code.isEmpty) return;
+
+    // Validate UUID format - only process valid membership card QR codes
+    final uuidRegex = RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+      caseSensitive: false,
+    );
+
+    if (!uuidRegex.hasMatch(code.trim())) {
+      // Silently ignore non-UUID QR codes (product barcodes, etc.)
+      return;
+    }
 
     setState(() => _isProcessing = true);
 
