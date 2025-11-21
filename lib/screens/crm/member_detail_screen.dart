@@ -26,6 +26,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 
@@ -36,6 +37,44 @@ class _WalletNotificationDraft {
 
   final String title;
   final String message;
+}
+
+class _DonationRecord {
+  const _DonationRecord({
+    this.id,
+    this.amount,
+    this.createdAt,
+    this.designation,
+  });
+
+  final String? id;
+  final double? amount;
+  final DateTime? createdAt;
+  final String? designation;
+}
+
+class _DonorProfile {
+  const _DonorProfile({
+    required this.id,
+    required this.name,
+    required this.totalDonated,
+    required this.donationCount,
+    required this.firstDonationAt,
+    required this.lastDonationAt,
+    required this.isRecurringDonor,
+    required this.profileUrl,
+    required this.donations,
+  });
+
+  final String? id;
+  final String? name;
+  final double? totalDonated;
+  final int donationCount;
+  final DateTime? firstDonationAt;
+  final DateTime? lastDonationAt;
+  final bool isRecurringDonor;
+  final String? profileUrl;
+  final List<_DonationRecord> donations;
 }
 
 /// Detailed view of a single member
@@ -81,6 +120,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   bool _loadingWalletPass = false;
   bool _sendingWalletPush = false;
   String? _walletPassError;
+  _DonorProfile? _donorProfile;
+  bool _loadingDonorProfile = false;
+  String? _donorError;
+  final NumberFormat _currencyFormat = NumberFormat.simpleCurrency();
 
   static const String _reportsBucket = 'member-documents';
 
@@ -124,6 +167,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       _loadMeetingAttendance();
       _fetchLatestMember();
       _loadWalletPassInfo();
+      _loadDonorProfile();
     }
   }
 
@@ -538,6 +582,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         if (_walletService.isReady) {
           unawaited(_loadWalletPassInfo());
         }
+        unawaited(_loadDonorProfile());
         if (showFeedback) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Member refreshed')),
@@ -591,6 +636,100 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         _loadingWalletPass = false;
       });
     }
+  }
+
+  Future<void> _loadDonorProfile() async {
+    if (!_crmReady || _loadingDonorProfile) return;
+
+    setState(() {
+      _loadingDonorProfile = true;
+      _donorError = null;
+    });
+
+    try {
+      final response = await _supabaseService.client
+          .from('donors')
+          .select(
+            'id,name,profile_url,total_donated,donation_count,first_donation_at,last_donation_at,'
+            'is_recurring_donor,donations(id,amount,created_at,designation)',
+          )
+          .eq('member_id', _member.id)
+          .order('created_at', referencedTable: 'donations', ascending: false)
+          .limit(1);
+
+      _DonorProfile? donor;
+      if (response is List && response.isNotEmpty) {
+        final row = response.first;
+        if (row is Map<String, dynamic>) {
+          donor = _mapDonorProfile(row);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _donorProfile = donor;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _donorError = 'Failed to load donor details: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingDonorProfile = false;
+        });
+      }
+    }
+  }
+
+  _DonorProfile _mapDonorProfile(Map<String, dynamic> donorRow) {
+    final donations = <_DonationRecord>[];
+    final donationRows = donorRow['donations'];
+    if (donationRows is List) {
+      for (final entry in donationRows) {
+        if (entry is! Map<String, dynamic>) continue;
+        final createdAt = _parseDate(entry['created_at']);
+        donations.add(
+          _DonationRecord(
+            id: entry['id']?.toString(),
+            amount: (entry['amount'] as num?)?.toDouble(),
+            createdAt: createdAt,
+            designation: entry['designation'] as String?,
+          ),
+        );
+      }
+    }
+
+    donations.sort((a, b) {
+      final aDate = a.createdAt;
+      final bDate = b.createdAt;
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
+
+    final totalFromRow = (donorRow['total_donated'] as num?)?.toDouble();
+    final totalDonated = totalFromRow ??
+        donations.fold<double>(0, (sum, donation) => sum + (donation.amount ?? 0));
+    final donationCount = donorRow['donation_count'] is int
+        ? donorRow['donation_count'] as int
+        : donations.length;
+
+    return _DonorProfile(
+      id: donorRow['id']?.toString(),
+      name: donorRow['name'] as String?,
+      totalDonated: totalDonated,
+      donationCount: donationCount,
+      firstDonationAt:
+          _parseDate(donorRow['first_donation_at']) ?? donations.lastOrNull?.createdAt,
+      lastDonationAt:
+          _parseDate(donorRow['last_donation_at']) ?? donations.firstOrNull?.createdAt,
+      isRecurringDonor: donorRow['is_recurring_donor'] == true,
+      profileUrl: donorRow['profile_url'] as String?,
+      donations: donations,
+    );
   }
 
   Future<void> _loadMeetingAttendance() async {
@@ -1899,9 +2038,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         (college == null && highSchool == null) ? _cleanText(_member.schoolName) : null;
 
     final walletSection = _buildWalletPassSection();
+    final donorSection = _buildDonorSection();
 
     final sections = <Widget?>[
       walletSection,
+      donorSection,
       _buildOptionalSection('Contact Information', [
         _copyRow('Phone', primaryPhone, copyValue: phoneCopyValue),
         _copyRow('Email', email),
@@ -2228,6 +2369,27 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     return trimmed.isEmpty ? null : trimmed;
   }
 
+  DateTime? _parseDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
+  String _formatCurrency(double amount) => _currencyFormat.format(amount);
+
+  String _formatDonationSubtitle(_DonationRecord donation) {
+    final parts = <String>[];
+    final designation = _cleanText(donation.designation);
+    if (designation != null) {
+      parts.add(designation);
+    }
+    if (donation.createdAt != null) {
+      parts.add(_formatDateOnly(donation.createdAt!));
+    }
+    if (parts.isEmpty) return 'No details available';
+    return parts.join(' • ');
+  }
+
   Future<bool?> _lookupServiceAvailability(String address) async {
     try {
       final response = await http.handleiMessageState(address);
@@ -2349,6 +2511,213 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final visible = rows.whereType<Widget>().toList();
     if (visible.isEmpty) return null;
     return _buildSection(title, visible);
+  }
+
+  Widget? _buildDonorSection() {
+    if (!_crmReady) return null;
+
+    if (_loadingDonorProfile) {
+      return _buildSection(
+        'Donor Activity',
+        const [
+          Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 8.0),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_donorError != null) {
+      return _buildSection(
+        'Donor Activity',
+        [
+          Text(
+            'Unable to load donor details right now.',
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _donorError!,
+            style: const TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _loadDonorProfile,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try again'),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final donor = _donorProfile;
+    if (donor == null) return null;
+
+    final totalDonated = donor.totalDonated ?? 0;
+    final donationCount = donor.donationCount;
+    final firstDonation = donor.firstDonationAt ?? donor.donations.lastOrNull?.createdAt;
+    final lastDonation = donor.lastDonationAt ?? donor.donations.firstOrNull?.createdAt;
+    final recentDonations = donor.donations.take(5).toList(growable: false);
+    final profileUrl = _buildDonorProfileUrl(donor);
+
+    final stats = <Widget>[
+      _buildDonorStatTile(
+        label: 'Total Donated',
+        value: _formatCurrency(totalDonated),
+        icon: Icons.volunteer_activism_outlined,
+        color: Colors.green.shade700,
+      ),
+      _buildDonorStatTile(
+        label: 'Donations',
+        value: donationCount.toString(),
+        icon: Icons.receipt_long_outlined,
+      ),
+      if (firstDonation != null)
+        _buildDonorStatTile(
+          label: 'First Donation',
+          value: _formatDateOnly(firstDonation),
+          icon: Icons.flag_outlined,
+        ),
+      if (lastDonation != null)
+        _buildDonorStatTile(
+          label: 'Last Donation',
+          value: _formatDate(lastDonation),
+          icon: Icons.history_toggle_off,
+        ),
+    ];
+
+    final children = <Widget>[
+      Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: stats,
+      ),
+    ];
+
+    if (donor.isRecurringDonor) {
+      children.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Chip(
+              avatar: Icon(
+                Icons.autorenew,
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              label: const Text('Recurring donor'),
+              backgroundColor:
+                  Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              labelStyle:
+                  TextStyle(color: Theme.of(context).colorScheme.primary),
+            ),
+          ),
+        ),
+      );
+    }
+
+    children.add(const SizedBox(height: 12));
+
+    if (recentDonations.isNotEmpty) {
+      children.addAll(
+        [
+          Text(
+            'Recent Donations',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Column(
+            children: [
+              for (int i = 0; i < recentDonations.length; i++) ...[
+                _buildDonationTile(recentDonations[i]),
+                if (i != recentDonations.length - 1)
+                  const Divider(height: 12),
+              ],
+            ],
+          ),
+        ],
+      );
+    } else {
+      children.add(const Text('No donation history on file.'));
+    }
+
+    if (profileUrl != null) {
+      children.addAll([
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => _openLink(profileUrl),
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('View full donor profile'),
+          ),
+        ),
+      ]);
+    }
+
+    return _buildSection('Donor Activity', children);
+  }
+
+  Widget _buildDonationTile(_DonationRecord donation) {
+    final amountLabel = donation.amount != null
+        ? _formatCurrency(donation.amount!)
+        : 'Unknown amount';
+
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.volunteer_activism_outlined),
+      title: Text(amountLabel),
+      subtitle: Text(_formatDonationSubtitle(donation)),
+    );
+  }
+
+  Widget _buildDonorStatTile({
+    required String label,
+    required String value,
+    required IconData icon,
+    Color? color,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color ?? theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Widget? _buildWalletPassSection() {
@@ -3089,6 +3458,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         SnackBar(content: Text('Could not open ${url.toString()}')),
       );
     }
+  }
+
+  Uri? _buildDonorProfileUrl(_DonorProfile donor) {
+    if (donor.profileUrl != null) {
+      final parsed = Uri.tryParse(donor.profileUrl!);
+      if (parsed != null && parsed.hasScheme) {
+        return parsed;
+      }
+    }
+    if (donor.id == null) return null;
+    return Uri.tryParse('https://donors.moyoungdemocrats.org/donors/${donor.id}');
   }
 
   String _formatDate(DateTime date) {
