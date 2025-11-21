@@ -94,6 +94,7 @@ class EventRepository {
         .map(EventAttendee.fromJson)
         .toList();
 
+    await _hydrateMembers(attendees);
     await _enrichDonorBadges(attendees);
     return attendees;
   }
@@ -154,6 +155,49 @@ class EventRepository {
   Future<EventAttendee> _insertAttendee(Map<String, dynamic> payload) async {
     final response = await _writeClient.from('event_attendees').insert(payload).select('*, members:member_id(*)').single();
     return EventAttendee.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<void> _hydrateMembers(List<EventAttendee> attendees) async {
+    final memberIds = attendees.map((a) => a.memberId).whereType<String>().toSet();
+    if (memberIds.isEmpty) return;
+
+    final memberData = await _readClient
+        .from('members')
+        .select('id,name,email,phone,phone_e164')
+        .inFilter('id', memberIds.toList());
+
+    final members = <String, Member>{};
+    for (final row in memberData as List<dynamic>) {
+      final map = row as Map<String, dynamic>;
+      final id = map['id'] as String?;
+      if (id != null) {
+        members[id] = Member.fromJson(map);
+      }
+    }
+
+    for (var i = 0; i < attendees.length; i++) {
+      final attendee = attendees[i];
+      final memberId = attendee.memberId;
+      if (memberId != null && members.containsKey(memberId)) {
+        attendees[i] = attendee.copyWith(member: members[memberId]);
+      }
+    }
+  }
+
+  Stream<List<EventAttendee>> watchAttendees(String eventId) {
+    if (!isReady) return const Stream.empty();
+
+    return _readClient
+        .from('event_attendees')
+        .stream(primaryKey: ['id'])
+        .eq('event_id', eventId)
+        .order('rsvp_at', ascending: false)
+        .asyncMap((rows) async {
+      final attendees = rows.whereType<Map<String, dynamic>>().map(EventAttendee.fromJson).toList();
+      await _hydrateMembers(attendees);
+      await _enrichDonorBadges(attendees);
+      return attendees;
+    });
   }
 
   Future<EventAttendee?> checkInByPhone({
@@ -302,3 +346,4 @@ class EventRepository {
     return EventAttendee.fromJson(response as Map<String, dynamic>);
   }
 }
+import 'package:bluebubbles/models/crm/member.dart';
