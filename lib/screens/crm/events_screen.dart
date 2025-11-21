@@ -391,11 +391,14 @@ class _EventsScreenState extends State<EventsScreen> {
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              sliver: const SliverToBoxAdapter(child: SizedBox(height: 18)),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               sliver: SliverToBoxAdapter(
                 child: _buildFilters(),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 18)),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               sliver: _events.isEmpty
