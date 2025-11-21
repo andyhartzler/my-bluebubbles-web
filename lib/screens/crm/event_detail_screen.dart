@@ -1,18 +1,27 @@
 import 'dart:async';
 
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:universal_html/html.dart' as html;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/database/global/platform_file.dart'
     as bluebubbles_file;
 import 'package:bluebubbles/models/crm/event.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
+import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
+const _sunriseGold = Color(0xFFFDB813);
 const _justicePurple = Color(0xFF6A1B9A);
 const _grassrootsGreen = Color(0xFF43A047);
 
@@ -29,6 +38,9 @@ enum _AttendeeFilter { all, checkedIn, notCheckedIn, members, guests }
 
 class _EventDetailScreenState extends State<EventDetailScreen> with TickerProviderStateMixin {
   final EventRepository _repository = EventRepository();
+  final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
+
+  late Event _currentEvent;
 
   late Event _currentEvent;
 
@@ -551,26 +563,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     final member = attendee.member;
     if (member == null) return;
 
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(member.name ?? 'Member'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (member.email != null) Text(member.email!),
-            if (member.phone != null) Text(member.phone!),
-            if (member.city != null)
-              Text(member.city!),
-          ],
+    _memberLookup.cacheMember(member);
+    await Navigator.of(context, rootNavigator: true).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(
+          child: MemberDetailScreen(member: member),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
       ),
     );
   }
@@ -917,43 +915,29 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     final address = _currentEvent.locationAddress;
     if (address == null || address.isEmpty) return const SizedBox.shrink();
 
-    final mapsUri = Uri.parse('https://maps.apple.com/?q=${Uri.encodeComponent(address)}');
+    final mapsUri = Uri.https('maps.apple.com', '/', {
+      'q': address,
+    });
+    final embedUri = mapsUri.replace(queryParameters: {...mapsUri.queryParameters, 'output': 'embed'});
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => launchUrl(mapsUri, mode: LaunchMode.externalApplication),
-        child: Container(
-          height: 200,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [_unityBlue, _momentumBlue],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 240,
+            child: _AppleMapsEmbed(embedUri: embedUri, launchUri: mapsUri),
           ),
-          child: Stack(
-            children: [
-              const Center(
-                child: Icon(Icons.map_outlined, color: Colors.white, size: 72),
-              ),
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 12,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(address, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    const Text('Tap to open in Apple Maps', style: TextStyle(color: Colors.white70)),
-                  ],
-                ),
-              ),
-            ],
+          ListTile(
+            leading: const Icon(Icons.map_outlined, color: _unityBlue),
+            title: Text(address, maxLines: 2, overflow: TextOverflow.ellipsis),
+            subtitle: const Text('Open full map in Apple Maps'),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () => launchUrl(mapsUri, mode: LaunchMode.externalApplication),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -973,64 +957,121 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
           Align(
             alignment: Alignment.centerRight,
             child: IconButton(
-              icon: const Icon(Icons.edit),
+              icon: const Icon(Icons.edit, color: Colors.white),
               tooltip: 'Edit event',
               onPressed: () => setState(() => _editingDetails = true),
             ),
           ),
           Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_currentEvent.title, style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 8),
-                  if (_currentEvent.description != null)
-                    Text(_currentEvent.description!),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today_outlined),
-                      const SizedBox(width: 8),
-                      Text(dateFormat.format(_currentEvent.eventDate.toLocal())),
-                    ],
-                  ),
-                  if (_currentEvent.eventEndDate != null) ...[
+            color: Colors.transparent,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Ink(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_unityBlue, _momentumBlue],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _currentEvent.title,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
                     const SizedBox(height: 8),
+                    if (_currentEvent.description != null)
+                      Text(
+                        _currentEvent.description!,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.more_time_outlined),
+                        const Icon(Icons.calendar_today_outlined, color: Colors.white),
                         const SizedBox(width: 8),
-                        Text(dateFormat.format(_currentEvent.eventEndDate!.toLocal())),
+                        Text(
+                          dateFormat.format(_currentEvent.eventDate.toLocal()),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                    if (_currentEvent.eventEndDate != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.more_time_outlined, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Text(
+                            dateFormat.format(_currentEvent.eventEndDate!.toLocal()),
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (_currentEvent.location != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.place_outlined, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _currentEvent.location!,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (_currentEvent.eventType != null) ...[
+                      const SizedBox(height: 8),
+                      Chip(
+                        label: Text(
+                          _currentEvent.eventType!.toUpperCase(),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        backgroundColor: Colors.white24,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Chip(
+                          label: Text(
+                            _currentEvent.rsvpEnabled ? 'RSVPs enabled' : 'RSVPs disabled',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: Colors.white24,
+                        ),
+                        Chip(
+                          label: Text(
+                            _currentEvent.checkinEnabled ? 'Check-in on' : 'Check-in off',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: Colors.white24,
+                        ),
+                        Chip(
+                          label: Text(
+                            _currentEvent.status.toUpperCase(),
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: Colors.white24,
+                        ),
                       ],
                     ),
                   ],
-                  if (_currentEvent.location != null) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.place_outlined),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(_currentEvent.location!)),
-                      ],
-                    ),
-                  ],
-                  if (_currentEvent.eventType != null) ...[
-                    const SizedBox(height: 8),
-                    Chip(label: Text(_currentEvent.eventType!.toUpperCase())),
-                  ],
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(label: Text(_currentEvent.rsvpEnabled ? 'RSVPs enabled' : 'RSVPs disabled')),
-                      Chip(label: Text(_currentEvent.checkinEnabled ? 'Check-in on' : 'Check-in off')),
-                      Chip(label: Text(_currentEvent.status.toUpperCase())),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -1052,17 +1093,30 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
+            gradient: LinearGradient(
+              colors: [color.withOpacity(0.9), color.withOpacity(0.6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: color),
+              Icon(icon, color: Colors.white),
               const SizedBox(height: 10),
-              Text(label, style: theme.textTheme.labelLarge?.copyWith(color: color)),
+              Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(color: Colors.white70),
+              ),
               const SizedBox(height: 4),
-              Text(value, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                value,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+              ),
             ],
           ),
         ),
@@ -1318,59 +1372,183 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final hasEventId = widget.initialEvent.id != null;
     final tabCount = hasEventId ? 3 : 1;
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
+        backgroundColor: Colors.black,
         elevation: 0,
-        title: Text(_currentEvent.id == null ? 'Create Event' : _currentEvent.title),
+        title: Text(
+          _currentEvent.id == null ? 'Create Event' : _currentEvent.title,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SafeArea(
         child: DefaultTabController(
           length: tabCount,
-          child: Column(
-            children: [
-              if (hasEventId)
-                const TabBar(
-                  labelColor: _unityBlue,
-                  tabs: [
-                    Tab(text: 'Details'),
-                    Tab(text: 'Attendees'),
-                    Tab(text: 'Check-In'),
-                  ],
-                ),
-              Expanded(
-                child: TabBarView(
-                  physics: const NeverScrollableScrollPhysics(),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Card(
+                color: Colors.black,
+                margin: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                elevation: 6,
+                child: Column(
                   children: [
                     if (hasEventId)
-                      _buildOverviewTab()
-                    else
-                      _buildForm(),
-                    if (hasEventId) _buildAttendeesTab(),
-                    if (hasEventId)
-                      SingleChildScrollView(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildStats(),
-                            const SizedBox(height: 16),
-                            _buildPhoneLookupCard(),
-                            const SizedBox(height: 16),
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [_unityBlue, _momentumBlue],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                        ),
+                        child: const TabBar(
+                          indicatorColor: _sunriseGold,
+                          labelColor: Colors.white,
+                          unselectedLabelColor: Colors.white70,
+                          tabs: [
+                            Tab(text: 'Details'),
+                            Tab(text: 'Attendees'),
+                            Tab(text: 'Check-In'),
                           ],
                         ),
                       ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: TabBarView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: [
+                            if (hasEventId)
+                              _buildOverviewTab()
+                            else
+                              _buildForm(),
+                            if (hasEventId)
+                              Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: _buildAttendeesTab(),
+                              ),
+                            if (hasEventId)
+                              SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildStats(),
+                                    const SizedBox(height: 16),
+                                    _buildPhoneLookupCard(),
+                                    const SizedBox(height: 16),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _AppleMapsEmbed extends StatefulWidget {
+  const _AppleMapsEmbed({required this.embedUri, required this.launchUri});
+
+  final Uri embedUri;
+  final Uri launchUri;
+
+  @override
+  State<_AppleMapsEmbed> createState() => _AppleMapsEmbedState();
+}
+
+class _AppleMapsEmbedState extends State<_AppleMapsEmbed> {
+  static const String _viewType = 'event-apple-maps-view';
+  static bool _registered = false;
+  static final Map<int, html.IFrameElement> _iframes = <int, html.IFrameElement>{};
+
+  int? _viewId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _ensureRegistered();
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_viewId != null) {
+      _iframes.remove(_viewId!);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!kIsWeb) {
+      return InkWell(
+        onTap: () => launchUrl(widget.launchUri, mode: LaunchMode.externalApplication),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_unityBlue, _momentumBlue],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: const Center(
+            child: Icon(Icons.map_outlined, color: Colors.white, size: 64),
+          ),
+        ),
+      );
+    }
+
+    return HtmlElementView(
+      viewType: _viewType,
+      onPlatformViewCreated: (int viewId) {
+        _viewId = viewId;
+        _setSource();
+      },
+    );
+  }
+
+  void _ensureRegistered() {
+    if (_registered) return;
+
+    // ignore: undefined_prefixed_name
+    ui.platformViewRegistry.registerViewFactory(
+      _viewType,
+      (int viewId) {
+        final element = html.IFrameElement()
+          ..style.border = '0'
+          ..allowFullscreen = true
+          ..src = widget.embedUri.toString();
+        _iframes[viewId] = element;
+        return element;
+      },
+    );
+
+    _registered = true;
+  }
+
+  void _setSource() {
+    if (!kIsWeb || _viewId == null) return;
+
+    final element = _iframes[_viewId!];
+    if (element != null) {
+      element.src = widget.embedUri.toString();
+    }
   }
 }

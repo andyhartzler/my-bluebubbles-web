@@ -134,65 +134,75 @@ class _EventsScreenState extends State<EventsScreen> {
     final dateFormat = DateFormat.yMMMd().add_jm();
 
     return Card(
-      elevation: 3,
-      color: _unityBlue,
+      elevation: 4,
+      color: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: InkWell(
         onTap: () => _openEvent(event),
         borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(18.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      event.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  _buildStatusChip(event.status),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                dateFormat.format(event.eventDate),
-                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-              ),
-              if (event.location?.isNotEmpty == true) ...[
-                const SizedBox(height: 6),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [_unityBlue, _momentumBlue],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Row(
                   children: [
-                    const Icon(Icons.place_outlined, size: 18, color: Colors.white70),
-                    const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        event.location!,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
+                        event.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    _buildStatusChip(event.status),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  dateFormat.format(event.eventDate),
+                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                ),
+                if (event.location?.isNotEmpty == true) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.place_outlined, size: 18, color: Colors.white70),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          event.location!,
+                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    _buildInfoChip(Icons.category_outlined, event.eventType ?? 'Other'),
+                    _buildInfoChip(Icons.event_available_outlined, event.rsvpEnabled ? 'RSVPs on' : 'RSVPs off'),
+                    _buildInfoChip(Icons.verified_outlined, event.checkinEnabled ? 'Check-in on' : 'Check-in off'),
                   ],
                 ),
               ],
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                children: [
-                  _buildInfoChip(Icons.category_outlined, event.eventType ?? 'Other'),
-                  _buildInfoChip(Icons.event_available_outlined, event.rsvpEnabled ? 'RSVPs on' : 'RSVPs off'),
-                  _buildInfoChip(Icons.verified_outlined, event.checkinEnabled ? 'Check-in on' : 'Check-in off'),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -332,91 +342,77 @@ class _EventsScreenState extends State<EventsScreen> {
       return Center(child: Text(_error!));
     }
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Image.asset(
-            'assets/images/Blue-Gradient-Background.png',
-            fit: BoxFit.cover,
-          ),
-        ),
-        Positioned.fill(
-          child: Container(
-            color: Colors.white.withOpacity(0.18),
-          ),
-        ),
-        Positioned.fill(
-          child: SafeArea(
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                  sliver: SliverToBoxAdapter(
-                    child: Row(
+    return Container(
+      color: Colors.black,
+      child: SafeArea(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _momentumBlue,
+                      ),
+                      child: const Icon(Icons.event_available_outlined, color: Colors.white),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _momentumBlue,
+                        Text(
+                          'Events',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
-                          child: const Icon(Icons.event_available_outlined, color: Colors.white),
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Events',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Text(
-                              'View upcoming and past gatherings.',
-                              style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-                            ),
-                          ],
+                        Text(
+                          'View upcoming and past gatherings.',
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                  sliver: SliverToBoxAdapter(child: _buildFilters()),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 18)),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  sliver: _events.isEmpty
-                      ? const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(
-                            child: Text(
-                              'No events found.',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        )
-                      : SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final event = _events[index];
-                              return Padding(
-                                padding: EdgeInsets.only(bottom: index == _events.length - 1 ? 0 : 12),
-                                child: _buildEventCard(event),
-                              );
-                            },
-                            childCount: _events.length,
-                          ),
-                        ),
-                ),
-              ],
+              ),
             ),
-          ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              sliver: SliverToBoxAdapter(child: _buildFilters()),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 18)),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              sliver: _events.isEmpty
+                  ? const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Text(
+                          'No events found.',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    )
+                  : SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final event = _events[index];
+                          return Padding(
+                            padding: EdgeInsets.only(bottom: index == _events.length - 1 ? 0 : 12),
+                            child: _buildEventCard(event),
+                          );
+                        },
+                        childCount: _events.length,
+                      ),
+                    ),
+            ),
+          ],
         ),
       ],
     );
