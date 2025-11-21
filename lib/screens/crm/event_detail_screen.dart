@@ -42,6 +42,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
   late Event _currentEvent;
 
+  late Event _currentEvent;
+
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
   late TextEditingController _locationController;
