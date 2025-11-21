@@ -346,8 +346,10 @@ class _EventsScreenState extends State<EventsScreen> {
       color: Colors.black,
       child: SafeArea(
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-          slivers: [
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: <Widget>[
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               sliver: SliverToBoxAdapter(
@@ -359,7 +361,10 @@ class _EventsScreenState extends State<EventsScreen> {
                         shape: BoxShape.circle,
                         color: _momentumBlue,
                       ),
-                      child: const Icon(Icons.event_available_outlined, color: Colors.white),
+                      child: const Icon(
+                        Icons.event_available_outlined,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -374,7 +379,9 @@ class _EventsScreenState extends State<EventsScreen> {
                         ),
                         Text(
                           'View upcoming and past gatherings.',
-                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white70,
+                          ),
                         ),
                       ],
                     ),
@@ -404,7 +411,9 @@ class _EventsScreenState extends State<EventsScreen> {
                         (context, index) {
                           final event = _events[index];
                           return Padding(
-                            padding: EdgeInsets.only(bottom: index == _events.length - 1 ? 0 : 12),
+                            padding: EdgeInsets.only(
+                              bottom: index == _events.length - 1 ? 0 : 12,
+                            ),
                             child: _buildEventCard(event),
                           );
                         },
