@@ -53,7 +53,7 @@ class Donation {
       sentThankYou: json['sent_thank_you'] == true,
       eventId: json['event_id'] as String?,
       eventName: json['event_name'] as String? ??
-          (json['events'] is Map<String, dynamic> ? json['events']['name'] as String? : null),
+          (json['events'] is Map<String, dynamic> ? json['events']['title'] as String? : null),
       donorName: donorName,
       donorEmail: donorEmail,
       donorPhone: donorPhone,
