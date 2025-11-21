@@ -19,7 +19,7 @@ class EventRepository {
   }) async {
     if (!isReady) return [];
 
-    var query = _readClient.from('events').select('*, created_by_member:created_by (*)');
+    var query = _readClient.from('events').select('*');
 
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
       query = query.ilike('title', '%${searchQuery.trim()}%');
@@ -69,7 +69,7 @@ class EventRepository {
         .from('events')
         .update(payload)
         .eq('id', eventId)
-        .select('*, created_by_member:created_by (*)')
+        .select('*')
         .single();
     return Event.fromJson(response as Map<String, dynamic>);
   }
