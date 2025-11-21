@@ -34,18 +34,20 @@
   <link rel="icon" type="image/x-icon" href="icons/favicon.ico">
 
   <!-- Apple MapKit JS Library -->
-  <script 
-    src="https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.core.js" 
+  <script
+    src="https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.core.js"
     crossorigin="anonymous"
     data-libraries="map,annotations,services">
   </script>
-  
+
   <!-- MapKit Initialization Helper -->
   <script>
+    console.log('[MapKit Setup] Initialization script loaded');
+
     // CRITICAL: This prevents "mapkit is not defined" and "$1 is not a function" errors
     window.mapKitLoaded = false;
     window.mapKitCallbacks = [];
-    
+
     // Poll for MapKit availability since it loads asynchronously
     (function checkMapKit() {
       if (window.mapkit && window.mapkit.init) {
@@ -54,13 +56,15 @@
         window.mapKitCallbacks.forEach(cb => cb());
         window.mapKitCallbacks = [];
       } else {
+        console.log('[MapKit] Still waiting for library...');
         setTimeout(checkMapKit, 100); // Check every 100ms
       }
     })();
-    
+
     // Helper function for Flutter code to use
     // This is what event_map_widget.dart calls via js.context.callMethod('whenMapKitReady', ...)
     window.whenMapKitReady = function(callback) {
+      console.log('[MapKit] whenMapKitReady called, loaded:', window.mapKitLoaded);
       if (window.mapKitLoaded) {
         callback();
       } else {
