@@ -265,6 +265,7 @@ class EventAttendee {
     bool? checkedIn,
     DateTime? checkedInAt,
     String? checkedInBy,
+    Member? member,
     double? totalDonated,
     bool? isRecurringDonor,
   }) {
@@ -283,7 +284,7 @@ class EventAttendee {
       notes: notes,
       checkedInAt: checkedInAt ?? this.checkedInAt,
       checkedInBy: checkedInBy ?? this.checkedInBy,
-      member: member,
+      member: member ?? this.member,
       totalDonated: totalDonated ?? this.totalDonated,
       isRecurringDonor: isRecurringDonor ?? this.isRecurringDonor,
     );
