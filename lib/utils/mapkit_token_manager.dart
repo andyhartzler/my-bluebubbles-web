@@ -4,10 +4,10 @@ import 'dart:html' as html;
 /// CRITICAL: Each domain requires its own token from Apple Developer
 class MapKitTokenManager {
   // Token for moyd.app domain
-  static const String _moydToken = 'PASTE_MAPKIT_TOKEN_MOYD_VALUE_HERE';
+  static const String _moydToken = 'eyJraWQiOiIzVzRCOFNLS1E5IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiJGU1lBRENTRDY3IiwiaWF0IjoxNzYzNzI3NzY3LCJvcmlnaW4iOiJtb3lkLmFwcCIsImV4cCI6MTgyNjc3NjgwMH0.I9FivsGCQZsdluZWIEIs5PlUL-YP0FtxSYeUrHRL4PMZnMSD-xSKpt5n23RKGBFg7Gg-b0UDBgXz5g_Bg4zmow';
 
   // Token for *.netlify.app domains (includes preview deployments)
-  static const String _netlifyToken = 'PASTE_MAPKIT_TOKEN_NETLIFY_VALUE_HERE';
+  static const String _netlifyToken = 'eyJraWQiOiIyOTk4WFNONFlWIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiJGU1lBRENTRDY3IiwiaWF0IjoxNzYzNzI3NzY3LCJvcmlnaW4iOiIqLm5ldGxpZnkuYXBwIiwiZXhwIjoxODI2Nzc2ODAwfQ.DfLGu5QCgZsMnZxdGEvZeL73LZT2BnevA0a7CaAoUa3fWuOxxa6czPPgEWU07qXzzPVBWp7EgCVpIii5oa40pg';
 
   /// Returns the appropriate token based on current hostname
   /// Falls back to Netlify token for localhost development
