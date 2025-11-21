@@ -196,6 +196,23 @@ class CRMMessageService {
     );
   }
 
+  Future<bool> sendRegistrationLink({
+    required String phoneNumber,
+    required String eventName,
+    required String registrationLink,
+  }) async {
+    if (!_isReady) return false;
+
+    final message =
+        'Complete your registration for $eventName at Missouri Young Democrats: $registrationLink';
+    return _sendSingleMessage(
+      phoneNumber: phoneNumber,
+      message: message,
+      includeContactCard: false,
+      attachments: const [],
+    );
+  }
+
   Future<void> handleIncomingAutomation(Chat chat, Message message) async {
     if (!_isReady) return;
     if (message.isFromMe ?? true) return;
