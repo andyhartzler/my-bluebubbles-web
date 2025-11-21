@@ -1,14 +1,18 @@
-import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
-
+import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/models/crm/donation.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/donor_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/services/services.dart';
+import 'package:bluebubbles/utils/string_utils.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class DonorDetailScreen extends StatefulWidget {
   final String donorId;
@@ -35,6 +39,8 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   bool _loading = true;
   String? _error;
   Donor? _donor;
+  bool _sendingEmail = false;
+  bool _startingMessage = false;
 
   @override
   void initState() {
@@ -238,12 +244,12 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
               runSpacing: 8,
               children: [
                 ElevatedButton.icon(
-                  onPressed: donor.phone == null ? null : () => _launch(Uri.parse('sms:${donor.phone}')),
+                  onPressed: donor.phone == null || _startingMessage ? null : _startMessage,
                   icon: const Icon(Icons.sms_outlined),
                   label: const Text('Send message'),
                 ),
                 ElevatedButton.icon(
-                  onPressed: donor.email == null ? null : () => _launch(Uri.parse('mailto:${donor.email}')),
+                  onPressed: donor.email == null || _sendingEmail ? null : _composeEmail,
                   icon: const Icon(Icons.email_outlined),
                   label: const Text('Send email'),
                 ),
@@ -492,6 +498,119 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     );
   }
 
+  Future<void> _startMessage() async {
+    final donor = _donor;
+    if (donor == null) return;
+
+    final address = _cleanText(donor.phone);
+    if (address == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No phone number available')),
+      );
+      return;
+    }
+
+    setState(() => _startingMessage = true);
+
+    try {
+      final normalized = address.contains('@') ? address : cleansePhoneNumber(address);
+      final lookup = await _lookupServiceAvailability(normalized);
+      final isIMessage = lookup ?? normalized.contains('@');
+
+      await Navigator.of(context, rootNavigator: true).push(
+        ThemeSwitcher.buildPageRoute(
+          builder: (context) => TitleBarWrapper(
+            child: ChatCreator(
+              initialSelected: [
+                SelectedContact(
+                  displayName: donor.name,
+                  address: normalized,
+                  isIMessage: isIMessage,
+                ),
+              ],
+              initialAttachments: const [],
+              launchConversationOnSend: false,
+              popOnSend: false,
+              onMessageSent: (_) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Message sent to ${donor.name ?? 'donor'}')),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to open chat composer: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _startingMessage = false);
+      } else {
+        _startingMessage = false;
+      }
+    }
+  }
+
+  Future<void> _composeEmail() async {
+    final donor = _donor;
+    if (donor == null) return;
+
+    final email = _cleanText(donor.email);
+    if (email == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No email address available')),
+      );
+      return;
+    }
+
+    setState(() => _sendingEmail = true);
+
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BulkEmailScreen(
+            initialManualEmails: [email],
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to open email composer: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _sendingEmail = false);
+      } else {
+        _sendingEmail = false;
+      }
+    }
+  }
+
+  Future<bool?> _lookupServiceAvailability(String address) async {
+    try {
+      final response = await http.handleiMessageState(address);
+      final data = response.data['data'];
+      if (data is Map<String, dynamic>) {
+        final available = data['available'];
+        if (available is bool) {
+          return available;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String? _cleanText(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
   String _formatCurrency(double value) {
     final format = NumberFormat.simpleCurrency();
     return format.format(value);
@@ -517,15 +636,6 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => MemberDetailScreen(member: member)),
     );
-  }
-
-  Future<void> _launch(Uri uri) async {
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open ${uri.toString()}')),
-      );
-    }
   }
 
   String _initialForDonor(Donor donor) {
