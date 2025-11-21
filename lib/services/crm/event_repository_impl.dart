@@ -200,6 +200,17 @@ class EventRepository {
   }) async {
     if (!isReady) return null;
 
+    // Validate UUID format before querying database
+    final uuidRegex = RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+      caseSensitive: false,
+    );
+
+    if (!uuidRegex.hasMatch(memberUUID.trim())) {
+      throw Exception('Invalid QR code format. Please scan a valid membership card.');
+    }
+
+    // First, verify the member exists in the members table
     final memberData = await _readClient
         .from('members')
         .select('id,name,email,phone,date_joined')
@@ -207,9 +218,10 @@ class EventRepository {
         .maybeSingle();
 
     if (memberData == null) {
-      throw Exception('Member not found with UUID: $memberUUID');
+      throw Exception('Member not found. Please ensure this is a valid membership card.');
     }
 
+    // Check if they already have an attendee record for this event
     final existing = await _readClient
         .from('event_attendees')
         .select('*, members:member_id(*)')
@@ -220,26 +232,30 @@ class EventRepository {
     if (existing != null) {
       final attendee = EventAttendee.fromJson(existing as Map<String, dynamic>);
 
+      // If already checked in, return existing record
       if (attendee.checkedIn) {
         return attendee;
       }
 
+      // Update existing RSVP to checked in
       final now = DateTime.now();
       await _writeClient
           .from('event_attendees')
           .update({
             'checked_in': true,
             'checked_in_at': now.toUtc().toIso8601String(),
-            'checked_in_by': 'qr_scan',
+            'checked_in_by': 'qr_code',
           })
           .eq('id', attendee.id);
 
       return attendee.copyWith(
         checkedIn: true,
         checkedInAt: now,
+        checkedInBy: 'qr_code',
       );
     }
 
+    // Member exists but hasn't RSVP'd - create walk-in attendee record
     final now = DateTime.now();
     final payload = {
       'event_id': eventId,
@@ -248,7 +264,7 @@ class EventRepository {
       'guest_count': 0,
       'checked_in': true,
       'checked_in_at': now.toUtc().toIso8601String(),
-      'checked_in_by': 'qr_scan',
+      'checked_in_by': 'qr_code',
     };
 
     return _insertAttendee(payload);
