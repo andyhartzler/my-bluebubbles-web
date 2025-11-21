@@ -2,6 +2,7 @@ import 'package:postgrest/postgrest.dart' show CountOption, PostgrestFilterBuild
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/models/crm/donation.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
 
 import 'supabase_service.dart';
@@ -13,6 +14,65 @@ class DonorRepository {
 
   SupabaseClient get _readClient =>
       _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+
+  Future<List<Donation>> fetchRecentDonations({int limit = 50}) async {
+    if (!isReady) return [];
+
+    final response = await _readClient
+        .from('donations')
+        .select('*, donor:donor_id(id,name,email,phone,member_id), events(name)')
+        .order('donation_date', ascending: false)
+        .limit(limit);
+
+    return (response as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(Donation.fromJson)
+        .toList();
+  }
+
+  Future<Donor?> fetchDonorDetails(String id) async {
+    if (!isReady) return null;
+
+    final response = await _readClient
+        .from('donors')
+        .select('*, donations(*, events(name))')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (response == null) return null;
+    return Donor.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<void> updateThankYouStatus(String donationId, bool sent) async {
+    if (!isReady) return;
+
+    await _readClient
+        .from('donations')
+        .update({'sent_thank_you': sent})
+        .eq('id', donationId);
+  }
+
+  Future<void> addManualDonation({
+    String? donorId,
+    required double amount,
+    required DateTime donationDate,
+    required String paymentMethod,
+    String? checkNumber,
+    String? notes,
+  }) async {
+    if (!isReady) return;
+
+    final payload = {
+      'donor_id': donorId,
+      'amount': amount,
+      'donation_date': donationDate.toIso8601String(),
+      'payment_method': paymentMethod,
+      'check_number': paymentMethod.toLowerCase() == 'check' ? checkNumber : null,
+      'notes': notes,
+    };
+
+    await _readClient.from('donations').insert(payload);
+  }
 
   Future<DonorFetchResult> fetchDonors({
     String? searchQuery,
