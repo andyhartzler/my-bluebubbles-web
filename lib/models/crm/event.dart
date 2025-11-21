@@ -66,6 +66,8 @@ class Event {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final Member? createdByMember;
+  final Map<String, dynamic>? socialShareImage;
+  final Map<String, dynamic>? websiteImage;
 
   const Event({
     required this.title,
@@ -85,6 +87,8 @@ class Event {
     this.createdAt,
     this.updatedAt,
     this.createdByMember,
+    this.socialShareImage,
+    this.websiteImage,
   });
 
   Event copyWith({
@@ -105,6 +109,8 @@ class Event {
     DateTime? createdAt,
     DateTime? updatedAt,
     Member? createdByMember,
+    Map<String, dynamic>? socialShareImage,
+    Map<String, dynamic>? websiteImage,
   }) {
     return Event(
       id: id ?? this.id,
@@ -124,6 +130,8 @@ class Event {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       createdByMember: createdByMember ?? this.createdByMember,
+      socialShareImage: socialShareImage ?? this.socialShareImage,
+      websiteImage: websiteImage ?? this.websiteImage,
     );
   }
 
@@ -142,6 +150,8 @@ class Event {
       'checkin_enabled': checkinEnabled,
       'status': status,
       'created_by': createdBy,
+      'social_share_image': socialShareImage,
+      'website_image': websiteImage,
     };
   }
 
@@ -159,6 +169,8 @@ class Event {
       'max_attendees': maxAttendees,
       'checkin_enabled': checkinEnabled,
       'status': status,
+      'social_share_image': socialShareImage,
+      'website_image': websiteImage,
     };
   }
 
@@ -168,6 +180,9 @@ class Event {
     if (creatorJson is Map<String, dynamic>) {
       createdByMember = Member.fromJson(creatorJson);
     }
+
+    final rawSocialShare = json['social_share_image'];
+    final rawWebsiteImage = json['website_image'];
 
     return Event(
       id: json['id'] as String?,
@@ -187,6 +202,8 @@ class Event {
       createdAt: _parseDateTime(json['created_at'], fieldName: 'created_at'),
       updatedAt: _parseDateTime(json['updated_at'], fieldName: 'updated_at'),
       createdByMember: createdByMember,
+      socialShareImage: rawSocialShare is Map<String, dynamic> ? rawSocialShare : null,
+      websiteImage: rawWebsiteImage is Map<String, dynamic> ? rawWebsiteImage : null,
     );
   }
 }
