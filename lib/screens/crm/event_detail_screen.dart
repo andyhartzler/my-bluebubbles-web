@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 
+import 'package:bluebubbles/database/global/platform_file.dart'
+    as bluebubbles_file;
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
 import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
@@ -199,9 +201,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
     setState(() => _saving = true);
     try {
+      final pickedFile = result.files.first;
+      final platformFile = bluebubbles_file.PlatformFile(
+        path: pickedFile.path,
+        name: pickedFile.name,
+        size: pickedFile.size,
+        bytes: pickedFile.bytes,
+      );
+
       final updated = await _repository.uploadEventImage(
         eventId: _currentEvent.id!,
-        file: result.files.first,
+        file: platformFile,
         isSocialShare: isSocialShare,
       );
       if (!mounted) return;
