@@ -1,5 +1,7 @@
 import 'package:collection/collection.dart';
 
+import 'donation.dart';
+
 class Donor {
   final String? id;
   final String? name;
@@ -9,6 +11,7 @@ class Donor {
   final double? totalDonated;
   final bool? isRecurringDonor;
   final DateTime? createdAt;
+  final List<Donation> donations;
   final Map<String, dynamic> extra;
 
   const Donor({
@@ -20,6 +23,7 @@ class Donor {
     this.totalDonated,
     this.isRecurringDonor,
     this.createdAt,
+    this.donations = const [],
     this.extra = const {},
   });
 
@@ -33,6 +37,7 @@ class Donor {
       totalDonated: (json['total_donated'] as num?)?.toDouble(),
       isRecurringDonor: json['is_recurring_donor'] as bool?,
       createdAt: _parseDate(json['created_at']),
+      donations: _parseDonations(json['donations']),
       extra: Map<String, dynamic>.from(json),
     );
   }
@@ -46,6 +51,7 @@ class Donor {
     double? totalDonated,
     bool? isRecurringDonor,
     DateTime? createdAt,
+    List<Donation>? donations,
     Map<String, dynamic>? extra,
   }) {
     return Donor(
@@ -57,8 +63,22 @@ class Donor {
       totalDonated: totalDonated ?? this.totalDonated,
       isRecurringDonor: isRecurringDonor ?? this.isRecurringDonor,
       createdAt: createdAt ?? this.createdAt,
+      donations: donations ?? this.donations,
       extra: extra ?? this.extra,
     );
+  }
+
+  static List<Donation> _parseDonations(dynamic value) {
+    final list = (value as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(Donation.fromJson)
+        .toList();
+    list.sort((a, b) {
+      final aDate = a.donationDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = b.donationDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
+    return list;
   }
 
   static DateTime? _parseDate(dynamic value) {

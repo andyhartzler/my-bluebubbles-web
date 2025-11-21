@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'package:bluebubbles/models/crm/donation.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/donor_repository.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 class DonorDetailScreen extends StatefulWidget {
@@ -22,7 +25,11 @@ class DonorDetailScreen extends StatefulWidget {
 }
 
 class _DonorDetailScreenState extends State<DonorDetailScreen> {
+  static const Color _unityBlue = Color(0xFF273351);
+  static const Color _momentumBlue = Color(0xFF32A6DE);
+
   final DonorRepository _repository = DonorRepository();
+  final MemberRepository _memberRepository = MemberRepository();
   final CRMSupabaseService _supabase = CRMSupabaseService();
 
   bool _loading = true;
@@ -118,15 +125,14 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     final donationCount = completedDonations.length;
     final averageGift = donationCount > 0 ? totalGiven / donationCount : null;
     final lastDonationDate = completedDonations
-        .map((d) => d.donatedAt)
+        .map((d) => d.donationDate)
         .whereType<DateTime>()
         .fold<DateTime?>(null, (latest, date) {
       if (latest == null) return date;
       return date.isAfter(latest) ? date : latest;
     });
     final eventsCount = donations.where((d) => (d.eventId ?? d.eventName) != null).length;
-    final isRecurring = donor.isRecurringDonor ??
-        donations.any((d) => d.recurring == true);
+    final isRecurring = donor.isRecurringDonor ?? false;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -137,7 +143,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
           const SizedBox(height: 16),
           _buildContactCard(theme, donor),
           const SizedBox(height: 16),
-          _buildMemberLinkCard(theme, donor.member),
+          _buildMemberLinkCard(theme, donor.memberId),
           const SizedBox(height: 16),
           _buildSummaryCard(
             theme,
@@ -148,6 +154,8 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
             eventsCount: eventsCount,
             isRecurring: isRecurring,
           ),
+          const SizedBox(height: 16),
+          _buildGivingChart(theme, donations),
           const SizedBox(height: 16),
           _buildDonationHistory(theme, donations),
         ],
@@ -224,14 +232,31 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
             const SizedBox(height: 12),
             _buildInfoRow('Email', donor.email ?? 'Not provided'),
             _buildInfoRow('Phone', donor.phone ?? 'Not provided'),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: donor.phone == null ? null : () => _launch(Uri.parse('sms:${donor.phone}')),
+                  icon: const Icon(Icons.sms_outlined),
+                  label: const Text('Send message'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: donor.email == null ? null : () => _launch(Uri.parse('mailto:${donor.email}')),
+                  icon: const Icon(Icons.email_outlined),
+                  label: const Text('Send email'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMemberLinkCard(ThemeData theme, Member? member) {
-    if (member == null) {
+  Widget _buildMemberLinkCard(ThemeData theme, String? memberId) {
+    if (memberId == null) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -254,20 +279,13 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                 children: [
                   Text('Linked member', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Text(member.name ?? 'Unknown member'),
-                  if (member.phone != null)
-                    Text(member.phone!, style: theme.textTheme.bodySmall),
+                  Text('Member ID: $memberId'),
+                  const Text('Tap below to view full profile.'),
                 ],
               ),
             ),
             ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => MemberDetailScreen(member: member),
-                  ),
-                );
-              },
+              onPressed: () => _openMember(memberId),
               icon: const Icon(Icons.open_in_new),
               label: const Text('View member'),
             ),
@@ -313,6 +331,64 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     );
   }
 
+  Widget _buildGivingChart(ThemeData theme, List<Donation> donations) {
+    if (donations.isEmpty) return const SizedBox.shrink();
+
+    final recent = [...donations]
+      ..sort((a, b) => (b.donationDate ?? DateTime(0)).compareTo(a.donationDate ?? DateTime(0)));
+    final sample = recent.take(6).toList();
+    final maxAmount = sample.map((d) => d.amount ?? 0).fold<double>(0, (a, b) => a > b ? a : b);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Giving snapshot', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: sample.map((donation) {
+                final amount = donation.amount ?? 0;
+                final height = maxAmount == 0 ? 10.0 : (amount / maxAmount) * 120 + 10;
+                return Expanded(
+                  child: Column(
+                    children: [
+                      Container(
+                        height: height,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          gradient: const LinearGradient(
+                            colors: [_unityBlue, _momentumBlue],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _formatCurrency(amount),
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        donation.donationDate != null ? DateFormat.Md().format(donation.donationDate!) : '—',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDonationHistory(ThemeData theme, List<Donation> donations) {
     if (donations.isEmpty) {
       return Card(
@@ -325,8 +401,8 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
 
     final sorted = [...donations]
       ..sort((a, b) {
-        final aDate = a.donatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate = b.donatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final aDate = a.donationDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = b.donationDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         return bDate.compareTo(aDate);
       });
 
@@ -343,22 +419,22 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
               physics: const NeverScrollableScrollPhysics(),
               itemBuilder: (context, index) {
                 final donation = sorted[index];
-                final dateText = donation.donatedAt != null
-                    ? DateFormat.yMMMd().format(donation.donatedAt!)
+                final dateText = donation.donationDate != null
+                    ? DateFormat.yMMMd().format(donation.donationDate!)
                     : 'Date unknown';
                 final title = _formatCurrency(donation.amount ?? 0);
                 final subtitle = [
                   dateText,
                   if (donation.eventName != null) 'Event: ${donation.eventName}',
-                  if (donation.eventDate != null)
-                    'Event Date: ${DateFormat.yMMMd().format(donation.eventDate!)}',
-                  if (donation.method != null) 'Method: ${donation.method}',
-                  if (donation.status != null) 'Status: ${donation.status}',
+                  if (donation.paymentMethod != null) 'Method: ${donation.paymentMethod}',
+                  if (donation.sentThankYou) 'Thank you sent',
                 ].join(' • ');
                 final notes = donation.notes?.trim();
 
-                return ListTile(
-                  leading: const Icon(Icons.volunteer_activism),
+                return CheckboxListTile(
+                  value: donation.sentThankYou,
+                  onChanged: (value) => _toggleThankYou(donation, value ?? false),
+                  secondary: const Icon(Icons.volunteer_activism),
                   title: Text(title),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,13 +447,8 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                         ),
                     ],
                   ),
-                  trailing: donation.recurring == true
-                      ? const Icon(Icons.autorenew, color: Colors.green)
-                      : null,
-                  isThreeLine: notes != null && notes.isNotEmpty,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  controlAffinity: ListTileControlAffinity.trailing,
                   dense: true,
-                  minVerticalPadding: 8,
                 );
               },
               separatorBuilder: (_, __) => const Divider(height: 1),
@@ -424,6 +495,37 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   String _formatCurrency(double value) {
     final format = NumberFormat.simpleCurrency();
     return format.format(value);
+  }
+
+  Future<void> _toggleThankYou(Donation donation, bool sent) async {
+    setState(() {
+      _donor = _donor?.copyWith(
+        donations: _donor?.donations
+                .map((d) => d.id == donation.id ? d.copyWith(sentThankYou: sent) : d)
+                .toList() ??
+            [],
+      );
+    });
+
+    await _repository.updateThankYouStatus(donation.id, sent);
+  }
+
+  Future<void> _openMember(String memberId) async {
+    final member = await _memberRepository.getMemberById(memberId);
+    if (member == null || !mounted) return;
+    // ignore: use_build_context_synchronously
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => MemberDetailScreen(member: member)),
+    );
+  }
+
+  Future<void> _launch(Uri uri) async {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open ${uri.toString()}')),
+      );
+    }
   }
 
   String _initialForDonor(Donor donor) {
