@@ -65,7 +65,8 @@ class EventRepository {
     if (!isReady) {
       throw Exception('CRM not configured');
     }
-    if (event.id == null) {
+    final eventId = event.id;
+    if (eventId == null) {
       throw Exception('Cannot update event without id');
     }
 
@@ -73,7 +74,7 @@ class EventRepository {
     final response = await _writeClient
         .from('events')
         .update(payload)
-        .eq('id', event.id)
+        .eq('id', eventId)
         .select('*, created_by_member:created_by (*)')
         .single();
     return Event.fromJson(response as Map<String, dynamic>);
@@ -108,7 +109,7 @@ class EventRepository {
       final donorData = await _readClient
           .from('donors')
           .select('member_id,total_donated,is_recurring_donor')
-          .in_('member_id', memberIds.toList());
+          .inFilter('member_id', memberIds.toList());
       for (final row in donorData as List<dynamic>) {
         final map = row as Map<String, dynamic>;
         final memberId = map['member_id'] as String?;
@@ -123,7 +124,7 @@ class EventRepository {
       final donorData = await _readClient
           .from('donors')
           .select('phone,total_donated,is_recurring_donor')
-          .in_('phone', guestPhones.toList());
+          .inFilter('phone', guestPhones.toList());
       for (final row in donorData as List<dynamic>) {
         final map = row as Map<String, dynamic>;
         final phone = map['phone'] as String?;
@@ -186,7 +187,7 @@ class EventRepository {
             .from('donors')
             .select('id,name,email,phone,member_id,total_donated,is_recurring_donor')
             .eq('phone', candidate)
-            .is_('member_id', null)
+            .isFilter('member_id', null)
             .limit(1);
         if (donorData is List && donorData.isNotEmpty) {
           donorRow = donorData.first as Map<String, dynamic>;
