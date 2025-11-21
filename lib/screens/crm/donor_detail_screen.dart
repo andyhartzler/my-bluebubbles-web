@@ -523,7 +523,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
             child: ChatCreator(
               initialSelected: [
                 SelectedContact(
-                  displayName: donor.name,
+                  displayName: donor.name ?? '',
                   address: normalized,
                   isIMessage: isIMessage,
                 ),
@@ -531,7 +531,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
               initialAttachments: const [],
               launchConversationOnSend: false,
               popOnSend: false,
-              onMessageSent: (_) {
+              onMessageSent: (_) async {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Message sent to ${donor.name ?? 'donor'}')),
