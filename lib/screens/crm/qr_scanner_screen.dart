@@ -15,6 +15,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   );
 
   bool _isProcessing = false;
+  bool _torchEnabled = false;
 
   @override
   void dispose() {
@@ -46,26 +47,16 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
         title: const Text('Scan Member QR Code'),
         actions: [
           IconButton(
-            icon: ValueListenableBuilder(
-              valueListenable: _controller.torchState,
-              builder: (context, state, child) {
-                if (state == TorchState.unavailable) {
-                  return const Icon(Icons.flash_off);
-                }
-                return state == TorchState.on
-                    ? const Icon(Icons.flash_on)
-                    : const Icon(Icons.flash_off);
-              },
-            ),
-            onPressed: () => _controller.toggleTorch(),
+            icon: Icon(_torchEnabled ? Icons.flash_on : Icons.flash_off),
+            onPressed: () {
+              setState(() {
+                _torchEnabled = !_torchEnabled;
+              });
+              _controller.toggleTorch();
+            },
           ),
           IconButton(
-            icon: ValueListenableBuilder(
-              valueListenable: _controller.cameraFacingState,
-              builder: (context, state, child) {
-                return const Icon(Icons.flip_camera_ios);
-              },
-            ),
+            icon: const Icon(Icons.flip_camera_ios),
             onPressed: () => _controller.switchCamera(),
           ),
         ],
