@@ -33,6 +33,41 @@
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="icons/favicon.ico">
 
+  <!-- Apple MapKit JS -->
+  <script
+    src="https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.core.js"
+    crossorigin="anonymous"
+    data-libraries="map,annotations,services">
+  </script>
+
+  <!-- MapKit Initialization Helper -->
+  <script>
+    // CRITICAL: This prevents the common "mapkit is not defined" error
+    window.mapKitLoaded = false;
+    window.mapKitCallbacks = [];
+
+    // Poll for MapKit availability since it loads asynchronously
+    (function checkMapKit() {
+      if (window.mapkit && window.mapkit.init) {
+        console.log('[MapKit] Library detected and ready');
+        window.mapKitLoaded = true;
+        window.mapKitCallbacks.forEach(cb => cb());
+        window.mapKitCallbacks = [];
+      } else {
+        setTimeout(checkMapKit, 100); // Check every 100ms
+      }
+    })();
+
+    // Helper function for Flutter code to use
+    window.whenMapKitReady = function(callback) {
+      if (window.mapKitLoaded) {
+        callback();
+      } else {
+        window.mapKitCallbacks.push(callback);
+      }
+    };
+  </script>
+
   <title>BlueBubbles</title>
   <link rel="manifest" href="manifest.json">
 

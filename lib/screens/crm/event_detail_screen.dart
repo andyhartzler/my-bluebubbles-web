@@ -1,11 +1,7 @@
 import 'dart:async';
 
-import 'dart:ui' as ui;
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:universal_html/html.dart' as html;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 
@@ -18,6 +14,7 @@ import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
+import 'package:bluebubbles/widgets/event_map_widget.dart';
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
@@ -910,13 +907,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   }
 
   Widget _buildMapCard() {
-    final address = _currentEvent.locationAddress;
-    if (address == null || address.isEmpty) return const SizedBox.shrink();
+    final location = _currentEvent.location ?? _currentEvent.locationAddress;
+    if (location == null || location.isEmpty) return const SizedBox.shrink();
 
+    final address = _currentEvent.locationAddress ?? location;
     final mapsUri = Uri.https('maps.apple.com', '/', {
       'q': address,
     });
-    final embedUri = mapsUri.replace(queryParameters: {...mapsUri.queryParameters, 'output': 'embed'});
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -924,9 +921,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 240,
-            child: _AppleMapsEmbed(embedUri: embedUri, launchUri: mapsUri),
+          EventMapWidget(
+            location: location,
+            locationAddress: _currentEvent.locationAddress,
+            eventTitle: _currentEvent.title,
           ),
           ListTile(
             leading: const Icon(Icons.map_outlined, color: _unityBlue),
@@ -1458,95 +1456,3 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       ),
     );
   }
-}
-
-class _AppleMapsEmbed extends StatefulWidget {
-  const _AppleMapsEmbed({required this.embedUri, required this.launchUri});
-
-  final Uri embedUri;
-  final Uri launchUri;
-
-  @override
-  State<_AppleMapsEmbed> createState() => _AppleMapsEmbedState();
-}
-
-class _AppleMapsEmbedState extends State<_AppleMapsEmbed> {
-  static const String _viewType = 'event-apple-maps-view';
-  static bool _registered = false;
-  static final Map<int, html.IFrameElement> _iframes = <int, html.IFrameElement>{};
-
-  int? _viewId;
-
-  @override
-  void initState() {
-    super.initState();
-    if (kIsWeb) {
-      _ensureRegistered();
-    }
-  }
-
-  @override
-  void dispose() {
-    if (_viewId != null) {
-      _iframes.remove(_viewId!);
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!kIsWeb) {
-      return InkWell(
-        onTap: () => launchUrl(widget.launchUri, mode: LaunchMode.externalApplication),
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [_unityBlue, _momentumBlue],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: const Center(
-            child: Icon(Icons.map_outlined, color: Colors.white, size: 64),
-          ),
-        ),
-      );
-    }
-
-    return HtmlElementView(
-      viewType: _viewType,
-      onPlatformViewCreated: (int viewId) {
-        _viewId = viewId;
-        _setSource();
-      },
-    );
-  }
-
-  void _ensureRegistered() {
-    if (_registered) return;
-
-    // ignore: undefined_prefixed_name
-    ui.platformViewRegistry.registerViewFactory(
-      _viewType,
-      (int viewId) {
-        final element = html.IFrameElement()
-          ..style.border = '0'
-          ..allowFullscreen = true
-          ..src = widget.embedUri.toString();
-        _iframes[viewId] = element;
-        return element;
-      },
-    );
-
-    _registered = true;
-  }
-
-  void _setSource() {
-    if (!kIsWeb || _viewId == null) return;
-
-    final element = _iframes[_viewId!];
-    if (element != null) {
-      element.src = widget.embedUri.toString();
-    }
-  }
-}
