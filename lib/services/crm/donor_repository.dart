@@ -30,20 +30,17 @@ class DonorRepository {
       return const DonorFetchResult(donors: []);
     }
 
-    PostgrestFilterBuilder<dynamic> query = _readClient.from('donors').select('*');
+    final allowedSorts = <String>{'name', 'total_donated', 'created_at', 'phone', 'member_id'};
+    final resolvedSort = allowedSorts.contains(sortBy) ? sortBy : 'name';
 
-    query = _applyFilters(
-      query,
+    var query = _applyFilters(
+      _readClient.from('donors').select('*'),
       searchQuery: searchQuery,
       recurring: recurring,
       linkedToMember: linkedToMember,
       minTotal: minTotal,
       maxTotal: maxTotal,
-    );
-
-    final allowedSorts = <String>{'name', 'total_donated', 'created_at', 'phone', 'member_id'};
-    final resolvedSort = allowedSorts.contains(sortBy) ? sortBy : 'name';
-    query = query.order(resolvedSort, ascending: ascending).order('id', ascending: true);
+    ).order(resolvedSort, ascending: ascending).order('id', ascending: true);
 
     if (limit != null && offset != null) {
       query = query.range(offset, offset + limit - 1);
