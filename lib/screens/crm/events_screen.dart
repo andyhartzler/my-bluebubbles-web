@@ -295,7 +295,6 @@ class _EventsScreenState extends State<EventsScreen> {
           icon: const Icon(Icons.refresh),
           label: const Text('Reset'),
         ),
-        const Spacer(),
         ElevatedButton.icon(
           onPressed: _createEvent,
           style: ElevatedButton.styleFrom(backgroundColor: _unityBlue, foregroundColor: Colors.white),
