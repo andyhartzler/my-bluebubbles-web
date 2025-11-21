@@ -114,7 +114,7 @@ class _EventMapWidgetState extends State<EventMapWidget> {
       // CRITICAL: Check if MapKit has already been initialized globally
       // This prevents "mapkit.init() can only be called once" errors
       final mapkit = js.context['mapkit'];
-      if (mapkit == null) {
+      if (mapkit == null || mapkit['init'] == null) {
         throw Exception('MapKit library not loaded');
       }
 
@@ -122,17 +122,14 @@ class _EventMapWidgetState extends State<EventMapWidget> {
       final isInitialized = js.context['_mapkitInitialized'] ?? false;
       if (!isInitialized) {
         print('[EventMap] First MapKit initialization');
-        final initOptions = js_util.newObject();
-        js_util.setProperty(
-          initOptions,
-          'authorizationCallback',
-          js.allowInterop((done) {
+        final initOptions = js_util.jsify({
+          'authorizationCallback': js.allowInterop((Function done) {
             print('[EventMap] Authorization callback invoked');
             done(token);
           }),
-        );
+        });
 
-        mapkit.callMethod('init', [initOptions]);
+        js_util.callMethod(mapkit, 'init', [initOptions]);
         js.context['_mapkitInitialized'] = true;
       } else {
         print('[EventMap] MapKit already initialized globally');
