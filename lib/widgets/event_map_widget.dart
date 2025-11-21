@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:html' as html;
 import 'dart:ui' as ui;
 import 'dart:js' as js;
+import 'package:js/js_util.dart' as js_util;
 import '../utils/mapkit_token_manager.dart';
 
 class EventMapWidget extends StatefulWidget {
@@ -113,7 +114,7 @@ class _EventMapWidgetState extends State<EventMapWidget> {
       // CRITICAL: Check if MapKit has already been initialized globally
       // This prevents "mapkit.init() can only be called once" errors
       final mapkit = js.context['mapkit'];
-      if (mapkit == null) {
+      if (mapkit == null || mapkit['init'] == null) {
         throw Exception('MapKit library not loaded');
       }
 
@@ -121,14 +122,14 @@ class _EventMapWidgetState extends State<EventMapWidget> {
       final isInitialized = js.context['_mapkitInitialized'] ?? false;
       if (!isInitialized) {
         print('[EventMap] First MapKit initialization');
-        mapkit.callMethod('init', [
-          js.JsObject.jsify({
-            'authorizationCallback': js.allowInterop((done) {
-              print('[EventMap] Authorization callback invoked');
-              done(token);
-            })
-          })
-        ]);
+        final initOptions = js_util.jsify({
+          'authorizationCallback': js.allowInterop((Function done) {
+            print('[EventMap] Authorization callback invoked');
+            done(token);
+          }),
+        });
+
+        js_util.callMethod(mapkit, 'init', [initOptions]);
         js.context['_mapkitInitialized'] = true;
       } else {
         print('[EventMap] MapKit already initialized globally');
@@ -151,10 +152,25 @@ class _EventMapWidgetState extends State<EventMapWidget> {
     }
   }
 
-  void _createMap() {
+  Future<void> _createMap() async {
     try {
       print('[EventMap] Creating map for ${widget.location}');
       final mapkit = js.context['mapkit'];
+
+      // Ensure required MapKit libraries are loaded before use
+      final importLibrary = mapkit['importLibrary'];
+      if (importLibrary != null) {
+        print('[EventMap] Importing MapKit libraries');
+        await js_util.promiseToFuture(
+          js_util.callMethod(mapkit, 'importLibrary', ['map']),
+        );
+        await js_util.promiseToFuture(
+          js_util.callMethod(mapkit, 'importLibrary', ['annotations']),
+        );
+        await js_util.promiseToFuture(
+          js_util.callMethod(mapkit, 'importLibrary', ['services']),
+        );
+      }
 
       // Create geocoder
       final Geocoder = mapkit['Geocoder'];
