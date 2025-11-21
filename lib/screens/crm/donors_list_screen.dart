@@ -444,7 +444,11 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         IconButton(
           tooltip: 'Copy phone',
           icon: const Icon(Icons.copy),
-          onPressed: donor.phone == null ? null : Clipboard.setData(ClipboardData(text: donor.phone!)),
+          onPressed: donor.phone == null
+              ? null
+              : () async {
+                  await Clipboard.setData(ClipboardData(text: donor.phone!));
+                },
         ),
         if (donor.memberId != null)
           IconButton(
