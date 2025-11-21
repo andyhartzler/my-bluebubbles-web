@@ -194,6 +194,66 @@ class EventRepository {
     });
   }
 
+  Future<EventAttendee?> checkInByMemberUUID({
+    required String eventId,
+    required String memberUUID,
+  }) async {
+    if (!isReady) return null;
+
+    final memberData = await _readClient
+        .from('members')
+        .select('id,name,email,phone,date_joined')
+        .eq('id', memberUUID)
+        .maybeSingle();
+
+    if (memberData == null) {
+      throw Exception('Member not found with UUID: $memberUUID');
+    }
+
+    final existing = await _readClient
+        .from('event_attendees')
+        .select('*, members:member_id(*)')
+        .eq('event_id', eventId)
+        .eq('member_id', memberUUID)
+        .maybeSingle();
+
+    if (existing != null) {
+      final attendee = EventAttendee.fromJson(existing as Map<String, dynamic>);
+
+      if (attendee.checkedIn) {
+        return attendee;
+      }
+
+      final now = DateTime.now();
+      await _writeClient
+          .from('event_attendees')
+          .update({
+            'checked_in': true,
+            'checked_in_at': now.toUtc().toIso8601String(),
+            'checked_in_by': 'qr_scan',
+          })
+          .eq('id', attendee.id);
+
+      return attendee.copyWith(
+        checkedIn: true,
+        checkedInAt: now,
+      );
+    }
+
+    final now = DateTime.now();
+    final payload = {
+      'event_id': eventId,
+      'member_id': memberUUID,
+      'rsvp_status': 'attending',
+      'guest_count': 0,
+      'checked_in': true,
+      'checked_in_at': now.toUtc().toIso8601String(),
+      'checked_in_by': 'qr_scan',
+    };
+
+    return _insertAttendee(payload);
+  }
+
   Future<EventAttendee?> checkInByPhone({
     required String eventId,
     required String phoneNumber,
