@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
+import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
@@ -226,6 +227,63 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     }
   }
 
+  Future<void> _handleQRScan() async {
+    if (widget.initialEvent.id == null) return;
+
+    try {
+      final scannedCode = await Navigator.of(context).push<String>(
+        MaterialPageRoute(
+          builder: (context) => const QRScannerScreen(),
+        ),
+      );
+
+      if (scannedCode == null || !mounted) return;
+
+      setState(() => _loadingAttendees = true);
+
+      final attendee = await _repository.checkInByMemberUUID(
+        eventId: widget.initialEvent.id!,
+        memberUUID: scannedCode.trim(),
+      );
+
+      if (!mounted) return;
+
+      setState(() => _loadingAttendees = false);
+
+      if (attendee == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to check in member'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      if (attendee.checkedInAt != null) {
+        final time = DateFormat.jm().format(attendee.checkedInAt!.toLocal());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${attendee.displayName} checked in at $time'),
+            backgroundColor: _grassrootsGreen,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _loadingAttendees = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _manualCheckIn(EventAttendee attendee) async {
     setState(() => _loadingAttendees = true);
     try {
@@ -364,41 +422,82 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   }
 
   Widget _buildPhoneLookupCard() {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Column(
+      children: [
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.phone_android_outlined, color: _unityBlue),
-                const SizedBox(width: 8),
-                Text('Phone Number Check-In',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Row(
+                  children: [
+                    const Icon(Icons.qr_code_scanner, color: _momentumBlue),
+                    const SizedBox(width: 8),
+                    Text('QR Code Check-In',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _loadingAttendees ? null : _handleQRScan,
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: const Text('Scan Member QR Code'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _momentumBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.all(16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text('Scan a member\'s digital membership card to check them in instantly.'),
               ],
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                hintText: 'Enter phone number',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.check_circle_outline),
-                  onPressed: _loadingAttendees ? null : _handlePhoneLookup,
-                ),
-              ),
-              onSubmitted: (_) => _handlePhoneLookup(),
-            ),
-            const SizedBox(height: 8),
-            const Text('Looks up members & donors by phone. Sends a registration link if not found.'),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.phone_android_outlined, color: _unityBlue),
+                    const SizedBox(width: 8),
+                    Text('Phone Number Check-In',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    hintText: 'Enter phone number',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.check_circle_outline),
+                      onPressed: _loadingAttendees ? null : _handlePhoneLookup,
+                    ),
+                  ),
+                  onSubmitted: (_) => _handlePhoneLookup(),
+                ),
+                const SizedBox(height: 8),
+                const Text('Looks up members & donors by phone. Sends a registration link if not found.'),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
