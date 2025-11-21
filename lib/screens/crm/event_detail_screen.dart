@@ -264,7 +264,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         final time = DateFormat.jm().format(attendee.checkedInAt!.toLocal());
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${attendee.displayName} checked in at $time'),
+            content: Text('✓ ${attendee.displayName} checked in at $time'),
             backgroundColor: _grassrootsGreen,
             duration: const Duration(seconds: 2),
           ),
@@ -275,10 +275,20 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
       setState(() => _loadingAttendees = false);
 
+      // Clean up error message formatting
+      String errorMessage = e.toString();
+      if (errorMessage.contains('Exception:')) {
+        errorMessage = errorMessage.split('Exception:').last.trim();
+      }
+      if (errorMessage.contains('PostgrestException')) {
+        errorMessage = 'Database error: Please try again or contact support.';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
+          content: Text(errorMessage),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
         ),
       );
     }
