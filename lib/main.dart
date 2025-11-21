@@ -30,6 +30,7 @@ import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:bluebubbles/screens/crm/events_screen.dart';
+import 'package:bluebubbles/screens/crm/donors_list_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:collection/collection.dart';
@@ -319,6 +320,7 @@ class Main extends StatelessWidget {
           ),
           getPages: [
             GetPage(name: '/auth/callback', page: AuthCallbackScreen.new),
+            GetPage(name: '/crm/donors', page: () => const DonorsListScreen()),
           ],
           home: SupabaseAuthGate(child: Home()),
           shortcuts: {
@@ -467,6 +469,7 @@ class Home extends StatefulWidget {
 enum _HomeSection {
   dashboard,
   members,
+  donors,
   chapters,
   meetings,
   events,
@@ -743,6 +746,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     children: [
                       const DashboardScreen(key: PageStorageKey('dashboard-view')),
                       const MembersListScreen(key: PageStorageKey('members-view'), embed: true),
+                      const DonorsListScreen(key: PageStorageKey('donors-view'), embed: true),
                       const MembersListScreen(
                         key: PageStorageKey('chapters-view'),
                         embed: true,
@@ -781,6 +785,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     final navButtons = [
       _buildNavButton(context, _HomeSection.dashboard, 'Dashboard', Icons.dashboard_outlined),
       _buildNavButton(context, _HomeSection.members, 'Members', Icons.groups_outlined, enabled: crmReady),
+      _buildNavButton(context, _HomeSection.donors, 'Donors', Icons.volunteer_activism_outlined, enabled: crmReady),
       _buildNavButton(context, _HomeSection.chapters, 'Chapters', Icons.account_tree_outlined, enabled: crmReady),
       _buildNavButton(context, _HomeSection.meetings, 'Meetings', Icons.video_camera_front_outlined, enabled: crmReady),
       _buildNavButton(context, _HomeSection.events, 'Events', Icons.event_available_outlined, enabled: crmReady),
@@ -1051,6 +1056,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   ),
                   buildItem(
                     order: 2,
+                    icon: Icons.volunteer_activism_outlined,
+                    label: 'Donors',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady ? () => _setSection(_HomeSection.donors) : null,
+                  ),
+                  buildItem(
+                    order: 3,
                     icon: Icons.account_tree_outlined,
                     label: 'Chapters',
                     enabled: crmReady,
@@ -1058,7 +1071,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.chapters) : null,
                   ),
                   buildItem(
-                    order: 3,
+                    order: 4,
                     icon: Icons.video_camera_front_outlined,
                     label: 'Meetings',
                     enabled: crmReady,
@@ -1066,7 +1079,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.meetings) : null,
                   ),
                   buildItem(
-                    order: 4,
+                    order: 5,
                     icon: Icons.event_available_outlined,
                     label: 'Events',
                     enabled: crmReady,
@@ -1074,7 +1087,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.events) : null,
                   ),
                   buildItem(
-                    order: 5,
+                    order: 6,
                     icon: Icons.notifications_active_outlined,
                     label: 'Wallet Notifications',
                     enabled: crmReady,
@@ -1082,14 +1095,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.walletNotifications) : null,
                   ),
                   buildItem(
-                    order: 6,
+                    order: 7,
                     icon: Icons.chat_bubble_outline,
                     label: 'Conversations',
                     onActivate: () => _setSection(_HomeSection.conversations),
                   ),
                   const Divider(),
                   buildItem(
-                    order: 7,
+                    order: 8,
                     icon: Icons.search,
                     label: 'Search CRM',
                     enabled: crmReady,
@@ -1097,19 +1110,19 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _openGlobalSearch(parentContext) : null,
                   ),
                   buildItem(
-                    order: 8,
+                    order: 9,
                     icon: Icons.add_comment,
                     label: 'New Message',
                     onActivate: () => _openNewMessage(parentContext),
                   ),
                   buildItem(
-                    order: 9,
+                    order: 10,
                     icon: Icons.email_outlined,
                     label: 'New Email',
                     onActivate: () => _openNewEmail(parentContext),
                   ),
                   buildItem(
-                    order: 10,
+                    order: 11,
                     icon: Icons.settings_outlined,
                     label: 'Settings',
                     onActivate: () => Actions.invoke(parentContext, const OpenSettingsIntent()),
