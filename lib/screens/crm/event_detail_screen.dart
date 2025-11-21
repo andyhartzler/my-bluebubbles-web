@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -44,6 +46,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   String? _attendeeError;
   _AttendeeFilter _attendeeFilter = _AttendeeFilter.all;
   String _attendeeSearch = '';
+  StreamSubscription<List<EventAttendee>>? _attendeeSub;
 
   @override
   void initState() {
@@ -67,6 +70,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
     if (event.id != null) {
       _loadAttendees();
+      _startAttendeeStream();
     }
   }
 
@@ -78,6 +82,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _locationAddressController.dispose();
     _maxAttendeesController.dispose();
     _phoneController.dispose();
+    _attendeeSub?.cancel();
     super.dispose();
   }
 
@@ -136,6 +141,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         );
       } else {
         _loadAttendees();
+        _startAttendeeStream();
       }
     } catch (e) {
       if (!mounted) return;
@@ -169,6 +175,27 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     }
   }
 
+  void _startAttendeeStream() {
+    if (widget.initialEvent.id == null) return;
+
+    _attendeeSub?.cancel();
+    _attendeeSub = _repository.watchAttendees(widget.initialEvent.id!).listen(
+      (attendees) {
+        if (!mounted) return;
+        setState(() {
+          _attendees = attendees;
+          _attendeeError = null;
+        });
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          _attendeeError = error.toString();
+        });
+      },
+    );
+  }
+
   Future<void> _handlePhoneLookup() async {
     if (widget.initialEvent.id == null) return;
     final phone = _phoneController.text.trim();
@@ -183,7 +210,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
     if (!mounted) return;
     _phoneController.clear();
-    await _loadAttendees();
+    setState(() => _loadingAttendees = false);
 
     if (attendee == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,13 +231,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     try {
       final updated = await _repository.manualCheckIn(attendee.id);
       if (!mounted) return;
-      setState(() {
-        final index = _attendees.indexWhere((a) => a.id == updated.id);
-        if (index != -1) {
-          _attendees[index] = updated;
-        }
-        _loadingAttendees = false;
-      });
+      setState(() => _loadingAttendees = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('${updated.displayName} checked in.')));
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingAttendees = false);
