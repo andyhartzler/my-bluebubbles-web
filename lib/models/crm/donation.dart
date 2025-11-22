@@ -38,6 +38,7 @@ class Donation {
     String? donorName;
     String? donorEmail;
     String? donorPhone;
+    String? donorPhoneE164;
     if (donor is Map<String, dynamic>) {
       donorName = donor['name'] as String?;
       donorEmail = donor['email'] as String?;
