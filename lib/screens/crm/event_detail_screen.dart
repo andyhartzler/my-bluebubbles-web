@@ -75,6 +75,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   late TextEditingController _eventDateDisplayController;
   late TextEditingController _eventEndDateDisplayController;
 
+  late FocusNode nameFocus;
+  late FocusNode emailFocus;
+  late FocusNode phoneFocus;
+  late FocusNode dobFocus;
+  late FocusNode addressFocus;
+  late FocusNode cityFocus;
+  late FocusNode stateFocus;
+  late FocusNode zipFocus;
+  late FocusNode employerFocus;
+  late FocusNode occupationFocus;
+  late FocusNode guestCountFocus;
+
   DateTime? _eventDate;
   DateTime? _eventEndDate;
   DateTime? _rsvpDeadline;
@@ -116,12 +128,47 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _checkinEnabled = event.checkinEnabled;
     _editingDetails = event.id == null;
 
+    _initFocusNodes();
+
     _syncDateDisplays();
 
     if (event.id != null) {
       _loadAttendees();
       _startAttendeeStream();
     }
+  }
+
+  void _initFocusNodes() {
+    nameFocus = FocusNode();
+    emailFocus = FocusNode();
+    phoneFocus = FocusNode();
+    dobFocus = FocusNode();
+    addressFocus = FocusNode();
+    cityFocus = FocusNode();
+    stateFocus = FocusNode();
+    zipFocus = FocusNode();
+    employerFocus = FocusNode();
+    occupationFocus = FocusNode();
+    guestCountFocus = FocusNode();
+  }
+
+  void _disposeFocusNodes() {
+    nameFocus.dispose();
+    emailFocus.dispose();
+    phoneFocus.dispose();
+    dobFocus.dispose();
+    addressFocus.dispose();
+    cityFocus.dispose();
+    stateFocus.dispose();
+    zipFocus.dispose();
+    employerFocus.dispose();
+    occupationFocus.dispose();
+    guestCountFocus.dispose();
+  }
+
+  void _resetFocusNodes() {
+    _disposeFocusNodes();
+    _initFocusNodes();
   }
 
   @override
@@ -134,6 +181,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _phoneController.dispose();
     _eventDateDisplayController.dispose();
     _eventEndDateDisplayController.dispose();
+    _disposeFocusNodes();
     _attendeeSub?.cancel();
     super.dispose();
   }
@@ -322,18 +370,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     final member = await _repository.previewMemberByPhone(phone);
     if (!mounted) return;
     setState(() => _loadingAttendees = false);
-
-    final nameFocus = FocusNode();
-    final emailFocus = FocusNode();
-    final phoneFocus = FocusNode();
-    final dobFocus = FocusNode();
-    final addressFocus = FocusNode();
-    final cityFocus = FocusNode();
-    final stateFocus = FocusNode();
-    final zipFocus = FocusNode();
-    final employerFocus = FocusNode();
-    final occupationFocus = FocusNode();
-    final guestCountFocus = FocusNode();
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1134,17 +1170,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       zipController.dispose();
       employerController.dispose();
       occupationController.dispose();
-      nameFocus.dispose();
-      emailFocus.dispose();
-      phoneFocus.dispose();
-      dobFocus.dispose();
-      addressFocus.dispose();
-      cityFocus.dispose();
-      stateFocus.dispose();
-      zipFocus.dispose();
-      employerFocus.dispose();
-      occupationFocus.dispose();
-      guestCountFocus.dispose();
+      _resetFocusNodes();
       debounce?.cancel();
       return;
     }
@@ -1197,17 +1223,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       zipController.dispose();
       employerController.dispose();
       occupationController.dispose();
-      nameFocus.dispose();
-      emailFocus.dispose();
-      phoneFocus.dispose();
-      dobFocus.dispose();
-      addressFocus.dispose();
-      cityFocus.dispose();
-      stateFocus.dispose();
-      zipFocus.dispose();
-      employerFocus.dispose();
-      occupationFocus.dispose();
-      guestCountFocus.dispose();
+      _resetFocusNodes();
       debounce?.cancel();
     }
   }
