@@ -244,6 +244,13 @@ class EventAttendee {
   final String? guestName;
   final String? guestEmail;
   final String? guestPhone;
+  final DateTime? dateOfBirth;
+  final String? address;
+  final String? city;
+  final String? state;
+  final String? zip;
+  final String? employer;
+  final String? occupation;
   final String rsvpStatus;
   final int? guestCount;
   final String? notes;
@@ -267,6 +274,13 @@ class EventAttendee {
     this.guestName,
     this.guestEmail,
     this.guestPhone,
+    this.dateOfBirth,
+    this.address,
+    this.city,
+    this.state,
+    this.zip,
+    this.employer,
+    this.occupation,
     this.guestCount,
     this.notes,
     this.checkedInAt,
@@ -297,6 +311,13 @@ class EventAttendee {
       guestName: guestName,
       guestEmail: guestEmail,
       guestPhone: guestPhone,
+      dateOfBirth: dateOfBirth,
+      address: address,
+      city: city,
+      state: state,
+      zip: zip,
+      employer: employer,
+      occupation: occupation,
       guestCount: guestCount,
       notes: notes,
       checkedInAt: checkedInAt ?? this.checkedInAt,
@@ -321,6 +342,13 @@ class EventAttendee {
       guestName: json['guest_name'] as String?,
       guestEmail: json['guest_email'] as String?,
       guestPhone: json['guest_phone'] as String?,
+      dateOfBirth: _parseDateTime(json['date_of_birth'], fieldName: 'date_of_birth'),
+      address: json['address'] as String?,
+      city: json['city'] as String?,
+      state: json['state'] as String?,
+      zip: json['zip'] as String?,
+      employer: json['employer'] as String?,
+      occupation: json['occupation'] as String?,
       rsvpStatus: json['rsvp_status'] as String? ?? 'attending',
       guestCount: _parseInt(json['guest_count']),
       notes: json['notes'] as String?,
