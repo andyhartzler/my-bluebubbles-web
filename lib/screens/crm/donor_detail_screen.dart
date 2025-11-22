@@ -240,23 +240,25 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   }
 
   Widget _buildContactCard(ThemeData theme, Donor donor) {
-    final formattedPhone = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone) ?? '+';
+    final formattedPhone = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone);
     final address = _formatAddress(donor);
-    final county = _cleanText(donor.county);
-    final district = _cleanText(donor.congressionalDistrict);
+    final county = _cleanCountyLabel(donor.county);
+    final district = _formatDistrictLabel(donor.congressionalDistrict);
     final dob = donor.dateOfBirth != null ? DateFormat.yMMMd().format(donor.dateOfBirth!) : null;
+    final email = _cleanText(donor.email);
 
     final pills = <Widget>[
-      _buildContactChip(
-        icon: Icons.sms_outlined,
-        label: formattedPhone,
-        tooltip: 'Mobile',
-      ),
-      if (_cleanText(donor.email) != null)
+      if (county != null)
         _buildContactChip(
-          icon: Icons.email_outlined,
-          label: donor.email!,
-          tooltip: 'Email',
+          icon: Icons.location_city_outlined,
+          label: county,
+          tooltip: 'County',
+        ),
+      if (district != null)
+        _buildContactChip(
+          icon: Icons.account_balance_outlined,
+          label: district,
+          tooltip: 'Congressional district',
         ),
       if (address != null)
         _buildContactChip(
@@ -264,27 +266,52 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
           label: address,
           tooltip: 'Address',
         ),
-      if (county != null)
+      if (formattedPhone != null)
         _buildContactChip(
-          icon: Icons.location_city_outlined,
-          label: '$county County',
-          tooltip: 'County',
+          icon: Icons.sms_outlined,
+          label: formattedPhone,
+          tooltip: 'Mobile',
         ),
-      if (district != null)
+      if (email != null)
         _buildContactChip(
-          icon: Icons.account_balance_outlined,
-          label: 'CD $district',
-          tooltip: 'Congressional district',
+          icon: Icons.email_outlined,
+          label: email,
+          tooltip: 'Email',
         ),
       if (dob != null)
         _buildContactChip(
           icon: Icons.cake_outlined,
-          label: 'Born $dob',
-          tooltip: 'Date of birth',
+          label: dob,
+          tooltip: 'Birthday',
         ),
     ];
 
-    if (pills.isEmpty) return const SizedBox.shrink();
+    final actionButtons = <Widget>[
+      if ((donor.phoneE164 ?? donor.phone) != null)
+        ElevatedButton.icon(
+          onPressed: _startingMessage ? null : _startMessage,
+          icon: const Icon(Icons.sms_outlined),
+          label: const Text('Send message'),
+        ),
+      if (donor.email != null)
+        ElevatedButton.icon(
+          onPressed: _sendingEmail ? null : _composeEmail,
+          icon: const Icon(Icons.email_outlined),
+          label: const Text('Send email'),
+        ),
+      OutlinedButton.icon(
+        onPressed: _savingEdit ? null : _openEdit,
+        icon: const Icon(Icons.edit_outlined),
+        label: const Text('Edit'),
+      ),
+      TextButton.icon(
+        onPressed: _loading ? null : _load,
+        icon: const Icon(Icons.refresh),
+        label: const Text('Refresh'),
+      ),
+    ];
+
+    if (pills.isEmpty && actionButtons.isEmpty) return const SizedBox.shrink();
 
     return Card(
       child: Padding(
@@ -292,68 +319,28 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Contact', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            _buildInfoRow('Email', donor.email ?? 'Not provided'),
-            _buildInfoRow('Phone', formattedPhone ?? 'Not provided'),
-            _buildInfoRow('County', donor.county ?? 'Not provided'),
-            _buildInfoRow('Congressional District', donor.congressionalDistrict ?? 'Not provided'),
-            _buildInfoRow(
-              'Date of Birth',
-              donor.dateOfBirth != null ? DateFormat.yMMMd().format(donor.dateOfBirth!) : 'Not provided',
+            Text(
+              'Contact & Details',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: (donor.phoneE164 ?? donor.phone) == null || _startingMessage ? null : _startMessage,
-                  icon: const Icon(Icons.sms_outlined),
-                  label: const Text('Send message'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: donor.email == null || _sendingEmail ? null : _composeEmail,
-                  icon: const Icon(Icons.email_outlined),
-                  label: const Text('Send email'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _savingEdit ? null : _openEdit,
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit'),
-                ),
-                TextButton.icon(
-                  onPressed: _loading ? null : _load,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Refresh'),
-                ),
-              ],
-            ),
+            if (pills.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: pills,
+              ),
+            ],
+            if (actionButtons.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: actionButtons,
+              ),
+            ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label: ',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -366,7 +353,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
       return const SizedBox.shrink();
     }
 
-    final addressText = formattedAddress ?? 'Address not provided';
+    final addressText = formattedAddress ?? mapAddress;
 
     final mapsUri = Uri.https('maps.apple.com', '/', {'q': mapAddress});
 
@@ -376,54 +363,66 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 900;
-            final addressContent = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            final mapHeight = isWide ? 220.0 : 200.0;
+
+            final addressHeader = GestureDetector(
+              onTap: () => launchUrl(mapsUri, mode: LaunchMode.externalApplication),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    addressText,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.none,
+                      color: theme.textTheme.titleMedium?.color,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.open_in_new,
+                    size: 18,
+                    color: theme.textTheme.titleMedium?.color,
+                  ),
+                ],
+              ),
+            );
+
+            final mapView = Stack(
               children: [
-                Text('Address',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text(addressText),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () => launchUrl(mapsUri, mode: LaunchMode.externalApplication),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.map_outlined, color: _momentumBlue),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Open in Apple Maps',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: _momentumBlue,
-                          decoration: TextDecoration.none,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.open_in_new, size: 18, color: _momentumBlue),
-                    ],
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    height: mapHeight,
+                    child: EventMapWidget(
+                      location: mapAddress,
+                      locationAddress: addressText.replaceAll('\n', ', '),
+                      eventTitle: donor.name ?? 'Donor address',
+                      height: mapHeight,
+                    ),
                   ),
                 ),
               ],
-            );
-
-            final mapView = ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: isWide ? 4 / 3 : 16 / 10,
-                child: EventMapWidget(
-                  location: mapAddress,
-                  locationAddress: addressText.replaceAll('\n', ', '),
-                  eventTitle: donor.name ?? 'Donor address',
-                ),
-              ),
             );
 
             if (isWide) {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 2, child: addressContent),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        addressHeader,
+                        const SizedBox(height: 8),
+                        Text(
+                          'Tap the address to open in Apple Maps.',
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: 16),
                   Expanded(flex: 3, child: mapView),
                 ],
@@ -433,8 +432,8 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                addressContent,
-                const SizedBox(height: 16),
+                addressHeader,
+                const SizedBox(height: 12),
                 mapView,
               ],
             );
@@ -634,17 +633,12 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          Chip(
-                            label: Text(
-                              donation.sentThankYou ? 'Thank you sent' : 'Thank you pending',
-                              style: const TextStyle(fontWeight: FontWeight.w600),
+                          if (donation.sentThankYou)
+                            Chip(
+                              label: const Text('Thank you sent', style: TextStyle(fontWeight: FontWeight.w600)),
+                              backgroundColor: Colors.green.shade100,
+                              labelStyle: TextStyle(color: Colors.green.shade800),
                             ),
-                            backgroundColor:
-                                donation.sentThankYou ? Colors.green.shade100 : Colors.grey.shade200,
-                            labelStyle: TextStyle(
-                              color: donation.sentThankYou ? Colors.green.shade800 : Colors.grey.shade800,
-                            ),
-                          ),
                         ],
                       ),
                       if (notes != null && notes.isNotEmpty)
@@ -654,19 +648,17 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                         ),
                     ],
                   ),
-                  trailing: ElevatedButton.icon(
-                    icon: Icon(
-                      donation.sentThankYou ? Icons.check_circle : Icons.mark_email_read_outlined,
-                    ),
-                    label: Text(donation.sentThankYou ? 'Marked sent' : 'Mark sent'),
-                    onPressed: () => _showThankYouConfirmation(donation),
-                    style: ElevatedButton.styleFrom(
-                      elevation: 0,
-                      backgroundColor:
-                          donation.sentThankYou ? Colors.green.shade600 : Theme.of(context).colorScheme.primary,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
+                  trailing: donation.sentThankYou
+                      ? OutlinedButton.icon(
+                          icon: const Icon(Icons.check_circle),
+                          label: const Text('Thank-you logged'),
+                          onPressed: () => _showThankYouConfirmation(donation),
+                        )
+                      : ElevatedButton.icon(
+                          icon: const Icon(Icons.favorite_border),
+                          label: const Text('Log thank-you'),
+                          onPressed: () => _showThankYouConfirmation(donation),
+                        ),
                   onTap: () => _showThankYouConfirmation(donation),
                   dense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 8),
@@ -735,6 +727,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   String? _formatPhoneDisplay(String? phone) {
     if (phone == null) return null;
     final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return null;
     if (digits.length == 11 && digits.startsWith('1')) {
       final area = digits.substring(1, 4);
       final prefix = digits.substring(4, 7);
@@ -742,7 +735,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
       return '+1 ($area) $prefix-$line';
     }
     if (phone.startsWith('+')) return phone;
-    return '+$phone';
+    return phone;
   }
 
   Future<void> _startMessage() async {
@@ -858,6 +851,26 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     return trimmed.isEmpty ? null : trimmed;
   }
 
+  String? _cleanCountyLabel(String? county) {
+    final cleaned = _cleanText(county);
+    if (cleaned == null) return null;
+    final withoutPrefix = cleaned.replaceFirst(RegExp(r'^County:\s*', caseSensitive: false), '');
+    final result = withoutPrefix.trim();
+    return result.isEmpty ? null : result;
+  }
+
+  String? _formatDistrictLabel(String? district) {
+    final cleaned = _cleanText(district);
+    if (cleaned == null) return null;
+
+    final withoutPrefix =
+        cleaned.replaceFirst(RegExp(r'^(congressional district|district|cd)[:\s-]*', caseSensitive: false), '');
+    final normalized = withoutPrefix.replaceFirst(RegExp(r'^-+'), '');
+    if (normalized.isEmpty) return null;
+
+    return 'CD-${normalized.toUpperCase()}';
+  }
+
   String _formatCurrency(double value) {
     final format = NumberFormat.simpleCurrency();
     return format.format(value);
@@ -871,34 +884,71 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
         : 'Unknown date';
     final donorName = donation.donorName ?? _donor?.name ?? 'this donor';
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
       builder: (context) {
-        return AlertDialog(
-          title: Text(markSent ? 'Mark thank-you sent?' : 'Reopen thank-you?'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(markSent
-                  ? 'Confirm you have sent a thank-you to $donorName.'
-                  : 'This will mark the thank-you as not yet sent.'),
-              const SizedBox(height: 12),
-              Text('Donation: $amountText'),
-              Text('Date: $dateText'),
-              if (donation.eventName != null) Text('Event: ${donation.eventName}'),
-            ],
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 16,
+              bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      markSent ? 'Log thank-you' : 'Reopen thank-you',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(false),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  markSent
+                      ? 'Confirm you have sent a thank-you to $donorName.'
+                      : 'Mark this donation as still needing a thank-you.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Chip(label: Text(amountText)),
+                    Chip(label: Text(dateText)),
+                    if (donation.eventName != null) Chip(label: Text(donation.eventName!)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      icon: Icon(markSent ? Icons.check_circle : Icons.undo),
+                      label: Text(markSent ? 'Mark thanked' : 'Reopen'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(markSent ? 'Mark sent' : 'Mark unsent'),
-            ),
-          ],
         );
       },
     );

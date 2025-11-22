@@ -74,6 +74,14 @@ class EventRepository {
     return Event.fromJson(response as Map<String, dynamic>);
   }
 
+  Future<void> deleteEvent(String eventId) async {
+    if (!isReady) {
+      throw Exception('CRM not configured');
+    }
+
+    await _writeClient.from('events').delete().eq('id', eventId);
+  }
+
   Future<List<EventAttendee>> fetchAttendees(String eventId) async {
     if (!isReady) return [];
 
@@ -478,13 +486,16 @@ class EventRepository {
   Future<EventAttendee> updateCheckInStatus({
     required String attendeeId,
     required bool checkedIn,
+    DateTime? checkedInAt,
   }) async {
     final now = DateTime.now();
+    final checkInTimestamp = checkedInAt ?? now;
     final response = await _writeClient
         .from('event_attendees')
         .update({
           'checked_in': checkedIn,
-          'checked_in_at': checkedIn ? now.toUtc().toIso8601String() : null,
+          'checked_in_at':
+              checkedIn ? checkInTimestamp.toUtc().toIso8601String() : null,
           'checked_in_by': checkedIn ? 'manual' : null,
         })
         .eq('id', attendeeId)
@@ -492,6 +503,10 @@ class EventRepository {
         .single();
 
     return EventAttendee.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<void> deleteAttendee(String attendeeId) async {
+    await _writeClient.from('event_attendees').delete().eq('id', attendeeId);
   }
 
   Future<EventAttendee> addAttendee({

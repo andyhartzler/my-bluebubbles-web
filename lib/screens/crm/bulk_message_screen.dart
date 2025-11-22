@@ -27,9 +27,10 @@ enum _RecipientMode {
 
 /// Screen for sending bulk individual messages
 class BulkMessageScreen extends StatefulWidget {
-  const BulkMessageScreen({Key? key, this.initialFilter}) : super(key: key);
+  const BulkMessageScreen({Key? key, this.initialFilter, this.initialManualMembers}) : super(key: key);
 
   final MessageFilter? initialFilter;
+  final List<Member>? initialManualMembers;
 
   @override
   State<BulkMessageScreen> createState() => _BulkMessageScreenState();
@@ -90,6 +91,16 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
     super.initState();
     _filter = widget.initialFilter ?? MessageFilter();
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
+    final initialMembers = widget.initialManualMembers;
+    if (initialMembers != null && initialMembers.isNotEmpty) {
+      for (final member in initialMembers) {
+        final key = _memberKey(member);
+        if (key != null && !_selectedMembers.any((m) => _memberKey(m) == key)) {
+          _selectedMembers.add(member);
+        }
+      }
+      _setMode(_RecipientMode.manual, notify: false);
+    }
     if (_filter.chapterName != null && _filter.chapterName!.isNotEmpty) {
       _mode = _RecipientMode.chapter;
     }
