@@ -8,12 +8,14 @@ class EventMapWidget extends StatefulWidget {
   final String location;
   final String? locationAddress;
   final String eventTitle;
+  final double? height;
 
   const EventMapWidget({
     Key? key,
     required this.location,
     this.locationAddress,
     required this.eventTitle,
+    this.height,
   }) : super(key: key);
 
   @override
@@ -51,11 +53,16 @@ class _EventMapWidgetState extends State<EventMapWidget> {
 
       _actualViewId = viewId;
 
+      final containerHeight = (widget.height ?? 400).toStringAsFixed(0);
       final mapContainer = html.DivElement()
         ..id = 'mapkit-$viewId'
         ..style.width = '100%'
-        ..style.height = '400px'
-        ..style.borderRadius = '12px';
+        ..style.height = '${containerHeight}px'
+        ..style.borderRadius = '12px'
+        ..style.overflow = 'hidden'
+        ..style.position = 'relative'
+        ..style.touchAction = 'pan-x pan-y'
+        ..style.transform = 'translateZ(0)';
 
       print('[EventMap] Created container with ID: mapkit-$viewId');
       return mapContainer;
@@ -300,7 +307,7 @@ class _EventMapWidgetState extends State<EventMapWidget> {
     if (_error != null) {
       return Container(
         width: double.infinity,
-        height: 400,
+        height: widget.height ?? 400,
         decoration: BoxDecoration(
           color: Colors.grey[200],
           borderRadius: BorderRadius.circular(12),
@@ -318,7 +325,7 @@ class _EventMapWidgetState extends State<EventMapWidget> {
       children: [
         Container(
           width: double.infinity,
-          height: 400,
+          height: widget.height ?? 400,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -327,7 +334,7 @@ class _EventMapWidgetState extends State<EventMapWidget> {
         if (_isLoading)
           Container(
             width: double.infinity,
-            height: 400,
+            height: widget.height ?? 400,
             decoration: BoxDecoration(
               color: Colors.grey[200],
               borderRadius: BorderRadius.circular(12),

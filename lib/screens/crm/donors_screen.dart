@@ -149,7 +149,7 @@ class _DonorsScreenState extends State<DonorsScreen> {
         children: [
           Expanded(
             flex: 6,
-            child: _buildDonorList(theme),
+            child: _buildDonorList(theme, isWide: true),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -188,22 +188,35 @@ class _DonorsScreenState extends State<DonorsScreen> {
     );
   }
 
-  Widget _buildDonorList(ThemeData theme) {
-    return Scrollbar(
-      child: ListView.separated(
-        itemCount: _donors.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (context, index) {
-          final donor = _donors[index];
-          return _buildDonorTile(
-            theme,
-            donor,
-            isSelected: donor.id == (_selectedDonor?.id ?? ''),
-            onTap: () => setState(() => _selectedDonor = donor),
-            showBorderHighlight: true,
-          );
-        },
-      ),
+  Widget _buildDonorList(ThemeData theme, {bool isWide = false}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useGrid = isWide && constraints.maxWidth > 640;
+        final crossAxisCount = useGrid ? 2 : 1;
+        final childAspectRatio = useGrid ? 2.6 : 2.8;
+
+        return Scrollbar(
+          child: GridView.builder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: childAspectRatio,
+            ),
+            itemCount: _donors.length,
+            itemBuilder: (context, index) {
+              final donor = _donors[index];
+              return _buildDonorTile(
+                theme,
+                donor,
+                isSelected: donor.id == (_selectedDonor?.id ?? ''),
+                onTap: () => setState(() => _selectedDonor = donor),
+                showBorderHighlight: true,
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -347,10 +360,15 @@ class _DonorsScreenState extends State<DonorsScreen> {
 
   String? _cleanCongressionalDistrictLabel(String? district) {
     if (district == null) return null;
-    final trimmed =
-        district.replaceFirst(RegExp(r'^CD\s*:?', caseSensitive: false), '').trim();
+    final trimmed = district.trim();
     if (trimmed.isEmpty) return null;
-    return trimmed;
+
+    final withoutPrefix =
+        trimmed.replaceFirst(RegExp(r'^(congressional district|district|cd)[:\s-]*', caseSensitive: false), '');
+    final normalized = withoutPrefix.replaceFirst(RegExp(r'^-+'), '');
+    if (normalized.isEmpty) return null;
+
+    return 'CD-${normalized.toUpperCase()}';
   }
 
   Widget _buildDetailPane(ThemeData theme, Donor? donor) {
