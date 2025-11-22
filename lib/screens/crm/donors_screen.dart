@@ -147,12 +147,13 @@ class _DonorsScreenState extends State<DonorsScreen> {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: MediaQuery.of(context).size.width * 0.45,
-            child: _buildDonorGrid(theme),
+          Expanded(
+            flex: 6,
+            child: _buildDonorList(theme),
           ),
           const SizedBox(width: 16),
           Expanded(
+            flex: 5,
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
               child: _buildDetailPane(theme, selected),
@@ -187,33 +188,22 @@ class _DonorsScreenState extends State<DonorsScreen> {
     );
   }
 
-  Widget _buildDonorGrid(ThemeData theme) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final tileWidth = (constraints.maxWidth / 2) - 10;
-        final adjustedWidth = tileWidth.clamp(220.0, 420.0) as double;
-
-        return SingleChildScrollView(
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: _donors
-                .map(
-                  (donor) => SizedBox(
-                    width: adjustedWidth,
-                    child: _buildDonorTile(
-                      theme,
-                      donor,
-                      isSelected: donor.id == (_selectedDonor?.id ?? ''),
-                      onTap: () => setState(() => _selectedDonor = donor),
-                      showBorderHighlight: true,
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        );
-      },
+  Widget _buildDonorList(ThemeData theme) {
+    return Scrollbar(
+      child: ListView.separated(
+        itemCount: _donors.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (context, index) {
+          final donor = _donors[index];
+          return _buildDonorTile(
+            theme,
+            donor,
+            isSelected: donor.id == (_selectedDonor?.id ?? ''),
+            onTap: () => setState(() => _selectedDonor = donor),
+            showBorderHighlight: true,
+          );
+        },
+      ),
     );
   }
 
@@ -236,12 +226,14 @@ class _DonorsScreenState extends State<DonorsScreen> {
     final formatter = NumberFormat.compactSimpleCurrency();
     final chips = <Widget>[];
 
-    if (donor.county != null && donor.county!.isNotEmpty) {
-      chips.add(_buildPillChip(Icons.location_city, donor.county!));
+    final countyLabel = _cleanCountyLabel(donor.county);
+    if (countyLabel != null) {
+      chips.add(_buildPillChip(Icons.location_city, countyLabel));
     }
 
-    if (donor.congressionalDistrict != null && donor.congressionalDistrict!.isNotEmpty) {
-      chips.add(_buildPillChip(Icons.account_balance, donor.congressionalDistrict!));
+    final districtLabel = _cleanCongressionalDistrictLabel(donor.congressionalDistrict);
+    if (districtLabel != null) {
+      chips.add(_buildPillChip(Icons.account_balance, districtLabel));
     }
 
     if (donor.member != null) {
@@ -346,6 +338,21 @@ class _DonorsScreenState extends State<DonorsScreen> {
     return '?';
   }
 
+  String? _cleanCountyLabel(String? county) {
+    if (county == null) return null;
+    final trimmed = county.replaceFirst(RegExp(r'^County:\s*', caseSensitive: false), '').trim();
+    if (trimmed.isEmpty) return null;
+    return trimmed;
+  }
+
+  String? _cleanCongressionalDistrictLabel(String? district) {
+    if (district == null) return null;
+    final trimmed =
+        district.replaceFirst(RegExp(r'^CD\s*:?', caseSensitive: false), '').trim();
+    if (trimmed.isEmpty) return null;
+    return trimmed;
+  }
+
   Widget _buildDetailPane(ThemeData theme, Donor? donor) {
     if (donor == null) {
       return Card(
@@ -365,6 +372,8 @@ class _DonorsScreenState extends State<DonorsScreen> {
     }
 
     final formatter = NumberFormat.simpleCurrency();
+    final countyLabel = _cleanCountyLabel(donor.county);
+    final districtLabel = _cleanCongressionalDistrictLabel(donor.congressionalDistrict);
 
     return Card(
       child: Padding(
@@ -422,10 +431,8 @@ class _DonorsScreenState extends State<DonorsScreen> {
               spacing: 6,
               runSpacing: 6,
               children: [
-                if (donor.county != null && donor.county!.isNotEmpty)
-                  _buildPillChip(Icons.location_city, donor.county!),
-                if (donor.congressionalDistrict != null && donor.congressionalDistrict!.isNotEmpty)
-                  _buildPillChip(Icons.account_balance, donor.congressionalDistrict!),
+                if (countyLabel != null) _buildPillChip(Icons.location_city, countyLabel),
+                if (districtLabel != null) _buildPillChip(Icons.account_balance, districtLabel),
                 if (donor.member != null)
                   _buildPillChip(Icons.link, donor.member!.name ?? donor.member!.id ?? 'Linked member'),
                 if (donor.isRecurringDonor == true)

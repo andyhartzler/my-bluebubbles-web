@@ -821,7 +821,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     final zipController = TextEditingController();
     final employerController = TextEditingController();
     final occupationController = TextEditingController();
-    bool checkInNow = false;
+    final now = DateTime.now();
+    final eventStart = _currentEvent.eventDate?.toLocal();
+    final hasEventStarted = eventStart != null && now.isAfter(eventStart);
+
+    bool checkInNow = hasEventStarted;
+    DateTime? defaultCheckInAt = hasEventStarted ? eventStart : null;
     bool sendConfirmation = false;
 
     Member? selectedMember;
@@ -902,236 +907,278 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Add attendee'),
-          content: LayoutBuilder(
-            builder: (context, constraints) {
-              final isWideForm = constraints.maxWidth > 720;
-              final fieldWidth = isWideForm ? (constraints.maxWidth / 2) - 24 : constraints.maxWidth;
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 760),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isWideForm = constraints.maxWidth > 760;
+                final fieldWidth = isWideForm ? (constraints.maxWidth / 2) - 28 : constraints.maxWidth;
+                double order = 0;
 
-              return SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: FocusTraversalGroup(
-                    policy: OrderedTraversalPolicy(),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextField(
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search),
-                            labelText: 'Search name, email, or phone',
-                          ),
-                          onChanged: (value) => runSearch(value, setDialogState),
-                        ),
-                        const SizedBox(height: 8),
-                        if (searching) const LinearProgressIndicator(),
-                        if (searchResults.isNotEmpty)
-                          SizedBox(
-                            height: 200,
-                            child: ListView.separated(
-                              itemBuilder: (context, index) {
-                                final prospect = searchResults[index];
-                                return ListTile(
-                                  leading: const Icon(Icons.person_search),
-                                  title: Text(prospect.displayName),
-                                  subtitle: Text(
-                                    [
-                                      prospect.source,
-                                      if (prospect.email != null) prospect.email!,
-                                      if (prospect.phone != null) prospect.phone!,
-                                    ].join(' • '),
-                                  ),
-                                  trailing: TextButton(
-                                    onPressed: () => applyProspect(prospect, setDialogState),
-                                    child: const Text('Use'),
-                                  ),
-                                );
-                              },
-                              separatorBuilder: (_, __) => const Divider(height: 1),
-                              itemCount: searchResults.length,
+                Widget ordered({required Widget child}) {
+                  return FocusTraversalOrder(
+                    order: NumericFocusOrder(order++),
+                    child: child,
+                  );
+                }
+
+                return SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: FocusTraversalGroup(
+                      policy: OrderedTraversalPolicy(),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ordered(
+                            child: TextField(
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.search),
+                                labelText: 'Search name, email, or phone',
+                              ),
+                              onChanged: (value) => runSearch(value, setDialogState),
                             ),
                           ),
-                        if (searchResults.isNotEmpty) const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Manual details',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 10,
-                          children: [
+                          const SizedBox(height: 8),
+                          if (searching) const LinearProgressIndicator(),
+                          if (searchResults.isNotEmpty)
                             SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: nameFocus,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) => emailFocus.requestFocus(),
-                                controller: nameController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Name',
-                                  prefixIcon: Icon(Icons.person_outline),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Name required for guests';
-                                  }
-                                  return null;
+                              height: 200,
+                              child: ListView.separated(
+                                itemBuilder: (context, index) {
+                                  final prospect = searchResults[index];
+                                  return ListTile(
+                                    leading: const Icon(Icons.person_search),
+                                    title: Text(prospect.displayName),
+                                    subtitle: Text(
+                                      [
+                                        prospect.source,
+                                        if (prospect.email != null) prospect.email!,
+                                        if (prospect.phone != null) prospect.phone!,
+                                      ].join(' • '),
+                                    ),
+                                    trailing: TextButton(
+                                      onPressed: () => applyProspect(prospect, setDialogState),
+                                      child: const Text('Use'),
+                                    ),
+                                  );
                                 },
+                                separatorBuilder: (_, __) => const Divider(height: 1),
+                                itemCount: searchResults.length,
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: emailFocus,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) => phoneFocus.requestFocus(),
-                                controller: emailController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Email',
-                                  prefixIcon: Icon(Icons.alternate_email_outlined),
+                          if (searchResults.isNotEmpty) const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Manual details',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 10,
+                            children: [
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: nameFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => emailFocus.requestFocus(),
+                                  controller: nameController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Name',
+                                    prefixIcon: Icon(Icons.person_outline),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Name required for guests';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: phoneFocus,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) => dobFocus.requestFocus(),
-                                controller: phoneController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Phone',
-                                  prefixIcon: Icon(Icons.phone_outlined),
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: emailFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => phoneFocus.requestFocus(),
+                                  controller: emailController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                    prefixIcon: Icon(Icons.alternate_email_outlined),
+                                  ),
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: dobFocus,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) => addressFocus.requestFocus(),
-                                controller: dobController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Date of birth (YYYY-MM-DD)',
-                                  prefixIcon: Icon(Icons.cake_outlined),
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: phoneFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => dobFocus.requestFocus(),
+                                  controller: phoneController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Phone',
+                                    prefixIcon: Icon(Icons.phone_outlined),
+                                  ),
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: addressFocus,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) => cityFocus.requestFocus(),
-                                controller: addressController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Address',
-                                  prefixIcon: Icon(Icons.home_outlined),
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: dobFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => addressFocus.requestFocus(),
+                                  controller: dobController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Date of birth (YYYY-MM-DD)',
+                                    prefixIcon: Icon(Icons.cake_outlined),
+                                  ),
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: cityFocus,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) => stateFocus.requestFocus(),
-                                controller: cityController,
-                                decoration: const InputDecoration(
-                                  labelText: 'City',
-                                  prefixIcon: Icon(Icons.location_city_outlined),
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: addressFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => cityFocus.requestFocus(),
+                                  controller: addressController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Address',
+                                    prefixIcon: Icon(Icons.home_outlined),
+                                  ),
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: stateFocus,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) => zipFocus.requestFocus(),
-                                controller: stateController,
-                                decoration: const InputDecoration(
-                                  labelText: 'State',
-                                  prefixIcon: Icon(Icons.map_outlined),
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: cityFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => stateFocus.requestFocus(),
+                                  controller: cityController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'City',
+                                    prefixIcon: Icon(Icons.location_city_outlined),
+                                  ),
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: zipFocus,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) => employerFocus.requestFocus(),
-                                controller: zipController,
-                                decoration: const InputDecoration(
-                                  labelText: 'ZIP',
-                                  prefixIcon: Icon(Icons.local_post_office_outlined),
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: stateFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => zipFocus.requestFocus(),
+                                  controller: stateController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'State',
+                                    prefixIcon: Icon(Icons.map_outlined),
+                                  ),
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: employerFocus,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) => occupationFocus.requestFocus(),
-                                controller: employerController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Employer',
-                                  prefixIcon: Icon(Icons.badge_outlined),
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: zipFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => employerFocus.requestFocus(),
+                                  controller: zipController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'ZIP',
+                                    prefixIcon: Icon(Icons.local_post_office_outlined),
+                                  ),
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: occupationFocus,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) => guestCountFocus.requestFocus(),
-                                controller: occupationController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Occupation',
-                                  prefixIcon: Icon(Icons.work_outline),
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: employerFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => occupationFocus.requestFocus(),
+                                  controller: employerController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Employer',
+                                    prefixIcon: Icon(Icons.badge_outlined),
+                                  ),
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
-                                focusNode: guestCountFocus,
-                                textInputAction: TextInputAction.done,
-                                controller: guestCountController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Guest Count',
-                                  prefixIcon: Icon(Icons.groups_outlined),
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: occupationFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => guestCountFocus.requestFocus(),
+                                  controller: occupationController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Occupation',
+                                    prefixIcon: Icon(Icons.work_outline),
+                                  ),
                                 ),
-                                keyboardType: TextInputType.number,
-                                onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: CheckboxListTile(
-                                contentPadding: EdgeInsets.zero,
-                                value: checkInNow,
-                                onChanged: (value) => setDialogState(() => checkInNow = value ?? false),
-                                title: const Text('Check in immediately'),
-                                controlAffinity: ListTileControlAffinity.leading,
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  focusNode: guestCountFocus,
+                                  textInputAction: TextInputAction.done,
+                                  controller: guestCountController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Guest Count',
+                                    prefixIcon: Icon(Icons.groups_outlined),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+                                ),
                               ),
                             ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: CheckboxListTile(
-                                contentPadding: EdgeInsets.zero,
-                                value: sendConfirmation,
-                                onChanged: (value) => setDialogState(() => sendConfirmation = value ?? false),
-                                title: const Text('Send RSVP confirmation'),
-                                controlAffinity: ListTileControlAffinity.leading,
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: CheckboxListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  value: checkInNow,
+                                  onChanged: (value) => setDialogState(() => checkInNow = value ?? false),
+                                  title: const Text('Check in immediately'),
+                                  controlAffinity: ListTileControlAffinity.leading,
+                                ),
+                              ),
+                            ),
+                            ordered(
+                              child: SizedBox(
+                                width: fieldWidth,
+                                child: CheckboxListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  value: sendConfirmation,
+                                  onChanged: (value) => setDialogState(() => sendConfirmation = value ?? false),
+                                  title: const Text('Send RSVP confirmation'),
+                                  controlAffinity: ListTileControlAffinity.leading,
+                                ),
                               ),
                             ),
                           ],
@@ -1139,9 +1186,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                       ],
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
@@ -1198,6 +1245,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
             occupationController.text.trim().isEmpty ? null : occupationController.text.trim(),
         guestCount: int.tryParse(guestCountController.text) ?? 0,
         checkedIn: checkInNow,
+        checkedInAt: checkInNow ? defaultCheckInAt : null,
         sendRsvpConfirmation: sendConfirmation,
       );
 
