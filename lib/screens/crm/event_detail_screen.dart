@@ -1186,8 +1186,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                       ],
                     ),
                   ),
-                );
-              },
+                ),
+              );
+            },
             ),
           ),
           actions: [
