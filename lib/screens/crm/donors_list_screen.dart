@@ -984,102 +984,104 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                   ),
                 ],
               ),
-            );
-          }),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                final amount = double.tryParse(amountController.text.trim());
-                if (amount == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Enter a valid donation amount.')),
-                  );
-                  return;
-                }
-
-                if (creatingNewDonor) {
-                  final name = newDonorNameController.text.trim();
-                  if (name.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Name is required to create a donor.')),
-                    );
-                    return;
-                  }
-
-                  final payload = {
-                    'name': name,
-                    'email': newDonorEmailController.text.trim().isEmpty
-                        ? null
-                        : newDonorEmailController.text.trim(),
-                    'phone': newDonorPhoneController.text.trim().isEmpty
-                        ? null
-                        : newDonorPhoneController.text.trim(),
-                    'phone_e164': newDonorPhoneController.text.trim().isEmpty
-                        ? null
-                        : newDonorPhoneController.text.trim(),
-                    'address': newDonorAddressController.text.trim().isEmpty
-                        ? null
-                        : newDonorAddressController.text.trim(),
-                    'city': newDonorCityController.text.trim().isEmpty
-                        ? null
-                        : newDonorCityController.text.trim(),
-                    'state': newDonorStateController.text.trim().isEmpty
-                        ? null
-                        : newDonorStateController.text.trim(),
-                    'zip_code': newDonorZipController.text.trim().isEmpty
-                        ? null
-                        : newDonorZipController.text.trim(),
-                    'employer': newDonorEmployerController.text.trim().isEmpty
-                        ? null
-                        : newDonorEmployerController.text.trim(),
-                    'occupation': newDonorOccupationController.text.trim().isEmpty
-                        ? null
-                        : newDonorOccupationController.text.trim(),
-                  };
-
-                  donorId = await _repository.upsertDonor(data: payload);
-                } else if (selectedSubject != null) {
-                  switch (selectedSubject!.type) {
-                    case _DonationSearchResultType.donor:
-                      donorId = selectedSubject!.donor?.id;
-                      break;
-                    case _DonationSearchResultType.member:
-                      final member = selectedSubject!.member;
-                      if (member != null) {
-                        donorId = await _ensureDonorForMember(member);
-                      }
-                      break;
-                    case _DonationSearchResultType.attendee:
-                      final attendee = selectedSubject!.attendee;
-                      if (attendee != null) {
-                        donorId = await _ensureDonorForAttendee(attendee);
-                      }
-                      break;
-                  }
-                }
-
-                await _repository.addManualDonation(
-                  donorId: donorId,
-                  amount: amount,
-                  donationDate: donationDate,
-                  paymentMethod: method,
-                  checkNumber: checkNumber,
-                  notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-                  eventId: selectedEvent?.id,
-                );
-                if (!mounted) return;
-                Navigator.of(context).pop();
-                await _loadData();
-              },
-              child: const Text('Save donation'),
-            ),
-          ],
+          ),
         );
-      },
+      }),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final amount = double.tryParse(amountController.text.trim());
+            if (amount == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Enter a valid donation amount.')),
+              );
+              return;
+            }
+
+            if (creatingNewDonor) {
+              final name = newDonorNameController.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Name is required to create a donor.')),
+                );
+                return;
+              }
+
+              final payload = {
+                'name': name,
+                'email': newDonorEmailController.text.trim().isEmpty
+                    ? null
+                    : newDonorEmailController.text.trim(),
+                'phone': newDonorPhoneController.text.trim().isEmpty
+                    ? null
+                    : newDonorPhoneController.text.trim(),
+                'phone_e164': newDonorPhoneController.text.trim().isEmpty
+                    ? null
+                    : newDonorPhoneController.text.trim(),
+                'address': newDonorAddressController.text.trim().isEmpty
+                    ? null
+                    : newDonorAddressController.text.trim(),
+                'city': newDonorCityController.text.trim().isEmpty
+                    ? null
+                    : newDonorCityController.text.trim(),
+                'state': newDonorStateController.text.trim().isEmpty
+                    ? null
+                    : newDonorStateController.text.trim(),
+                'zip_code': newDonorZipController.text.trim().isEmpty
+                    ? null
+                    : newDonorZipController.text.trim(),
+                'employer': newDonorEmployerController.text.trim().isEmpty
+                    ? null
+                    : newDonorEmployerController.text.trim(),
+                'occupation': newDonorOccupationController.text.trim().isEmpty
+                    ? null
+                    : newDonorOccupationController.text.trim(),
+              };
+
+              donorId = await _repository.upsertDonor(data: payload);
+            } else if (selectedSubject != null) {
+              switch (selectedSubject!.type) {
+                case _DonationSearchResultType.donor:
+                  donorId = selectedSubject!.donor?.id;
+                  break;
+                case _DonationSearchResultType.member:
+                  final member = selectedSubject!.member;
+                  if (member != null) {
+                    donorId = await _ensureDonorForMember(member);
+                  }
+                  break;
+                case _DonationSearchResultType.attendee:
+                  final attendee = selectedSubject!.attendee;
+                  if (attendee != null) {
+                    donorId = await _ensureDonorForAttendee(attendee);
+                  }
+                  break;
+              }
+            }
+
+            await _repository.addManualDonation(
+              donorId: donorId,
+              amount: amount,
+              donationDate: donationDate,
+              paymentMethod: method,
+              checkNumber: checkNumber,
+              notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+              eventId: selectedEvent?.id,
+            );
+            if (!mounted) return;
+            Navigator.of(context).pop();
+            await _loadData();
+          },
+          child: const Text('Save donation'),
+        ),
+      ],
+    );
+  },
     );
     debounce?.cancel();
   }
