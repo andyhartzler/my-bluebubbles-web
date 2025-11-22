@@ -11,8 +11,10 @@ import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
+import 'package:bluebubbles/widgets/event_map_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DonorDetailScreen extends StatefulWidget {
   final String donorId;
@@ -149,6 +151,8 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
           const SizedBox(height: 16),
           _buildContactCard(theme, donor),
           const SizedBox(height: 16),
+          _buildAddressSection(theme, donor),
+          const SizedBox(height: 16),
           _buildMemberLinkCard(theme, donor.memberId),
           const SizedBox(height: 16),
           _buildSummaryCard(
@@ -239,7 +243,6 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
             const SizedBox(height: 12),
             _buildInfoRow('Email', donor.email ?? 'Not provided'),
             _buildInfoRow('Phone', formattedPhone ?? 'Not provided'),
-            _buildInfoRow('Address', _formatAddress(donor)),
             _buildInfoRow('County', donor.county ?? 'Not provided'),
             _buildInfoRow('Congressional District', donor.congressionalDistrict ?? 'Not provided'),
             _buildInfoRow(
@@ -264,6 +267,90 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddressSection(ThemeData theme, Donor donor) {
+    final formattedAddress = _formatAddress(donor);
+    final mapAddress = _formatAddressSingleLine(donor);
+
+    if (formattedAddress == 'Not provided' || mapAddress == null) {
+      return const SizedBox.shrink();
+    }
+
+    final mapsUri = Uri.https('maps.apple.com', '/', {'q': mapAddress});
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 900;
+            final addressContent = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Address',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(formattedAddress),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () => launchUrl(mapsUri, mode: LaunchMode.externalApplication),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.map_outlined, color: _momentumBlue),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Open in Apple Maps',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: _momentumBlue,
+                          decoration: TextDecoration.none,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.open_in_new, size: 18, color: _momentumBlue),
+                    ],
+                  ),
+                ),
+              ],
+            );
+
+            final mapView = ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: AspectRatio(
+                aspectRatio: isWide ? 4 / 3 : 16 / 10,
+                child: EventMapWidget(
+                  location: mapAddress,
+                  locationAddress: formattedAddress.replaceAll('\n', ', '),
+                  eventTitle: donor.name ?? 'Donor address',
+                ),
+              ),
+            );
+
+            if (isWide) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 2, child: addressContent),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 3, child: mapView),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                addressContent,
+                const SizedBox(height: 16),
+                mapView,
+              ],
+            );
+          },
         ),
       ),
     );
@@ -516,6 +603,21 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     ].where((part) => part != null && part!.trim().isNotEmpty).join('\n');
 
     return parts.isEmpty ? 'Not provided' : parts;
+  }
+
+  String? _formatAddressSingleLine(Donor donor) {
+    final parts = [
+      donor.address,
+      [donor.city, donor.state].where((p) => (p ?? '').isNotEmpty).join(', '),
+      donor.zipCode,
+    ]
+        .where((part) => part != null && part!.trim().isNotEmpty)
+        .map((part) => part!.trim())
+        .toList();
+
+    if (parts.isEmpty) return null;
+
+    return parts.join(', ');
   }
 
   String? _formatPhoneDisplay(String? phone) {
