@@ -182,6 +182,10 @@ class Donor {
     return inferred;
   }
 
+  static bool inferRecurringFromDonations(List<Donation> donations) {
+    return _hasRecurringPattern(donations);
+  }
+
   static bool _hasRecurringPattern(List<Donation> donations) {
     if (donations.length < 3) return false;
     final groups = <double, List<DateTime>>{};

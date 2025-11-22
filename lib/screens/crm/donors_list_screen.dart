@@ -52,6 +52,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
   int _recurringCount = 0;
   int _linkedCount = 0;
   double _totalRaised = 0;
+  double _recurringTotal = 0;
 
   @override
   void initState() {
@@ -93,6 +94,8 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         _recurringCount = stats['recurring'] as int? ?? 0;
         _linkedCount = stats['linked'] as int? ?? 0;
         _totalRaised = stats['totalRaised'] as double? ?? _calculateTotalRaised(result.donors);
+        _recurringTotal =
+            stats['recurringTotal'] as double? ?? _calculateRecurringTotal(result.donors);
         _recentDonations = donations;
         _loading = false;
       });
@@ -114,6 +117,12 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     return donors.fold<double>(0, (sum, donor) => sum + (donor.totalDonated ?? 0));
   }
 
+  double _calculateRecurringTotal(List<Donor> donors) {
+    return donors
+        .where((donor) => Donor.inferRecurringFromDonations(donor.donations))
+        .fold<double>(0, (sum, donor) => sum + (donor.totalDonated ?? 0));
+  }
+
   void _applyFilters() {
     final query = _searchController.text.trim().toLowerCase();
     final minTotal = double.tryParse(_minTotalController.text.trim());
@@ -129,7 +138,10 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     }
 
     if (_recurringFilter != null) {
-      filtered = filtered.where((donor) => donor.isRecurringDonor == _recurringFilter).toList();
+      filtered = filtered
+          .where((donor) =>
+              Donor.inferRecurringFromDonations(donor.donations) == _recurringFilter)
+          .toList();
     }
 
     if (_linkedFilter != null) {
@@ -824,7 +836,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                 title: 'Recurring Donors',
                 value: _recurringCount.toString(),
                 subtitle:
-                    '${((_recurringCount / (_totalDonors == 0 ? 1 : _totalDonors)) * 100).toStringAsFixed(1)}% of base',
+                    '${((_recurringCount / (_totalDonors == 0 ? 1 : _totalDonors)) * 100).toStringAsFixed(1)}% of base • ${currency.format(_recurringTotal)} lifetime',
                 color: _grassrootsGreen,
                 icon: Icons.autorenew,
               ),
