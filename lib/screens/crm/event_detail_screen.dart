@@ -13,6 +13,7 @@ import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
+import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
 import 'package:bluebubbles/widgets/event_map_widget.dart';
 
@@ -572,8 +573,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     final nameController = TextEditingController();
     final emailController = TextEditingController();
     final phoneController = TextEditingController();
-    final memberIdController = TextEditingController();
     final guestCountController = TextEditingController(text: '0');
+    final dobController = TextEditingController();
+    final addressController = TextEditingController();
+    final cityController = TextEditingController();
+    final stateController = TextEditingController(text: 'MO');
+    final zipController = TextEditingController();
+    final employerController = TextEditingController();
+    final occupationController = TextEditingController();
     bool checkInNow = false;
     bool sendConfirmation = false;
 
@@ -591,26 +598,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextFormField(
-                    controller: memberIdController,
-                    decoration: const InputDecoration(labelText: 'Member UUID (optional)'),
-                    validator: (value) {
-                      if (value != null && value.isNotEmpty) {
-                        final uuidRegex = RegExp(
-                          r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-                          caseSensitive: false,
-                        );
-                        if (!uuidRegex.hasMatch(value.trim())) {
-                          return 'Enter a valid UUID';
-                        }
-                      }
-                      return null;
-                    },
-                  ),
-                  TextFormField(
                     controller: nameController,
                     decoration: const InputDecoration(labelText: 'Name'),
                     validator: (value) {
-                      if ((value == null || value.trim().isEmpty) && memberIdController.text.isEmpty) {
+                      if (value == null || value.trim().isEmpty) {
                         return 'Name required for guests';
                       }
                       return null;
@@ -623,6 +614,34 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                   TextFormField(
                     controller: phoneController,
                     decoration: const InputDecoration(labelText: 'Phone'),
+                  ),
+                  TextFormField(
+                    controller: dobController,
+                    decoration: const InputDecoration(labelText: 'Date of birth (YYYY-MM-DD)'),
+                  ),
+                  TextFormField(
+                    controller: addressController,
+                    decoration: const InputDecoration(labelText: 'Address'),
+                  ),
+                  TextFormField(
+                    controller: cityController,
+                    decoration: const InputDecoration(labelText: 'City'),
+                  ),
+                  TextFormField(
+                    controller: stateController,
+                    decoration: const InputDecoration(labelText: 'State'),
+                  ),
+                  TextFormField(
+                    controller: zipController,
+                    decoration: const InputDecoration(labelText: 'ZIP'),
+                  ),
+                  TextFormField(
+                    controller: employerController,
+                    decoration: const InputDecoration(labelText: 'Employer'),
+                  ),
+                  TextFormField(
+                    controller: occupationController,
+                    decoration: const InputDecoration(labelText: 'Occupation'),
                   ),
                   TextFormField(
                     controller: guestCountController,
@@ -664,8 +683,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       nameController.dispose();
       emailController.dispose();
       phoneController.dispose();
-      memberIdController.dispose();
       guestCountController.dispose();
+      dobController.dispose();
+      addressController.dispose();
+      cityController.dispose();
+      stateController.dispose();
+      zipController.dispose();
+      employerController.dispose();
+      occupationController.dispose();
       return;
     }
 
@@ -675,10 +700,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       final eventId = _currentEvent.id!;
       final attendee = await _repository.addAttendee(
         eventId: eventId,
-        memberId: memberIdController.text.trim().isEmpty ? null : memberIdController.text.trim(),
         guestName: nameController.text.trim().isEmpty ? null : nameController.text.trim(),
         guestEmail: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
-        guestPhone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
+        guestPhone: formatToE164(phoneController.text.trim()),
+        dateOfBirth:
+            dobController.text.trim().isEmpty ? null : DateTime.tryParse(dobController.text.trim()),
+        address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
+        city: cityController.text.trim().isEmpty ? null : cityController.text.trim(),
+        state: stateController.text.trim().isEmpty ? null : stateController.text.trim(),
+        zip: zipController.text.trim().isEmpty ? null : zipController.text.trim(),
+        employer: employerController.text.trim().isEmpty ? null : employerController.text.trim(),
+        occupation:
+            occupationController.text.trim().isEmpty ? null : occupationController.text.trim(),
         guestCount: int.tryParse(guestCountController.text) ?? 0,
         checkedIn: checkInNow,
         sendRsvpConfirmation: sendConfirmation,
@@ -698,8 +731,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       nameController.dispose();
       emailController.dispose();
       phoneController.dispose();
-      memberIdController.dispose();
       guestCountController.dispose();
+      dobController.dispose();
+      addressController.dispose();
+      cityController.dispose();
+      stateController.dispose();
+      zipController.dispose();
+      employerController.dispose();
+      occupationController.dispose();
     }
   }
 

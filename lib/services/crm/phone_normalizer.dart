@@ -61,3 +61,24 @@ List<String> buildPhoneLookupCandidates(String rawPhone) {
 
   return candidates.where((value) => value.isNotEmpty).toList(growable: false);
 }
+
+String? formatToE164(String? phone) {
+  if (phone == null) return null;
+
+  final trimmed = phone.trim();
+  if (trimmed.isEmpty) return null;
+
+  final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+  if (digits.length == 10) {
+    return '+1$digits';
+  }
+  if (digits.length == 11 && digits.startsWith('1')) {
+    return '+$digits';
+  }
+
+  if (trimmed.startsWith('+') && digits.isNotEmpty) {
+    return '+$digits';
+  }
+
+  return trimmed;
+}
