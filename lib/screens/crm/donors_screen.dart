@@ -143,41 +143,20 @@ class _DonorsScreenState extends State<DonorsScreen> {
     }
 
     if (isWide) {
+      final selected = _selectedDonor ?? _donors.first;
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 3,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final tileWidth = (constraints.maxWidth / 2) - 12;
-                return SingleChildScrollView(
-                  child: Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: _donors
-                        .map(
-                          (donor) => SizedBox(
-                            width: tileWidth,
-                            child: _buildDonorTile(
-                              theme,
-                              donor,
-                              isSelected: donor.id == (_selectedDonor?.id ?? ''),
-                              onTap: () => setState(() => _selectedDonor = donor),
-                              showBorderHighlight: true,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                );
-              },
-            ),
+          SizedBox(
+            width: MediaQuery.of(context).size.width * 0.45,
+            child: _buildDonorGrid(theme),
           ),
           const SizedBox(width: 16),
           Expanded(
-            flex: 2,
-            child: _buildDetailPane(theme, _selectedDonor ?? _donors.first),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: _buildDetailPane(theme, selected),
+            ),
           ),
         ],
       );
@@ -208,6 +187,36 @@ class _DonorsScreenState extends State<DonorsScreen> {
     );
   }
 
+  Widget _buildDonorGrid(ThemeData theme) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tileWidth = (constraints.maxWidth / 2) - 10;
+        final adjustedWidth = tileWidth.clamp(220.0, 420.0) as double;
+
+        return SingleChildScrollView(
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _donors
+                .map(
+                  (donor) => SizedBox(
+                    width: adjustedWidth,
+                    child: _buildDonorTile(
+                      theme,
+                      donor,
+                      isSelected: donor.id == (_selectedDonor?.id ?? ''),
+                      onTap: () => setState(() => _selectedDonor = donor),
+                      showBorderHighlight: true,
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        );
+      },
+    );
+  }
+
   Donor? _resolveSelection(List<Donor> donors) {
     if (donors.isEmpty) return null;
     if (_selectedDonor == null) return donors.first;
@@ -232,7 +241,7 @@ class _DonorsScreenState extends State<DonorsScreen> {
     }
 
     if (donor.congressionalDistrict != null && donor.congressionalDistrict!.isNotEmpty) {
-      chips.add(_buildPillChip(Icons.account_balance, 'CD ${donor.congressionalDistrict!}'));
+      chips.add(_buildPillChip(Icons.account_balance, donor.congressionalDistrict!));
     }
 
     if (donor.member != null) {
@@ -250,7 +259,7 @@ class _DonorsScreenState extends State<DonorsScreen> {
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -416,7 +425,7 @@ class _DonorsScreenState extends State<DonorsScreen> {
                 if (donor.county != null && donor.county!.isNotEmpty)
                   _buildPillChip(Icons.location_city, donor.county!),
                 if (donor.congressionalDistrict != null && donor.congressionalDistrict!.isNotEmpty)
-                  _buildPillChip(Icons.account_balance, 'CD ${donor.congressionalDistrict!}'),
+                  _buildPillChip(Icons.account_balance, donor.congressionalDistrict!),
                 if (donor.member != null)
                   _buildPillChip(Icons.link, donor.member!.name ?? donor.member!.id ?? 'Linked member'),
                 if (donor.isRecurringDonor == true)
