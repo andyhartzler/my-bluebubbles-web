@@ -442,29 +442,59 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                 final subtitle = [
                   dateText,
                   if (donation.eventName != null) 'Event: ${donation.eventName}',
-                  if (donation.paymentMethod != null) 'Method: ${donation.paymentMethod}',
+                  if (donation.paymentMethod != null) 'Method: ${donation.paymentMethodLabel}',
                   if (donation.sentThankYou) 'Thank you sent',
                 ].join(' • ');
                 final notes = donation.notes?.trim();
 
-                return CheckboxListTile(
-                  value: donation.sentThankYou,
-                  onChanged: (value) => _toggleThankYou(donation, value ?? false),
-                  secondary: const Icon(Icons.volunteer_activism),
+                return ListTile(
+                  leading: const Icon(Icons.volunteer_activism),
                   title: Text(title),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(subtitle),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          Chip(
+                            label: Text(
+                              donation.sentThankYou ? 'Thank you sent' : 'Thank you pending',
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            backgroundColor:
+                                donation.sentThankYou ? Colors.green.shade100 : Colors.grey.shade200,
+                            labelStyle: TextStyle(
+                              color: donation.sentThankYou ? Colors.green.shade800 : Colors.grey.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
                       if (notes != null && notes.isNotEmpty)
                         Padding(
-                          padding: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.only(top: 6),
                           child: Text(notes, style: theme.textTheme.bodySmall),
                         ),
                     ],
                   ),
-                  controlAffinity: ListTileControlAffinity.trailing,
+                  trailing: ElevatedButton.icon(
+                    icon: Icon(
+                      donation.sentThankYou ? Icons.check_circle : Icons.mark_email_read_outlined,
+                    ),
+                    label: Text(donation.sentThankYou ? 'Marked sent' : 'Mark sent'),
+                    onPressed: () => _showThankYouConfirmation(donation),
+                    style: ElevatedButton.styleFrom(
+                      elevation: 0,
+                      backgroundColor:
+                          donation.sentThankYou ? Colors.green.shade600 : Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                  onTap: () => _showThankYouConfirmation(donation),
                   dense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 );
               },
               separatorBuilder: (_, __) => const Divider(height: 1),
@@ -647,6 +677,51 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   String _formatCurrency(double value) {
     final format = NumberFormat.simpleCurrency();
     return format.format(value);
+  }
+
+  Future<void> _showThankYouConfirmation(Donation donation) async {
+    final markSent = !donation.sentThankYou;
+    final amountText = _formatCurrency(donation.amount ?? 0);
+    final dateText = donation.donationDate != null
+        ? DateFormat.yMMMd().format(donation.donationDate!)
+        : 'Unknown date';
+    final donorName = donation.donorName ?? _donor?.name ?? 'this donor';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(markSent ? 'Mark thank-you sent?' : 'Reopen thank-you?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(markSent
+                  ? 'Confirm you have sent a thank-you to $donorName.'
+                  : 'This will mark the thank-you as not yet sent.'),
+              const SizedBox(height: 12),
+              Text('Donation: $amountText'),
+              Text('Date: $dateText'),
+              if (donation.eventName != null) Text('Event: ${donation.eventName}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(markSent ? 'Mark sent' : 'Mark unsent'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      await _toggleThankYou(donation, markSent);
+    }
   }
 
   Future<void> _toggleThankYou(Donation donation, bool sent) async {

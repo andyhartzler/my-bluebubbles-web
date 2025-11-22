@@ -489,11 +489,43 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Checkbox(
-                    value: donation.sentThankYou,
-                    onChanged: (value) => _toggleThankYou(donation, value ?? false),
-                    checkColor: Colors.white,
-                    fillColor: MaterialStateProperty.all(_sunriseGold),
+                  SizedBox(
+                    width: 150,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () => _showThankYouConfirmation(donation),
+                          icon: Icon(
+                            donation.sentThankYou
+                                ? Icons.check_circle
+                                : Icons.mark_email_read_outlined,
+                            size: 18,
+                          ),
+                          label: Text(
+                            donation.sentThankYou ? 'Marked sent' : 'Mark sent',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            backgroundColor:
+                                donation.sentThankYou ? _grassrootsGreen : _sunriseGold,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          donation.sentThankYou ? 'Thank-you sent' : 'Awaiting thank-you',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.white70),
+                          textAlign: TextAlign.right,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -516,6 +548,51 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
       }
     });
     _applyFilters();
+  }
+
+  Future<void> _showThankYouConfirmation(Donation donation) async {
+    final markSent = !donation.sentThankYou;
+    final amountText = NumberFormat.simpleCurrency().format(donation.amount ?? 0);
+    final dateText = donation.donationDate != null
+        ? DateFormat.yMMMd().format(donation.donationDate!)
+        : 'Unknown date';
+    final donorName = donation.donorName ?? 'this donor';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(markSent ? 'Confirm thank-you sent' : 'Mark thank-you pending'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(markSent
+                  ? 'Confirm you have sent a thank-you to $donorName.'
+                  : 'This will reopen the thank-you task.'),
+              const SizedBox(height: 12),
+              Text('Donation: $amountText'),
+              Text('Date: $dateText'),
+              if (donation.eventName != null) Text('Event: ${donation.eventName}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(markSent ? 'Mark sent' : 'Mark unsent'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      await _toggleThankYou(donation, markSent);
+    }
   }
 
   Future<void> _toggleThankYou(Donation donation, bool sent) async {
