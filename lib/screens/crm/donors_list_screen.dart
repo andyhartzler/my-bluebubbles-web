@@ -10,11 +10,13 @@ import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/donation.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
+import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/donor_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
+import 'package:bluebubbles/services/crm/event_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 const _unityBlue = Color(0xFF273351);
@@ -22,6 +24,77 @@ const _momentumBlue = Color(0xFF32A6DE);
 const _sunriseGold = Color(0xFFFDB813);
 const _grassrootsGreen = Color(0xFF43A047);
 const _justicePurple = Color(0xFF6A1B9A);
+
+enum _DonationSearchResultType { donor, member, attendee }
+
+class _DonationSearchResult {
+  final _DonationSearchResultType type;
+  final Donor? donor;
+  final Member? member;
+  final EventAttendee? attendee;
+
+  const _DonationSearchResult({
+    required this.type,
+    this.donor,
+    this.member,
+    this.attendee,
+  });
+
+  String get uniqueKey {
+    switch (type) {
+      case _DonationSearchResultType.donor:
+        return 'donor-${donor?.id ?? donor?.email ?? donor?.phone ?? ''}';
+      case _DonationSearchResultType.member:
+        return 'member-${member?.id ?? member?.email ?? member?.phone ?? ''}';
+      case _DonationSearchResultType.attendee:
+        return 'attendee-${attendee?.id ?? attendee?.guestEmail ?? attendee?.guestPhone ?? ''}';
+    }
+  }
+
+  String get displayName {
+    switch (type) {
+      case _DonationSearchResultType.donor:
+        return donor?.name ?? 'Unknown donor';
+      case _DonationSearchResultType.member:
+        return member?.name ?? 'Unknown member';
+      case _DonationSearchResultType.attendee:
+        return attendee?.displayName ?? 'Unknown attendee';
+    }
+  }
+
+  String? get detail {
+    switch (type) {
+      case _DonationSearchResultType.donor:
+        return donor?.email ?? donor?.phone;
+      case _DonationSearchResultType.member:
+        return member?.email ?? member?.phone ?? member?.phoneE164;
+      case _DonationSearchResultType.attendee:
+        return attendee?.guestEmail ?? attendee?.guestPhone ?? attendee?.member?.email ?? attendee?.member?.phone;
+    }
+  }
+
+  IconData get icon {
+    switch (type) {
+      case _DonationSearchResultType.donor:
+        return Icons.volunteer_activism_outlined;
+      case _DonationSearchResultType.member:
+        return Icons.person_outline;
+      case _DonationSearchResultType.attendee:
+        return Icons.event_available_outlined;
+    }
+  }
+
+  String get chipLabel {
+    switch (type) {
+      case _DonationSearchResultType.donor:
+        return 'Donor';
+      case _DonationSearchResultType.member:
+        return 'Member';
+      case _DonationSearchResultType.attendee:
+        return 'Event attendee';
+    }
+  }
+}
 
 class DonorsListScreen extends StatefulWidget {
   final bool embed;
@@ -35,6 +108,7 @@ class DonorsListScreen extends StatefulWidget {
 class _DonorsListScreenState extends State<DonorsListScreen> {
   final DonorRepository _repository = DonorRepository();
   final MemberRepository _memberRepository = MemberRepository();
+  final EventRepository _eventRepository = EventRepository();
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _minTotalController = TextEditingController();
 
@@ -52,6 +126,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
   int _recurringCount = 0;
   int _linkedCount = 0;
   double _totalRaised = 0;
+  double _recurringTotal = 0;
 
   @override
   void initState() {
@@ -93,6 +168,8 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         _recurringCount = stats['recurring'] as int? ?? 0;
         _linkedCount = stats['linked'] as int? ?? 0;
         _totalRaised = stats['totalRaised'] as double? ?? _calculateTotalRaised(result.donors);
+        _recurringTotal =
+            stats['recurringTotal'] as double? ?? _calculateRecurringTotal(result.donors);
         _recentDonations = donations;
         _loading = false;
       });
@@ -114,6 +191,12 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     return donors.fold<double>(0, (sum, donor) => sum + (donor.totalDonated ?? 0));
   }
 
+  double _calculateRecurringTotal(List<Donor> donors) {
+    return donors
+        .where((donor) => Donor.inferRecurringFromDonations(donor.donations))
+        .fold<double>(0, (sum, donor) => sum + (donor.totalDonated ?? 0));
+  }
+
   void _applyFilters() {
     final query = _searchController.text.trim().toLowerCase();
     final minTotal = double.tryParse(_minTotalController.text.trim());
@@ -129,7 +212,10 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     }
 
     if (_recurringFilter != null) {
-      filtered = filtered.where((donor) => donor.isRecurringDonor == _recurringFilter).toList();
+      filtered = filtered
+          .where((donor) =>
+              Donor.inferRecurringFromDonations(donor.donations) == _recurringFilter)
+          .toList();
     }
 
     if (_linkedFilter != null) {
@@ -167,6 +253,81 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     setState(() {
       _visibleDonors = filtered;
     });
+  }
+
+  Future<List<_DonationSearchResult>> _searchDonationSubjects(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return [];
+
+    final results = <_DonationSearchResult>[];
+
+    final donorResult = await _repository.fetchDonors(searchQuery: trimmed, limit: 6);
+    for (final donor in donorResult.donors) {
+      results.add(_DonationSearchResult(type: _DonationSearchResultType.donor, donor: donor));
+    }
+
+    final members = await _memberRepository.searchMembers(trimmed);
+    for (final member in members.take(6)) {
+      results.add(_DonationSearchResult(type: _DonationSearchResultType.member, member: member));
+    }
+
+    if (_eventRepository.isReady) {
+      final attendees = await _eventRepository.searchHistoricalAttendees(trimmed, limit: 6);
+      for (final attendee in attendees) {
+        results.add(_DonationSearchResult(type: _DonationSearchResultType.attendee, attendee: attendee));
+      }
+    }
+
+    final unique = <String, _DonationSearchResult>{};
+    for (final result in results) {
+      unique.putIfAbsent(result.uniqueKey, () => result);
+    }
+
+    return unique.values.toList();
+  }
+
+  Future<String?> _ensureDonorForMember(Member member) async {
+    final memberId = member.id;
+    if (memberId == null) return null;
+
+    final existing = await _repository.findDonorByMemberId(memberId);
+    if (existing?.id != null) return existing!.id;
+
+    final payload = {
+      'member_id': memberId,
+      'name': member.name,
+      'email': member.email,
+      'phone': member.phone ?? member.phoneE164,
+      'phone_e164': member.phoneE164 ?? member.phone,
+    };
+
+    return _repository.upsertDonor(data: payload);
+  }
+
+  Future<String?> _ensureDonorForAttendee(EventAttendee attendee) async {
+    if (attendee.memberId != null) {
+      final existing = await _repository.findDonorByMemberId(attendee.memberId!);
+      if (existing?.id != null) return existing!.id;
+    } else if (attendee.guestPhone != null) {
+      final existing = await _repository.findDonorByPhone(attendee.guestPhone!);
+      if (existing?.id != null) return existing!.id;
+    }
+
+    final payload = {
+      'member_id': attendee.memberId,
+      'name': attendee.member?.name ?? attendee.guestName,
+      'email': attendee.member?.email ?? attendee.guestEmail,
+      'phone': attendee.member?.phone ?? attendee.guestPhone,
+      'phone_e164': attendee.member?.phoneE164 ?? attendee.guestPhone,
+      'address': attendee.address,
+      'city': attendee.city,
+      'state': attendee.state,
+      'zip_code': attendee.zip,
+      'employer': attendee.employer,
+      'occupation': attendee.occupation,
+    };
+
+    return _repository.upsertDonor(data: payload);
   }
 
   Future<void> _openMember(Donor donor) async {
@@ -489,11 +650,43 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Checkbox(
-                    value: donation.sentThankYou,
-                    onChanged: (value) => _toggleThankYou(donation, value ?? false),
-                    checkColor: Colors.white,
-                    fillColor: MaterialStateProperty.all(_sunriseGold),
+                  SizedBox(
+                    width: 150,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () => _showThankYouConfirmation(donation),
+                          icon: Icon(
+                            donation.sentThankYou
+                                ? Icons.check_circle
+                                : Icons.mark_email_read_outlined,
+                            size: 18,
+                          ),
+                          label: Text(
+                            donation.sentThankYou ? 'Marked sent' : 'Mark sent',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            backgroundColor:
+                                donation.sentThankYou ? _grassrootsGreen : _sunriseGold,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          donation.sentThankYou ? 'Thank-you sent' : 'Awaiting thank-you',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.white70),
+                          textAlign: TextAlign.right,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -518,6 +711,51 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     _applyFilters();
   }
 
+  Future<void> _showThankYouConfirmation(Donation donation) async {
+    final markSent = !donation.sentThankYou;
+    final amountText = NumberFormat.simpleCurrency().format(donation.amount ?? 0);
+    final dateText = donation.donationDate != null
+        ? DateFormat.yMMMd().format(donation.donationDate!)
+        : 'Unknown date';
+    final donorName = donation.donorName ?? 'this donor';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(markSent ? 'Confirm thank-you sent' : 'Mark thank-you pending'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(markSent
+                  ? 'Confirm you have sent a thank-you to $donorName.'
+                  : 'This will reopen the thank-you task.'),
+              const SizedBox(height: 12),
+              Text('Donation: $amountText'),
+              Text('Date: $dateText'),
+              if (donation.eventName != null) Text('Event: ${donation.eventName}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(markSent ? 'Mark sent' : 'Mark unsent'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      await _toggleThankYou(donation, markSent);
+    }
+  }
+
   Future<void> _toggleThankYou(Donation donation, bool sent) async {
     setState(() {
       _recentDonations = _recentDonations
@@ -531,10 +769,30 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
   Future<void> _showAddDonationDialog() async {
     final amountController = TextEditingController();
     final notesController = TextEditingController();
+    final searchController = TextEditingController();
+    final newDonorNameController = TextEditingController();
+    final newDonorEmailController = TextEditingController();
+    final newDonorPhoneController = TextEditingController();
+    final newDonorAddressController = TextEditingController();
+    final newDonorCityController = TextEditingController();
+    final newDonorStateController = TextEditingController();
+    final newDonorZipController = TextEditingController();
+    final newDonorEmployerController = TextEditingController();
+    final newDonorOccupationController = TextEditingController();
     DateTime donationDate = DateTime.now();
     String method = 'Cash';
-    String? selectedDonorId;
     String? checkNumber;
+    String? donorId;
+    Event? selectedEvent;
+    var searchResults = <_DonationSearchResult>[];
+    _DonationSearchResult? selectedSubject;
+    bool creatingNewDonor = false;
+    bool searching = false;
+
+    Timer? debounce;
+    final availableEvents = _eventRepository.isReady
+        ? await _eventRepository.fetchEvents(upcomingOnly: false, pastOnly: false)
+        : <Event>[];
 
     await showDialog(
       context: context,
@@ -542,25 +800,159 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         return AlertDialog(
           title: const Text('Add manual donation'),
           content: StatefulBuilder(builder: (context, setState) {
+            Future<void> handleSearch(String value) async {
+              debounce?.cancel();
+              debounce = Timer(const Duration(milliseconds: 300), () async {
+                setState(() => searching = true);
+                final results = await _searchDonationSubjects(value);
+                if (!mounted) return;
+                setState(() {
+                  searchResults = results;
+                  searching = false;
+                });
+              });
+            }
+
             return SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  DropdownButtonFormField<String?>(
-                    decoration: const InputDecoration(labelText: 'Donor (optional)'),
-                    value: selectedDonorId,
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('Unattributed')),
-                      ..._donors
-                          .map((donor) => DropdownMenuItem(
-                                value: donor.id,
-                                child: Text(donor.name ?? 'Unknown Donor'),
-                              ))
-                          .toList(),
-                    ],
-                    onChanged: (value) => setState(() => selectedDonorId = value),
+                  TextField(
+                    controller: searchController,
+                    decoration: const InputDecoration(
+                      labelText: 'Search member, donor, or event attendee',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: handleSearch,
                   ),
+                  const SizedBox(height: 8),
+                  if (selectedSubject != null)
+                    Card(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      child: ListTile(
+                        leading: Icon(selectedSubject!.icon),
+                        title: Text(selectedSubject!.displayName),
+                        subtitle: Text(selectedSubject!.detail ?? 'Selected record'),
+                        trailing: TextButton(
+                          onPressed: () => setState(() {
+                            selectedSubject = null;
+                            creatingNewDonor = false;
+                          }),
+                          child: const Text('Change'),
+                        ),
+                      ),
+                    ),
+                  if (!creatingNewDonor)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (searching)
+                          const LinearProgressIndicator(minHeight: 2)
+                        else if (searchResults.isEmpty && searchController.text.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6.0),
+                            child: Text(
+                              'No matches found. Create a new donor with full details.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ...searchResults.map(
+                          (result) => ListTile(
+                            dense: true,
+                            leading: Icon(result.icon),
+                            title: Text(result.displayName),
+                            subtitle: Row(
+                              children: [
+                                Chip(label: Text(result.chipLabel)),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text(result.detail ?? '', overflow: TextOverflow.ellipsis)),
+                              ],
+                            ),
+                            onTap: () => setState(() {
+                              selectedSubject = result;
+                              creatingNewDonor = false;
+                            }),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () => setState(() {
+                              creatingNewDonor = true;
+                              selectedSubject = null;
+                              if (newDonorNameController.text.isEmpty &&
+                                  searchController.text.trim().isNotEmpty) {
+                                newDonorNameController.text = searchController.text.trim();
+                              }
+                            }),
+                            icon: const Icon(Icons.person_add_alt_1),
+                            label: const Text('Create new donor with details'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (creatingNewDonor) ...[
+                    const SizedBox(height: 8),
+                    Text('New donor details', style: Theme.of(context).textTheme.titleSmall),
+                    TextField(
+                      controller: newDonorNameController,
+                      decoration: const InputDecoration(labelText: 'Full name *'),
+                    ),
+                    TextField(
+                      controller: newDonorEmailController,
+                      decoration: const InputDecoration(labelText: 'Email'),
+                    ),
+                    TextField(
+                      controller: newDonorPhoneController,
+                      decoration: const InputDecoration(labelText: 'Phone (E.164 preferred)'),
+                    ),
+                    TextField(
+                      controller: newDonorAddressController,
+                      decoration: const InputDecoration(labelText: 'Address'),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: newDonorCityController,
+                            decoration: const InputDecoration(labelText: 'City'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: newDonorStateController,
+                            decoration: const InputDecoration(labelText: 'State'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: newDonorZipController,
+                            decoration: const InputDecoration(labelText: 'ZIP'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: newDonorEmployerController,
+                            decoration: const InputDecoration(labelText: 'Employer'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: newDonorOccupationController,
+                            decoration: const InputDecoration(labelText: 'Occupation'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   TextField(
                     controller: amountController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -601,6 +993,21 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                       onChanged: (value) => checkNumber = value,
                       decoration: const InputDecoration(labelText: 'Check number'),
                     ),
+                  DropdownButtonFormField<Event?>(
+                    value: selectedEvent,
+                    decoration: const InputDecoration(labelText: 'Link to event (optional)'),
+                    items: [
+                      const DropdownMenuItem<Event?>(value: null, child: Text('No event')),
+                      ...availableEvents.map(
+                        (event) => DropdownMenuItem<Event?>(
+                          value: event,
+                          child: Text('${event.title ?? 'Untitled'} — '
+                              '${event.eventDate != null ? DateFormat.yMMMd().format(event.eventDate!.toLocal()) : 'No date'}'),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) => setState(() => selectedEvent = value),
+                  ),
                   TextField(
                     controller: notesController,
                     decoration: const InputDecoration(labelText: 'Notes'),
@@ -618,15 +1025,82 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
             ElevatedButton(
               onPressed: () async {
                 final amount = double.tryParse(amountController.text.trim());
-                if (amount == null) return;
+                if (amount == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Enter a valid donation amount.')),
+                  );
+                  return;
+                }
+
+                if (creatingNewDonor) {
+                  final name = newDonorNameController.text.trim();
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Name is required to create a donor.')),
+                    );
+                    return;
+                  }
+
+                  final payload = {
+                    'name': name,
+                    'email': newDonorEmailController.text.trim().isEmpty
+                        ? null
+                        : newDonorEmailController.text.trim(),
+                    'phone': newDonorPhoneController.text.trim().isEmpty
+                        ? null
+                        : newDonorPhoneController.text.trim(),
+                    'phone_e164': newDonorPhoneController.text.trim().isEmpty
+                        ? null
+                        : newDonorPhoneController.text.trim(),
+                    'address': newDonorAddressController.text.trim().isEmpty
+                        ? null
+                        : newDonorAddressController.text.trim(),
+                    'city': newDonorCityController.text.trim().isEmpty
+                        ? null
+                        : newDonorCityController.text.trim(),
+                    'state': newDonorStateController.text.trim().isEmpty
+                        ? null
+                        : newDonorStateController.text.trim(),
+                    'zip_code': newDonorZipController.text.trim().isEmpty
+                        ? null
+                        : newDonorZipController.text.trim(),
+                    'employer': newDonorEmployerController.text.trim().isEmpty
+                        ? null
+                        : newDonorEmployerController.text.trim(),
+                    'occupation': newDonorOccupationController.text.trim().isEmpty
+                        ? null
+                        : newDonorOccupationController.text.trim(),
+                  };
+
+                  donorId = await _repository.upsertDonor(data: payload);
+                } else if (selectedSubject != null) {
+                  switch (selectedSubject!.type) {
+                    case _DonationSearchResultType.donor:
+                      donorId = selectedSubject!.donor?.id;
+                      break;
+                    case _DonationSearchResultType.member:
+                      final member = selectedSubject!.member;
+                      if (member != null) {
+                        donorId = await _ensureDonorForMember(member);
+                      }
+                      break;
+                    case _DonationSearchResultType.attendee:
+                      final attendee = selectedSubject!.attendee;
+                      if (attendee != null) {
+                        donorId = await _ensureDonorForAttendee(attendee);
+                      }
+                      break;
+                  }
+                }
 
                 await _repository.addManualDonation(
-                  donorId: selectedDonorId,
+                  donorId: donorId,
                   amount: amount,
                   donationDate: donationDate,
                   paymentMethod: method,
                   checkNumber: checkNumber,
                   notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                  eventId: selectedEvent?.id,
                 );
                 if (!mounted) return;
                 Navigator.of(context).pop();
@@ -638,6 +1112,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         );
       },
     );
+    debounce?.cancel();
   }
 
   Widget _buildRowActions(Donor donor) {
@@ -747,7 +1222,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                 title: 'Recurring Donors',
                 value: _recurringCount.toString(),
                 subtitle:
-                    '${((_recurringCount / (_totalDonors == 0 ? 1 : _totalDonors)) * 100).toStringAsFixed(1)}% of base',
+                    '${((_recurringCount / (_totalDonors == 0 ? 1 : _totalDonors)) * 100).toStringAsFixed(1)}% of base • ${currency.format(_recurringTotal)} lifetime',
                 color: _grassrootsGreen,
                 icon: Icons.autorenew,
               ),

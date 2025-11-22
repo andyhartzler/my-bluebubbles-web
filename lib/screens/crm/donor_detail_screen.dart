@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -43,6 +45,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   Donor? _donor;
   bool _sendingEmail = false;
   bool _startingMessage = false;
+  bool _savingEdit = false;
 
   @override
   void initState() {
@@ -87,6 +90,11 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
       appBar: AppBar(
         title: const Text('Donor Details'),
         actions: [
+          IconButton(
+            tooltip: 'Edit donor',
+            onPressed: _loading ? null : _openEdit,
+            icon: const Icon(Icons.edit_note_outlined),
+          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: _loading ? null : _load,
@@ -232,7 +240,52 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   }
 
   Widget _buildContactCard(ThemeData theme, Donor donor) {
-    final formattedPhone = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone);
+    final formattedPhone = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone) ?? '+';
+    final address = _formatAddress(donor);
+    final county = _cleanText(donor.county);
+    final district = _cleanText(donor.congressionalDistrict);
+    final dob = donor.dateOfBirth != null ? DateFormat.yMMMd().format(donor.dateOfBirth!) : null;
+
+    final pills = <Widget>[
+      _buildContactChip(
+        icon: Icons.sms_outlined,
+        label: formattedPhone,
+        tooltip: 'Mobile',
+      ),
+      if (_cleanText(donor.email) != null)
+        _buildContactChip(
+          icon: Icons.email_outlined,
+          label: donor.email!,
+          tooltip: 'Email',
+        ),
+      if (address != null)
+        _buildContactChip(
+          icon: Icons.home_outlined,
+          label: address,
+          tooltip: 'Address',
+        ),
+      if (county != null)
+        _buildContactChip(
+          icon: Icons.location_city_outlined,
+          label: '$county County',
+          tooltip: 'County',
+        ),
+      if (district != null)
+        _buildContactChip(
+          icon: Icons.account_balance_outlined,
+          label: 'CD $district',
+          tooltip: 'Congressional district',
+        ),
+      if (dob != null)
+        _buildContactChip(
+          icon: Icons.cake_outlined,
+          label: 'Born $dob',
+          tooltip: 'Date of birth',
+        ),
+    ];
+
+    if (pills.isEmpty) return const SizedBox.shrink();
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -263,6 +316,16 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                   onPressed: donor.email == null || _sendingEmail ? null : _composeEmail,
                   icon: const Icon(Icons.email_outlined),
                   label: const Text('Send email'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _savingEdit ? null : _openEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Edit'),
+                ),
+                TextButton.icon(
+                  onPressed: _loading ? null : _load,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refresh'),
                 ),
               ],
             ),
@@ -529,29 +592,59 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                 final subtitle = [
                   dateText,
                   if (donation.eventName != null) 'Event: ${donation.eventName}',
-                  if (donation.paymentMethod != null) 'Method: ${donation.paymentMethod}',
+                  if (donation.paymentMethod != null) 'Method: ${donation.paymentMethodLabel}',
                   if (donation.sentThankYou) 'Thank you sent',
                 ].join(' • ');
                 final notes = donation.notes?.trim();
 
-                return CheckboxListTile(
-                  value: donation.sentThankYou,
-                  onChanged: (value) => _toggleThankYou(donation, value ?? false),
-                  secondary: const Icon(Icons.volunteer_activism),
+                return ListTile(
+                  leading: const Icon(Icons.volunteer_activism),
                   title: Text(title),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(subtitle),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          Chip(
+                            label: Text(
+                              donation.sentThankYou ? 'Thank you sent' : 'Thank you pending',
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            backgroundColor:
+                                donation.sentThankYou ? Colors.green.shade100 : Colors.grey.shade200,
+                            labelStyle: TextStyle(
+                              color: donation.sentThankYou ? Colors.green.shade800 : Colors.grey.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
                       if (notes != null && notes.isNotEmpty)
                         Padding(
-                          padding: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.only(top: 6),
                           child: Text(notes, style: theme.textTheme.bodySmall),
                         ),
                     ],
                   ),
-                  controlAffinity: ListTileControlAffinity.trailing,
+                  trailing: ElevatedButton.icon(
+                    icon: Icon(
+                      donation.sentThankYou ? Icons.check_circle : Icons.mark_email_read_outlined,
+                    ),
+                    label: Text(donation.sentThankYou ? 'Marked sent' : 'Mark sent'),
+                    onPressed: () => _showThankYouConfirmation(donation),
+                    style: ElevatedButton.styleFrom(
+                      elevation: 0,
+                      backgroundColor:
+                          donation.sentThankYou ? Colors.green.shade600 : Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                  onTap: () => _showThankYouConfirmation(donation),
                   dense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 );
               },
               separatorBuilder: (_, __) => const Divider(height: 1),
@@ -559,24 +652,6 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Expanded(child: Text(value)),
-        ],
       ),
     );
   }
@@ -595,14 +670,26 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     );
   }
 
-  String _formatAddress(Donor donor) {
+  String? _formatAddress(Donor donor) {
+    final cityState = [donor.city, donor.state].where((p) => (p ?? '').isNotEmpty).join(', ');
     final parts = [
       donor.address,
-      [donor.city, donor.state].where((p) => (p ?? '').isNotEmpty).join(', '),
+      cityState.isNotEmpty ? cityState : null,
       donor.zipCode,
-    ].where((part) => part != null && part!.trim().isNotEmpty).join('\n');
+    ].where((part) => part != null && part!.trim().isNotEmpty).join(', ');
 
-    return parts.isEmpty ? 'Not provided' : parts;
+    return parts.isEmpty ? null : parts;
+  }
+
+  Widget _buildContactChip({required IconData icon, required String label, String? tooltip}) {
+    final chip = Chip(
+      avatar: Icon(icon, size: 18),
+      label: Text(label),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+
+    if (tooltip == null) return chip;
+    return Tooltip(message: tooltip, child: chip);
   }
 
   String? _formatAddressSingleLine(Donor donor) {
@@ -751,6 +838,51 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     return format.format(value);
   }
 
+  Future<void> _showThankYouConfirmation(Donation donation) async {
+    final markSent = !donation.sentThankYou;
+    final amountText = _formatCurrency(donation.amount ?? 0);
+    final dateText = donation.donationDate != null
+        ? DateFormat.yMMMd().format(donation.donationDate!)
+        : 'Unknown date';
+    final donorName = donation.donorName ?? _donor?.name ?? 'this donor';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(markSent ? 'Mark thank-you sent?' : 'Reopen thank-you?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(markSent
+                  ? 'Confirm you have sent a thank-you to $donorName.'
+                  : 'This will mark the thank-you as not yet sent.'),
+              const SizedBox(height: 12),
+              Text('Donation: $amountText'),
+              Text('Date: $dateText'),
+              if (donation.eventName != null) Text('Event: ${donation.eventName}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(markSent ? 'Mark sent' : 'Mark unsent'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      await _toggleThankYou(donation, markSent);
+    }
+  }
+
   Future<void> _toggleThankYou(Donation donation, bool sent) async {
     setState(() {
       _donor = _donor?.copyWith(
@@ -762,6 +894,241 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     });
 
     await _repository.updateThankYouStatus(donation.id, sent);
+  }
+
+  Future<void> _confirmThankYouChange(Donation donation, bool sent) async {
+    final actionLabel = sent ? 'mark this donation as thanked' : 'undo the thank you log';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Update thank you status'),
+          content: Text(
+            'Are you sure you want to $actionLabel for ${_formatCurrency(donation.amount ?? 0)}?\n'
+            'This helps keep follow-up tracking accurate.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(sent ? 'Mark thanked' : 'Undo thank you'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _toggleThankYou(donation, sent);
+    }
+  }
+
+  Future<void> _openEdit() async {
+    final donor = _donor;
+    if (donor == null || _savingEdit) return;
+
+    final theme = Theme.of(context);
+
+    final nameController = TextEditingController(text: donor.name);
+    final emailController = TextEditingController(text: donor.email);
+    final phoneController = TextEditingController(text: donor.phoneE164 ?? donor.phone);
+    final addressController = TextEditingController(text: donor.address);
+    final cityController = TextEditingController(text: donor.city);
+    final stateController = TextEditingController(text: donor.state);
+    final zipController = TextEditingController(text: donor.zipCode);
+    final countyController = TextEditingController(text: donor.county);
+    final districtController = TextEditingController(text: donor.congressionalDistrict);
+    DateTime? dob = donor.dateOfBirth;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          Future<void> save() async {
+            setState(() => _savingEdit = true);
+            final data = {
+              'name': _cleanText(nameController.text),
+              'email': _cleanText(emailController.text),
+              'phone': _cleanText(phoneController.text),
+              'phone_e164': _cleanText(phoneController.text),
+              'address': _cleanText(addressController.text),
+              'city': _cleanText(cityController.text),
+              'state': _cleanText(stateController.text),
+              'zip_code': _cleanText(zipController.text),
+              'county': _cleanText(countyController.text),
+              'congressional_district': _cleanText(districtController.text),
+              'date_of_birth': dob?.toUtc().toIso8601String(),
+            }..removeWhere((_, value) => value == null);
+
+            try {
+              await _repository.upsertDonor(donorId: donor.id, data: data);
+              if (mounted) {
+                setState(() => _savingEdit = false);
+                Navigator.of(context).pop();
+                this.setState(() {
+                  _donor = donor.copyWith(
+                    name: data['name'] as String? ?? donor.name,
+                    email: data['email'] as String? ?? donor.email,
+                    phone: data['phone'] as String? ?? donor.phone,
+                    phoneE164: data['phone_e164'] as String? ?? donor.phoneE164,
+                    address: data['address'] as String? ?? donor.address,
+                    city: data['city'] as String? ?? donor.city,
+                    state: data['state'] as String? ?? donor.state,
+                    zipCode: data['zip_code'] as String? ?? donor.zipCode,
+                    county: data['county'] as String? ?? donor.county,
+                    congressionalDistrict:
+                        data['congressional_district'] as String? ?? donor.congressionalDistrict,
+                    dateOfBirth: dob ?? donor.dateOfBirth,
+                  );
+                });
+              }
+            } catch (error) {
+              if (!mounted) return;
+              setState(() => _savingEdit = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Unable to save donor: $error')),
+              );
+            }
+          }
+
+          Future<void> pickDate() async {
+            final now = DateTime.now();
+            final initialDate = dob ?? DateTime(now.year - 25, now.month, now.day);
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: initialDate,
+              firstDate: DateTime(1900),
+              lastDate: DateTime(now.year + 1),
+            );
+            if (picked != null) {
+              setState(() => dob = picked);
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 16,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Edit donor', style: theme.textTheme.titleMedium),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                  ),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                  ),
+                  TextField(
+                    controller: phoneController,
+                    decoration: const InputDecoration(labelText: 'Phone (E.164 preferred)'),
+                  ),
+                  TextField(
+                    controller: addressController,
+                    decoration: const InputDecoration(labelText: 'Address'),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: cityController,
+                          decoration: const InputDecoration(labelText: 'City'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: stateController,
+                          decoration: const InputDecoration(labelText: 'State'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: zipController,
+                          decoration: const InputDecoration(labelText: 'ZIP'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: countyController,
+                          decoration: const InputDecoration(labelText: 'County'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: districtController,
+                          decoration: const InputDecoration(labelText: 'Congressional District'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: pickDate,
+                          icon: const Icon(Icons.cake_outlined),
+                          label: Text(dob != null ? DateFormat.yMMMd().format(dob!) : 'Add birthday'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _savingEdit ? null : () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: _savingEdit ? null : save,
+                        child: _savingEdit
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Save changes'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          );
+        });
+      },
+    );
   }
 
   Future<void> _openMember(String memberId) async {
@@ -779,16 +1146,29 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
 
     final searchController = TextEditingController();
     List<Member> results = [];
+    bool searching = false;
+    Timer? debounce;
 
     await showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(builder: (context, setState) {
-          Future<void> search() async {
-            final query = searchController.text.trim();
-            if (query.isEmpty) return;
+          Future<void> search([String? queryOverride]) async {
+            final query = (queryOverride ?? searchController.text).trim();
+            if (query.isEmpty) {
+              setState(() {
+                results = [];
+                searching = false;
+              });
+              return;
+            }
+            setState(() => searching = true);
             final members = await _memberRepository.searchMembers(query);
-            setState(() => results = members);
+            if (!context.mounted) return;
+            setState(() {
+              results = members;
+              searching = false;
+            });
           }
 
           return AlertDialog(
@@ -804,33 +1184,39 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                       labelText: 'Search members',
                       hintText: 'Name, email, or phone',
                     ),
+                    onChanged: (value) {
+                      debounce?.cancel();
+                      debounce = Timer(const Duration(milliseconds: 300), () => search(value));
+                    },
                     onSubmitted: (_) => search(),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
                     height: 280,
-                    child: results.isEmpty
-                        ? const Center(child: Text('Search for a member to link.'))
-                        : ListView.separated(
-                            itemBuilder: (context, index) {
-                              final member = results[index];
-                              return ListTile(
-                                title: Text(member.name ?? 'Unnamed member'),
-                                subtitle: Text(member.phoneE164 ?? member.phone ?? 'No phone'),
-                                trailing: TextButton(
-                                  onPressed: () async {
-                                    await _repository.linkDonorToMember(donor.id!, member.id);
-                                    if (!mounted) return;
-                                    Navigator.of(context).pop();
-                                    await _load();
-                                  },
-                                  child: const Text('Link'),
-                                ),
-                              );
-                            },
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemCount: results.length,
-                          ),
+                    child: searching
+                        ? const Center(child: CircularProgressIndicator())
+                        : results.isEmpty
+                            ? const Center(child: Text('Search for a member to link.'))
+                            : ListView.separated(
+                                itemBuilder: (context, index) {
+                                  final member = results[index];
+                                  return ListTile(
+                                    title: Text(member.name ?? 'Unnamed member'),
+                                    subtitle: Text(member.phoneE164 ?? member.phone ?? 'No phone'),
+                                    trailing: TextButton(
+                                      onPressed: () async {
+                                        await _repository.linkDonorToMember(donor.id!, member.id);
+                                        if (!mounted) return;
+                                        Navigator.of(context).pop();
+                                        await _load();
+                                      },
+                                      child: const Text('Link'),
+                                    ),
+                                  );
+                                },
+                                separatorBuilder: (_, __) => const Divider(height: 1),
+                                itemCount: results.length,
+                              ),
                   ),
                 ],
               ),
@@ -840,15 +1226,13 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Close'),
               ),
-              ElevatedButton(
-                onPressed: search,
-                child: const Text('Search'),
-              ),
             ],
           );
         });
       },
     );
+
+    debounce?.cancel();
   }
 
   String _initialForDonor(Donor donor) {
