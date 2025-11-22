@@ -1,14 +1,13 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart' as file_picker;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:file_picker/file_picker.dart' as file_picker;
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
-import 'package:bluebubbles/database/global/platform_file.dart'
-    as bluebubbles_file;
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
@@ -16,6 +15,7 @@ import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
 import 'package:bluebubbles/widgets/event_map_widget.dart';
+import 'file_picker_materializer.dart';
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
@@ -201,22 +201,28 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     final result = await file_picker.FilePicker.platform.pickFiles(
       allowMultiple: false,
       withData: true,
+      withReadStream: !kIsWeb,
       type: file_picker.FileType.custom,
       allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
     );
 
     if (result == null || result.files.isEmpty) return;
 
+    final platformFile = await materializePickedPlatformFile(
+      result.files.first,
+      source: result,
+    );
+
+    if (platformFile == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to read selected image. Please try again.')),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
-      final pickedFile = result.files.first;
-      final platformFile = bluebubbles_file.PlatformFile(
-        path: pickedFile.path,
-        name: pickedFile.name,
-        size: pickedFile.size,
-        bytes: pickedFile.bytes,
-      );
-
       final updated = await _repository.uploadEventImage(
         eventId: _currentEvent.id!,
         file: platformFile,
