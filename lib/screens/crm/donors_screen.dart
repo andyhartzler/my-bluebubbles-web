@@ -51,7 +51,7 @@ class _DonorsScreenState extends State<DonorsScreen> {
     try {
       final donors = await _repository.fetchDonors(
         limit: 200,
-        search: _searchController.text,
+        searchQuery: _searchController.text,
       );
       setState(() {
         _donors = donors;

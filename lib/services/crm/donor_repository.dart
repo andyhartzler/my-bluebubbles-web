@@ -15,12 +15,14 @@ class DonorRepository {
   SupabaseClient get _readClient =>
       _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
 
+  SupabaseClient get _writeClient => _supabase.privilegedClient;
+
   Future<List<Donation>> fetchRecentDonations({int limit = 50}) async {
     if (!isReady) return [];
 
     final response = await _readClient
         .from('donations')
-        .select('*, donor:donor_id(id,name,email,phone,member_id), events(title)')
+        .select('*, donor:donor_id(*), events(title)')
         .order('donation_date', ascending: false)
         .limit(limit);
 
@@ -59,6 +61,7 @@ class DonorRepository {
     required String paymentMethod,
     String? checkNumber,
     String? notes,
+    String? eventId,
   }) async {
     if (!isReady) return;
 
@@ -69,9 +72,36 @@ class DonorRepository {
       'payment_method': paymentMethod,
       'check_number': paymentMethod.toLowerCase() == 'check' ? checkNumber : null,
       'notes': notes,
+      'event_id': eventId,
     };
 
-    await _readClient.from('donations').insert(payload);
+    await _writeClient.from('donations').insert(payload);
+  }
+
+  Future<String> upsertDonor({
+    String? donorId,
+    required Map<String, dynamic> data,
+  }) async {
+    if (!isReady) throw Exception('CRM not configured');
+
+    final payload = Map<String, dynamic>.from(data)..removeWhere((_, value) => value == null);
+    if (donorId == null) {
+      final response = await _writeClient.from('donors').insert(payload).select('id').single();
+      return (response as Map<String, dynamic>)['id'] as String;
+    }
+
+    final response = await _writeClient
+        .from('donors')
+        .update(payload)
+        .eq('id', donorId)
+        .select('id')
+        .single();
+    return (response as Map<String, dynamic>)['id'] as String;
+  }
+
+  Future<void> linkDonorToMember(String donorId, String? memberId) async {
+    if (!isReady) return;
+    await _writeClient.from('donors').update({'member_id': memberId}).eq('id', donorId);
   }
 
   Future<DonorFetchResult> fetchDonors({
@@ -94,7 +124,7 @@ class DonorRepository {
     final resolvedSort = allowedSorts.contains(sortBy) ? sortBy : 'name';
 
     var query = _applyFilters(
-      _readClient.from('donors').select('*'),
+      _readClient.from('donors').select('*, donations(*)'),
       searchQuery: searchQuery,
       recurring: recurring,
       linkedToMember: linkedToMember,
@@ -181,7 +211,8 @@ class DonorRepository {
   }) {
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
       final value = searchQuery.trim();
-      query = query.or('name.ilike.%$value%,email.ilike.%$value%,phone.ilike.%$value%');
+      query = query.or(
+          'name.ilike.%$value%,email.ilike.%$value%,phone.ilike.%$value%,phone_e164.ilike.%$value%');
     }
 
     if (recurring != null) {
