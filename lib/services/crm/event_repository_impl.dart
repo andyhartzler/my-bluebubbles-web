@@ -501,6 +501,7 @@ class EventRepository {
     String? guestEmail,
     String? guestPhone,
     DateTime? dateOfBirth,
+    DateTime? checkedInAt,
     String? address,
     String? city,
     String? state,
@@ -528,7 +529,8 @@ class EventRepository {
       'guest_count': guestCount,
       'rsvp_status': rsvpStatus,
       'checked_in': checkedIn,
-      'checked_in_at': checkedIn ? DateTime.now().toUtc().toIso8601String() : null,
+      'checked_in_at':
+          checkedIn ? (checkedInAt ?? DateTime.now()).toUtc().toIso8601String() : null,
       'checked_in_by': checkedIn ? 'manual' : null,
       'rsvp_at': DateTime.now().toUtc().toIso8601String(),
     };
