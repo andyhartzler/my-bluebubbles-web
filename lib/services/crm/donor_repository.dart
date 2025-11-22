@@ -178,40 +178,44 @@ class DonorRepository {
       return {
         'total': 0,
         'recurring': 0,
+        'recurringTotal': 0.0,
         'linked': 0,
         'totalRaised': 0.0,
       };
     }
 
     try {
-      final PostgrestResponse totalResponse =
-          await _readClient.from('donors').select('id').count(CountOption.exact);
-      final total = totalResponse.count ?? 0;
-
-      final PostgrestResponse recurringResponse = await _readClient
+      final donorsResponse = await _readClient
           .from('donors')
-          .select('id')
-          .eq('is_recurring_donor', true)
-          .count(CountOption.exact);
-      final recurring = recurringResponse.count ?? 0;
+          .select('id, member_id, total_donated, donations(amount, donation_date)');
 
-      final PostgrestResponse linkedResponse = await _readClient
-          .from('donors')
-          .select('id')
-          .not('member_id', 'is', null)
-          .count(CountOption.exact);
-      final linked = linkedResponse.count ?? 0;
-
-      final totalsResponse = await _readClient.from('donors').select('total_donated');
-      final donations = (totalsResponse as List<dynamic>? ?? [])
+      final donors = (donorsResponse as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
-          .map((row) => (row['total_donated'] as num?)?.toDouble() ?? 0.0)
-          .toList();
-      final totalRaised = donations.fold<double>(0, (sum, value) => sum + value);
+          .map((row) {
+        final donations = (row['donations'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(Donation.fromJson)
+            .toList();
+
+        return (
+          recurring: Donor.inferRecurringFromDonations(donations),
+          totalDonated: (row['total_donated'] as num?)?.toDouble() ?? 0.0,
+          linked: row['member_id'] != null,
+        );
+      }).toList();
+
+      final total = donors.length;
+      final recurring = donors.where((donor) => donor.recurring).length;
+      final linked = donors.where((donor) => donor.linked).length;
+      final totalRaised = donors.fold<double>(0, (sum, donor) => sum + donor.totalDonated);
+      final recurringTotal = donors
+          .where((donor) => donor.recurring)
+          .fold<double>(0, (sum, donor) => sum + donor.totalDonated);
 
       return {
         'total': total,
         'recurring': recurring,
+        'recurringTotal': recurringTotal,
         'linked': linked,
         'totalRaised': totalRaised,
       };
@@ -220,6 +224,7 @@ class DonorRepository {
       return {
         'total': 0,
         'recurring': 0,
+        'recurringTotal': 0.0,
         'linked': 0,
         'totalRaised': 0.0,
       };
