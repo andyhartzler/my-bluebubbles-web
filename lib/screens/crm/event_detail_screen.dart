@@ -8,10 +8,14 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/event.dart';
+import 'package:bluebubbles/models/crm/donor.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/services/crm/donor_repository.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
 import 'package:bluebubbles/widgets/event_map_widget.dart';
@@ -34,9 +38,31 @@ class EventDetailScreen extends StatefulWidget {
 
 enum _AttendeeFilter { all, checkedIn, notCheckedIn, members, guests }
 
+class _AttendeeProspect {
+  final String source;
+  final Member? member;
+  final Donor? donor;
+  final EventAttendee? attendee;
+
+  const _AttendeeProspect({
+    required this.source,
+    this.member,
+    this.donor,
+    this.attendee,
+  });
+
+  String get displayName => member?.name ?? donor?.name ?? attendee?.displayName ?? 'Unknown';
+
+  String? get email => member?.email ?? donor?.email ?? attendee?.guestEmail;
+
+  String? get phone => member?.phone ?? member?.phoneE164 ?? donor?.phoneE164 ?? donor?.phone ?? attendee?.guestPhone;
+}
+
 class _EventDetailScreenState extends State<EventDetailScreen> with TickerProviderStateMixin {
   final EventRepository _repository = EventRepository();
   final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
+  final DonorRepository _donorRepository = DonorRepository();
+  final MemberRepository _memberRepository = MemberRepository();
 
   late Event _currentEvent;
 
@@ -575,6 +601,166 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     );
   }
 
+  Future<String?> _ensureDonorForAttendee(EventAttendee attendee) async {
+    if (!_donorRepository.isReady) return null;
+
+    Donor? donor;
+    if (attendee.memberId != null) {
+      donor = await _donorRepository.findDonorByMemberId(attendee.memberId!);
+    }
+
+    donor ??= attendee.guestPhone != null
+        ? await _donorRepository.findDonorByPhone(attendee.guestPhone!)
+        : null;
+
+    final payload = {
+      'name': attendee.member?.name ?? attendee.guestName,
+      'email': attendee.member?.email ?? attendee.guestEmail,
+      'phone': attendee.member?.phone ?? attendee.guestPhone,
+      'phone_e164': attendee.member?.phoneE164 ?? attendee.guestPhone,
+      'member_id': attendee.memberId,
+      'address': attendee.address,
+      'city': attendee.city,
+      'state': attendee.state,
+      'zip_code': attendee.zip,
+      'employer': attendee.employer,
+      'occupation': attendee.occupation,
+    };
+
+    return _donorRepository.upsertDonor(
+      donorId: donor?.id,
+      data: payload,
+    );
+  }
+
+  Future<void> _showManualDonationDialog(EventAttendee attendee) async {
+    final eventId = _currentEvent.id;
+    if (eventId == null) return;
+
+    final amountController = TextEditingController();
+    final notesController = TextEditingController();
+    final checkNumberController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+    String paymentMethod = 'cash';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Add donation for ${attendee.displayName}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: amountController,
+                  decoration: const InputDecoration(labelText: 'Amount'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: paymentMethod,
+                  decoration: const InputDecoration(labelText: 'Payment Method'),
+                  items: const [
+                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                    DropdownMenuItem(value: 'check', child: Text('Check')),
+                    DropdownMenuItem(value: 'in-kind', child: Text('In-kind')),
+                  ],
+                  onChanged: (value) => setDialogState(() => paymentMethod = value ?? 'cash'),
+                ),
+                if (paymentMethod == 'check')
+                  TextField(
+                    controller: checkNumberController,
+                    decoration: const InputDecoration(labelText: 'Check number'),
+                  ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: notesController,
+                  decoration: const InputDecoration(labelText: 'Notes'),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: Text('Date: ${DateFormat.yMMMd().format(selectedDate)}')),
+                    TextButton(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime.now().add(const Duration(days: 1)),
+                          initialDate: selectedDate,
+                        );
+                        if (picked != null) {
+                          setDialogState(() => selectedDate = picked);
+                        }
+                      },
+                      child: const Text('Change'),
+                    )
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save donation'),
+            )
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true) {
+      amountController.dispose();
+      notesController.dispose();
+      checkNumberController.dispose();
+      return;
+    }
+
+    final amount = double.tryParse(amountController.text.trim());
+    if (amount == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Enter a valid donation amount.')));
+      amountController.dispose();
+      notesController.dispose();
+      checkNumberController.dispose();
+      return;
+    }
+
+    setState(() => _loadingAttendees = true);
+    try {
+      final donorId = await _ensureDonorForAttendee(attendee);
+      await _donorRepository.addManualDonation(
+        donorId: donorId,
+        amount: amount,
+        donationDate: selectedDate,
+        paymentMethod: paymentMethod,
+        checkNumber: checkNumberController.text.trim(),
+        notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+        eventId: eventId,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Donation recorded for ${attendee.displayName}.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed to record donation: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => _loadingAttendees = false);
+      }
+      amountController.dispose();
+      notesController.dispose();
+      checkNumberController.dispose();
+    }
+  }
+
   Future<void> _showAddAttendeeDialog() async {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
@@ -590,7 +776,78 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     bool checkInNow = false;
     bool sendConfirmation = false;
 
+    Member? selectedMember;
+    EventAttendee? selectedHistoricalAttendee;
+    List<_AttendeeProspect> searchResults = [];
+    bool searching = false;
+    Timer? debounce;
+
     final formKey = GlobalKey<FormState>();
+
+    Future<void> runSearch(String value, void Function(void Function()) setDialogState) async {
+      debounce?.cancel();
+      debounce = Timer(const Duration(milliseconds: 300), () async {
+        if (value.trim().length < 2) {
+          setDialogState(() => searchResults = []);
+          return;
+        }
+
+        setDialogState(() => searching = true);
+        try {
+          final members = await _memberRepository.searchMembers(value.trim());
+          final donors = (await _donorRepository.fetchDonors(searchQuery: value.trim(), limit: 10)).donors;
+          final pastAttendees = await _repository.searchHistoricalAttendees(value.trim());
+
+          setDialogState(() {
+            searchResults = [
+              ...members.map((m) => _AttendeeProspect(source: 'Member', member: m)),
+              ...donors.map((d) => _AttendeeProspect(source: 'Donor', donor: d)),
+              ...pastAttendees.map(
+                (a) => _AttendeeProspect(source: 'Previous attendee', attendee: a),
+              ),
+            ];
+            searching = false;
+          });
+        } catch (_) {
+          setDialogState(() {
+            searchResults = [];
+            searching = false;
+          });
+        }
+      });
+    }
+
+    void applyProspect(_AttendeeProspect prospect, void Function(void Function()) setDialogState) {
+      setDialogState(() {
+        selectedMember = prospect.member;
+        selectedHistoricalAttendee = prospect.attendee;
+
+        nameController.text = prospect.displayName;
+        emailController.text = prospect.email ?? '';
+        phoneController.text = prospect.phone ?? '';
+
+        final sourceAttendee = prospect.attendee;
+        final sourceDonor = prospect.donor;
+        if (sourceAttendee != null) {
+          addressController.text = sourceAttendee.address ?? '';
+          cityController.text = sourceAttendee.city ?? '';
+          stateController.text = sourceAttendee.state ?? stateController.text;
+          zipController.text = sourceAttendee.zip ?? '';
+          employerController.text = sourceAttendee.employer ?? '';
+          occupationController.text = sourceAttendee.occupation ?? '';
+          guestCountController.text = sourceAttendee.guestCount?.toString() ?? '0';
+          dobController.text = sourceAttendee.dateOfBirth?.toIso8601String().split('T').first ?? '';
+        } else if (sourceDonor != null) {
+          addressController.text = sourceDonor.address ?? '';
+          cityController.text = sourceDonor.city ?? '';
+          stateController.text = sourceDonor.state ?? stateController.text;
+          zipController.text = sourceDonor.zipCode ?? '';
+          employerController.text = sourceDonor.employer ?? '';
+          occupationController.text = sourceDonor.occupation ?? '';
+          dobController.text = sourceDonor.dateOfBirth?.toIso8601String().split('T').first ?? '';
+        }
+      });
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -603,6 +860,50 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  TextField(
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      labelText: 'Search name, email, or phone',
+                    ),
+                    onChanged: (value) => runSearch(value, setDialogState),
+                  ),
+                  const SizedBox(height: 8),
+                  if (searching) const LinearProgressIndicator(),
+                  if (searchResults.isNotEmpty)
+                    SizedBox(
+                      height: 200,
+                      child: ListView.separated(
+                        itemBuilder: (context, index) {
+                          final prospect = searchResults[index];
+                          return ListTile(
+                            leading: const Icon(Icons.person_search),
+                            title: Text(prospect.displayName),
+                            subtitle: Text(
+                              [
+                                prospect.source,
+                                if (prospect.email != null) prospect.email!,
+                                if (prospect.phone != null) prospect.phone!,
+                              ].join(' • '),
+                            ),
+                            trailing: TextButton(
+                              onPressed: () => applyProspect(prospect, setDialogState),
+                              child: const Text('Use'),
+                            ),
+                          );
+                        },
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemCount: searchResults.length,
+                      ),
+                    ),
+                  if (searchResults.isNotEmpty) const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Manual details',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   TextFormField(
                     controller: nameController,
                     decoration: const InputDecoration(labelText: 'Name'),
@@ -697,20 +998,24 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       zipController.dispose();
       employerController.dispose();
       occupationController.dispose();
+      debounce?.cancel();
       return;
     }
 
+    debounce?.cancel();
     setState(() => _loadingAttendees = true);
 
     try {
       final eventId = _currentEvent.id!;
       final attendee = await _repository.addAttendee(
         eventId: eventId,
+        memberId: selectedMember?.id ?? selectedHistoricalAttendee?.memberId,
         guestName: nameController.text.trim().isEmpty ? null : nameController.text.trim(),
         guestEmail: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
         guestPhone: formatToE164(phoneController.text.trim()),
-        dateOfBirth:
-            dobController.text.trim().isEmpty ? null : DateTime.tryParse(dobController.text.trim()),
+        dateOfBirth: dobController.text.trim().isEmpty
+            ? null
+            : DateTime.tryParse(dobController.text.trim())?.toLocal(),
         address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
         city: cityController.text.trim().isEmpty ? null : cityController.text.trim(),
         state: stateController.text.trim().isEmpty ? null : stateController.text.trim(),
@@ -745,6 +1050,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       zipController.dispose();
       employerController.dispose();
       occupationController.dispose();
+      debounce?.cancel();
     }
   }
 
@@ -809,6 +1115,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                     icon: const Icon(Icons.account_circle_outlined),
                     label: const Text('View member'),
                   ),
+                TextButton.icon(
+                  onPressed: () => _showManualDonationDialog(attendee),
+                  icon: const Icon(Icons.volunteer_activism_outlined),
+                  label: const Text('Add donation'),
+                ),
                 const Spacer(),
                 if (attendee.checkedIn)
                   TextButton(
