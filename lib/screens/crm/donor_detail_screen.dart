@@ -228,6 +228,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   }
 
   Widget _buildContactCard(ThemeData theme, Donor donor) {
+    final formattedPhone = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -237,14 +238,21 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
             Text('Contact', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             _buildInfoRow('Email', donor.email ?? 'Not provided'),
-            _buildInfoRow('Phone', donor.phone ?? 'Not provided'),
+            _buildInfoRow('Phone', formattedPhone ?? 'Not provided'),
+            _buildInfoRow('Address', _formatAddress(donor)),
+            _buildInfoRow('County', donor.county ?? 'Not provided'),
+            _buildInfoRow('Congressional District', donor.congressionalDistrict ?? 'Not provided'),
+            _buildInfoRow(
+              'Date of Birth',
+              donor.dateOfBirth != null ? DateFormat.yMMMd().format(donor.dateOfBirth!) : 'Not provided',
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 12,
               runSpacing: 8,
               children: [
                 ElevatedButton.icon(
-                  onPressed: donor.phone == null || _startingMessage ? null : _startMessage,
+                  onPressed: (donor.phoneE164 ?? donor.phone) == null || _startingMessage ? null : _startMessage,
                   icon: const Icon(Icons.sms_outlined),
                   label: const Text('Send message'),
                 ),
@@ -262,18 +270,6 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   }
 
   Widget _buildMemberLinkCard(ThemeData theme, String? memberId) {
-    if (memberId == null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            'No linked member record',
-            style: theme.textTheme.bodyMedium,
-          ),
-        ),
-      );
-    }
-
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -285,15 +281,29 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                 children: [
                   Text('Linked member', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Text('Member ID: $memberId'),
-                  const Text('Tap below to view full profile.'),
+                  if (memberId != null) ...[
+                    Text('Member ID: $memberId'),
+                    const Text('Tap below to view full profile.'),
+                  ] else
+                    const Text('No linked member record'),
                 ],
               ),
             ),
-            ElevatedButton.icon(
-              onPressed: () => _openMember(memberId),
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('View member'),
+            Wrap(
+              spacing: 8,
+              children: [
+                if (memberId != null)
+                  ElevatedButton.icon(
+                    onPressed: () => _openMember(memberId),
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('View member'),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: _openMemberSearch,
+                  icon: const Icon(Icons.search),
+                  label: Text(memberId == null ? 'Link to member' : 'Change member'),
+                ),
+              ],
             ),
           ],
         ),
@@ -498,11 +508,34 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     );
   }
 
+  String _formatAddress(Donor donor) {
+    final parts = [
+      donor.address,
+      [donor.city, donor.state].where((p) => (p ?? '').isNotEmpty).join(', '),
+      donor.zipCode,
+    ].where((part) => part != null && part!.trim().isNotEmpty).join('\n');
+
+    return parts.isEmpty ? 'Not provided' : parts;
+  }
+
+  String? _formatPhoneDisplay(String? phone) {
+    if (phone == null) return null;
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 11 && digits.startsWith('1')) {
+      final area = digits.substring(1, 4);
+      final prefix = digits.substring(4, 7);
+      final line = digits.substring(7);
+      return '+1 ($area) $prefix-$line';
+    }
+    if (phone.startsWith('+')) return phone;
+    return '+$phone';
+  }
+
   Future<void> _startMessage() async {
     final donor = _donor;
     if (donor == null) return;
 
-    final address = _cleanText(donor.phone);
+    final address = _cleanText(donor.phoneE164 ?? donor.phone);
     if (address == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No phone number available')),
@@ -635,6 +668,84 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     // ignore: use_build_context_synchronously
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => MemberDetailScreen(member: member)),
+    );
+  }
+
+  Future<void> _openMemberSearch() async {
+    final donor = _donor;
+    if (donor == null) return;
+
+    final searchController = TextEditingController();
+    List<Member> results = [];
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          Future<void> search() async {
+            final query = searchController.text.trim();
+            if (query.isEmpty) return;
+            final members = await _memberRepository.searchMembers(query);
+            setState(() => results = members);
+          }
+
+          return AlertDialog(
+            title: const Text('Link to member'),
+            content: SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: searchController,
+                    decoration: const InputDecoration(
+                      labelText: 'Search members',
+                      hintText: 'Name, email, or phone',
+                    ),
+                    onSubmitted: (_) => search(),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 280,
+                    child: results.isEmpty
+                        ? const Center(child: Text('Search for a member to link.'))
+                        : ListView.separated(
+                            itemBuilder: (context, index) {
+                              final member = results[index];
+                              return ListTile(
+                                title: Text(member.name ?? 'Unnamed member'),
+                                subtitle: Text(member.phoneE164 ?? member.phone ?? 'No phone'),
+                                trailing: TextButton(
+                                  onPressed: () async {
+                                    await _repository.linkDonorToMember(donor.id!, member.id);
+                                    if (!mounted) return;
+                                    Navigator.of(context).pop();
+                                    await _load();
+                                  },
+                                  child: const Text('Link'),
+                                ),
+                              );
+                            },
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemCount: results.length,
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+              ElevatedButton(
+                onPressed: search,
+                child: const Text('Search'),
+              ),
+            ],
+          );
+        });
+      },
     );
   }
 

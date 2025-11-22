@@ -393,7 +393,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         }
 
         final phoneDisplay = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone ?? donation.donorPhone);
-        final county = donor.county ?? donation.donorName;
+        final county = donor.county;
         final district = donor.congressionalDistrict;
         final age = _calculateAge(donor.dateOfBirth);
         final headerLine = [
