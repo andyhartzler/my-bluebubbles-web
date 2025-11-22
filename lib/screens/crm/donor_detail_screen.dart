@@ -335,13 +335,38 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     );
   }
 
+  Widget _buildInfoRow(String label, String value) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label: ',
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAddressSection(ThemeData theme, Donor donor) {
     final formattedAddress = _formatAddress(donor);
     final mapAddress = _formatAddressSingleLine(donor);
 
-    if (formattedAddress == 'Not provided' || mapAddress == null) {
+    if (mapAddress == null) {
       return const SizedBox.shrink();
     }
+
+    final addressText = formattedAddress ?? 'Address not provided';
 
     final mapsUri = Uri.https('maps.apple.com', '/', {'q': mapAddress});
 
@@ -357,7 +382,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                 Text('Address',
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text(formattedAddress),
+                Text(addressText),
                 const SizedBox(height: 12),
                 InkWell(
                   onTap: () => launchUrl(mapsUri, mode: LaunchMode.externalApplication),
@@ -388,7 +413,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                 aspectRatio: isWide ? 4 / 3 : 16 / 10,
                 child: EventMapWidget(
                   location: mapAddress,
-                  locationAddress: formattedAddress.replaceAll('\n', ', '),
+                  locationAddress: addressText.replaceAll('\n', ', '),
                   eventTitle: donor.name ?? 'Donor address',
                 ),
               ),
