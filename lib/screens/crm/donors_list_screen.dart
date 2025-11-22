@@ -407,7 +407,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           child: InkWell(
-            borderRadius: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            borderRadius: BorderRadius.circular(18),
             onTap: () {
               if (donor.id != null) {
                 Navigator.of(context).push(
