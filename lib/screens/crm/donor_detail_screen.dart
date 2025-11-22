@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -677,16 +679,29 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
 
     final searchController = TextEditingController();
     List<Member> results = [];
+    bool searching = false;
+    Timer? debounce;
 
     await showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(builder: (context, setState) {
-          Future<void> search() async {
-            final query = searchController.text.trim();
-            if (query.isEmpty) return;
+          Future<void> search([String? queryOverride]) async {
+            final query = (queryOverride ?? searchController.text).trim();
+            if (query.isEmpty) {
+              setState(() {
+                results = [];
+                searching = false;
+              });
+              return;
+            }
+            setState(() => searching = true);
             final members = await _memberRepository.searchMembers(query);
-            setState(() => results = members);
+            if (!context.mounted) return;
+            setState(() {
+              results = members;
+              searching = false;
+            });
           }
 
           return AlertDialog(
@@ -702,33 +717,39 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                       labelText: 'Search members',
                       hintText: 'Name, email, or phone',
                     ),
+                    onChanged: (value) {
+                      debounce?.cancel();
+                      debounce = Timer(const Duration(milliseconds: 300), () => search(value));
+                    },
                     onSubmitted: (_) => search(),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
                     height: 280,
-                    child: results.isEmpty
-                        ? const Center(child: Text('Search for a member to link.'))
-                        : ListView.separated(
-                            itemBuilder: (context, index) {
-                              final member = results[index];
-                              return ListTile(
-                                title: Text(member.name ?? 'Unnamed member'),
-                                subtitle: Text(member.phoneE164 ?? member.phone ?? 'No phone'),
-                                trailing: TextButton(
-                                  onPressed: () async {
-                                    await _repository.linkDonorToMember(donor.id!, member.id);
-                                    if (!mounted) return;
-                                    Navigator.of(context).pop();
-                                    await _load();
-                                  },
-                                  child: const Text('Link'),
-                                ),
-                              );
-                            },
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemCount: results.length,
-                          ),
+                    child: searching
+                        ? const Center(child: CircularProgressIndicator())
+                        : results.isEmpty
+                            ? const Center(child: Text('Search for a member to link.'))
+                            : ListView.separated(
+                                itemBuilder: (context, index) {
+                                  final member = results[index];
+                                  return ListTile(
+                                    title: Text(member.name ?? 'Unnamed member'),
+                                    subtitle: Text(member.phoneE164 ?? member.phone ?? 'No phone'),
+                                    trailing: TextButton(
+                                      onPressed: () async {
+                                        await _repository.linkDonorToMember(donor.id!, member.id);
+                                        if (!mounted) return;
+                                        Navigator.of(context).pop();
+                                        await _load();
+                                      },
+                                      child: const Text('Link'),
+                                    ),
+                                  );
+                                },
+                                separatorBuilder: (_, __) => const Divider(height: 1),
+                                itemCount: results.length,
+                              ),
                   ),
                 ],
               ),
@@ -738,15 +759,13 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Close'),
               ),
-              ElevatedButton(
-                onPressed: search,
-                child: const Text('Search'),
-              ),
             ],
           );
         });
       },
     );
+
+    debounce?.cancel();
   }
 
   String _initialForDonor(Donor donor) {
