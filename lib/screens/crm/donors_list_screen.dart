@@ -270,6 +270,30 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     );
   }
 
+  String? _formatPhoneDisplay(String? phone) {
+    if (phone == null) return null;
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 11 && digits.startsWith('1')) {
+      final area = digits.substring(1, 4);
+      final prefix = digits.substring(4, 7);
+      final line = digits.substring(7);
+      return '+1 ($area) $prefix-$line';
+    }
+    if (phone.startsWith('+')) return phone;
+    return '+$phone';
+  }
+
+  int? _calculateAge(DateTime? birthDate) {
+    if (birthDate == null) return null;
+    final now = DateTime.now();
+    var age = now.year - birthDate.year;
+    if (now.month < birthDate.month ||
+        (now.month == birthDate.month && now.day < birthDate.day)) {
+      age--;
+    }
+    return age;
+  }
+
   Widget _buildFilters() {
     return Wrap(
       spacing: 12,
@@ -355,23 +379,35 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
             name: donation.donorName,
             email: donation.donorEmail,
             phone: donation.donorPhone,
+            phoneE164: donation.donorPhoneE164,
           ),
         );
 
         final subtitleChips = <Widget>[];
-        if (donation.paymentMethod != null) {
-          subtitleChips.add(_buildInfoChip(Icons.credit_card, donation.paymentMethod!));
-        }
+        subtitleChips.add(_buildInfoChip(Icons.credit_card, donation.paymentMethodLabel));
         if (donation.eventId != null || donation.eventName != null) {
           subtitleChips.add(_buildInfoChip(Icons.event_available, donation.eventName ?? 'Linked event'));
         }
+        if (donation.sentThankYou) {
+          subtitleChips.add(_buildInfoChip(Icons.favorite, 'Thank you sent'));
+        }
+
+        final phoneDisplay = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone ?? donation.donorPhone);
+        final county = donor.county;
+        final district = donor.congressionalDistrict;
+        final age = _calculateAge(donor.dateOfBirth);
+        final headerLine = [
+          donation.formattedDate,
+          if (county != null && county.isNotEmpty) 'County: $county',
+          if (district != null && district.isNotEmpty) 'CD: $district',
+          if (age != null) 'Age: $age',
+        ].where((value) => value.isNotEmpty).join(' • ');
 
         return Card(
           elevation: 2,
-          color: _unityBlue,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             onTap: () {
               if (donor.id != null) {
                 Navigator.of(context).push(
@@ -386,7 +422,15 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                 );
               }
             },
-            child: Padding(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_unityBlue, _momentumBlue],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
               child: Row(
                 children: [
@@ -396,8 +440,10 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          donation.formattedDate,
+                          headerLine,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 6),
                         Text(
@@ -409,11 +455,11 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if ((donor.phone ?? donation.donorPhone) != null)
+                        if (phoneDisplay != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              donor.phone ?? donation.donorPhone!,
+                              phoneDisplay,
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
                             ),
                           ),

@@ -14,6 +14,7 @@ class Donation {
   final String? donorName;
   final String? donorEmail;
   final String? donorPhone;
+  final String? donorPhoneE164;
 
   const Donation({
     required this.id,
@@ -29,6 +30,7 @@ class Donation {
     this.donorName,
     this.donorEmail,
     this.donorPhone,
+    this.donorPhoneE164,
   });
 
   factory Donation.fromJson(Map<String, dynamic> json) {
@@ -40,6 +42,7 @@ class Donation {
       donorName = donor['name'] as String?;
       donorEmail = donor['email'] as String?;
       donorPhone = donor['phone'] as String?;
+      donorPhoneE164 = donor['phone_e164'] as String? ?? donorPhone;
     }
 
     return Donation(
@@ -57,6 +60,7 @@ class Donation {
       donorName: donorName,
       donorEmail: donorEmail,
       donorPhone: donorPhone,
+      donorPhoneE164: donorPhoneE164,
     );
   }
 
@@ -82,7 +86,33 @@ class Donation {
       donorName: donorName,
       donorEmail: donorEmail,
       donorPhone: donorPhone,
+      donorPhoneE164: donorPhoneE164,
     );
+  }
+
+  String get paymentMethodLabel {
+    final value = paymentMethod?.trim().toLowerCase();
+    switch (value) {
+      case 'actblue':
+        return 'ActBlue';
+      case 'cash':
+        return 'Cash';
+      case 'check':
+        return 'Check';
+      case 'card':
+        return 'Card';
+      case 'venmo':
+        return 'Venmo';
+      case 'paypal':
+        return 'PayPal';
+      case 'in-kind':
+        return 'In-kind';
+      default:
+        if (paymentMethod == null || paymentMethod!.isEmpty) return 'Unknown';
+        return paymentMethod!.length <= 1
+            ? paymentMethod!.toUpperCase()
+            : '${paymentMethod![0].toUpperCase()}${paymentMethod!.substring(1).toLowerCase()}';
+    }
   }
 
   static DateTime? _parseDate(dynamic value) {
