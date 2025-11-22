@@ -41,6 +41,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   Donor? _donor;
   bool _sendingEmail = false;
   bool _startingMessage = false;
+  bool _savingEdit = false;
 
   @override
   void initState() {
@@ -85,6 +86,11 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
       appBar: AppBar(
         title: const Text('Donor Details'),
         actions: [
+          IconButton(
+            tooltip: 'Edit donor',
+            onPressed: _loading ? null : _openEdit,
+            icon: const Icon(Icons.edit_note_outlined),
+          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: _loading ? null : _load,
@@ -228,7 +234,52 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   }
 
   Widget _buildContactCard(ThemeData theme, Donor donor) {
-    final formattedPhone = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone);
+    final formattedPhone = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone) ?? '+';
+    final address = _formatAddress(donor);
+    final county = _cleanText(donor.county);
+    final district = _cleanText(donor.congressionalDistrict);
+    final dob = donor.dateOfBirth != null ? DateFormat.yMMMd().format(donor.dateOfBirth!) : null;
+
+    final pills = <Widget>[
+      _buildContactChip(
+        icon: Icons.sms_outlined,
+        label: formattedPhone,
+        tooltip: 'Mobile',
+      ),
+      if (_cleanText(donor.email) != null)
+        _buildContactChip(
+          icon: Icons.email_outlined,
+          label: donor.email!,
+          tooltip: 'Email',
+        ),
+      if (address != null)
+        _buildContactChip(
+          icon: Icons.home_outlined,
+          label: address,
+          tooltip: 'Address',
+        ),
+      if (county != null)
+        _buildContactChip(
+          icon: Icons.location_city_outlined,
+          label: '$county County',
+          tooltip: 'County',
+        ),
+      if (district != null)
+        _buildContactChip(
+          icon: Icons.account_balance_outlined,
+          label: 'CD $district',
+          tooltip: 'Congressional district',
+        ),
+      if (dob != null)
+        _buildContactChip(
+          icon: Icons.cake_outlined,
+          label: 'Born $dob',
+          tooltip: 'Date of birth',
+        ),
+    ];
+
+    if (pills.isEmpty) return const SizedBox.shrink();
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -237,14 +288,10 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
           children: [
             Text('Contact', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            _buildInfoRow('Email', donor.email ?? 'Not provided'),
-            _buildInfoRow('Phone', formattedPhone ?? 'Not provided'),
-            _buildInfoRow('Address', _formatAddress(donor)),
-            _buildInfoRow('County', donor.county ?? 'Not provided'),
-            _buildInfoRow('Congressional District', donor.congressionalDistrict ?? 'Not provided'),
-            _buildInfoRow(
-              'Date of Birth',
-              donor.dateOfBirth != null ? DateFormat.yMMMd().format(donor.dateOfBirth!) : 'Not provided',
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: pills,
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -260,6 +307,16 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                   onPressed: donor.email == null || _sendingEmail ? null : _composeEmail,
                   icon: const Icon(Icons.email_outlined),
                   label: const Text('Send email'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _savingEdit ? null : _openEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Edit'),
+                ),
+                TextButton.icon(
+                  onPressed: _loading ? null : _load,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refresh'),
                 ),
               ],
             ),
@@ -447,10 +504,8 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                 ].join(' • ');
                 final notes = donation.notes?.trim();
 
-                return CheckboxListTile(
-                  value: donation.sentThankYou,
-                  onChanged: (value) => _toggleThankYou(donation, value ?? false),
-                  secondary: const Icon(Icons.volunteer_activism),
+                return ListTile(
+                  leading: const Icon(Icons.volunteer_activism),
                   title: Text(title),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -463,7 +518,31 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                         ),
                     ],
                   ),
-                  controlAffinity: ListTileControlAffinity.trailing,
+                  trailing: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (donation.sentThankYou)
+                        Chip(
+                          label: const Text('Thank you sent'),
+                          avatar: const Icon(Icons.check_circle, color: Colors.green),
+                          backgroundColor: Colors.green.shade50,
+                          side: BorderSide(color: Colors.green.shade200),
+                        )
+                      else
+                        OutlinedButton.icon(
+                          onPressed: () => _confirmThankYouChange(donation, true),
+                          icon: const Icon(Icons.mark_email_read_outlined),
+                          label: const Text('Log thank you'),
+                        ),
+                      if (donation.sentThankYou)
+                        TextButton(
+                          onPressed: () => _confirmThankYouChange(donation, false),
+                          child: const Text('Undo'),
+                        ),
+                    ],
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   dense: true,
                 );
               },
@@ -472,24 +551,6 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Expanded(child: Text(value)),
-        ],
       ),
     );
   }
@@ -508,14 +569,26 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     );
   }
 
-  String _formatAddress(Donor donor) {
+  String? _formatAddress(Donor donor) {
+    final cityState = [donor.city, donor.state].where((p) => (p ?? '').isNotEmpty).join(', ');
     final parts = [
       donor.address,
-      [donor.city, donor.state].where((p) => (p ?? '').isNotEmpty).join(', '),
+      cityState.isNotEmpty ? cityState : null,
       donor.zipCode,
-    ].where((part) => part != null && part!.trim().isNotEmpty).join('\n');
+    ].where((part) => part != null && part!.trim().isNotEmpty).join(', ');
 
-    return parts.isEmpty ? 'Not provided' : parts;
+    return parts.isEmpty ? null : parts;
+  }
+
+  Widget _buildContactChip({required IconData icon, required String label, String? tooltip}) {
+    final chip = Chip(
+      avatar: Icon(icon, size: 18),
+      label: Text(label),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+
+    if (tooltip == null) return chip;
+    return Tooltip(message: tooltip, child: chip);
   }
 
   String? _formatPhoneDisplay(String? phone) {
@@ -660,6 +733,241 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     });
 
     await _repository.updateThankYouStatus(donation.id, sent);
+  }
+
+  Future<void> _confirmThankYouChange(Donation donation, bool sent) async {
+    final actionLabel = sent ? 'mark this donation as thanked' : 'undo the thank you log';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Update thank you status'),
+          content: Text(
+            'Are you sure you want to $actionLabel for ${_formatCurrency(donation.amount ?? 0)}?\n'
+            'This helps keep follow-up tracking accurate.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(sent ? 'Mark thanked' : 'Undo thank you'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _toggleThankYou(donation, sent);
+    }
+  }
+
+  Future<void> _openEdit() async {
+    final donor = _donor;
+    if (donor == null || _savingEdit) return;
+
+    final theme = Theme.of(context);
+
+    final nameController = TextEditingController(text: donor.name);
+    final emailController = TextEditingController(text: donor.email);
+    final phoneController = TextEditingController(text: donor.phoneE164 ?? donor.phone);
+    final addressController = TextEditingController(text: donor.address);
+    final cityController = TextEditingController(text: donor.city);
+    final stateController = TextEditingController(text: donor.state);
+    final zipController = TextEditingController(text: donor.zipCode);
+    final countyController = TextEditingController(text: donor.county);
+    final districtController = TextEditingController(text: donor.congressionalDistrict);
+    DateTime? dob = donor.dateOfBirth;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          Future<void> save() async {
+            setState(() => _savingEdit = true);
+            final data = {
+              'name': _cleanText(nameController.text),
+              'email': _cleanText(emailController.text),
+              'phone': _cleanText(phoneController.text),
+              'phone_e164': _cleanText(phoneController.text),
+              'address': _cleanText(addressController.text),
+              'city': _cleanText(cityController.text),
+              'state': _cleanText(stateController.text),
+              'zip_code': _cleanText(zipController.text),
+              'county': _cleanText(countyController.text),
+              'congressional_district': _cleanText(districtController.text),
+              'date_of_birth': dob?.toUtc().toIso8601String(),
+            }..removeWhere((_, value) => value == null);
+
+            try {
+              await _repository.upsertDonor(donorId: donor.id, data: data);
+              if (mounted) {
+                setState(() => _savingEdit = false);
+                Navigator.of(context).pop();
+                this.setState(() {
+                  _donor = donor.copyWith(
+                    name: data['name'] as String? ?? donor.name,
+                    email: data['email'] as String? ?? donor.email,
+                    phone: data['phone'] as String? ?? donor.phone,
+                    phoneE164: data['phone_e164'] as String? ?? donor.phoneE164,
+                    address: data['address'] as String? ?? donor.address,
+                    city: data['city'] as String? ?? donor.city,
+                    state: data['state'] as String? ?? donor.state,
+                    zipCode: data['zip_code'] as String? ?? donor.zipCode,
+                    county: data['county'] as String? ?? donor.county,
+                    congressionalDistrict:
+                        data['congressional_district'] as String? ?? donor.congressionalDistrict,
+                    dateOfBirth: dob ?? donor.dateOfBirth,
+                  );
+                });
+              }
+            } catch (error) {
+              if (!mounted) return;
+              setState(() => _savingEdit = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Unable to save donor: $error')),
+              );
+            }
+          }
+
+          Future<void> pickDate() async {
+            final now = DateTime.now();
+            final initialDate = dob ?? DateTime(now.year - 25, now.month, now.day);
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: initialDate,
+              firstDate: DateTime(1900),
+              lastDate: DateTime(now.year + 1),
+            );
+            if (picked != null) {
+              setState(() => dob = picked);
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 16,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Edit donor', style: theme.textTheme.titleMedium),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                  ),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                  ),
+                  TextField(
+                    controller: phoneController,
+                    decoration: const InputDecoration(labelText: 'Phone (E.164 preferred)'),
+                  ),
+                  TextField(
+                    controller: addressController,
+                    decoration: const InputDecoration(labelText: 'Address'),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: cityController,
+                          decoration: const InputDecoration(labelText: 'City'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: stateController,
+                          decoration: const InputDecoration(labelText: 'State'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: zipController,
+                          decoration: const InputDecoration(labelText: 'ZIP'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: countyController,
+                          decoration: const InputDecoration(labelText: 'County'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: districtController,
+                          decoration: const InputDecoration(labelText: 'Congressional District'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: pickDate,
+                          icon: const Icon(Icons.cake_outlined),
+                          label: Text(dob != null ? DateFormat.yMMMd().format(dob!) : 'Add birthday'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _savingEdit ? null : () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: _savingEdit ? null : save,
+                        child: _savingEdit
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Save changes'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          );
+        });
+      },
+    );
   }
 
   Future<void> _openMember(String memberId) async {
