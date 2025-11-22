@@ -178,6 +178,27 @@ class EventRepository {
     }
   }
 
+  Future<List<EventAttendee>> searchHistoricalAttendees(String query, {int limit = 10}) async {
+    if (!isReady) return [];
+    if (query.trim().isEmpty) return [];
+
+    final response = await _readClient
+        .from('event_attendees')
+        .select('*, members:member_id(*)')
+        .or('guest_name.ilike.%$query%,guest_email.ilike.%$query%,guest_phone.ilike.%$query%')
+        .order('rsvp_at', ascending: false)
+        .limit(limit);
+
+    final attendees = (response as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(EventAttendee.fromJson)
+        .toList();
+
+    await _hydrateMembers(attendees);
+    await _enrichDonorBadges(attendees);
+    return attendees;
+  }
+
   Stream<List<EventAttendee>> watchAttendees(String eventId) {
     if (!isReady) return const Stream.empty();
 

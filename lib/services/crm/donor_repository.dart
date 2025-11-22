@@ -78,6 +78,31 @@ class DonorRepository {
     await _writeClient.from('donations').insert(payload);
   }
 
+  Future<Donor?> findDonorByMemberId(String memberId) async {
+    if (!isReady) return null;
+
+    final response = await _readClient.from('donors').select().eq('member_id', memberId).limit(1);
+    if (response is List && response.isNotEmpty) {
+      return Donor.fromJson(response.first as Map<String, dynamic>);
+    }
+    return null;
+  }
+
+  Future<Donor?> findDonorByPhone(String phone) async {
+    if (!isReady) return null;
+
+    final response = await _readClient
+        .from('donors')
+        .select()
+        .or('phone.ilike.%$phone%,phone_e164.ilike.%$phone%')
+        .limit(1);
+
+    if (response is List && response.isNotEmpty) {
+      return Donor.fromJson(response.first as Map<String, dynamic>);
+    }
+    return null;
+  }
+
   Future<String> upsertDonor({
     String? donorId,
     required Map<String, dynamic> data,
