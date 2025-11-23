@@ -20,7 +20,7 @@ class SubscriberRepository {
 
   Future<SubscriberFetchResult> fetchSubscribers({
     String? searchQuery,
-    String? subscriptionStatus,
+    bool? subscribed,
     String? source,
     String? county,
     String? state,
@@ -50,7 +50,7 @@ class SubscriberRepository {
     query = _applyFilters(
       query,
       searchQuery: searchQuery,
-      subscriptionStatus: subscriptionStatus,
+      subscribed: subscribed,
       source: source,
       county: county,
       state: state,
@@ -95,20 +95,32 @@ class SubscriberRepository {
 
     try {
       final results = await Future.wait([
-        _countWhere({'subscription_status': 'subscribed', 'member_id': null}),
-        _countWhere({'subscription_status': 'subscribed', 'member_id': null}),
-        _countWhere({'subscription_status': 'unsubscribed', 'member_id': null}),
-        _countWhere({'member_id': null}, notNullColumn: 'donor_id'),
-        _countWhere({'member_id': null},
-            orFilter: 'phone_e164.not.is.null,address.not.is.null'),
+        _countWhere(const {}),
+        _countWhere({'subscribed': true}),
+        _countWhere({'subscribed': false}),
+        _countWhere(const {}, notNullColumn: 'donor_id'),
+        _countWhere(const {}, orFilter: 'phone_e164.not.is.null,address.not.is.null'),
         _recentOptIns(),
         _sourceBreakdown(),
       ]);
 
+      var totalSubscribers = results[0] as int;
+      var activeSubscribers = results[1] as int;
+      var unsubscribed = results[2] as int;
+
+      if (activeSubscribers == 0 && unsubscribed == 0) {
+        activeSubscribers = await _countWhere({'subscription_status': 'subscribed'});
+        unsubscribed = await _countWhere({'subscription_status': 'unsubscribed'});
+      }
+
+      if (unsubscribed == 0 && totalSubscribers > activeSubscribers) {
+        unsubscribed = totalSubscribers - activeSubscribers;
+      }
+
       return SubscriberStats(
-        totalSubscribers: results[0] as int,
-        activeSubscribers: results[1] as int,
-        unsubscribed: results[2] as int,
+        totalSubscribers: totalSubscribers,
+        activeSubscribers: activeSubscribers,
+        unsubscribed: unsubscribed,
         donorCount: results[3] as int,
         contactInfoCount: results[4] as int,
         recentOptIns: results[5] as int,
@@ -123,7 +135,7 @@ class SubscriberRepository {
   postgrest.PostgrestFilterBuilder<T> _applyFilters<T>(
     postgrest.PostgrestFilterBuilder<T> query, {
     String? searchQuery,
-    String? subscriptionStatus,
+    bool? subscribed,
     String? source,
     String? county,
     String? state,
@@ -131,8 +143,8 @@ class SubscriberRepository {
     DateTime? optInStart,
     DateTime? optInEnd,
   }) {
-    if (subscriptionStatus != null && subscriptionStatus.isNotEmpty) {
-      query = query.eq('subscription_status', subscriptionStatus);
+    if (subscribed != null) {
+      query = query.eq('subscribed', subscribed);
     }
 
     if (source != null && source.isNotEmpty) {

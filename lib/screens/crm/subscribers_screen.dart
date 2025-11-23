@@ -7,6 +7,11 @@ import 'package:bluebubbles/models/crm/subscriber.dart';
 import 'package:bluebubbles/services/crm/subscriber_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+const _actionRed = Color(0xFFE63946);
+const _grassrootsGreen = Color(0xFF43A047);
+
 class SubscribersScreen extends StatefulWidget {
   const SubscribersScreen({super.key});
 
@@ -31,7 +36,7 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
   String? _errorMessage;
 
   // Filters
-  String? _statusFilter;
+  bool? _subscribedFilter;
   String? _sourceFilter;
   String? _countyFilter;
   String? _stateFilter;
@@ -117,7 +122,7 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
 
     final response = await _repository.fetchSubscribers(
       searchQuery: _searchController.text,
-      subscriptionStatus: _statusFilter,
+      subscribed: _subscribedFilter,
       source: _sourceFilter,
       county: _countyFilter,
       state: _stateFilter,
@@ -226,24 +231,111 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () => _loadSubscribers(reset: true),
-      child: ListView(
-        controller: _scrollController,
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildStats(context),
-          const SizedBox(height: 16),
-          _buildFilters(context),
-          const SizedBox(height: 16),
-          _buildSubscriberList(context),
-          if (_loadingMore)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(child: CircularProgressIndicator()),
+    if (_loading && _subscribers.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/Blue-Gradient-Background.png',
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned.fill(
+          child: Container(
+            color: Colors.white.withOpacity(0.2),
+          ),
+        ),
+        Positioned.fill(
+          child: RefreshIndicator(
+            onRefresh: () => _loadSubscribers(reset: true),
+            child: _buildContent(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContent() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 900;
+        final horizontalPadding = isCompact ? 12.0 : 28.0;
+        final bottomPadding = isCompact ? 16.0 : 32.0;
+
+        return CustomScrollView(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 20, horizontalPadding, 0),
+              sliver: SliverToBoxAdapter(child: _buildHeader()),
             ),
-        ],
-      ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 0),
+              sliver: SliverToBoxAdapter(child: _buildStats(context)),
+            ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 0),
+              sliver: SliverToBoxAdapter(child: _buildFilters(context)),
+            ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 20, horizontalPadding, bottomPadding),
+              sliver: _buildSubscriberList(),
+            ),
+            if (_loadingMore)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, bottomPadding),
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader() {
+    final theme = Theme.of(context);
+    final totalLabel = _stats.totalSubscribers > 0
+        ? '${_stats.totalSubscribers} subscriber${_stats.totalSubscribers == 1 ? '' : 's'}'
+        : 'Subscribers overview';
+
+    return Row(
+      children: [
+        Container(
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: _momentumBlue,
+          ),
+          padding: const EdgeInsets.all(10),
+          child: const Icon(Icons.mark_email_unread_outlined, color: Colors.white),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Subscribers',
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              Text(
+                totalLabel,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Refresh',
+          icon: const Icon(Icons.refresh),
+          onPressed: _loading ? null : () => _initialize(),
+        ),
+      ],
     );
   }
 
@@ -369,17 +461,16 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
                 ),
                 SizedBox(
                   width: 200,
-                  child: DropdownButtonFormField<String?>(
-                    value: _statusFilter,
+                  child: DropdownButtonFormField<bool?>(
+                    value: _subscribedFilter,
                     decoration: const InputDecoration(labelText: 'Subscription Status'),
                     items: const [
-                      DropdownMenuItem(value: 'subscribed', child: Text('Subscribed')),
-                      DropdownMenuItem(value: 'unsubscribed', child: Text('Unsubscribed')),
-                      DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                      DropdownMenuItem(value: 'cleaned', child: Text('Cleaned')),
+                      DropdownMenuItem(value: null, child: Text('Any')),
+                      DropdownMenuItem(value: true, child: Text('Subscribed')),
+                      DropdownMenuItem(value: false, child: Text('Unsubscribed')),
                     ],
                     onChanged: (value) async {
-                      setState(() => _statusFilter = value);
+                      setState(() => _subscribedFilter = value);
                       await _loadSubscribers(reset: true);
                     },
                   ),
@@ -480,44 +571,38 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
     );
   }
 
-  Widget _buildSubscriberList(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
+  Widget _buildSubscriberList() {
     if (_subscribers.isEmpty) {
-      return Column(
-        children: const [
-          SizedBox(height: 32),
-          Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
-          SizedBox(height: 8),
-          Text('No subscribers match the current filters.'),
-        ],
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
+            SizedBox(height: 8),
+            Text('No subscribers match the current filters.'),
+          ],
+        ),
       );
     }
 
-    final isWide = MediaQuery.of(context).size.width > 960;
-    final crossAxisCount = isWide ? 2 : 1;
-    final childAspectRatio = isWide ? 2.5 : 1.8;
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: childAspectRatio,
+    final itemCount = _subscribers.length * 2 - 1;
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          if (index.isOdd) {
+            return const SizedBox(height: 10);
+          }
+          final subscriberIndex = index ~/ 2;
+          final subscriber = _subscribers[subscriberIndex];
+          return _SubscriberCard(
+            subscriber: subscriber,
+            onTap: () => _openDetail(subscriber),
+            onEdit: _canManage ? () => _openDetail(subscriber) : null,
+          );
+        },
+        childCount: itemCount > 0 ? itemCount : 0,
       ),
-      itemCount: _subscribers.length,
-      itemBuilder: (context, index) {
-        final subscriber = _subscribers[index];
-        return _SubscriberCard(
-          subscriber: subscriber,
-          onTap: () => _openDetail(subscriber),
-          onEdit: _canManage ? () => _openDetail(subscriber) : null,
-        );
-      },
     );
   }
 
@@ -539,6 +624,12 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
   }
 }
 
+String _statusLabelFor(Subscriber subscriber) {
+  if (subscriber.subscribed == true) return 'subscribed';
+  if (subscriber.subscribed == false) return 'unsubscribed';
+  return (subscriber.subscriptionStatus ?? 'unknown').toLowerCase();
+}
+
 class _SubscriberCard extends StatelessWidget {
   final Subscriber subscriber;
   final VoidCallback? onTap;
@@ -555,23 +646,29 @@ class _SubscriberCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final status = (subscriber.subscriptionStatus ?? 'unknown').toLowerCase();
-    final statusColor = _statusColor(status, theme);
+    final statusLabel = _statusLabelFor(subscriber);
+    final statusColor = _statusColor(statusLabel, theme);
+
+    final tags = subscriber.tagList.take(3).toList();
 
     return Card(
+      elevation: 2,
+      color: _unityBlue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: InkWell(
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
                         Row(
                           children: [
@@ -592,14 +689,20 @@ class _SubscriberCard extends StatelessWidget {
                             Expanded(child: Text(subscriber.email)),
                           ],
                         ),
-                        if (subscriber.phoneE164 != null && subscriber.phoneE164!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.phone_outlined, size: 16),
-                              const SizedBox(width: 6),
-                              Text(subscriber.phoneE164!),
-                            ],
+                        const SizedBox(width: 8),
+                        _StatusPill(label: statusLabel, color: statusColor),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.email_outlined, size: 16, color: Colors.white70),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            subscriber.email,
+                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                         const SizedBox(height: 8),
@@ -641,23 +744,46 @@ class _SubscriberCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ),
-                  Column(
-                    children: [
-                      IconButton(
-                        tooltip: 'View details',
-                        icon: const Icon(Icons.open_in_new),
-                        onPressed: onTap,
+                    if (subscriber.phoneE164 != null && subscriber.phoneE164!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.phone_outlined, size: 16, color: Colors.white70),
+                          const SizedBox(width: 6),
+                          Text(
+                            subscriber.phoneE164!,
+                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                          ),
+                        ],
                       ),
-                      if (onEdit != null)
-                        IconButton(
-                          tooltip: 'Edit',
-                          icon: const Icon(Icons.edit_outlined),
-                          onPressed: onEdit,
-                        ),
                     ],
-                  ),
-                ],
+                    if (tags.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: tags
+                            .map(
+                              (tag) => Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.18),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  tag,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -667,19 +793,16 @@ class _SubscriberCard extends StatelessWidget {
   }
 
   Color _statusColor(String status, ThemeData theme) {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'subscribed':
-        return Colors.green;
+        return _grassrootsGreen;
       case 'unsubscribed':
-        return Colors.red;
-      case 'pending':
-        return Colors.orange;
-      case 'cleaned':
-        return Colors.grey;
+        return _actionRed;
       default:
         return theme.colorScheme.primary;
     }
   }
+
 }
 
 class _SubscriberDetailSheet extends StatefulWidget {
@@ -736,8 +859,9 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                       ),
                     ),
                     Chip(
-                      label: Text(subscriber.subscriptionStatus ?? 'unknown'),
-                      backgroundColor: Colors.blueGrey.withOpacity(0.1),
+                      label: Text(statusLabel),
+                      backgroundColor: statusColor.withOpacity(0.12),
+                      shape: StadiumBorder(side: BorderSide(color: statusColor.withOpacity(0.4))),
                     ),
                   ],
                 ),
@@ -789,7 +913,7 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                         DateFormat('MMM d, y').format(subscriber.lastSyncedAt!),
                         icon: Icons.sync_outlined,
                       ),
-                    _detailItem('Status', subscriber.subscriptionStatus ?? 'unknown'),
+                    _detailItem('Status', statusLabel),
                   ],
                 ),
                 const SizedBox(height: 12),
