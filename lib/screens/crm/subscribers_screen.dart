@@ -1154,8 +1154,8 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                         .map(
                           (tag) => Chip(
                             label: Text(tag),
-                            backgroundColor: theme.colorScheme.primary
-                                .withOpacity(0.08),
+                            backgroundColor:
+                                theme.colorScheme.primary.withOpacity(0.08),
                           ),
                         )
                         .toList(),
@@ -1166,7 +1166,7 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                   Text('Donor Profile', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Text(
-                    'Total Donated: \$${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                    'Total Donated: ${_formatCurrency(subscriber.donor!.totalDonated ?? 0)}',
                   ),
                   Text('Donation Count: ${subscriber.donor!.donationCount}'),
                   if (subscriber.donor!.lastDonationDate != null)
@@ -1216,10 +1216,9 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
     );
   }
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('This action will be available soon.')),
-    );
+  String _formatCurrency(num amount) {
+    final formatter = NumberFormat.currency(symbol: '\$');
+    return formatter.format(amount);
   }
 
   Widget _detailItem(String label, String value, {IconData? icon}) {
