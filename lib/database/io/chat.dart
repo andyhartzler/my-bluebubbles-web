@@ -5,8 +5,7 @@ import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/database/io/message.dart';
-import 'package:bluebubbles/objectbox.g.dart'
-    if (dart.library.html) 'package:bluebubbles/database/html/objectbox.dart';
+import 'package:bluebubbles/objectbox.dart';
 import 'package:bluebubbles/database/io/attachment.dart';
 import 'package:bluebubbles/database/io/handle.dart';
 import 'package:bluebubbles/services/services.dart';
