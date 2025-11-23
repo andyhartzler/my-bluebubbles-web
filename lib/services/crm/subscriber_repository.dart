@@ -34,16 +34,15 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query =
-        _readClient
-            .from('subscribers')
-            .select<List<Map<String, dynamic>>>(
-              '''
+    postgrest.PostgrestFilterBuilder<dynamic> query = _readClient
+        .from('subscribers')
+        .select(
+          '''
         *,
         donor:donor_id(id,total_donated,donation_count,last_donation_date)
       ''',
-            )
-          ..is_('member_id', null);
+        )
+      ..is_('member_id', null);
 
     query = _applyFilters(
       query,
@@ -166,9 +165,9 @@ class SubscriberRepository {
 
   Future<int> _countWhere(Map<String, dynamic> filters,
       {String? notNullColumn, String? orFilter}) async {
-    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query = _readClient
+    postgrest.PostgrestFilterBuilder<dynamic> query = _readClient
         .from('subscribers')
-        .select<List<Map<String, dynamic>>>('id')
+        .select('id')
       ..is_('member_id', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
@@ -185,7 +184,7 @@ class SubscriberRepository {
   Future<Map<String, int>> _sourceBreakdown() async {
     final data = await _readClient
         .from('subscribers')
-        .select<List<Map<String, dynamic>>>('source')
+        .select('source')
         .is_('member_id', null);
 
     final results = <String, int>{};
@@ -201,7 +200,7 @@ class SubscriberRepository {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select<List<Map<String, dynamic>>>('id')
+        .select('id')
         .is_('member_id', null)
         .eq('subscription_status', 'subscribed')
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
@@ -213,7 +212,7 @@ class SubscriberRepository {
     if (!isReady) return [];
     final response = await _readClient
         .from('subscribers')
-        .select<List<Map<String, dynamic>>>(column)
+        .select(column)
         .is_('member_id', null)
         .order(column, ascending: true);
 
