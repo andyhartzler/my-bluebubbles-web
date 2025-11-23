@@ -34,9 +34,10 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    final baseQuery = _readClient
-        .from('subscribers')
-        .select(
+    final postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> baseQuery =
+        _readClient
+            .from('subscribers')
+            .select<List<Map<String, dynamic>>>(
           '''
         *,
         donor:donor_id(id,total_donated,donation_count,last_donation_date)
@@ -116,8 +117,8 @@ class SubscriberRepository {
     }
   }
 
-  postgrest.PostgrestFilterBuilder<dynamic> _applyFilters(
-    postgrest.PostgrestFilterBuilder<dynamic> query, {
+  postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> _applyFilters(
+    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query, {
     String? searchQuery,
     String? subscriptionStatus,
     String? source,
