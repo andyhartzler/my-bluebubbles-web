@@ -3,8 +3,7 @@ import 'dart:convert';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/database/global/structured_name.dart';
-import 'package:bluebubbles/objectbox.g.dart'
-    if (dart.library.html) 'package:bluebubbles/database/html/objectbox.dart';
+import 'package:bluebubbles/objectbox.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
