@@ -183,7 +183,7 @@ class SubscriberRepository {
     final data = await _readClient
         .from('subscribers')
         .select('source')
-        .filter('member_id', 'is', null);
+        .is_('member_id', null);
 
     final results = <String, int>{};
     for (final row in (data as List<dynamic>?) ?? []) {
@@ -199,7 +199,7 @@ class SubscriberRepository {
     final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
         .select('id')
-        .filter('member_id', 'is', null)
+        .is_('member_id', null)
         .eq('subscription_status', 'subscribed')
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
         .count(postgrest.CountOption.exact);
@@ -211,7 +211,7 @@ class SubscriberRepository {
     final response = await _readClient
         .from('subscribers')
         .select(column)
-        .filter('member_id', 'is', null)
+        .is_('member_id', null)
         .order(column, ascending: true);
 
     return ((response as List<dynamic>?) ?? [])
