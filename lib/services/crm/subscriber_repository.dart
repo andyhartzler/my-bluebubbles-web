@@ -16,6 +16,8 @@ class SubscriberRepository {
   SupabaseClient get _readClient =>
       _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
 
+  SupabaseClient get _writeClient => _supabase.privilegedClient;
+
   Future<SubscriberFetchResult> fetchSubscribers({
     String? searchQuery,
     bool? subscribed,
@@ -34,15 +36,16 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    postgrest.PostgrestFilterBuilder<dynamic> query = _readClient
-        .from('subscribers')
-        .select(
-          '''
+    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query =
+        _readClient
+            .from('subscribers')
+            .select<List<Map<String, dynamic>>>(
+              '''
         *,
         donor:donor_id(id,total_donated,donation_count,last_donation_date)
       ''',
-        )
-      ..filter('member_id', 'is', null);
+            )
+          ..is_('member_id', null);
 
     query = _applyFilters(
       query,
@@ -177,10 +180,10 @@ class SubscriberRepository {
 
   Future<int> _countWhere(Map<String, dynamic> filters,
       {String? notNullColumn, String? orFilter}) async {
-    postgrest.PostgrestFilterBuilder<dynamic> query = _readClient
+    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query = _readClient
         .from('subscribers')
-        .select('id')
-      ..filter('member_id', 'is', null);
+        .select<List<Map<String, dynamic>>>('id')
+      ..is_('member_id', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
       query = query.not(notNullColumn, 'is', null);
@@ -196,8 +199,8 @@ class SubscriberRepository {
   Future<Map<String, int>> _sourceBreakdown() async {
     final data = await _readClient
         .from('subscribers')
-        .select('source')
-        .filter('member_id', 'is', null);
+        .select<List<Map<String, dynamic>>>('source')
+        .is_('member_id', null);
 
     final results = <String, int>{};
     for (final row in (data as List<dynamic>?) ?? []) {
@@ -224,8 +227,8 @@ class SubscriberRepository {
     if (!isReady) return [];
     final response = await _readClient
         .from('subscribers')
-        .select(column)
-        .filter('member_id', 'is', null)
+        .select<List<Map<String, dynamic>>>(column)
+        .is_('member_id', null)
         .order(column, ascending: true);
 
     return ((response as List<dynamic>?) ?? [])
@@ -235,6 +238,31 @@ class SubscriberRepository {
         .toSet()
         .toList()
       ..sort((a, b) => a.compareTo(b));
+  }
+
+  Future<Subscriber> updateSubscriber(
+    String id, {
+    required Map<String, dynamic> data,
+  }) async {
+    if (!_supabase.hasServiceRole) {
+      throw Exception('Insufficient permissions to update subscribers');
+    }
+
+    final payload = Map<String, dynamic>.from(data)
+      ..removeWhere((_, value) => value == null);
+
+    final response = await _writeClient
+        .from('subscribers')
+        .update(payload)
+        .eq('id', id)
+        .select<Map<String, dynamic>>('*')
+        .maybeSingle();
+
+    if (response == null) {
+      throw Exception('Subscriber not found');
+    }
+
+    return Subscriber.fromJson(response);
   }
 
   Future<List<Subscriber>> _enrichWithEventCounts(List<Subscriber> subscribers) async {
