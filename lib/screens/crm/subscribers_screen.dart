@@ -427,10 +427,28 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(spacing: 12, runSpacing: 12, children: tiles),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return Row(
+              children: [
+                for (var i = 0; i < tiles.length; i++)
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: i == tiles.length - 1 ? 0 : 8),
+                      child: tiles[i],
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
         if (sourceTiles.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Wrap(spacing: 12, runSpacing: 12, children: sourceTiles),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: sourceTiles,
+          ),
         ],
       ],
     );
@@ -701,15 +719,16 @@ class _SubscriberCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Expanded(
-                          child: Text(
-                            subscriber.name,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                subscriber.name,
+                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          ],
                         ),
                         const SizedBox(width: 8),
                         _StatusPill(label: statusLabel, color: statusColor),
@@ -732,6 +751,43 @@ class _SubscriberCard extends StatelessWidget {
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
+                        ],
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            _StatusPill(status: status, color: statusColor),
+                            if (subscriber.city != null || subscriber.state != null)
+                              _InfoPill(
+                                icon: Icons.location_on_outlined,
+                                label:
+                                    '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}',
+                              ),
+                            if (subscriber.county != null)
+                              _InfoPill(icon: Icons.map_outlined, label: subscriber.county!),
+                            if (subscriber.congressionalDistrict != null)
+                              _InfoPill(
+                                  icon: Icons.account_balance_outlined,
+                                  label: 'CD ${subscriber.congressionalDistrict}'),
+                            if (subscriber.optinDate != null)
+                              _InfoPill(
+                                  icon: Icons.calendar_month_outlined,
+                                  label: 'Opt-in ${_dateFormat.format(subscriber.optinDate!)}'),
+                            if (subscriber.source != null)
+                              _InfoPill(icon: Icons.source_outlined, label: subscriber.source!),
+                            if (subscriber.eventAttendanceCount > 0)
+                              _InfoPill(
+                                icon: Icons.event_available_outlined,
+                                label: '${subscriber.eventAttendanceCount} events',
+                              ),
+                            if (subscriber.donor != null)
+                              _InfoPill(
+                                icon: Icons.volunteer_activism_outlined,
+                                label:
+                                    'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                              ),
+                          ],
                         ),
                       ],
                     ),
@@ -916,10 +972,7 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final statusLabel = _statusLabelFor(subscriber);
-    final statusColor = subscriber.subscribed == false
-        ? _actionRed
-        : _grassrootsGreen;
+    final subscriber = _subscriber;
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1090,17 +1143,13 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
-                      onPressed: canManage
-                          ? () => _showComingSoon(context)
-                          : null,
+                      onPressed: widget.canManage && !_saving ? _openEditDialog : null,
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Edit Subscriber'),
                     ),
                     const SizedBox(width: 12),
                     OutlinedButton.icon(
-                      onPressed: canManage
-                          ? () => _showComingSoon(context)
-                          : null,
+                      onPressed: widget.canManage && !_saving ? _openEditDialog : null,
                       icon: const Icon(Icons.note_add_outlined),
                       label: const Text('Edit Notes'),
                     ),

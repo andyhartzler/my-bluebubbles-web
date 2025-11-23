@@ -213,7 +213,7 @@ class SubscriberRepository {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select('id')
+        .select<List<Map<String, dynamic>>>('id')
         .filter('member_id', 'is', null)
         .eq('subscribed', true)
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
