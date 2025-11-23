@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:postgrest/postgrest.dart' show CountOption, PostgrestFilterBuilder, PostgrestResponse;
+import 'package:postgrest/postgrest.dart'
+    show CountOption, FetchOptions, PostgrestFilterBuilder, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -34,6 +35,10 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
+    final fetchOptions = FetchOptions(
+      count: fetchTotalCount ? CountOption.exact : null,
+    );
+
     var query = _readClient
         .from('subscribers')
         .select(
@@ -41,10 +46,10 @@ class SubscriberRepository {
         *,
         donor:donor_id(id,total_donated,donation_count,last_donation_date)
       ''',
+          fetchOptions: fetchOptions,
         )
-        .is_('member_id', null);
-
-    query = query.order('created_at', ascending: false);
+        .filter('member_id', 'is', null)
+        .order('created_at', ascending: false);
 
     query = _applyFilters(
       query,
@@ -62,15 +67,8 @@ class SubscriberRepository {
       query = query.range(offset, offset + limit - 1);
     }
 
-    PostgrestResponse? counted;
-    final dynamic data;
-
-    if (fetchTotalCount) {
-      counted = await query.count(CountOption.exact);
-      data = counted.data;
-    } else {
-      data = await query;
-    }
+    final PostgrestResponse response = await query;
+    final data = response.data ?? [];
 
     final subscribers = _mapSubscribers(data);
     final withEvents = await _enrichWithEventCounts(subscribers);
@@ -81,7 +79,9 @@ class SubscriberRepository {
 
     return SubscriberFetchResult(
       subscribers: filtered,
-      totalCount: eventAttendeesOnly ? filtered.length : counted?.count,
+      totalCount: eventAttendeesOnly
+          ? filtered.length
+          : (fetchTotalCount ? response.count : null),
     );
   }
 
@@ -165,7 +165,10 @@ class SubscriberRepository {
 
   Future<int> _countWhere(Map<String, dynamic> filters,
       {String? notNullColumn, String? orFilter}) async {
-    var query = _readClient.from('subscribers').select('id', head: true).is_('member_id', null);
+    var query = _readClient.from('subscribers').select(
+          'id',
+          fetchOptions: const FetchOptions(head: true, count: CountOption.exact),
+        ).filter('member_id', 'is', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
       query = query.not(notNullColumn, 'is', null);
@@ -173,19 +176,19 @@ class SubscriberRepository {
     if (orFilter != null) {
       query = query.or(orFilter);
     }
-    final PostgrestResponse response = await query.count(CountOption.exact);
+    final PostgrestResponse response = await query;
     return response.count ?? 0;
   }
 
   Future<Map<String, int>> _sourceBreakdown() async {
-    final response = await _readClient
+    final PostgrestResponse response = await _readClient
         .from('subscribers')
         .select('source, count:id')
-        .is_('member_id', null)
+        .filter('member_id', 'is', null)
         .group('source');
 
     final results = <String, int>{};
-    for (final row in response as List<dynamic>) {
+    for (final row in (response.data ?? []) as List<dynamic>) {
       final map = row as Map<String, dynamic>;
       final source = (map['source'] as String?)?.isNotEmpty == true ? map['source'] as String : 'unknown';
       final count = map['count'] as int? ?? 0;
@@ -198,23 +201,23 @@ class SubscriberRepository {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     final PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select('id', head: true)
-        .is_('member_id', null)
+        .select('id', fetchOptions: const FetchOptions(head: true, count: CountOption.exact))
+        .filter('member_id', 'is', null)
         .eq('subscription_status', 'subscribed')
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
-        .count(CountOption.exact);
+        ;
     return response.count ?? 0;
   }
 
   Future<List<String>> fetchDistinctValues(String column) async {
     if (!isReady) return [];
-    final response = await _readClient
+    final PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select(column, distinct: true)
-        .is_('member_id', null)
+        .select(column, fetchOptions: const FetchOptions(distinct: true))
+        .filter('member_id', 'is', null)
         .order(column, ascending: true);
 
-    return (response as List<dynamic>)
+    return ((response.data ?? []) as List<dynamic>)
         .map((row) => (row as Map<String, dynamic>)[column] as String?)
         .whereType<String>()
         .where((value) => value.trim().isNotEmpty)
@@ -228,14 +231,14 @@ class SubscriberRepository {
     if (emails.isEmpty) return subscribers;
 
     try {
-      final response = await _readClient
+      final PostgrestResponse response = await _readClient
           .from('event_attendees')
           .select('email, count:id')
-          .in_('email', emails)
+          .inFilter('email', emails)
           .group('email');
 
       final counts = <String, int>{};
-      for (final row in response as List<dynamic>) {
+      for (final row in (response.data ?? []) as List<dynamic>) {
         final map = row as Map<String, dynamic>;
         final email = map['email'] as String?;
         if (email == null) continue;

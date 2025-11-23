@@ -532,6 +532,8 @@ class _SubscriberCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
 
+  static final DateFormat _dateFormat = DateFormat('MMM d, y');
+
   const _SubscriberCard({
     required this.subscriber,
     this.onTap,
@@ -625,7 +627,8 @@ class _SubscriberCard extends StatelessWidget {
                             if (subscriber.donor != null)
                               _InfoPill(
                                 icon: Icons.volunteer_activism_outlined,
-                                label: 'Donor • ${subscriber.donor!.totalDonated.toStringAsFixed(2)}',
+                                label:
+                                    'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
                               ),
                           ],
                         ),
@@ -795,7 +798,7 @@ class _SubscriberDetailSheet extends StatelessWidget {
                 if (subscriber.donor != null) ...[
                   Text('Donor Profile', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  Text('Total Donated: \$${subscriber.donor!.totalDonated.toStringAsFixed(2)}'),
+                  Text('Total Donated: \$${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}'),
                   Text('Donation Count: ${subscriber.donor!.donationCount}'),
                   if (subscriber.donor!.lastDonationDate != null)
                     Text(
