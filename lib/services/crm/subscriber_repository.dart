@@ -34,7 +34,7 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    var query = _readClient
+    postgrest.PostgrestFilterBuilder<dynamic> query = _readClient
         .from('subscribers')
         .select(
           '''
@@ -54,10 +54,12 @@ class SubscriberRepository {
       donorsOnly: donorsOnly,
       optInStart: optInStart,
       optInEnd: optInEnd,
-    ).order('created_at', ascending: false);
+    );
+
+    query.order('created_at', ascending: false);
 
     if (limit > 0) {
-      query = query.range(offset, offset + limit - 1);
+      query.range(offset, offset + limit - 1);
     }
 
     final postgrest.PostgrestResponse response = fetchTotalCount
