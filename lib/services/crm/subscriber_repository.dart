@@ -34,11 +34,18 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    var filterQuery =
-        _readClient.from('subscribers').filter('member_id', 'is', null);
+    var query = _readClient
+        .from('subscribers')
+        .select(
+          '''
+        *,
+        donor:donor_id(id,total_donated,donation_count,last_donation_date)
+      ''',
+        )
+        .filter('member_id', 'is', null);
 
-    filterQuery = _applyFilters(
-      filterQuery,
+    query = _applyFilters(
+      query,
       searchQuery: searchQuery,
       subscriptionStatus: subscriptionStatus,
       source: source,
@@ -47,16 +54,7 @@ class SubscriberRepository {
       donorsOnly: donorsOnly,
       optInStart: optInStart,
       optInEnd: optInEnd,
-    );
-
-    var query = filterQuery
-        .select(
-          '''
-        *,
-        donor:donor_id(id,total_donated,donation_count,last_donation_date)
-      ''',
-        )
-        .order('created_at', ascending: false);
+    ).order('created_at', ascending: false);
 
     if (limit > 0) {
       query = query.range(offset, offset + limit - 1);
@@ -165,7 +163,8 @@ class SubscriberRepository {
 
   Future<int> _countWhere(Map<String, dynamic> filters,
       {String? notNullColumn, String? orFilter}) async {
-    var query = _readClient.from('subscribers').select('id').filter('member_id', 'is', null);
+    var query =
+        _readClient.from('subscribers').select('id').filter('member_id', 'is', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
       query = query.not(notNullColumn, 'is', null);

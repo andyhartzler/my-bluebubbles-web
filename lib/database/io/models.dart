@@ -5,7 +5,7 @@ export 'package:bluebubbles/database/io/fcm_data.dart';
 export 'package:bluebubbles/database/io/giphy.dart';
 export 'package:bluebubbles/database/io/handle.dart';
 export 'package:bluebubbles/database/io/launch_at_startup.dart';
-export 'package:bluebubbles/objectbox.g.dart';
+export 'package:bluebubbles/objectbox.dart';
 export 'package:bluebubbles/database/io/theme.dart';
 export 'package:bluebubbles/database/io/theme_entry.dart';
 export 'package:bluebubbles/database/io/theme_object.dart';
