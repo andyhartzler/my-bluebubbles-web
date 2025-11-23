@@ -37,7 +37,7 @@ class SubscriberRepository {
     final postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> baseQuery =
         _readClient
             .from('subscribers')
-            .select<List<Map<String, dynamic>>>(
+            .select(
           '''
         *,
         donor:donor_id(id,total_donated,donation_count,last_donation_date)
@@ -117,8 +117,8 @@ class SubscriberRepository {
     }
   }
 
-  postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> _applyFilters(
-    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query, {
+  postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> _applyFilters(
+    postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> query, {
     String? searchQuery,
     String? subscriptionStatus,
     String? source,
