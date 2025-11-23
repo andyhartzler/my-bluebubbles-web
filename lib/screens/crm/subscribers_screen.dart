@@ -75,7 +75,8 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
       setState(() {
         _loading = false;
         _errorState = true;
-        _errorMessage = 'CRM Supabase is not configured. Add credentials to enable Subscribers.';
+        _errorMessage =
+            'CRM Supabase is not configured. Add credentials to enable Subscribers.';
       });
       return;
     }
@@ -222,10 +223,7 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
             const SizedBox(height: 12),
             Text(_errorMessage ?? 'Unable to load subscribers'),
             const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _initialize,
-              child: const Text('Retry'),
-            ),
+            ElevatedButton(onPressed: _initialize, child: const Text('Retry')),
           ],
         ),
       );
@@ -243,11 +241,7 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
             fit: BoxFit.cover,
           ),
         ),
-        Positioned.fill(
-          child: Container(
-            color: Colors.white.withOpacity(0.2),
-          ),
-        ),
+        Positioned.fill(child: Container(color: Colors.white.withOpacity(0.2))),
         Positioned.fill(
           child: RefreshIndicator(
             onRefresh: () => _loadSubscribers(reset: true),
@@ -267,28 +261,55 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
 
         return CustomScrollView(
           controller: _scrollController,
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
           slivers: [
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, 20, horizontalPadding, 0),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                20,
+                horizontalPadding,
+                0,
+              ),
               sliver: SliverToBoxAdapter(child: _buildHeader()),
             ),
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 0),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                16,
+                horizontalPadding,
+                0,
+              ),
               sliver: SliverToBoxAdapter(child: _buildStats(context)),
             ),
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 0),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                16,
+                horizontalPadding,
+                0,
+              ),
               sliver: SliverToBoxAdapter(child: _buildFilters(context)),
             ),
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, 20, horizontalPadding, bottomPadding),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                20,
+                horizontalPadding,
+                bottomPadding,
+              ),
               sliver: _buildSubscriberList(),
             ),
             if (_loadingMore)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, bottomPadding),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    0,
+                    horizontalPadding,
+                    bottomPadding,
+                  ),
                   child: const Center(child: CircularProgressIndicator()),
                 ),
               ),
@@ -312,7 +333,10 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
             color: _momentumBlue,
           ),
           padding: const EdgeInsets.all(10),
-          child: const Icon(Icons.mark_email_unread_outlined, color: Colors.white),
+          child: const Icon(
+            Icons.mark_email_unread_outlined,
+            color: Colors.white,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -321,11 +345,15 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
             children: [
               Text(
                 'Subscribers',
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               Text(
                 totalLabel,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -386,38 +414,23 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
     ];
 
     final sourceTiles = _stats.bySource.entries
-        .map((entry) => Chip(
-              visualDensity: VisualDensity.compact,
-              avatar: const Icon(Icons.tag_outlined, size: 16),
-              label: Text('Source: ${entry.key} (${entry.value})'),
-            ))
+        .map(
+          (entry) => _StatsTile(
+            label: 'Source: ${entry.key}',
+            value: entry.value,
+            icon: Icons.tag_outlined,
+            color: Colors.indigo,
+          ),
+        )
         .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            return Row(
-              children: [
-                for (var i = 0; i < tiles.length; i++)
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(right: i == tiles.length - 1 ? 0 : 8),
-                      child: tiles[i],
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
+        Wrap(spacing: 12, runSpacing: 12, children: tiles),
         if (sourceTiles.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: sourceTiles,
-          ),
+          const SizedBox(height: 12),
+          Wrap(spacing: 12, runSpacing: 12, children: sourceTiles),
         ],
       ],
     );
@@ -463,11 +476,16 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
                   width: 200,
                   child: DropdownButtonFormField<bool?>(
                     value: _subscribedFilter,
-                    decoration: const InputDecoration(labelText: 'Subscription Status'),
+                    decoration: const InputDecoration(
+                      labelText: 'Subscription Status',
+                    ),
                     items: const [
                       DropdownMenuItem(value: null, child: Text('Any')),
                       DropdownMenuItem(value: true, child: Text('Subscribed')),
-                      DropdownMenuItem(value: false, child: Text('Unsubscribed')),
+                      DropdownMenuItem(
+                        value: false,
+                        child: Text('Unsubscribed'),
+                      ),
                     ],
                     onChanged: (value) async {
                       setState(() => _subscribedFilter = value);
@@ -483,9 +501,17 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
                     items: [
                       const DropdownMenuItem(value: null, child: Text('Any')),
                       ..._availableSources
-                          .map((source) => DropdownMenuItem(value: source, child: Text(source)))
+                          .map(
+                            (source) => DropdownMenuItem(
+                              value: source,
+                              child: Text(source),
+                            ),
+                          )
                           .toList(),
-                      const DropdownMenuItem(value: 'other', child: Text('Other')),
+                      const DropdownMenuItem(
+                        value: 'other',
+                        child: Text('Other'),
+                      ),
                     ],
                     onChanged: (value) async {
                       setState(() => _sourceFilter = value);
@@ -501,7 +527,12 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
                     items: [
                       const DropdownMenuItem(value: null, child: Text('Any')),
                       ..._availableCounties
-                          .map((county) => DropdownMenuItem(value: county, child: Text(county)))
+                          .map(
+                            (county) => DropdownMenuItem(
+                              value: county,
+                              child: Text(county),
+                            ),
+                          )
                           .toList(),
                     ],
                     onChanged: (value) async {
@@ -518,7 +549,12 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
                     items: [
                       const DropdownMenuItem(value: null, child: Text('Any')),
                       ..._availableStates
-                          .map((state) => DropdownMenuItem(value: state, child: Text(state)))
+                          .map(
+                            (state) => DropdownMenuItem(
+                              value: state,
+                              child: Text(state),
+                            ),
+                          )
                           .toList(),
                     ],
                     onChanged: (value) async {
@@ -551,9 +587,11 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
                     TextButton.icon(
                       onPressed: _pickDateRange,
                       icon: const Icon(Icons.date_range),
-                      label: Text(_optInStart != null && _optInEnd != null
-                          ? '${_dateFormat.format(_optInStart!)} - ${_dateFormat.format(_optInEnd!)}'
-                          : 'Opt-in Range'),
+                      label: Text(
+                        _optInStart != null && _optInEnd != null
+                            ? '${_dateFormat.format(_optInStart!)} - ${_dateFormat.format(_optInEnd!)}'
+                            : 'Opt-in Range',
+                      ),
                     ),
                     if (_optInStart != null)
                       IconButton(
@@ -588,21 +626,18 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
 
     final itemCount = _subscribers.length * 2 - 1;
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          if (index.isOdd) {
-            return const SizedBox(height: 10);
-          }
-          final subscriberIndex = index ~/ 2;
-          final subscriber = _subscribers[subscriberIndex];
-          return _SubscriberCard(
-            subscriber: subscriber,
-            onTap: () => _openDetail(subscriber),
-            onEdit: _canManage ? () => _openDetail(subscriber) : null,
-          );
-        },
-        childCount: itemCount > 0 ? itemCount : 0,
-      ),
+      delegate: SliverChildBuilderDelegate((context, index) {
+        if (index.isOdd) {
+          return const SizedBox(height: 10);
+        }
+        final subscriberIndex = index ~/ 2;
+        final subscriber = _subscribers[subscriberIndex];
+        return _SubscriberCard(
+          subscriber: subscriber,
+          onTap: () => _openDetail(subscriber),
+          onEdit: _canManage ? () => _openDetail(subscriber) : null,
+        );
+      }, childCount: itemCount > 0 ? itemCount : 0),
     );
   }
 
@@ -637,11 +672,7 @@ class _SubscriberCard extends StatelessWidget {
 
   static final DateFormat _dateFormat = DateFormat('MMM d, y');
 
-  const _SubscriberCard({
-    required this.subscriber,
-    this.onTap,
-    this.onEdit,
-  });
+  const _SubscriberCard({required this.subscriber, this.onTap, this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -670,24 +701,15 @@ class _SubscriberCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                subscriber.name,
-                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                        Expanded(
+                          child: Text(
+                            subscriber.name,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.email_outlined, size: 16),
-                            const SizedBox(width: 6),
-                            Expanded(child: Text(subscriber.email)),
-                          ],
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         _StatusPill(label: statusLabel, color: statusColor),
@@ -696,63 +718,39 @@ class _SubscriberCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.email_outlined, size: 16, color: Colors.white70),
+                        const Icon(
+                          Icons.email_outlined,
+                          size: 16,
+                          color: Colors.white70,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             subscriber.email,
-                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white70,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ],
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            _StatusPill(status: status, color: statusColor),
-                            if (subscriber.city != null || subscriber.state != null)
-                              _InfoPill(
-                                icon: Icons.location_on_outlined,
-                                label:
-                                    '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}',
-                              ),
-                            if (subscriber.county != null)
-                              _InfoPill(icon: Icons.map_outlined, label: subscriber.county!),
-                            if (subscriber.congressionalDistrict != null)
-                              _InfoPill(
-                                  icon: Icons.account_balance_outlined,
-                                  label: 'CD ${subscriber.congressionalDistrict}'),
-                            if (subscriber.optinDate != null)
-                              _InfoPill(
-                                  icon: Icons.calendar_month_outlined,
-                                  label: 'Opt-in ${_dateFormat.format(subscriber.optinDate!)}'),
-                            if (subscriber.source != null)
-                              _InfoPill(icon: Icons.source_outlined, label: subscriber.source!),
-                            if (subscriber.eventAttendanceCount > 0)
-                              _InfoPill(
-                                icon: Icons.event_available_outlined,
-                                label: '${subscriber.eventAttendanceCount} events',
-                              ),
-                            if (subscriber.donor != null)
-                              _InfoPill(
-                                icon: Icons.volunteer_activism_outlined,
-                                label:
-                                    'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
-                              ),
-                          ],
                         ),
                       ],
                     ),
-                    if (subscriber.phoneE164 != null && subscriber.phoneE164!.isNotEmpty) ...[
+                    if (subscriber.phoneE164 != null &&
+                        subscriber.phoneE164!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.phone_outlined, size: 16, color: Colors.white70),
+                          const Icon(
+                            Icons.phone_outlined,
+                            size: 16,
+                            color: Colors.white70,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             subscriber.phoneE164!,
-                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white70,
+                            ),
                           ),
                         ],
                       ),
@@ -765,7 +763,10 @@ class _SubscriberCard extends StatelessWidget {
                         children: tags
                             .map(
                               (tag) => Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.18),
                                   borderRadius: BorderRadius.circular(12),
@@ -784,6 +785,76 @@ class _SubscriberCard extends StatelessWidget {
                     ],
                   ],
                 ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    if (subscriber.city != null || subscriber.state != null)
+                      _InfoPill(
+                        icon: Icons.location_on_outlined,
+                        label:
+                            '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}',
+                      ),
+                    if (subscriber.county != null)
+                      _InfoPill(
+                        icon: Icons.map_outlined,
+                        label: subscriber.county!,
+                      ),
+                    if (subscriber.congressionalDistrict != null)
+                      _InfoPill(
+                        icon: Icons.account_balance_outlined,
+                        label: 'CD ${subscriber.congressionalDistrict}',
+                      ),
+                    if (subscriber.optinDate != null)
+                      _InfoPill(
+                        icon: Icons.calendar_month_outlined,
+                        label:
+                            'Opt-in ${_dateFormat.format(subscriber.optinDate!)}',
+                      ),
+                    if (subscriber.source != null)
+                      _InfoPill(
+                        icon: Icons.source_outlined,
+                        label: subscriber.source!,
+                      ),
+                    if (subscriber.eventAttendanceCount > 0)
+                      _InfoPill(
+                        icon: Icons.event_available_outlined,
+                        label: '${subscriber.eventAttendanceCount} events',
+                      ),
+                    if (subscriber.donor != null)
+                      _InfoPill(
+                        icon: Icons.volunteer_activism_outlined,
+                        label:
+                            'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                children: [
+                  IconButton(
+                    tooltip: 'View details',
+                    icon: const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.white,
+                    ),
+                    onPressed: onTap,
+                  ),
+                  if (onEdit != null)
+                    IconButton(
+                      tooltip: 'Edit',
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        color: Colors.white,
+                      ),
+                      onPressed: onEdit,
+                    ),
+                ],
               ),
             ],
           ),
@@ -834,7 +905,10 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final subscriber = _subscriber;
+    final statusLabel = _statusLabelFor(subscriber);
+    final statusColor = subscriber.subscribed == false
+        ? _actionRed
+        : _grassrootsGreen;
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -861,7 +935,9 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                     Chip(
                       label: Text(statusLabel),
                       backgroundColor: statusColor.withOpacity(0.12),
-                      shape: StadiumBorder(side: BorderSide(color: statusColor.withOpacity(0.4))),
+                      shape: StadiumBorder(
+                        side: BorderSide(color: statusColor.withOpacity(0.4)),
+                      ),
                     ),
                   ],
                 ),
@@ -870,9 +946,17 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                   spacing: 12,
                   runSpacing: 8,
                   children: [
-                    _detailItem('Email', subscriber.email, icon: Icons.email_outlined),
+                    _detailItem(
+                      'Email',
+                      subscriber.email,
+                      icon: Icons.email_outlined,
+                    ),
                     if (subscriber.phoneE164?.isNotEmpty ?? false)
-                      _detailItem('Phone', subscriber.phoneE164!, icon: Icons.phone_outlined),
+                      _detailItem(
+                        'Phone',
+                        subscriber.phoneE164!,
+                        icon: Icons.phone_outlined,
+                      ),
                     if (subscriber.dateOfBirth != null)
                       _detailItem(
                         'Date of Birth',
@@ -880,7 +964,11 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                         icon: Icons.cake_outlined,
                       ),
                     if (subscriber.address != null)
-                      _detailItem('Address', subscriber.address!, icon: Icons.home_outlined),
+                      _detailItem(
+                        'Address',
+                        subscriber.address!,
+                        icon: Icons.home_outlined,
+                      ),
                     if (subscriber.city != null || subscriber.state != null)
                       _detailItem(
                         'Location',
@@ -888,19 +976,41 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                         icon: Icons.location_city_outlined,
                       ),
                     if (subscriber.zipCode != null)
-                      _detailItem('ZIP', subscriber.zipCode!, icon: Icons.local_post_office_outlined),
+                      _detailItem(
+                        'ZIP',
+                        subscriber.zipCode!,
+                        icon: Icons.local_post_office_outlined,
+                      ),
                     if (subscriber.county != null)
-                      _detailItem('County', subscriber.county!, icon: Icons.map_outlined),
+                      _detailItem(
+                        'County',
+                        subscriber.county!,
+                        icon: Icons.map_outlined,
+                      ),
                     if (subscriber.congressionalDistrict != null)
-                      _detailItem('Congressional District', subscriber.congressionalDistrict!),
+                      _detailItem(
+                        'Congressional District',
+                        subscriber.congressionalDistrict!,
+                      ),
                     if (subscriber.houseDistrict != null)
                       _detailItem('House District', subscriber.houseDistrict!),
                     if (subscriber.senateDistrict != null)
-                      _detailItem('Senate District', subscriber.senateDistrict!),
+                      _detailItem(
+                        'Senate District',
+                        subscriber.senateDistrict!,
+                      ),
                     if (subscriber.employer != null)
-                      _detailItem('Employer', subscriber.employer!, icon: Icons.badge_outlined),
+                      _detailItem(
+                        'Employer',
+                        subscriber.employer!,
+                        icon: Icons.badge_outlined,
+                      ),
                     if (subscriber.source != null)
-                      _detailItem('Source', subscriber.source!, icon: Icons.source_outlined),
+                      _detailItem(
+                        'Source',
+                        subscriber.source!,
+                        icon: Icons.source_outlined,
+                      ),
                     if (subscriber.optinDate != null)
                       _detailItem(
                         'Opt-in Date',
@@ -924,10 +1034,13 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                     spacing: 6,
                     runSpacing: 6,
                     children: subscriber.tagList
-                        .map((tag) => Chip(
-                              label: Text(tag),
-                              backgroundColor: theme.colorScheme.primary.withOpacity(0.08),
-                            ))
+                        .map(
+                          (tag) => Chip(
+                            label: Text(tag),
+                            backgroundColor: theme.colorScheme.primary
+                                .withOpacity(0.08),
+                          ),
+                        )
                         .toList(),
                   ),
                   const SizedBox(height: 12),
@@ -935,11 +1048,14 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                 if (subscriber.donor != null) ...[
                   Text('Donor Profile', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  Text('Total Donated: \$${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}'),
+                  Text(
+                    'Total Donated: \$${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                  ),
                   Text('Donation Count: ${subscriber.donor!.donationCount}'),
                   if (subscriber.donor!.lastDonationDate != null)
                     Text(
-                        'Last Donation: ${DateFormat('MMM d, y').format(subscriber.donor!.lastDonationDate!)}'),
+                      'Last Donation: ${DateFormat('MMM d, y').format(subscriber.donor!.lastDonationDate!)}',
+                    ),
                   const SizedBox(height: 12),
                 ],
                 if (subscriber.eventAttendanceCount > 0) ...[
@@ -963,13 +1079,17 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
-                      onPressed: widget.canManage && !_saving ? _openEditDialog : null,
+                      onPressed: canManage
+                          ? () => _showComingSoon(context)
+                          : null,
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Edit Subscriber'),
                     ),
                     const SizedBox(width: 12),
                     OutlinedButton.icon(
-                      onPressed: widget.canManage && !_saving ? _openEditDialog : null,
+                      onPressed: canManage
+                          ? () => _showComingSoon(context)
+                          : null,
                       icon: const Icon(Icons.note_add_outlined),
                       label: const Text('Edit Notes'),
                     ),
@@ -989,15 +1109,15 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (icon != null) ...[
-            Icon(icon, size: 18),
-            const SizedBox(width: 6),
-          ],
+          if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 6)],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 Text(value),
               ],
             ),
@@ -1150,11 +1270,55 @@ class _InfoPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      avatar: Icon(icon, size: 15),
-      label: Text(label, style: const TextStyle(fontSize: 12)),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusPill({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      ),
     );
   }
 }
@@ -1194,14 +1358,40 @@ class _StatHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color.withOpacity(0.85), color.withOpacity(0.65)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: 200,
+      child: Card(
+        color: color.withOpacity(0.06),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withOpacity(0.15),
+                ),
+                padding: const EdgeInsets.all(8),
+                child: Icon(icon, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: theme.textTheme.bodyMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      value.toString(),
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           borderRadius: BorderRadius.circular(12),
         ),

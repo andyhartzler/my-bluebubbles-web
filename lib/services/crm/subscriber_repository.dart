@@ -215,9 +215,9 @@ class SubscriberRepository {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select<List<Map<String, dynamic>>>('id')
-        .is_('member_id', null)
-        .eq('subscription_status', 'subscribed')
+        .select('id')
+        .filter('member_id', 'is', null)
+        .eq('subscribed', true)
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
         .count(postgrest.CountOption.exact);
     return response.count;
