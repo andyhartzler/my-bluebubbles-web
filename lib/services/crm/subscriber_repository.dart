@@ -34,19 +34,11 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    var query = _readClient
-        .from('subscribers')
-        .select(
-          '''
-        *,
-        donor:donor_id(id,total_donated,donation_count,last_donation_date)
-      ''',
-        )
-        .filter('member_id', 'is', null)
-        .order('created_at', ascending: false);
+    var filterQuery =
+        _readClient.from('subscribers').filter('member_id', 'is', null);
 
-    query = _applyFilters(
-      query,
+    filterQuery = _applyFilters(
+      filterQuery,
       searchQuery: searchQuery,
       subscriptionStatus: subscriptionStatus,
       source: source,
@@ -56,6 +48,15 @@ class SubscriberRepository {
       optInStart: optInStart,
       optInEnd: optInEnd,
     );
+
+    var query = filterQuery
+        .select(
+          '''
+        *,
+        donor:donor_id(id,total_donated,donation_count,last_donation_date)
+      ''',
+        )
+        .order('created_at', ascending: false);
 
     if (limit > 0) {
       query = query.range(offset, offset + limit - 1);
