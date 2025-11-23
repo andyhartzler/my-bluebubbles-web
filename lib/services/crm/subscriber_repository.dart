@@ -1,7 +1,6 @@
 import 'dart:async';
 
-import 'package:postgrest/postgrest.dart'
-    show CountOption, FetchOptions, PostgrestFilterBuilder, PostgrestResponse;
+import 'package:postgrest/postgrest.dart' as postgrest;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -35,8 +34,8 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    final fetchOptions = FetchOptions(
-      count: fetchTotalCount ? CountOption.exact : null,
+    final fetchOptions = postgrest.FetchOptions(
+      count: fetchTotalCount ? postgrest.CountOption.exact : null,
     );
 
     var query = _readClient
@@ -67,7 +66,7 @@ class SubscriberRepository {
       query = query.range(offset, offset + limit - 1);
     }
 
-    final PostgrestResponse response = await query;
+    final postgrest.PostgrestResponse response = await query;
     final data = response.data ?? [];
 
     final subscribers = _mapSubscribers(data);
@@ -117,8 +116,8 @@ class SubscriberRepository {
     }
   }
 
-  PostgrestFilterBuilder<dynamic> _applyFilters(
-    PostgrestFilterBuilder<dynamic> query, {
+  postgrest.PostgrestFilterBuilder<dynamic> _applyFilters(
+    postgrest.PostgrestFilterBuilder<dynamic> query, {
     String? searchQuery,
     String? subscriptionStatus,
     String? source,
@@ -167,7 +166,8 @@ class SubscriberRepository {
       {String? notNullColumn, String? orFilter}) async {
     var query = _readClient.from('subscribers').select(
           'id',
-          fetchOptions: const FetchOptions(head: true, count: CountOption.exact),
+          fetchOptions:
+              const postgrest.FetchOptions(head: true, count: postgrest.CountOption.exact),
         ).filter('member_id', 'is', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
@@ -176,12 +176,12 @@ class SubscriberRepository {
     if (orFilter != null) {
       query = query.or(orFilter);
     }
-    final PostgrestResponse response = await query;
+    final postgrest.PostgrestResponse response = await query;
     return response.count ?? 0;
   }
 
   Future<Map<String, int>> _sourceBreakdown() async {
-    final PostgrestResponse response = await _readClient
+    final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
         .select('source, count:id')
         .filter('member_id', 'is', null)
@@ -199,9 +199,9 @@ class SubscriberRepository {
 
   Future<int> _recentOptIns() async {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    final PostgrestResponse response = await _readClient
+    final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select('id', fetchOptions: const FetchOptions(head: true, count: CountOption.exact))
+        .select('id', fetchOptions: const postgrest.FetchOptions(head: true, count: postgrest.CountOption.exact))
         .filter('member_id', 'is', null)
         .eq('subscription_status', 'subscribed')
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
@@ -211,9 +211,9 @@ class SubscriberRepository {
 
   Future<List<String>> fetchDistinctValues(String column) async {
     if (!isReady) return [];
-    final PostgrestResponse response = await _readClient
+    final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select(column, fetchOptions: const FetchOptions(distinct: true))
+        .select(column, fetchOptions: const postgrest.FetchOptions(distinct: true))
         .filter('member_id', 'is', null)
         .order(column, ascending: true);
 
@@ -231,7 +231,7 @@ class SubscriberRepository {
     if (emails.isEmpty) return subscribers;
 
     try {
-      final PostgrestResponse response = await _readClient
+      final postgrest.PostgrestResponse response = await _readClient
           .from('event_attendees')
           .select('email, count:id')
           .inFilter('email', emails)
