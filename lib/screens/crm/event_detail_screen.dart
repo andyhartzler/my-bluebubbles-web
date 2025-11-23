@@ -12,6 +12,8 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
+import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/services/crm/donor_repository.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
@@ -26,6 +28,7 @@ const _momentumBlue = Color(0xFF32A6DE);
 const _sunriseGold = Color(0xFFFDB813);
 const _justicePurple = Color(0xFF6A1B9A);
 const _grassrootsGreen = Color(0xFF43A047);
+const _actionRed = Color(0xFFE63946);
 
 class EventDetailScreen extends StatefulWidget {
   final Event initialEvent;
@@ -92,17 +95,22 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   DateTime? _rsvpDeadline;
   String? _eventType;
   String _status = 'draft';
+  bool _hideAddressBeforeRsvp = false;
   bool _rsvpEnabled = true;
   bool _checkinEnabled = false;
   bool _editingDetails = false;
 
+  bool _autoSavingDraft = false;
   bool _saving = false;
+  bool _deleting = false;
   bool _loadingAttendees = false;
   List<EventAttendee> _attendees = [];
   String? _attendeeError;
   _AttendeeFilter _attendeeFilter = _AttendeeFilter.all;
   String _attendeeSearch = '';
   StreamSubscription<List<EventAttendee>>? _attendeeSub;
+  bool _openingAttendeeEmail = false;
+  bool _openingAttendeeMessage = false;
 
   @override
   void initState() {
@@ -124,9 +132,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _rsvpDeadline = event.rsvpDeadline;
     _eventType = event.eventType;
     _status = event.status;
+    _hideAddressBeforeRsvp = event.hideAddressBeforeRsvp;
     _rsvpEnabled = event.rsvpEnabled;
     _checkinEnabled = event.checkinEnabled;
     _editingDetails = event.id == null;
+
+    _titleController.addListener(_maybeAutoSaveDraft);
 
     _initFocusNodes();
 
@@ -194,23 +205,58 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         _eventEndDate != null ? formatter.format(_eventEndDate!.toLocal()) : '';
   }
 
+  void _maybeAutoSaveDraft() {
+    if (_currentEvent.id != null || _autoSavingDraft) return;
+
+    final title = _titleController.text.trim();
+    if (title.isEmpty) return;
+
+    _ensureDraftSaved();
+  }
+
+  Future<void> _ensureDraftSaved() async {
+    if (_currentEvent.id != null || _autoSavingDraft) return;
+    if (_titleController.text.trim().isEmpty) return;
+
+    setState(() => _autoSavingDraft = true);
+    try {
+      final saved = await _repository.createEvent(_buildEventFromForm());
+      if (!mounted) return;
+      setState(() {
+        _currentEvent = saved;
+        _status = saved.status;
+        _hideAddressBeforeRsvp = saved.hideAddressBeforeRsvp;
+        _autoSavingDraft = false;
+      });
+      _loadAttendees();
+      _startAttendeeStream();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _autoSavingDraft = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save draft: $e')),
+      );
+    }
+  }
+
   Event _buildEventFromForm({String? id}) {
     return Event(
-      id: id ?? widget.initialEvent.id,
+      id: id ?? _currentEvent.id ?? widget.initialEvent.id,
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
-      eventDate: _eventDate ?? DateTime.now(),
+      eventDate: _eventDate ?? _currentEvent.eventDate ?? DateTime.now(),
       eventEndDate: _eventEndDate,
       location: _locationController.text.trim().isEmpty ? null : _locationController.text.trim(),
       locationAddress: _locationAddressController.text.trim().isEmpty ? null : _locationAddressController.text.trim(),
+      hideAddressBeforeRsvp: _hideAddressBeforeRsvp,
       eventType: _eventType,
       rsvpEnabled: _rsvpEnabled,
       rsvpDeadline: _rsvpDeadline,
       maxAttendees: int.tryParse(_maxAttendeesController.text),
       checkinEnabled: _checkinEnabled,
       status: _status,
-      createdBy: widget.initialEvent.createdBy,
-      createdAt: widget.initialEvent.createdAt,
+      createdBy: _currentEvent.createdBy ?? widget.initialEvent.createdBy,
+      createdAt: _currentEvent.createdAt ?? widget.initialEvent.createdAt,
       updatedAt: DateTime.now(),
       socialShareImage: _currentEvent.socialShareImage,
       websiteImage: _currentEvent.websiteImage,
@@ -225,10 +271,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       return;
     }
 
+    final isNew = _currentEvent.id == null;
     setState(() => _saving = true);
     try {
       Event saved;
-      if (widget.initialEvent.id == null) {
+      if (isNew) {
         saved = await _repository.createEvent(_buildEventFromForm());
       } else {
         saved = await _repository.updateEvent(_buildEventFromForm());
@@ -238,20 +285,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       setState(() {
         _saving = false;
         _currentEvent = saved;
+        _hideAddressBeforeRsvp = saved.hideAddressBeforeRsvp;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Event saved successfully.')),
       );
 
-      if (widget.initialEvent.id == null) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => EventDetailScreen(initialEvent: saved),
-          ),
-        );
-      } else {
-        setState(() => _editingDetails = false);
+      setState(() => _editingDetails = false);
+      if (isNew) {
         _loadAttendees();
         _startAttendeeStream();
       }
@@ -266,10 +308,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
   Future<void> _pickAndUploadImage({required bool isSocialShare}) async {
     if (_currentEvent.id == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Save the event before uploading images.')),
-      );
-      return;
+      await _ensureDraftSaved();
+      if (_currentEvent.id == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Add a title to save this event before uploading.')),
+        );
+        return;
+      }
     }
 
     final result = await file_picker.FilePicker.platform.pickFiles(
@@ -312,6 +357,45 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Failed to upload image: $e')));
+    }
+  }
+
+  Future<void> _confirmDeleteEvent() async {
+    final eventId = _currentEvent.id;
+    if (eventId == null || _deleting) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete event?'),
+        content: const Text('Are you sure you want to delete this event?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: _actionRed, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _deleting = true);
+    try {
+      await _repository.deleteEvent(eventId);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete event: $e')),
+      );
     }
   }
 
@@ -617,9 +701,27 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   Future<void> _toggleCheckInStatus(EventAttendee attendee, bool checkedIn) async {
     setState(() => _loadingAttendees = true);
     try {
+      final now = DateTime.now();
+      final eventStart = _currentEvent.eventDate?.toLocal();
+      DateTime? desiredCheckInAt;
+
+      if (checkedIn) {
+        final hasEventStarted = eventStart != null && now.isAfter(eventStart);
+        final fourHoursAfterStart =
+            eventStart != null ? eventStart.add(const Duration(hours: 4)) : null;
+        final isFourHoursAfterStart = fourHoursAfterStart != null && now.isAfter(fourHoursAfterStart);
+
+        if (isFourHoursAfterStart) {
+          desiredCheckInAt = eventStart;
+        } else if (hasEventStarted) {
+          desiredCheckInAt = now;
+        }
+      }
+
       final updated = await _repository.updateCheckInStatus(
         attendeeId: attendee.id,
         checkedIn: checkedIn,
+        checkedInAt: desiredCheckInAt,
       );
       if (!mounted) return;
       setState(() {
@@ -632,6 +734,159 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update check-in: $e')),
       );
+    }
+  }
+
+  String? _memberKey(Member member) => member.id ?? member.phoneE164 ?? member.phone;
+
+  List<Member> _attendeeMembersWithEmails() {
+    final seen = <String>{};
+    final members = <Member>[];
+
+    for (final attendee in _attendees) {
+      final member = attendee.member;
+      final email = member?.preferredEmail ?? member?.email;
+      if (member == null || email == null || email.trim().isEmpty) continue;
+
+      final key = _memberKey(member);
+      if (key != null && seen.add(key)) {
+        members.add(member);
+      }
+    }
+
+    return members;
+  }
+
+  List<Member> _attendeeMembersWithPhones() {
+    final seen = <String>{};
+    final members = <Member>[];
+
+    for (final attendee in _attendees) {
+      final member = attendee.member;
+      final hasPhone = member?.phoneE164?.trim().isNotEmpty == true ||
+          member?.phone?.trim().isNotEmpty == true;
+
+      if (member == null || !hasPhone) continue;
+
+      final key = _memberKey(member);
+      if (key != null && seen.add(key)) {
+        members.add(member);
+      }
+    }
+
+    return members;
+  }
+
+  List<String> _attendeeGuestEmails() {
+    final manualEmails = <String>{};
+
+    for (final attendee in _attendees) {
+      final email = attendee.guestEmail?.trim();
+      if (email != null && email.isNotEmpty) {
+        manualEmails.add(email);
+      }
+    }
+
+    return manualEmails.toList();
+  }
+
+  Future<void> _handleEmailAttendees() async {
+    if (_openingAttendeeEmail) return;
+
+    final memberRecipients = _attendeeMembersWithEmails();
+    final manualEmails = _attendeeGuestEmails();
+
+    if (memberRecipients.isEmpty && manualEmails.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No attendee emails available.')),
+      );
+      return;
+    }
+
+    setState(() => _openingAttendeeEmail = true);
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BulkEmailScreen(
+            initialManualMembers: memberRecipients.isEmpty ? null : memberRecipients,
+            initialManualEmails: manualEmails.isEmpty ? null : manualEmails,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _openingAttendeeEmail = false);
+      } else {
+        _openingAttendeeEmail = false;
+      }
+    }
+  }
+
+  Future<void> _handleMessageAttendees() async {
+    if (_openingAttendeeMessage) return;
+
+    final memberRecipients = _attendeeMembersWithPhones();
+
+    if (memberRecipients.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No attendee phone numbers available to message.')),
+      );
+      return;
+    }
+
+    setState(() => _openingAttendeeMessage = true);
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BulkMessageScreen(initialManualMembers: memberRecipients),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _openingAttendeeMessage = false);
+      } else {
+        _openingAttendeeMessage = false;
+      }
+    }
+  }
+
+  Future<void> _deleteAttendee(EventAttendee attendee) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Remove attendee'),
+        content: Text('Are you sure you want to remove ${attendee.displayName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _loadingAttendees = true);
+    try {
+      await _repository.deleteAttendee(attendee.id);
+      if (!mounted) return;
+      setState(() {
+        _attendees = _attendees.where((a) => a.id != attendee.id).toList();
+        _loadingAttendees = false;
+      });
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Removed ${attendee.displayName}.')));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingAttendees = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not delete attendee: $e')));
     }
   }
 
@@ -1343,6 +1598,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                   icon: const Icon(Icons.volunteer_activism_outlined),
                   label: const Text('Add donation'),
                 ),
+                TextButton.icon(
+                  onPressed: _loadingAttendees ? null : () => _deleteAttendee(attendee),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Delete'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                ),
                 const Spacer(),
                 if (attendee.checkedIn)
                   TextButton(
@@ -1362,9 +1623,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.spaceBetween,
           children: [
-            Expanded(
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 260, maxWidth: 520),
               child: TextField(
                 decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.search),
@@ -1373,12 +1639,27 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                 onChanged: (value) => setState(() => _attendeeSearch = value),
               ),
             ),
-            const SizedBox(width: 12),
-            ElevatedButton.icon(
-              onPressed: _loadingAttendees ? null : _showAddAttendeeDialog,
-              icon: const Icon(Icons.person_add_alt_1),
-              label: const Text('Add attendee'),
-              style: ElevatedButton.styleFrom(backgroundColor: _unityBlue, foregroundColor: Colors.white),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _loadingAttendees ? null : _handleMessageAttendees,
+                  icon: const Icon(Icons.message_outlined),
+                  label: const Text('Send message'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _loadingAttendees ? null : _handleEmailAttendees,
+                  icon: const Icon(Icons.email_outlined),
+                  label: const Text('Send email'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _loadingAttendees ? null : _showAddAttendeeDialog,
+                  icon: const Icon(Icons.person_add_alt_1),
+                  label: const Text('Add attendee'),
+                  style: ElevatedButton.styleFrom(backgroundColor: _unityBlue, foregroundColor: Colors.white),
+                ),
+              ],
             ),
           ],
         ),
@@ -1482,6 +1763,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
             child: Text('Save the event to enable uploads.', style: TextStyle(color: Colors.red)),
           ),
       ],
+    );
+  }
+
+  Widget _buildDeleteButton() {
+    if (_currentEvent.id == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12.0),
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _actionRed,
+          side: const BorderSide(color: _actionRed),
+        ),
+        onPressed: _deleting ? null : _confirmDeleteEvent,
+        icon: _deleting
+            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.delete_outline),
+        label: Text(_deleting ? 'Deleting...' : 'Delete Event'),
+      ),
     );
   }
 
@@ -1654,6 +1954,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
           _buildMapCard(),
           const SizedBox(height: 12),
           _buildImageUploadSection(),
+          _buildDeleteButton(),
         ],
       ),
     );
@@ -1808,6 +2109,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
             TextField(
               controller: _titleController,
               decoration: _decor('Title *'),
+              onEditingComplete: _ensureDraftSaved,
+              onSubmitted: (_) => _ensureDraftSaved(),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -1862,6 +2165,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              value: _hideAddressBeforeRsvp,
+              onChanged: (value) => setState(() => _hideAddressBeforeRsvp = value),
+              title: const Text('Hide address until RSVP'),
+              subtitle: const Text('Keep the event address hidden until someone RSVPs'),
             ),
             const SizedBox(height: 12),
             _buildImageUploadSection(),
@@ -1939,6 +2249,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                 style: ElevatedButton.styleFrom(backgroundColor: _unityBlue, foregroundColor: Colors.white),
               ),
             ),
+            _buildDeleteButton(),
           ],
         ),
       ),
@@ -1947,7 +2258,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
-    final hasEventId = widget.initialEvent.id != null;
+    final hasEventId = _currentEvent.id != null;
     final tabCount = hasEventId ? 3 : 1;
 
     return Scaffold(
@@ -1963,6 +2274,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       ),
       body: SafeArea(
         child: DefaultTabController(
+          key: ValueKey(hasEventId ? _currentEvent.id ?? 'new' : 'new'),
           length: tabCount,
           child: Center(
             child: ConstrainedBox(

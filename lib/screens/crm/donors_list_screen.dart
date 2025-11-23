@@ -434,6 +434,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
   String? _formatPhoneDisplay(String? phone) {
     if (phone == null) return null;
     final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return null;
     if (digits.length == 11 && digits.startsWith('1')) {
       final area = digits.substring(1, 4);
       final prefix = digits.substring(4, 7);
@@ -441,7 +442,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
       return '+1 ($area) $prefix-$line';
     }
     if (phone.startsWith('+')) return phone;
-    return '+$phone';
+    return phone;
   }
 
   int? _calculateAge(DateTime? birthDate) {
@@ -453,6 +454,26 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
       age--;
     }
     return age;
+  }
+
+  String? _cleanCountyLabel(String? county) {
+    if (county == null) return null;
+    final trimmed = county.replaceFirst(RegExp(r'^County:\s*', caseSensitive: false), '').trim();
+    if (trimmed.isEmpty) return null;
+    return trimmed;
+  }
+
+  String? _formatDistrictLabel(String? district) {
+    if (district == null) return null;
+    final trimmed = district.trim();
+    if (trimmed.isEmpty) return null;
+
+    final withoutPrefix =
+        trimmed.replaceFirst(RegExp(r'^(congressional district|district|cd)[:\s-]*', caseSensitive: false), '');
+    final normalized = withoutPrefix.replaceFirst(RegExp(r'^-+'), '');
+    if (normalized.isEmpty) return null;
+
+    return 'CD-${normalized.toUpperCase()}';
   }
 
   Widget _buildFilters() {
@@ -559,10 +580,10 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         final age = _calculateAge(donor.dateOfBirth);
         final headerLine = [
           donation.formattedDate,
-          if (county != null && county.isNotEmpty) 'County: $county',
-          if (district != null && district.isNotEmpty) 'CD: $district',
+          if (county != null && county.isNotEmpty) _cleanCountyLabel(county),
+          if (district != null && district.isNotEmpty) _formatDistrictLabel(district),
           if (age != null) 'Age: $age',
-        ].where((value) => value.isNotEmpty).join(' • ');
+        ].where((value) => (value ?? '').isNotEmpty).join(' • ');
 
         return Card(
           elevation: 2,
@@ -616,14 +637,6 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (phoneDisplay != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              phoneDisplay,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
-                            ),
-                          ),
                       ],
                     ),
                   ),
@@ -650,44 +663,24 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  SizedBox(
-                    width: 150,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: () => _showThankYouConfirmation(donation),
-                          icon: Icon(
-                            donation.sentThankYou
-                                ? Icons.check_circle
-                                : Icons.mark_email_read_outlined,
-                            size: 18,
+                  if (donation.sentThankYou)
+                    SizedBox(
+                      width: 150,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Chip(
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            label: const Text(
+                              'Thank-you sent',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                            ),
+                            avatar: const Icon(Icons.check_circle, color: Colors.white),
                           ),
-                          label: Text(
-                            donation.sentThankYou ? 'Marked sent' : 'Mark sent',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            backgroundColor:
-                                donation.sentThankYou ? _grassrootsGreen : _sunriseGold,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          donation.sentThankYou ? 'Thank-you sent' : 'Awaiting thank-you',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.white70),
-                          textAlign: TextAlign.right,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -709,61 +702,6 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
       }
     });
     _applyFilters();
-  }
-
-  Future<void> _showThankYouConfirmation(Donation donation) async {
-    final markSent = !donation.sentThankYou;
-    final amountText = NumberFormat.simpleCurrency().format(donation.amount ?? 0);
-    final dateText = donation.donationDate != null
-        ? DateFormat.yMMMd().format(donation.donationDate!)
-        : 'Unknown date';
-    final donorName = donation.donorName ?? 'this donor';
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(markSent ? 'Confirm thank-you sent' : 'Mark thank-you pending'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(markSent
-                  ? 'Confirm you have sent a thank-you to $donorName.'
-                  : 'This will reopen the thank-you task.'),
-              const SizedBox(height: 12),
-              Text('Donation: $amountText'),
-              Text('Date: $dateText'),
-              if (donation.eventName != null) Text('Event: ${donation.eventName}'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(markSent ? 'Mark sent' : 'Mark unsent'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed == true && mounted) {
-      await _toggleThankYou(donation, markSent);
-    }
-  }
-
-  Future<void> _toggleThankYou(Donation donation, bool sent) async {
-    setState(() {
-      _recentDonations = _recentDonations
-          .map((d) => d.id == donation.id ? d.copyWith(sentThankYou: sent) : d)
-          .toList();
-    });
-
-    await _repository.updateThankYouStatus(donation.id, sent);
   }
 
   Future<void> _showAddDonationDialog() async {
@@ -814,170 +752,199 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
             }
 
             return SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: searchController,
-                    decoration: const InputDecoration(
-                      labelText: 'Search member, donor, or event attendee',
-                      prefixIcon: Icon(Icons.search),
-                    ),
-                    onChanged: handleSearch,
-                  ),
-                  const SizedBox(height: 8),
-                  if (selectedSubject != null)
-                    Card(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      child: ListTile(
-                        leading: Icon(selectedSubject!.icon),
-                        title: Text(selectedSubject!.displayName),
-                        subtitle: Text(selectedSubject!.detail ?? 'Selected record'),
-                        trailing: TextButton(
-                          onPressed: () => setState(() {
-                            selectedSubject = null;
-                            creatingNewDonor = false;
-                          }),
-                          child: const Text('Change'),
-                        ),
-                      ),
-                    ),
-                  if (!creatingNewDonor)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (searching)
-                          const LinearProgressIndicator(minHeight: 2)
-                        else if (searchResults.isEmpty && searchController.text.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6.0),
-                            child: Text(
-                              'No matches found. Create a new donor with full details.',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ),
-                        ...searchResults.map(
-                          (result) => ListTile(
-                            dense: true,
-                            leading: Icon(result.icon),
-                            title: Text(result.displayName),
-                            subtitle: Row(
-                              children: [
-                                Chip(label: Text(result.chipLabel)),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(result.detail ?? '', overflow: TextOverflow.ellipsis)),
-                              ],
-                            ),
-                            onTap: () => setState(() {
-                              selectedSubject = result;
-                              creatingNewDonor = false;
-                            }),
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: () => setState(() {
-                              creatingNewDonor = true;
-                              selectedSubject = null;
-                              if (newDonorNameController.text.isEmpty &&
-                                  searchController.text.trim().isNotEmpty) {
-                                newDonorNameController.text = searchController.text.trim();
-                              }
-                            }),
-                            icon: const Icon(Icons.person_add_alt_1),
-                            label: const Text('Create new donor with details'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  if (creatingNewDonor) ...[
-                    const SizedBox(height: 8),
-                    Text('New donor details', style: Theme.of(context).textTheme.titleSmall),
-                    TextField(
-                      controller: newDonorNameController,
-                      decoration: const InputDecoration(labelText: 'Full name *'),
-                    ),
-                    TextField(
-                      controller: newDonorEmailController,
-                      decoration: const InputDecoration(labelText: 'Email'),
-                    ),
-                    TextField(
-                      controller: newDonorPhoneController,
-                      decoration: const InputDecoration(labelText: 'Phone (E.164 preferred)'),
-                    ),
-                    TextField(
-                      controller: newDonorAddressController,
-                      decoration: const InputDecoration(labelText: 'Address'),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: newDonorCityController,
-                            decoration: const InputDecoration(labelText: 'City'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: newDonorStateController,
-                            decoration: const InputDecoration(labelText: 'State'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: newDonorZipController,
-                            decoration: const InputDecoration(labelText: 'ZIP'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: newDonorEmployerController,
-                            decoration: const InputDecoration(labelText: 'Employer'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: newDonorOccupationController,
-                            decoration: const InputDecoration(labelText: 'Occupation'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  TextField(
-                    controller: amountController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Amount'),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(),
+                child: AutofillGroup(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: Text(DateFormat.yMMMd().format(donationDate))),
-                      TextButton(
-                        onPressed: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: donationDate,
-                            firstDate: DateTime(2000),
-                            lastDate: DateTime.now().add(const Duration(days: 1)),
-                          );
-                          if (picked != null) {
-                            setState(() => donationDate = picked);
-                          }
-                        },
-                        child: const Text('Change date'),
+                      TextField(
+                        controller: searchController,
+                        decoration: const InputDecoration(
+                          labelText: 'Search member, donor, or event attendee',
+                          prefixIcon: Icon(Icons.search),
+                        ),
+                        textInputAction: TextInputAction.search,
+                        onChanged: handleSearch,
+                        onSubmitted: handleSearch,
                       ),
-                    ],
-                  ),
+                      const SizedBox(height: 8),
+                      if (selectedSubject != null)
+                        Card(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          child: ListTile(
+                            leading: Icon(selectedSubject!.icon),
+                            title: Text(selectedSubject!.displayName),
+                            subtitle: Text(selectedSubject!.detail ?? 'Selected record'),
+                            trailing: TextButton(
+                              onPressed: () => setState(() {
+                                selectedSubject = null;
+                                creatingNewDonor = false;
+                              }),
+                              child: const Text('Change'),
+                            ),
+                          ),
+                        ),
+                      if (!creatingNewDonor)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (searching)
+                              const LinearProgressIndicator(minHeight: 2)
+                            else if (searchResults.isEmpty && searchController.text.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6.0),
+                                child: Text(
+                                  'No matches found. Create a new donor with full details.',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ),
+                            ...searchResults.map(
+                              (result) => ListTile(
+                                dense: true,
+                                leading: Icon(result.icon),
+                                title: Text(result.displayName),
+                                subtitle: Row(
+                                  children: [
+                                    Chip(label: Text(result.chipLabel)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child:
+                                          Text(result.detail ?? '', overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ],
+                                ),
+                                onTap: () => setState(() {
+                                  selectedSubject = result;
+                                  creatingNewDonor = false;
+                                }),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () => setState(() {
+                                  creatingNewDonor = true;
+                                  selectedSubject = null;
+                                  if (newDonorNameController.text.isEmpty &&
+                                      searchController.text.trim().isNotEmpty) {
+                                    newDonorNameController.text = searchController.text.trim();
+                                  }
+                                }),
+                                icon: const Icon(Icons.person_add_alt_1),
+                                label: const Text('Create new donor with details'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      if (creatingNewDonor) ...[
+                        const SizedBox(height: 8),
+                        Text('New donor details', style: Theme.of(context).textTheme.titleSmall),
+                        TextField(
+                          controller: newDonorNameController,
+                          decoration: const InputDecoration(labelText: 'Full name *'),
+                          textInputAction: TextInputAction.next,
+                        ),
+                        TextField(
+                          controller: newDonorEmailController,
+                          decoration: const InputDecoration(labelText: 'Email'),
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.email],
+                        ),
+                        TextField(
+                          controller: newDonorPhoneController,
+                          decoration: const InputDecoration(labelText: 'Phone (E.164 preferred)'),
+                          keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.telephoneNumber],
+                        ),
+                        TextField(
+                          controller: newDonorAddressController,
+                          decoration: const InputDecoration(labelText: 'Address'),
+                          keyboardType: TextInputType.streetAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.streetAddressLine1],
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: newDonorCityController,
+                                decoration: const InputDecoration(labelText: 'City'),
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.addressCity],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: newDonorStateController,
+                                decoration: const InputDecoration(labelText: 'State'),
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.addressState],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: newDonorZipController,
+                                decoration: const InputDecoration(labelText: 'ZIP'),
+                                keyboardType: TextInputType.number,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.postalCode],
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: newDonorEmployerController,
+                                decoration: const InputDecoration(labelText: 'Employer'),
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.organizationName],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: newDonorOccupationController,
+                                decoration: const InputDecoration(labelText: 'Occupation'),
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                        TextField(
+                          controller: amountController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(labelText: 'Amount'),
+                          textInputAction: TextInputAction.next,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(child: Text(DateFormat.yMMMd().format(donationDate))),
+                            TextButton(
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: donationDate,
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime.now().add(const Duration(days: 1)),
+                                );
+                                if (picked != null) {
+                                  setState(() => donationDate = picked);
+                                }
+                              },
+                              child: const Text('Change date'),
+                            ),
+                          ],
+                        ),
                   DropdownButtonFormField<String>(
                     value: method,
                     decoration: const InputDecoration(labelText: 'Payment method'),
@@ -992,6 +959,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                     TextField(
                       onChanged: (value) => checkNumber = value,
                       decoration: const InputDecoration(labelText: 'Check number'),
+                      textInputAction: TextInputAction.next,
                     ),
                   DropdownButtonFormField<Event?>(
                     value: selectedEvent,
@@ -1012,105 +980,108 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                     controller: notesController,
                     decoration: const InputDecoration(labelText: 'Notes'),
                     maxLines: 2,
+                    textInputAction: TextInputAction.done,
                   ),
                 ],
               ),
-            );
-          }),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                final amount = double.tryParse(amountController.text.trim());
-                if (amount == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Enter a valid donation amount.')),
-                  );
-                  return;
-                }
-
-                if (creatingNewDonor) {
-                  final name = newDonorNameController.text.trim();
-                  if (name.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Name is required to create a donor.')),
-                    );
-                    return;
-                  }
-
-                  final payload = {
-                    'name': name,
-                    'email': newDonorEmailController.text.trim().isEmpty
-                        ? null
-                        : newDonorEmailController.text.trim(),
-                    'phone': newDonorPhoneController.text.trim().isEmpty
-                        ? null
-                        : newDonorPhoneController.text.trim(),
-                    'phone_e164': newDonorPhoneController.text.trim().isEmpty
-                        ? null
-                        : newDonorPhoneController.text.trim(),
-                    'address': newDonorAddressController.text.trim().isEmpty
-                        ? null
-                        : newDonorAddressController.text.trim(),
-                    'city': newDonorCityController.text.trim().isEmpty
-                        ? null
-                        : newDonorCityController.text.trim(),
-                    'state': newDonorStateController.text.trim().isEmpty
-                        ? null
-                        : newDonorStateController.text.trim(),
-                    'zip_code': newDonorZipController.text.trim().isEmpty
-                        ? null
-                        : newDonorZipController.text.trim(),
-                    'employer': newDonorEmployerController.text.trim().isEmpty
-                        ? null
-                        : newDonorEmployerController.text.trim(),
-                    'occupation': newDonorOccupationController.text.trim().isEmpty
-                        ? null
-                        : newDonorOccupationController.text.trim(),
-                  };
-
-                  donorId = await _repository.upsertDonor(data: payload);
-                } else if (selectedSubject != null) {
-                  switch (selectedSubject!.type) {
-                    case _DonationSearchResultType.donor:
-                      donorId = selectedSubject!.donor?.id;
-                      break;
-                    case _DonationSearchResultType.member:
-                      final member = selectedSubject!.member;
-                      if (member != null) {
-                        donorId = await _ensureDonorForMember(member);
-                      }
-                      break;
-                    case _DonationSearchResultType.attendee:
-                      final attendee = selectedSubject!.attendee;
-                      if (attendee != null) {
-                        donorId = await _ensureDonorForAttendee(attendee);
-                      }
-                      break;
-                  }
-                }
-
-                await _repository.addManualDonation(
-                  donorId: donorId,
-                  amount: amount,
-                  donationDate: donationDate,
-                  paymentMethod: method,
-                  checkNumber: checkNumber,
-                  notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-                  eventId: selectedEvent?.id,
-                );
-                if (!mounted) return;
-                Navigator.of(context).pop();
-                await _loadData();
-              },
-              child: const Text('Save donation'),
-            ),
-          ],
+          ),
         );
-      },
+      }),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final amount = double.tryParse(amountController.text.trim());
+            if (amount == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Enter a valid donation amount.')),
+              );
+              return;
+            }
+
+            if (creatingNewDonor) {
+              final name = newDonorNameController.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Name is required to create a donor.')),
+                );
+                return;
+              }
+
+              final payload = {
+                'name': name,
+                'email': newDonorEmailController.text.trim().isEmpty
+                    ? null
+                    : newDonorEmailController.text.trim(),
+                'phone': newDonorPhoneController.text.trim().isEmpty
+                    ? null
+                    : newDonorPhoneController.text.trim(),
+                'phone_e164': newDonorPhoneController.text.trim().isEmpty
+                    ? null
+                    : newDonorPhoneController.text.trim(),
+                'address': newDonorAddressController.text.trim().isEmpty
+                    ? null
+                    : newDonorAddressController.text.trim(),
+                'city': newDonorCityController.text.trim().isEmpty
+                    ? null
+                    : newDonorCityController.text.trim(),
+                'state': newDonorStateController.text.trim().isEmpty
+                    ? null
+                    : newDonorStateController.text.trim(),
+                'zip_code': newDonorZipController.text.trim().isEmpty
+                    ? null
+                    : newDonorZipController.text.trim(),
+                'employer': newDonorEmployerController.text.trim().isEmpty
+                    ? null
+                    : newDonorEmployerController.text.trim(),
+                'occupation': newDonorOccupationController.text.trim().isEmpty
+                    ? null
+                    : newDonorOccupationController.text.trim(),
+              };
+
+              donorId = await _repository.upsertDonor(data: payload);
+            } else if (selectedSubject != null) {
+              switch (selectedSubject!.type) {
+                case _DonationSearchResultType.donor:
+                  donorId = selectedSubject!.donor?.id;
+                  break;
+                case _DonationSearchResultType.member:
+                  final member = selectedSubject!.member;
+                  if (member != null) {
+                    donorId = await _ensureDonorForMember(member);
+                  }
+                  break;
+                case _DonationSearchResultType.attendee:
+                  final attendee = selectedSubject!.attendee;
+                  if (attendee != null) {
+                    donorId = await _ensureDonorForAttendee(attendee);
+                  }
+                  break;
+              }
+            }
+
+            await _repository.addManualDonation(
+              donorId: donorId,
+              amount: amount,
+              donationDate: donationDate,
+              paymentMethod: method,
+              checkNumber: checkNumber,
+              notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+              eventId: selectedEvent?.id,
+            );
+            if (!mounted) return;
+            Navigator.of(context).pop();
+            await _loadData();
+          },
+          child: const Text('Save donation'),
+        ),
+      ],
+    );
+  },
     );
     debounce?.cancel();
   }
