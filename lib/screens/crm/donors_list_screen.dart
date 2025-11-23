@@ -583,7 +583,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
           if (county != null && county.isNotEmpty) _cleanCountyLabel(county),
           if (district != null && district.isNotEmpty) _formatDistrictLabel(district),
           if (age != null) 'Age: $age',
-        ].where((value) => value.isNotEmpty).join(' • ');
+        ].where((value) => (value ?? '').isNotEmpty).join(' • ');
 
         return Card(
           elevation: 2,

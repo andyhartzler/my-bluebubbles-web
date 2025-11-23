@@ -28,6 +28,7 @@ const _momentumBlue = Color(0xFF32A6DE);
 const _sunriseGold = Color(0xFFFDB813);
 const _justicePurple = Color(0xFF6A1B9A);
 const _grassrootsGreen = Color(0xFF43A047);
+const _actionRed = Color(0xFFE63946);
 
 class EventDetailScreen extends StatefulWidget {
   final Event initialEvent;
