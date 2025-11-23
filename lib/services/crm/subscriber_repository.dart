@@ -34,10 +34,6 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    final fetchOptions = postgrest.FetchOptions(
-      count: fetchTotalCount ? postgrest.CountOption.exact : null,
-    );
-
     var query = _readClient
         .from('subscribers')
         .select(
@@ -45,7 +41,6 @@ class SubscriberRepository {
         *,
         donor:donor_id(id,total_donated,donation_count,last_donation_date)
       ''',
-          fetchOptions: fetchOptions,
         )
         .filter('member_id', 'is', null)
         .order('created_at', ascending: false);
@@ -66,7 +61,12 @@ class SubscriberRepository {
       query = query.range(offset, offset + limit - 1);
     }
 
-    final postgrest.PostgrestResponse response = await query;
+    final postgrest.PostgrestResponse response = fetchTotalCount
+        ? await query.count(postgrest.CountOption.exact)
+        : postgrest.PostgrestResponse(
+            data: await query,
+            count: 0,
+          );
     final data = response.data ?? [];
 
     final subscribers = _mapSubscribers(data);
@@ -164,11 +164,7 @@ class SubscriberRepository {
 
   Future<int> _countWhere(Map<String, dynamic> filters,
       {String? notNullColumn, String? orFilter}) async {
-    var query = _readClient.from('subscribers').select(
-          'id',
-          fetchOptions:
-              const postgrest.FetchOptions(head: true, count: postgrest.CountOption.exact),
-        ).filter('member_id', 'is', null);
+    var query = _readClient.from('subscribers').select('id').filter('member_id', 'is', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
       query = query.not(notNullColumn, 'is', null);
@@ -176,23 +172,22 @@ class SubscriberRepository {
     if (orFilter != null) {
       query = query.or(orFilter);
     }
-    final postgrest.PostgrestResponse response = await query;
-    return response.count ?? 0;
+    final postgrest.PostgrestResponse response =
+        await query.count(postgrest.CountOption.exact);
+    return response.count;
   }
 
   Future<Map<String, int>> _sourceBreakdown() async {
-    final postgrest.PostgrestResponse response = await _readClient
+    final data = await _readClient
         .from('subscribers')
-        .select('source, count:id')
-        .filter('member_id', 'is', null)
-        .group('source');
+        .select('source')
+        .filter('member_id', 'is', null);
 
     final results = <String, int>{};
-    for (final row in (response.data ?? []) as List<dynamic>) {
+    for (final row in (data as List<dynamic>?) ?? []) {
       final map = row as Map<String, dynamic>;
       final source = (map['source'] as String?)?.isNotEmpty == true ? map['source'] as String : 'unknown';
-      final count = map['count'] as int? ?? 0;
-      results[source] = count;
+      results[source] = (results[source] ?? 0) + 1;
     }
     return results;
   }
@@ -201,23 +196,23 @@ class SubscriberRepository {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select('id', fetchOptions: const postgrest.FetchOptions(head: true, count: postgrest.CountOption.exact))
+        .select('id')
         .filter('member_id', 'is', null)
         .eq('subscription_status', 'subscribed')
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
-        ;
-    return response.count ?? 0;
+        .count(postgrest.CountOption.exact);
+    return response.count;
   }
 
   Future<List<String>> fetchDistinctValues(String column) async {
     if (!isReady) return [];
-    final postgrest.PostgrestResponse response = await _readClient
+    final response = await _readClient
         .from('subscribers')
-        .select(column, fetchOptions: const postgrest.FetchOptions(distinct: true))
+        .select(column)
         .filter('member_id', 'is', null)
         .order(column, ascending: true);
 
-    return ((response.data ?? []) as List<dynamic>)
+    return ((response as List<dynamic>?) ?? [])
         .map((row) => (row as Map<String, dynamic>)[column] as String?)
         .whereType<String>()
         .where((value) => value.trim().isNotEmpty)
@@ -231,18 +226,17 @@ class SubscriberRepository {
     if (emails.isEmpty) return subscribers;
 
     try {
-      final postgrest.PostgrestResponse response = await _readClient
+      final response = await _readClient
           .from('event_attendees')
-          .select('email, count:id')
-          .inFilter('email', emails)
-          .group('email');
+          .select('email')
+          .inFilter('email', emails);
 
       final counts = <String, int>{};
-      for (final row in (response.data ?? []) as List<dynamic>) {
+      for (final row in (response as List<dynamic>?) ?? []) {
         final map = row as Map<String, dynamic>;
         final email = map['email'] as String?;
         if (email == null) continue;
-        counts[email] = map['count'] as int? ?? 0;
+        counts[email] = (counts[email] ?? 0) + 1;
       }
 
       return subscribers
