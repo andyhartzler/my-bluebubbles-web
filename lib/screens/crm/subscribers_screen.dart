@@ -413,15 +413,12 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
       ),
     ];
 
-    final List<Widget> sourceTiles = _stats.bySource.entries
-        .map<Widget>(
-          (entry) => _StatsTile(
-            label: 'Source: ${entry.key}',
-            value: entry.value,
-            icon: Icons.tag_outlined,
-            color: Colors.indigo,
-          ),
-        )
+    final sourceTiles = _stats.bySource.entries
+        .map((entry) => Chip(
+              visualDensity: VisualDensity.compact,
+              avatar: const Icon(Icons.tag_outlined, size: 16),
+              label: Text('Source: ${entry.key} (${entry.value})'),
+            ))
         .toList();
 
     return Column(
@@ -1015,9 +1012,6 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
   bool _saving = false;
   final SubscriberRepository _repository = SubscriberRepository();
 
-  Subscriber get subscriber => _subscriber;
-  bool get canManage => widget.canManage;
-
   @override
   void initState() {
     super.initState();
@@ -1091,7 +1085,11 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                     if (subscriber.city != null || subscriber.state != null)
                       _detailItem(
                         'Location',
-                        '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}',
+                        [
+                          if (subscriber.city != null) subscriber.city!,
+                          if (subscriber.city != null && subscriber.state != null) ', ',
+                          if (subscriber.state != null) subscriber.state!,
+                        ].join(),
                         icon: Icons.location_city_outlined,
                       ),
                     if (subscriber.zipCode != null)
@@ -1391,106 +1389,29 @@ class _InfoPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.14),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.16)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatsTile extends StatelessWidget {
-  final String label;
-  final int value;
-  final IconData icon;
-  final Color color;
-
-  const _StatsTile({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withOpacity(0.12),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: theme.textTheme.labelLarge),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$value',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return Chip(
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      avatar: Icon(icon, size: 15),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 }
 
 class _StatusPill extends StatelessWidget {
-  final String label;
+  final String status;
   final Color color;
 
-  const _StatusPill({required this.label, required this.color});
+  const _StatusPill({required this.status, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Chip(
       visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       backgroundColor: color.withOpacity(0.12),
       side: BorderSide(color: color.withOpacity(0.5)),
-      label: Text(
-        label,
-        style: const TextStyle(
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-        ),
-      ),
+      label: Text(status, style: const TextStyle(fontSize: 12)),
     );
   }
 }
@@ -1512,48 +1433,52 @@ class _StatHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 200,
-      child: Card(
-        color: color.withOpacity(0.06),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.white.withOpacity(0.2),
-                child: Icon(icon, color: Colors.white, size: 18),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: Colors.white.withOpacity(0.85)),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelMedium
-                    ?.copyWith(color: Colors.white.withOpacity(0.8)),
-              ),
-            ],
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color.withOpacity(0.85), color.withOpacity(0.65)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: Colors.white.withOpacity(0.2),
+              child: Icon(icon, color: Colors.white, size: 18),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.white.withOpacity(0.85)),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
+                  ?.copyWith(color: Colors.white.withOpacity(0.8)),
+            ),
+          ],
         ),
       ),
     );

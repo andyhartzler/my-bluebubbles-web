@@ -39,11 +39,13 @@ class SubscriberRepository {
     postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query =
         _readClient
             .from('subscribers')
-            .select('''
+            .select<List<Map<String, dynamic>>>(
+              '''
         *,
         donor:donor_id(id,total_donated,donation_count,last_donation_date)
-      ''')
-          ..is_('member_id', null);
+      ''',
+            )
+          ..filter('member_id', 'is', null);
 
     query = _applyFilters(
       query,
@@ -180,8 +182,8 @@ class SubscriberRepository {
       {String? notNullColumn, String? orFilter}) async {
     postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query = _readClient
         .from('subscribers')
-        .select('id')
-      ..is_('member_id', null);
+        .select<List<Map<String, dynamic>>>('id')
+      ..filter('member_id', 'is', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
       query = query.not(notNullColumn, 'is', null);
@@ -197,8 +199,8 @@ class SubscriberRepository {
   Future<Map<String, int>> _sourceBreakdown() async {
     final data = await _readClient
         .from('subscribers')
-        .select('source')
-        .is_('member_id', null);
+        .select<List<Map<String, dynamic>>>('source')
+        .filter('member_id', 'is', null);
 
     final results = <String, int>{};
     for (final row in (data as List<dynamic>?) ?? []) {
@@ -225,8 +227,8 @@ class SubscriberRepository {
     if (!isReady) return [];
     final response = await _readClient
         .from('subscribers')
-        .select(column)
-        .is_('member_id', null)
+        .select<List<Map<String, dynamic>>>(column)
+        .filter('member_id', 'is', null)
         .order(column, ascending: true);
 
     return ((response as List<dynamic>?) ?? [])
@@ -253,7 +255,7 @@ class SubscriberRepository {
         .from('subscribers')
         .update(payload)
         .eq('id', id)
-        .select('*')
+        .select<Map<String, dynamic>>('*')
         .maybeSingle();
 
     if (response == null) {
