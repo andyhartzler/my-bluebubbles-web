@@ -34,11 +34,18 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    var filterQuery =
-        _readClient.from('subscribers').filter('member_id', 'is', null);
+    var query = _readClient
+        .from('subscribers')
+        .select(
+          '''
+        *,
+        donor:donor_id(id,total_donated,donation_count,last_donation_date)
+      ''',
+        )
+        .is_('member_id', null);
 
-    filterQuery = _applyFilters(
-      filterQuery,
+    query = _applyFilters(
+      query,
       searchQuery: searchQuery,
       subscriptionStatus: subscriptionStatus,
       source: source,
@@ -47,16 +54,7 @@ class SubscriberRepository {
       donorsOnly: donorsOnly,
       optInStart: optInStart,
       optInEnd: optInEnd,
-    );
-
-    var query = filterQuery
-        .select(
-          '''
-        *,
-        donor:donor_id(id,total_donated,donation_count,last_donation_date)
-      ''',
-        )
-        .order('created_at', ascending: false);
+    ).order('created_at', ascending: false);
 
     if (limit > 0) {
       query = query.range(offset, offset + limit - 1);
@@ -165,7 +163,7 @@ class SubscriberRepository {
 
   Future<int> _countWhere(Map<String, dynamic> filters,
       {String? notNullColumn, String? orFilter}) async {
-    var query = _readClient.from('subscribers').select('id').filter('member_id', 'is', null);
+    var query = _readClient.from('subscribers').select('id').is_('member_id', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
       query = query.not(notNullColumn, 'is', null);
@@ -182,7 +180,7 @@ class SubscriberRepository {
     final data = await _readClient
         .from('subscribers')
         .select('source')
-        .filter('member_id', 'is', null);
+        .is_('member_id', null);
 
     final results = <String, int>{};
     for (final row in (data as List<dynamic>?) ?? []) {
@@ -198,7 +196,7 @@ class SubscriberRepository {
     final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
         .select('id')
-        .filter('member_id', 'is', null)
+        .is_('member_id', null)
         .eq('subscription_status', 'subscribed')
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
         .count(postgrest.CountOption.exact);
@@ -210,7 +208,7 @@ class SubscriberRepository {
     final response = await _readClient
         .from('subscribers')
         .select(column)
-        .filter('member_id', 'is', null)
+        .is_('member_id', null)
         .order(column, ascending: true);
 
     return ((response as List<dynamic>?) ?? [])
