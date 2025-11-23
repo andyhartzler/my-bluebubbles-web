@@ -140,6 +140,8 @@ class Donor {
     );
   }
 
+  int get donationCount => (extra['donation_count'] as num?)?.toInt() ?? donations.length;
+
   static List<Donation> _parseDonations(dynamic value) {
     final list = (value as List<dynamic>? ?? [])
         .whereType<Map<String, dynamic>>()
