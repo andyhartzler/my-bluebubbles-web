@@ -42,7 +42,7 @@ class SubscriberRepository {
         donor:donor_id(id,total_donated,donation_count,last_donation_date)
       ''',
         )
-        .is_('member_id', null);
+        .filter('member_id', 'is', null);
 
     query = _applyFilters(
       query,
@@ -163,7 +163,8 @@ class SubscriberRepository {
 
   Future<int> _countWhere(Map<String, dynamic> filters,
       {String? notNullColumn, String? orFilter}) async {
-    var query = _readClient.from('subscribers').select('id').is_('member_id', null);
+    var query =
+        _readClient.from('subscribers').select('id').filter('member_id', 'is', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
       query = query.not(notNullColumn, 'is', null);
