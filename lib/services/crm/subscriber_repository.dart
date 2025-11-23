@@ -16,6 +16,8 @@ class SubscriberRepository {
   SupabaseClient get _readClient =>
       _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
 
+  SupabaseClient get _writeClient => _supabase.privilegedClient;
+
   Future<SubscriberFetchResult> fetchSubscribers({
     String? searchQuery,
     String? subscriptionStatus,
@@ -34,11 +36,19 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    var filterQuery =
-        _readClient.from('subscribers').filter('member_id', 'is', null);
+    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query =
+        _readClient
+            .from('subscribers')
+            .select<List<Map<String, dynamic>>>(
+              '''
+        *,
+        donor:donor_id(id,total_donated,donation_count,last_donation_date)
+      ''',
+            )
+          ..filter('member_id', 'is', null);
 
-    filterQuery = _applyFilters(
-      filterQuery,
+    query = _applyFilters(
+      query,
       searchQuery: searchQuery,
       subscriptionStatus: subscriptionStatus,
       source: source,
@@ -49,17 +59,10 @@ class SubscriberRepository {
       optInEnd: optInEnd,
     );
 
-    var query = filterQuery
-        .select(
-          '''
-        *,
-        donor:donor_id(id,total_donated,donation_count,last_donation_date)
-      ''',
-        )
-        .order('created_at', ascending: false);
+    query.order('created_at', ascending: false);
 
     if (limit > 0) {
-      query = query.range(offset, offset + limit - 1);
+      query.range(offset, offset + limit - 1);
     }
 
     final postgrest.PostgrestResponse response = fetchTotalCount
@@ -117,8 +120,8 @@ class SubscriberRepository {
     }
   }
 
-  postgrest.PostgrestFilterBuilder<dynamic> _applyFilters(
-    postgrest.PostgrestFilterBuilder<dynamic> query, {
+  postgrest.PostgrestFilterBuilder<T> _applyFilters<T>(
+    postgrest.PostgrestFilterBuilder<T> query, {
     String? searchQuery,
     String? subscriptionStatus,
     String? source,
@@ -165,7 +168,10 @@ class SubscriberRepository {
 
   Future<int> _countWhere(Map<String, dynamic> filters,
       {String? notNullColumn, String? orFilter}) async {
-    var query = _readClient.from('subscribers').select('id').filter('member_id', 'is', null);
+    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query = _readClient
+        .from('subscribers')
+        .select<List<Map<String, dynamic>>>('id')
+      ..filter('member_id', 'is', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
       query = query.not(notNullColumn, 'is', null);
@@ -181,7 +187,7 @@ class SubscriberRepository {
   Future<Map<String, int>> _sourceBreakdown() async {
     final data = await _readClient
         .from('subscribers')
-        .select('source')
+        .select<List<Map<String, dynamic>>>('source')
         .filter('member_id', 'is', null);
 
     final results = <String, int>{};
@@ -197,7 +203,7 @@ class SubscriberRepository {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select('id')
+        .select<List<Map<String, dynamic>>>('id')
         .filter('member_id', 'is', null)
         .eq('subscription_status', 'subscribed')
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
@@ -209,7 +215,7 @@ class SubscriberRepository {
     if (!isReady) return [];
     final response = await _readClient
         .from('subscribers')
-        .select(column)
+        .select<List<Map<String, dynamic>>>(column)
         .filter('member_id', 'is', null)
         .order(column, ascending: true);
 
@@ -220,6 +226,31 @@ class SubscriberRepository {
         .toSet()
         .toList()
       ..sort((a, b) => a.compareTo(b));
+  }
+
+  Future<Subscriber> updateSubscriber(
+    String id, {
+    required Map<String, dynamic> data,
+  }) async {
+    if (!_supabase.hasServiceRole) {
+      throw Exception('Insufficient permissions to update subscribers');
+    }
+
+    final payload = Map<String, dynamic>.from(data)
+      ..removeWhere((_, value) => value == null);
+
+    final response = await _writeClient
+        .from('subscribers')
+        .update(payload)
+        .eq('id', id)
+        .select<Map<String, dynamic>>('*')
+        .maybeSingle();
+
+    if (response == null) {
+      throw Exception('Subscriber not found');
+    }
+
+    return Subscriber.fromJson(response);
   }
 
   Future<List<Subscriber>> _enrichWithEventCounts(List<Subscriber> subscribers) async {
