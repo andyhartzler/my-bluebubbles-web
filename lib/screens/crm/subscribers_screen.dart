@@ -841,6 +841,61 @@ class _SubscriberCard extends StatelessWidget {
                     ],
                   ],
                 ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: Builder(
+                  builder: (context) {
+                    final locationLabel =
+                        subscriber.city != null || subscriber.state != null
+                            ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
+                            : null;
+
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        if (locationLabel != null)
+                          _InfoPill(
+                            icon: Icons.location_on_outlined,
+                            label: locationLabel,
+                          ),
+                        if (subscriber.county != null)
+                          _InfoPill(
+                            icon: Icons.map_outlined,
+                            label: subscriber.county!,
+                          ),
+                        if (subscriber.congressionalDistrict != null)
+                          _InfoPill(
+                            icon: Icons.account_balance_outlined,
+                            label: 'CD ${subscriber.congressionalDistrict}',
+                          ),
+                        if (subscriber.optinDate != null)
+                          _InfoPill(
+                            icon: Icons.calendar_month_outlined,
+                            label:
+                                'Opt-in ${_dateFormat.format(subscriber.optinDate!)}',
+                          ),
+                        if (subscriber.source != null)
+                          _InfoPill(
+                            icon: Icons.source_outlined,
+                            label: subscriber.source!,
+                          ),
+                        if (subscriber.eventAttendanceCount > 0)
+                          _InfoPill(
+                            icon: Icons.event_available_outlined,
+                            label: '${subscriber.eventAttendanceCount} events',
+                          ),
+                        if (subscriber.donor != null)
+                          _InfoPill(
+                            icon: Icons.volunteer_activism_outlined,
+                            label:
+                                'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                          ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(width: 12),
                 Expanded(
