@@ -34,20 +34,19 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    final postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> baseQuery =
+    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query =
         _readClient
             .from('subscribers')
-            .select(
-          '''
+            .select<List<Map<String, dynamic>>>(
+              '''
         *,
         donor:donor_id(id,total_donated,donation_count,last_donation_date)
       ''',
-        )
-        .filter('member_id', 'is', null);
+            )
+          ..is_('member_id', null);
 
-    postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> query =
-        _applyFilters(
-      baseQuery,
+    query = _applyFilters(
+      query,
       searchQuery: searchQuery,
       subscriptionStatus: subscriptionStatus,
       source: source,
@@ -56,10 +55,12 @@ class SubscriberRepository {
       donorsOnly: donorsOnly,
       optInStart: optInStart,
       optInEnd: optInEnd,
-    ).order('created_at', ascending: false);
+    );
+
+    query.order('created_at', ascending: false);
 
     if (limit > 0) {
-      query = query.range(offset, offset + limit - 1);
+      query.range(offset, offset + limit - 1);
     }
 
     final postgrest.PostgrestResponse response = fetchTotalCount
@@ -117,8 +118,8 @@ class SubscriberRepository {
     }
   }
 
-  postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> _applyFilters(
-    postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> query, {
+  postgrest.PostgrestFilterBuilder<T> _applyFilters<T>(
+    postgrest.PostgrestFilterBuilder<T> query, {
     String? searchQuery,
     String? subscriptionStatus,
     String? source,
@@ -165,8 +166,10 @@ class SubscriberRepository {
 
   Future<int> _countWhere(Map<String, dynamic> filters,
       {String? notNullColumn, String? orFilter}) async {
-    var query =
-        _readClient.from('subscribers').select('id').filter('member_id', 'is', null);
+    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query = _readClient
+        .from('subscribers')
+        .select<List<Map<String, dynamic>>>('id')
+      ..is_('member_id', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
       query = query.not(notNullColumn, 'is', null);
@@ -182,8 +185,8 @@ class SubscriberRepository {
   Future<Map<String, int>> _sourceBreakdown() async {
     final data = await _readClient
         .from('subscribers')
-        .select('source')
-        .filter('member_id', 'is', null);
+        .select<List<Map<String, dynamic>>>('source')
+        .is_('member_id', null);
 
     final results = <String, int>{};
     for (final row in (data as List<dynamic>?) ?? []) {
@@ -198,8 +201,8 @@ class SubscriberRepository {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select('id')
-        .filter('member_id', 'is', null)
+        .select<List<Map<String, dynamic>>>('id')
+        .is_('member_id', null)
         .eq('subscription_status', 'subscribed')
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
         .count(postgrest.CountOption.exact);
@@ -210,8 +213,8 @@ class SubscriberRepository {
     if (!isReady) return [];
     final response = await _readClient
         .from('subscribers')
-        .select(column)
-        .filter('member_id', 'is', null)
+        .select<List<Map<String, dynamic>>>(column)
+        .is_('member_id', null)
         .order(column, ascending: true);
 
     return ((response as List<dynamic>?) ?? [])
