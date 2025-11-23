@@ -34,7 +34,7 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    var query = _readClient
+    final baseQuery = _readClient
         .from('subscribers')
         .select(
           '''
@@ -44,8 +44,9 @@ class SubscriberRepository {
         )
         .filter('member_id', 'is', null);
 
-    query = _applyFilters(
-      query,
+    postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> query =
+        _applyFilters(
+      baseQuery,
       searchQuery: searchQuery,
       subscriptionStatus: subscriptionStatus,
       source: source,
