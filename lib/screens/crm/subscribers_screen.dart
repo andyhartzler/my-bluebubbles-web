@@ -413,12 +413,15 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
       ),
     ];
 
-    final sourceTiles = _stats.bySource.entries
-        .map((entry) => Chip(
-              visualDensity: VisualDensity.compact,
-              avatar: const Icon(Icons.tag_outlined, size: 16),
-              label: Text('Source: ${entry.key} (${entry.value})'),
-            ))
+    final List<Widget> sourceTiles = _stats.bySource.entries
+        .map<Widget>(
+          (entry) => _StatsTile(
+            label: 'Source: ${entry.key}',
+            value: entry.value,
+            icon: Icons.tag_outlined,
+            color: Colors.indigo,
+          ),
+        )
         .toList();
 
     return Column(
@@ -838,6 +841,84 @@ class _SubscriberCard extends StatelessWidget {
                     ],
                   ],
                 ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: Builder(
+                    builder: (context) {
+                      final locationLabel =
+                          subscriber.city != null || subscriber.state != null
+                              ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
+                              : null;
+
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          if (locationLabel != null)
+                            _InfoPill(
+                              icon: Icons.location_on_outlined,
+                              label: locationLabel,
+                            ),
+                          if (subscriber.county != null)
+                            _InfoPill(
+                              icon: Icons.map_outlined,
+                              label: subscriber.county!,
+                            ),
+                          if (subscriber.congressionalDistrict != null)
+                            _InfoPill(
+                              icon: Icons.account_balance_outlined,
+                              label: 'CD ${subscriber.congressionalDistrict}',
+                            ),
+                          if (subscriber.optinDate != null)
+                            _InfoPill(
+                              icon: Icons.calendar_month_outlined,
+                              label:
+                                  'Opt-in ${_dateFormat.format(subscriber.optinDate!)}',
+                            ),
+                          if (subscriber.source != null)
+                            _InfoPill(
+                              icon: Icons.source_outlined,
+                              label: subscriber.source!,
+                            ),
+                          if (subscriber.eventAttendanceCount > 0)
+                            _InfoPill(
+                              icon: Icons.event_available_outlined,
+                              label: '${subscriber.eventAttendanceCount} events',
+                            ),
+                          if (subscriber.donor != null)
+                            _InfoPill(
+                              icon: Icons.volunteer_activism_outlined,
+                              label:
+                                  'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+              Column(
+                children: [
+                  IconButton(
+                    tooltip: 'View details',
+                    icon: const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.white,
+                    ),
+                    onPressed: onTap,
+                  ),
+                  if (onEdit != null)
+                    IconButton(
+                      tooltip: 'Edit',
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        color: Colors.white,
+                      ),
+                      onPressed: onEdit,
+                    ),
+                ],
               ),
             ],
           ),
@@ -878,6 +959,9 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
   late Subscriber _subscriber;
   bool _saving = false;
   final SubscriberRepository _repository = SubscriberRepository();
+
+  Subscriber get subscriber => _subscriber;
+  bool get canManage => widget.canManage;
 
   @override
   void initState() {
@@ -1252,29 +1336,106 @@ class _InfoPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      avatar: Icon(icon, size: 15),
-      label: Text(label, style: const TextStyle(fontSize: 12)),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatsTile extends StatelessWidget {
+  final String label;
+  final int value;
+  final IconData icon;
+  final Color color;
+
+  const _StatsTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withOpacity(0.12),
+              ),
+              padding: const EdgeInsets.all(8),
+              child: Icon(icon, color: color, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: theme.textTheme.labelLarge),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$value',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 class _StatusPill extends StatelessWidget {
-  final String status;
+  final String label;
   final Color color;
 
-  const _StatusPill({required this.status, required this.color});
+  const _StatusPill({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Chip(
       visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       backgroundColor: color.withOpacity(0.12),
       side: BorderSide(color: color.withOpacity(0.5)),
-      label: Text(status, style: const TextStyle(fontSize: 12)),
+      label: Text(
+        label,
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      ),
     );
   }
 }
@@ -1296,52 +1457,48 @@ class _StatHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color.withOpacity(0.85), color.withOpacity(0.65)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return SizedBox(
+      width: 200,
+      child: Card(
+        color: color.withOpacity(0.06),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                child: Icon(icon, color: Colors.white, size: 18),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.white.withOpacity(0.85)),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                value,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelMedium
+                    ?.copyWith(color: Colors.white.withOpacity(0.8)),
+              ),
+            ],
           ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.white.withOpacity(0.2),
-              child: Icon(icon, color: Colors.white, size: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.white.withOpacity(0.85)),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: Colors.white.withOpacity(0.8)),
-            ),
-          ],
         ),
       ),
     );
