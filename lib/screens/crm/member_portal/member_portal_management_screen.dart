@@ -1048,8 +1048,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   }
 
   Widget _buildRecordingSection(String? recordingEmbedUrl, String? recordingUrl) {
-    final hasEmbed = recordingEmbedUrl?.isNotEmpty == true;
-    final embedUri = hasEmbed ? Uri.tryParse(recordingEmbedUrl!) : null;
+    final resolvedUrl =
+        recordingEmbedUrl?.isNotEmpty == true ? recordingEmbedUrl : recordingUrl;
+    final embedUri = resolvedUrl != null ? Uri.tryParse(resolvedUrl) : null;
+    final hasEmbed = embedUri != null;
 
     return Card(
       color: Colors.grey.shade900,
@@ -1058,28 +1060,28 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         initiallyExpanded: _recordingExpanded && hasEmbed,
         onExpansionChanged: (expanded) => setState(() => _recordingExpanded = expanded),
         leading: Icon(
-          _selectedShowRecording ? Icons.play_circle : Icons.play_disabled,
+          hasEmbed ? Icons.play_circle : Icons.play_disabled,
           color: Colors.white,
         ),
         title: Text(
-          !_selectedShowRecording
-              ? 'Recording is hidden for members'
-              : hasEmbed
-                  ? 'Recording embed ready'
-                  : 'Recording embed URL missing',
+          hasEmbed
+              ? (_selectedShowRecording
+                  ? 'Recording embed visible to members'
+                  : 'Recording embed ready (hidden from members)')
+              : 'Recording embed URL missing',
           style: const TextStyle(color: Colors.white),
         ),
         subtitle: Text(
-          !_selectedShowRecording
-              ? 'Enable "Show recording" to surface the embed on the portal.'
-              : hasEmbed
-                  ? 'Tap to preview the embedded player.'
-                  : 'Add an embed URL in Supabase to stream the recording.',
+          hasEmbed
+              ? _selectedShowRecording
+                  ? 'Embedded player matches the main Meetings page.'
+                  : 'Embed previewed here but hidden from portal visitors.'
+              : 'Add an embed URL in Supabase to stream the recording.',
           style: const TextStyle(color: Colors.white70),
         ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          if (_selectedShowRecording && hasEmbed && embedUri != null)
+          if (hasEmbed && embedUri != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: SizedBox(
@@ -1087,7 +1089,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                 child: MeetingRecordingEmbed(uri: embedUri),
               ),
             )
-          else if (_selectedShowRecording)
+          else
             const Text(
               'No valid embed URL was provided.',
               style: TextStyle(color: Colors.white70),
@@ -2691,74 +2693,17 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
               else
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final isTwoColumn = constraints.maxWidth > 900;
-                    final spacing = 12.0;
-                    final columnWidth = isTwoColumn
-                        ? (constraints.maxWidth - spacing) / 2
-                        : constraints.maxWidth;
+                    final tiles = signIns
+                        .map((signIn) => _buildRecentSignInTile(signIn, constraints.maxWidth, theme))
+                        .toList(growable: false);
 
-                    return Wrap(
-                      spacing: spacing,
-                      runSpacing: spacing,
-                      children: signIns
-                          .map(
-                            (signIn) => SizedBox(
-                              width: columnWidth,
-                              child: Card(
-                                elevation: 2,
-                                color: _unityBlue,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(18),
-                                  onTap: () => _openMemberProfile(signIn.id),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        _buildAvatar(signIn),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                signIn.name,
-                                                style: theme.textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              if (signIn.chapterName != null && signIn.chapterName!.isNotEmpty)
-                                                Padding(
-                                                  padding: const EdgeInsets.only(top: 2.0),
-                                                  child: Text(
-                                                    signIn.chapterName!,
-                                                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              Padding(
-                                                padding: const EdgeInsets.only(top: 4.0),
-                                                child: Text(
-                                                  _formatCentralSignIn(signIn.lastSignInAt),
-                                                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
+                    return Column(
+                      children: [
+                        for (int i = 0; i < tiles.length; i++) ...[
+                          tiles[i],
+                          if (i != tiles.length - 1) const SizedBox(height: 12),
+                        ],
+                      ],
                     );
                   },
                 ),
@@ -2791,6 +2736,96 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       backgroundColor: Colors.white.withOpacity(0.1),
       foregroundColor: Colors.white,
       child: Text(initials),
+    );
+  }
+
+  Widget _buildRecentSignInTile(
+    MemberPortalRecentSignIn signIn,
+    double maxWidth,
+    ThemeData theme,
+  ) {
+    final labelStyle = theme.textTheme.bodySmall?.copyWith(color: Colors.white70, fontWeight: FontWeight.w600);
+    final valueStyle = theme.textTheme.bodyMedium?.copyWith(color: Colors.white);
+    final detailSpacing = const SizedBox(height: 6);
+
+    String orPlaceholder(String? value) =>
+        value != null && value.trim().isNotEmpty ? value.trim() : 'Not provided';
+
+    return SizedBox(
+      width: maxWidth,
+      child: Card(
+        elevation: 3,
+        color: _unityBlue,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _openMemberProfile(signIn.id),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _buildAvatar(signIn),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            signIn.name,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _formatCentralSignIn(signIn.lastSignInAt),
+                            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildRecentSignInDetail('Member ID', signIn.id, labelStyle, valueStyle),
+                detailSpacing,
+                _buildRecentSignInDetail('Email', orPlaceholder(signIn.email), labelStyle, valueStyle),
+                detailSpacing,
+                _buildRecentSignInDetail('Chapter', orPlaceholder(signIn.chapterName), labelStyle, valueStyle),
+                detailSpacing,
+                _buildRecentSignInDetail('Last Sign-In', _formatCentralSignIn(signIn.lastSignInAt), labelStyle, valueStyle),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentSignInDetail(
+    String label,
+    String value,
+    TextStyle? labelStyle,
+    TextStyle? valueStyle,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(label, style: labelStyle),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: valueStyle,
+          ),
+        ),
+      ],
     );
   }
 
