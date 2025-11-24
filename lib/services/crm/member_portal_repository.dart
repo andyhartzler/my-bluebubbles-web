@@ -91,33 +91,63 @@ class MemberPortalRepository {
     if (!_isReady) return const [];
 
     try {
-      var query = _readClient.from('member_portal_meetings').select(''',
-            *,
-            meetings(meeting_title, meeting_date, attendance_count, recording_embed_url, recording_url)
-          ''');
+      final meetings = await _loadMeetingsWithJoin(isPublished: isPublished);
+      if (meetings.isNotEmpty) return meetings;
 
-      if (isPublished != null) {
-        query = query.eq('is_published', isPublished);
-      }
-
-      final response = await query
-          .order('meeting_date', ascending: false, referencedTable: 'meetings')
-          .order('created_at', ascending: false);
-      final meetings = _coerceJsonList(response)
-          .map(MemberPortalMeeting.fromJson)
-          .toList(growable: false);
-
-      meetings.sort((a, b) {
-        final aDate = a.meetingDate ?? a.createdAt;
-        final bDate = b.meetingDate ?? b.createdAt;
-        return bDate.compareTo(aDate);
-      });
-
-      return meetings;
+      // If the relational join fails (e.g., RLS on meetings), fall back to a simple query
+      // so the portal still renders existing curated content.
+      return await _loadMeetingsWithoutJoin(isPublished: isPublished);
     } catch (e) {
       print('❌ Error loading portal meetings: $e');
-      rethrow;
+      // Attempt a minimal fallback to avoid a blank portal when the joined query fails.
+      try {
+        return await _loadMeetingsWithoutJoin(isPublished: isPublished);
+      } catch (_) {
+        rethrow;
+      }
     }
+  }
+
+  Future<List<MemberPortalMeeting>> _loadMeetingsWithJoin({bool? isPublished}) async {
+    var query = _readClient.from('member_portal_meetings').select(''',
+          *,
+          meetings(meeting_title, meeting_date, attendance_count, recording_embed_url, recording_url)
+        ''');
+
+    if (isPublished != null) {
+      query = query.eq('is_published', isPublished);
+    }
+
+    final response = await query
+        .order('meeting_date', ascending: false, referencedTable: 'meetings')
+        .order('created_at', ascending: false);
+
+    return _parseMeetings(response);
+  }
+
+  Future<List<MemberPortalMeeting>> _loadMeetingsWithoutJoin({bool? isPublished}) async {
+    var query = _readClient.from('member_portal_meetings').select();
+
+    if (isPublished != null) {
+      query = query.eq('is_published', isPublished);
+    }
+
+    final response = await query.order('created_at', ascending: false);
+    return _parseMeetings(response);
+  }
+
+  List<MemberPortalMeeting> _parseMeetings(dynamic response) {
+    final meetings = _coerceJsonList(response)
+        .map(MemberPortalMeeting.fromJson)
+        .toList(growable: false);
+
+    meetings.sort((a, b) {
+      final aDate = a.meetingDate ?? a.createdAt;
+      final bDate = b.meetingDate ?? b.createdAt;
+      return bDate.compareTo(aDate);
+    });
+
+    return meetings;
   }
 
   Future<MemberPortalMeeting?> savePortalMeeting(MemberPortalMeeting meeting) async {

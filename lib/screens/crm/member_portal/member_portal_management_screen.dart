@@ -307,6 +307,18 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
             return const Center(child: CircularProgressIndicator());
           }
 
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Text(
+                  'Failed to load meetings: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+
           final meetings = snapshot.data ?? const [];
           final selectedMeeting = _resolveSelectedMeeting(meetings);
 
