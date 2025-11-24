@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:file_picker/file_picker.dart' as file_picker;
+import 'package:intl/intl.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
@@ -10,8 +12,10 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/member_portal.dart';
 import 'package:bluebubbles/screens/crm/editors/member_search_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/member_portal_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/markdown_quill_loader.dart';
@@ -25,6 +29,8 @@ class MemberPortalManagementScreen extends StatefulWidget {
   State<MemberPortalManagementScreen> createState() => _MemberPortalManagementScreenState();
 }
 
+enum _MeetingSwitchAction { save, discard, cancel }
+
 class _MemberPortalManagementScreenState extends State<MemberPortalManagementScreen>
     with SingleTickerProviderStateMixin {
   static const _unityBlue = Color(0xFF273351);
@@ -33,7 +39,9 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   late final TabController _tabController = TabController(length: 6, vsync: this);
   final MemberPortalRepository _repository = MemberPortalRepository();
   final MeetingRepository _meetingRepository = MeetingRepository();
+  final MemberRepository _memberRepository = MemberRepository();
   final CRMSupabaseService _supabase = CRMSupabaseService();
+  final DateFormat _signInFormat = DateFormat('MMM d, y • h:mm a');
 
   late Future<MemberPortalDashboardStats> _statsFuture;
   late Future<List<MemberPortalRecentSignIn>> _recentSignInsFuture;
@@ -49,9 +57,11 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   String? _selectedMeetingId;
   String? _editingMeetingId;
+  MemberPortalMeeting? _currentMeeting;
   bool _savingMeeting = false;
   bool _meetingSaveSucceeded = false;
   String? _meetingSaveError;
+  bool _meetingHasUnsavedChanges = false;
   bool _selectedVisibleToAll = false;
   bool _selectedVisibleToAttendeesOnly = true;
   bool _selectedVisibleToExecutives = true;
@@ -126,6 +136,21 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     setState(() {
       _fieldVisibilityFuture = _repository.fetchFieldVisibility();
     });
+  }
+
+  void _markMeetingDirty() {
+    if (_meetingHasUnsavedChanges) return;
+    setState(() {
+      _meetingHasUnsavedChanges = true;
+      _meetingSaveSucceeded = false;
+    });
+  }
+
+  void _attachEditorListeners() {
+    _descriptionController?.addListener(_markMeetingDirty);
+    _summaryController?.addListener(_markMeetingDirty);
+    _keyPointsController?.addListener(_markMeetingDirty);
+    _actionItemsController?.addListener(_markMeetingDirty);
   }
 
   @override
@@ -380,6 +405,46 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     return meetings.first;
   }
 
+  Future<_MeetingSwitchAction?> _promptForUnsavedChanges() {
+    return showDialog<_MeetingSwitchAction>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save changes?'),
+        content:
+            const Text('You have unsaved edits for this meeting. What would you like to do?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_MeetingSwitchAction.discard),
+            child: const Text('Discard'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_MeetingSwitchAction.cancel),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(_MeetingSwitchAction.save),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _onMeetingTapped(MemberPortalMeeting meeting) async {
+    if (_currentMeeting != null &&
+        _meetingHasUnsavedChanges &&
+        meeting.id != _currentMeeting!.id) {
+      final action = await _promptForUnsavedChanges();
+      if (action == null || action == _MeetingSwitchAction.cancel) return;
+      if (action == _MeetingSwitchAction.save) {
+        await _saveMeeting(_currentMeeting!);
+      }
+    }
+
+    if (!mounted) return;
+    _selectMeeting(meeting);
+  }
+
   void _selectMeeting(MemberPortalMeeting meeting) {
     _disposeMeetingControllers();
     final descriptionDoc = _controllerFromHtml(meeting.memberDescription);
@@ -397,12 +462,16 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       _selectedShowRecording = meeting.showRecording ?? false;
       _meetingSaveError = null;
       _meetingSaveSucceeded = false;
+      _meetingHasUnsavedChanges = false;
+      _currentMeeting = meeting;
       _descriptionController = descriptionDoc;
       _summaryController = summaryDoc;
       _keyPointsController = keyPointsDoc;
       _actionItemsController = actionItemsDoc;
       _meetingDetailsError = null;
     });
+
+    _attachEditorListeners();
 
     _loadMeetingDetails(meeting);
   }
@@ -454,6 +523,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   }
 
   void _disposeMeetingControllers() {
+    _descriptionController?.removeListener(_markMeetingDirty);
+    _summaryController?.removeListener(_markMeetingDirty);
+    _keyPointsController?.removeListener(_markMeetingDirty);
+    _actionItemsController?.removeListener(_markMeetingDirty);
     _descriptionController?.dispose();
     _summaryController?.dispose();
     _keyPointsController?.dispose();
@@ -543,7 +616,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _selectMeeting(meeting),
+        onTap: () => _onMeetingTapped(meeting),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
@@ -722,7 +795,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                                 const Text('Published'),
                                 Switch.adaptive(
                                   value: _selectedIsPublished,
-                                  onChanged: (value) => setState(() => _selectedIsPublished = value),
+                                  onChanged: (value) => setState(() {
+                                    _selectedIsPublished = value;
+                                    _markMeetingDirty();
+                                  }),
                                   activeColor: Colors.white,
                                 ),
                               ],
@@ -733,7 +809,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                                 const Text('Show recording'),
                                 Switch.adaptive(
                                   value: _selectedShowRecording,
-                                  onChanged: (value) => setState(() => _selectedShowRecording = value),
+                                  onChanged: (value) => setState(() {
+                                    _selectedShowRecording = value;
+                                    _markMeetingDirty();
+                                  }),
                                   activeColor: Colors.white,
                                 ),
                               ],
@@ -775,82 +854,21 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                         ),
                       ],
                     ),
-                    if (_meetingDetailsError != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _meetingDetailsError!,
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade200),
-                      ),
-                    ],
-                    if (_loadingMeetingDetails)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8.0),
-                        child: LinearProgressIndicator(
-                          minHeight: 4,
-                          backgroundColor: Colors.white24,
-                          color: Colors.white,
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _buildVisibilityCheckbox(
-                          label: 'Visible to all members',
-                          value: _selectedVisibleToAll,
-                          onChanged: (value) => setState(() {
-                            _selectedVisibleToAll = value ?? false;
-                          }),
-                        ),
-                        _buildVisibilityCheckbox(
-                          label: 'Visible to attendees only',
-                          value: _selectedVisibleToAttendeesOnly,
-                          onChanged: (value) => setState(() {
-                            _selectedVisibleToAttendeesOnly = value ?? false;
-                          }),
-                        ),
-                        _buildVisibilityCheckbox(
-                          label: 'Visible to executives',
-                          value: _selectedVisibleToExecutives,
-                          onChanged: (value) => setState(() {
-                            _selectedVisibleToExecutives = value ?? true;
-                          }),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildAttendanceSection(meeting, attendance, attendeeCount ?? 0),
-                    const SizedBox(height: 12),
-                    _buildRecordingSection(recordingEmbedUrl, recordingUrl),
-                    const SizedBox(height: 12),
-                    _buildRichTextSection(
-                      title: 'Description',
-                      helper: 'Shows at the top of the meeting page for members.',
-                      controller: _descriptionController!,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildRichTextSection(
-                      title: 'Summary',
-                      helper: 'Short recap of what happened.',
-                      controller: _summaryController!,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildRichTextSection(
-                      title: 'Key Points',
-                      helper: 'Bulleted discussion highlights.',
-                      controller: _keyPointsController!,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildRichTextSection(
-                      title: 'Action Items',
-                      helper: 'Next steps members should see.',
-                      controller: _actionItemsController!,
-                    ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
-                        if (_meetingSaveError != null || _meetingSaveSucceeded)
+                        if (_meetingHasUnsavedChanges)
+                          Row(
+                            children: [
+                              const Icon(Icons.edit, color: Colors.amberAccent),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Unsaved changes',
+                                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.amberAccent),
+                              ),
+                            ],
+                          )
+                        else if (_meetingSaveError != null || _meetingSaveSucceeded)
                           Row(
                             children: [
                               Icon(
@@ -883,6 +901,81 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                           ),
                         ),
                       ],
+                    ),
+                    if (_meetingDetailsError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _meetingDetailsError!,
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade200),
+                      ),
+                    ],
+                    if (_loadingMeetingDetails)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: LinearProgressIndicator(
+                          minHeight: 4,
+                          backgroundColor: Colors.white24,
+                          color: Colors.white,
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildVisibilityCheckbox(
+                          label: 'Visible to all members',
+                          value: _selectedVisibleToAll,
+                          onChanged: (value) => setState(() {
+                            _selectedVisibleToAll = value ?? false;
+                            _markMeetingDirty();
+                          }),
+                        ),
+                        _buildVisibilityCheckbox(
+                          label: 'Visible to attendees only',
+                          value: _selectedVisibleToAttendeesOnly,
+                          onChanged: (value) => setState(() {
+                            _selectedVisibleToAttendeesOnly = value ?? false;
+                            _markMeetingDirty();
+                          }),
+                        ),
+                        _buildVisibilityCheckbox(
+                          label: 'Visible to executives',
+                          value: _selectedVisibleToExecutives,
+                          onChanged: (value) => setState(() {
+                            _selectedVisibleToExecutives = value ?? true;
+                            _markMeetingDirty();
+                          }),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildAttendanceSection(meeting, attendance, attendeeCount ?? 0),
+                    const SizedBox(height: 12),
+                    _buildRecordingSection(recordingEmbedUrl, recordingUrl),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Description',
+                      helper: 'Shows at the top of the meeting page for members.',
+                      controller: _descriptionController!,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Summary',
+                      helper: 'Short recap of what happened.',
+                      controller: _summaryController!,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Key Points',
+                      helper: 'Bulleted discussion highlights.',
+                      controller: _keyPointsController!,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Action Items',
+                      helper: 'Next steps members should see.',
+                      controller: _actionItemsController!,
                     ),
                   ],
                 ),
@@ -1343,7 +1436,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
           _editingMeetingId = savedMeeting.id;
           _meetingsFuture = _repository.fetchPortalMeetings();
           _statsFuture = _repository.fetchDashboardStats();
+          _meetingHasUnsavedChanges = false;
+          _currentMeeting = savedMeeting;
         });
+        _selectMeeting(savedMeeting);
       } else {
         setState(() {
           _meetingSaveError = 'Save did not return updated data.';
@@ -2454,48 +2550,73 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                   style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
                 )
               else
-                Column(
-                  children: signIns
-                      .map(
-                        (signIn) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6.0),
-                          child: Row(
-                            children: [
-                              _buildAvatar(signIn),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      signIn.name,
-                                      style: theme.textTheme.bodyLarge?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Row(
+                    children: signIns
+                        .map(
+                          (signIn) => Padding(
+                            padding: const EdgeInsets.only(right: 12.0),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
+                              child: Card(
+                                elevation: 2,
+                                color: _unityBlue,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(18),
+                                  onTap: () => _openMemberProfile(signIn.id),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        _buildAvatar(signIn),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                signIn.name,
+                                                style: theme.textTheme.titleMedium?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              if (signIn.chapterName != null && signIn.chapterName!.isNotEmpty)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(top: 2.0),
+                                                  child: Text(
+                                                    signIn.chapterName!,
+                                                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 4.0),
+                                                child: Text(
+                                                  _formatCentralSignIn(signIn.lastSignInAt),
+                                                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
+                                      ],
                                     ),
-                                    if (signIn.chapterName != null && signIn.chapterName!.isNotEmpty)
-                                      Text(
-                                        signIn.chapterName!,
-                                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-                                      ),
-                                    if (signIn.email != null && signIn.email!.isNotEmpty)
-                                      Text(
-                                        signIn.email!,
-                                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.white54),
-                                      ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                              Text(
-                                _formatRelativeTime(signIn.lastSignInAt),
-                                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                      )
-                      .toList(),
+                        )
+                        .toList(),
+                  ),
                 ),
             ],
           ),
@@ -2527,6 +2648,52 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       foregroundColor: Colors.white,
       child: Text(initials),
     );
+  }
+
+  String _formatCentralSignIn(DateTime lastSignIn) {
+    try {
+      final location = tz.getLocation('America/Chicago');
+      final centralTime = tz.TZDateTime.from(lastSignIn.toUtc(), location);
+      return '${_signInFormat.format(centralTime)} CT';
+    } catch (_) {
+      return _signInFormat.format(lastSignIn.toLocal());
+    }
+  }
+
+  Future<void> _openMemberProfile(String memberId) async {
+    if (!_supabase.isInitialized) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final member = await _memberRepository.getMemberById(memberId);
+      if (!mounted) return;
+
+      Navigator.of(context).pop();
+
+      if (member == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to load member profile')),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => MemberDetailScreen(member: member)),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to open member profile: $e')),
+        );
+      }
+    }
   }
 
   Widget _buildStatCard(String title, int value, IconData icon) {

@@ -23,8 +23,22 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
   bool? _isHost;
   bool _saving = false;
   late final Map<String, dynamic> _originalData;
+  late final Map<String, _AttendanceFieldType> _fieldTypes;
 
-  static final Map<String, _AttendanceFieldType> _fieldTypes = {
+  static const Map<String, _AttendanceFieldType> _meetingFieldTypes = {
+    'member_id': _AttendanceFieldType.text,
+    'total_duration_minutes': _AttendanceFieldType.integer,
+    'number_of_joins': _AttendanceFieldType.integer,
+    'first_join_time': _AttendanceFieldType.dateTime,
+    'last_leave_time': _AttendanceFieldType.dateTime,
+    'zoom_display_name': _AttendanceFieldType.text,
+    'zoom_email': _AttendanceFieldType.text,
+    'matched_by': _AttendanceFieldType.text,
+    'notes': _AttendanceFieldType.multiline,
+    'is_host': _AttendanceFieldType.bool,
+  };
+
+  static const Map<String, _AttendanceFieldType> _eventFieldTypes = {
     'member_id': _AttendanceFieldType.text,
     'guest_name': _AttendanceFieldType.text,
     'guest_email': _AttendanceFieldType.text,
@@ -38,18 +52,60 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
   @override
   void initState() {
     super.initState();
+    _fieldTypes = _isEventAttendance
+        ? Map<String, _AttendanceFieldType>.from(_eventFieldTypes)
+        : Map<String, _AttendanceFieldType>.from(_meetingFieldTypes);
     _originalData = widget.attendance.toJson(includeMeeting: false, includeMember: false);
-    _isHost = widget.attendance.isHost;
-    _controllers['member_id'] = TextEditingController(text: widget.attendance.memberId ?? '');
-    _controllers['guest_name'] = TextEditingController(text: widget.attendance.guestName ?? widget.attendance.zoomDisplayName ?? '');
-    _controllers['guest_email'] = TextEditingController(text: widget.attendance.guestEmail ?? widget.attendance.zoomEmail ?? '');
-    _controllers['guest_phone'] = TextEditingController(text: widget.attendance.guestPhone ?? '');
-    _controllers['rsvp_status'] = TextEditingController(text: widget.attendance.rsvpStatus ?? 'attending');
-    _controllers['guest_count'] = TextEditingController(
-      text: widget.attendance.guestCount?.toString() ?? '',
-    );
-    _controllers['notes'] = TextEditingController(text: widget.attendance.notes ?? '');
-    _isHost = widget.attendance.checkedIn;
+    _isHost = _fieldTypes.containsKey('is_host')
+        ? widget.attendance.isHost
+        : widget.attendance.checkedIn;
+
+    void assignController(String key, String? value) {
+      _controllers[key] = TextEditingController(text: value ?? '');
+    }
+
+    if (_fieldTypes.containsKey('member_id')) {
+      assignController('member_id', widget.attendance.memberId);
+    }
+    if (_fieldTypes.containsKey('guest_name')) {
+      assignController('guest_name', widget.attendance.guestName ?? widget.attendance.zoomDisplayName);
+    }
+    if (_fieldTypes.containsKey('guest_email')) {
+      assignController('guest_email', widget.attendance.guestEmail ?? widget.attendance.zoomEmail);
+    }
+    if (_fieldTypes.containsKey('guest_phone')) {
+      assignController('guest_phone', widget.attendance.guestPhone);
+    }
+    if (_fieldTypes.containsKey('rsvp_status')) {
+      assignController('rsvp_status', widget.attendance.rsvpStatus ?? 'attending');
+    }
+    if (_fieldTypes.containsKey('guest_count')) {
+      assignController('guest_count', widget.attendance.guestCount?.toString());
+    }
+    if (_fieldTypes.containsKey('notes')) {
+      assignController('notes', widget.attendance.notes);
+    }
+    if (_fieldTypes.containsKey('total_duration_minutes')) {
+      assignController('total_duration_minutes', widget.attendance.totalDurationMinutes?.toString());
+    }
+    if (_fieldTypes.containsKey('number_of_joins')) {
+      assignController('number_of_joins', widget.attendance.numberOfJoins?.toString());
+    }
+    if (_fieldTypes.containsKey('first_join_time')) {
+      assignController('first_join_time', widget.attendance.firstJoinTime?.toIso8601String());
+    }
+    if (_fieldTypes.containsKey('last_leave_time')) {
+      assignController('last_leave_time', widget.attendance.lastLeaveTime?.toIso8601String());
+    }
+    if (_fieldTypes.containsKey('zoom_display_name')) {
+      assignController('zoom_display_name', widget.attendance.zoomDisplayName);
+    }
+    if (_fieldTypes.containsKey('zoom_email')) {
+      assignController('zoom_email', widget.attendance.zoomEmail);
+    }
+    if (_fieldTypes.containsKey('matched_by')) {
+      assignController('matched_by', widget.attendance.matchedBy);
+    }
   }
 
   @override
@@ -143,14 +199,16 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
   }
 
   Widget _buildField(String key, _AttendanceFieldType type) {
-    final controller = _controllers[key]!;
+    TextEditingController ensureController() =>
+        _controllers.putIfAbsent(key, () => TextEditingController());
+
     switch (type) {
       case _AttendanceFieldType.bool:
         return DropdownButtonFormField<bool?>(
           value: _isHost,
-          decoration: const InputDecoration(
-            labelText: 'Checked In',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: _labelFor(key),
+            border: const OutlineInputBorder(),
           ),
           items: const [
             DropdownMenuItem<bool?>(value: null, child: Text('Unset')),
@@ -160,6 +218,7 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
           onChanged: (value) => setState(() => _isHost = value),
         );
       case _AttendanceFieldType.integer:
+        final controller = ensureController();
         return TextFormField(
           controller: controller,
           keyboardType: TextInputType.number,
@@ -177,6 +236,7 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
           },
         );
       case _AttendanceFieldType.dateTime:
+        final controller = ensureController();
         return TextFormField(
           controller: controller,
           decoration: InputDecoration(
@@ -194,6 +254,7 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
           },
         );
       case _AttendanceFieldType.multiline:
+        final controller = ensureController();
         return TextFormField(
           controller: controller,
           minLines: 3,
@@ -205,6 +266,7 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
         );
       case _AttendanceFieldType.text:
       default:
+        final controller = ensureController();
         final isMemberField = key == 'member_id';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,8 +390,32 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
         return 'Guest Count';
       case 'notes':
         return 'Notes';
+      case 'checked_in':
+        return 'Checked In';
+      case 'total_duration_minutes':
+        return 'Total Duration (min)';
+      case 'number_of_joins':
+        return 'Number of Joins';
+      case 'first_join_time':
+        return 'First Join Time';
+      case 'last_leave_time':
+        return 'Last Leave Time';
+      case 'zoom_display_name':
+        return 'Zoom Display Name';
+      case 'zoom_email':
+        return 'Zoom Email';
+      case 'matched_by':
+        return 'Matched By';
+      case 'is_host':
+        return 'Is Host';
       default:
         return key;
     }
   }
+
+  bool get _isEventAttendance =>
+      widget.attendance.rsvpStatus != null ||
+      widget.attendance.guestName != null ||
+      widget.attendance.guestEmail != null ||
+      widget.attendance.checkedIn != null;
 }

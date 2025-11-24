@@ -100,10 +100,20 @@ class MemberPortalRepository {
         query = query.eq('is_published', isPublished);
       }
 
-      final response = await query.order('created_at', ascending: false);
-      return _coerceJsonList(response)
+      final response = await query
+          .order('meeting_date', ascending: false, referencedTable: 'meetings')
+          .order('created_at', ascending: false);
+      final meetings = _coerceJsonList(response)
           .map(MemberPortalMeeting.fromJson)
           .toList(growable: false);
+
+      meetings.sort((a, b) {
+        final aDate = a.meetingDate ?? a.createdAt;
+        final bDate = b.meetingDate ?? b.createdAt;
+        return bDate.compareTo(aDate);
+      });
+
+      return meetings;
     } catch (e) {
       print('❌ Error loading portal meetings: $e');
       rethrow;
