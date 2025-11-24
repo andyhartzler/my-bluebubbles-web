@@ -122,6 +122,21 @@ class MemberPortalMeeting {
     );
   }
 
+  String? get resolvedRecordingEmbedUrl {
+    final candidate = (recordingEmbedUrl ?? recordingUrl)?.trim();
+    if (candidate == null || candidate.isEmpty) return null;
+    final uri = Uri.tryParse(candidate);
+    if (uri == null) return null;
+    final host = uri.host.toLowerCase();
+    if (host.contains('drive.google.com')) {
+      final id = _extractDriveIdFromUri(uri);
+      if (id != null) {
+        return 'https://drive.google.com/file/d/$id/preview';
+      }
+    }
+    return uri.toString();
+  }
+
   MemberPortalMeeting copyWith({
     bool? visibleToAll,
     bool? visibleToAttendeesOnly,
@@ -622,12 +637,14 @@ class MemberPortalDashboardStats {
   final int pendingProfileChanges;
   final int pendingEventSubmissions;
   final int publishedMeetings;
+  final int totalMeetings;
   final int visibleResources;
 
   const MemberPortalDashboardStats({
     required this.pendingProfileChanges,
     required this.pendingEventSubmissions,
     required this.publishedMeetings,
+    required this.totalMeetings,
     required this.visibleResources,
   });
 
@@ -635,6 +652,7 @@ class MemberPortalDashboardStats {
     pendingProfileChanges: 0,
     pendingEventSubmissions: 0,
     publishedMeetings: 0,
+    totalMeetings: 0,
     visibleResources: 0,
   );
 }
@@ -686,5 +704,23 @@ int? _normalizeInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value);
+  return null;
+}
+
+String? _extractDriveIdFromUri(Uri uri) {
+  final segments = uri.pathSegments.toList();
+  if (segments.isEmpty) return null;
+
+  if (segments.contains('d')) {
+    final index = segments.indexOf('d');
+    if (index < segments.length - 1) {
+      return segments[index + 1];
+    }
+  }
+
+  if (segments.length >= 2 && segments[0] == 'file') {
+    return segments[1];
+  }
+
   return null;
 }

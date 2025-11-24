@@ -7,6 +7,7 @@ import 'package:universal_io/io.dart' as io;
 
 import 'package:bluebubbles/database/global/platform_file.dart';
 
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/member_portal.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
@@ -69,6 +70,10 @@ class MemberPortalRepository {
             .eq('is_published', true)
             .count(CountOption.exact),
         _readClient
+            .from('member_portal_meetings')
+            .select('id')
+            .count(CountOption.exact),
+        _readClient
             .from('member_portal_resources')
             .select('id')
             .eq('is_visible', true)
@@ -79,7 +84,8 @@ class MemberPortalRepository {
         pendingProfileChanges: responses[0].count ?? 0,
         pendingEventSubmissions: responses[1].count ?? 0,
         publishedMeetings: responses[2].count ?? 0,
-        visibleResources: responses[3].count ?? 0,
+        totalMeetings: responses[3].count ?? 0,
+        visibleResources: responses[4].count ?? 0,
       );
     } catch (e) {
       print('❌ Failed to load member portal dashboard stats: $e');
@@ -156,24 +162,18 @@ class MemberPortalRepository {
 
   Future<List<MemberPortalMeeting>> _hydrateMeetingMetadata(
       List<MemberPortalMeeting> meetings) async {
-    final missing = meetings
-        .where((m) => m.meetingId.isNotEmpty)
-        .where((m) =>
-            m.meetingDate == null ||
-            m.attendeeCount == null ||
-            (m.recordingEmbedUrl == null && m.recordingUrl == null) ||
-            m.meetingTitle == null ||
-            m.meetingTitle!.isEmpty)
+    final meetingIds = meetings
         .map((m) => m.meetingId)
+        .where((id) => id.isNotEmpty)
         .toSet();
 
-    if (missing.isEmpty) return meetings;
+    if (meetingIds.isEmpty) return meetings;
 
     try {
       final response = await _readClient
           .from('meetings')
           .select('id, meeting_date, meeting_title, attendance_count, recording_embed_url, recording_url')
-          .in_('id', missing.toList());
+          .inFilter('id', meetingIds.toList());
 
       final meetingMap = <String, Map<String, dynamic>>{};
       for (final raw in _coerceJsonList(response)) {
@@ -187,12 +187,22 @@ class MemberPortalRepository {
             final metadata = meetingMap[meeting.meetingId];
             if (metadata == null) return meeting;
 
+            String? normalizeNullableString(dynamic value) {
+              final str = value?.toString().trim();
+              return str != null && str.isNotEmpty ? str : null;
+            }
+
             return meeting.copyWith(
-              meetingDate: DateTime.tryParse(metadata['meeting_date']?.toString() ?? ''),
-              meetingTitle: metadata['meeting_title']?.toString(),
-              attendeeCount: _normalizeInt(metadata['attendance_count']),
-              recordingEmbedUrl: metadata['recording_embed_url']?.toString(),
-              recordingUrl: metadata['recording_url']?.toString(),
+              meetingDate: DateTime.tryParse(metadata['meeting_date']?.toString() ?? '') ??
+                  meeting.meetingDate,
+              meetingTitle: normalizeNullableString(metadata['meeting_title']) ??
+                  meeting.meetingTitle,
+              attendeeCount:
+                  _normalizeInt(metadata['attendance_count']) ?? meeting.attendeeCount,
+              recordingEmbedUrl: normalizeNullableString(metadata['recording_embed_url']) ??
+                  meeting.recordingEmbedUrl,
+              recordingUrl: normalizeNullableString(metadata['recording_url']) ??
+                  meeting.recordingUrl,
             );
           })
           .toList(growable: false);
@@ -208,23 +218,6 @@ class MemberPortalRepository {
       print('⚠️ Failed to hydrate meeting metadata: $e');
       return meetings;
     }
-
-    final response = await query.order('created_at', ascending: false);
-    return _parseMeetings(response);
-  }
-
-  List<MemberPortalMeeting> _parseMeetings(dynamic response) {
-    final meetings = _coerceJsonList(response)
-        .map(MemberPortalMeeting.fromJson)
-        .toList(growable: false);
-
-    meetings.sort((a, b) {
-      final aDate = a.meetingDate ?? a.createdAt;
-      final bDate = b.meetingDate ?? b.createdAt;
-      return bDate.compareTo(aDate);
-    });
-
-    return meetings;
   }
 
   Future<MemberPortalMeeting?> savePortalMeeting(MemberPortalMeeting meeting) async {
@@ -489,7 +482,7 @@ class MemberPortalRepository {
     try {
       var query = _readClient.from('member_profile_changes').select('''
             *,
-            members (id, name, profile_pictures),
+            members!member_profile_changes_member_id_fkey (id, name, profile_pictures),
             member_portal_field_visibility(field_name, display_label, field_category)
           ''');
 
@@ -510,7 +503,7 @@ class MemberPortalRepository {
         final memberResponse = await _readClient
             .from('members')
             .select('id, name, profile_pictures')
-            .in_('id', memberIds.toList());
+            .inFilter('id', memberIds.toList());
 
         final memberMap = <String, Map<String, dynamic>>{};
         for (final raw in _coerceJsonList(memberResponse)) {
@@ -629,6 +622,14 @@ class MemberPortalRepository {
     if (trimmed.isEmpty) return 'resource';
     final safe = trimmed.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
     return safe.replaceAll(RegExp(r'_+'), '_');
+  }
+
+  int? _normalizeInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 }
 

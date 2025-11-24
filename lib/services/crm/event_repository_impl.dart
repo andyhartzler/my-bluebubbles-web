@@ -50,9 +50,23 @@ class EventRepository {
       throw Exception('CRM not configured');
     }
 
-    final payload = event.toInsertPayload();
-    final response = await _writeClient.from('events').insert(payload).select('*').single();
-    return Event.fromJson(response as Map<String, dynamic>);
+    final eventId = event.id ?? const Uuid().v4();
+    final payload = {
+      ...event.toInsertPayload(),
+      'id': eventId,
+    };
+
+    final response = await _writeClient.from('events').insert(payload).select('*').maybeSingle();
+    if (response != null) {
+      return Event.fromJson(response as Map<String, dynamic>);
+    }
+
+    final fallback = await _readClient.from('events').select('*').eq('id', eventId).maybeSingle();
+    if (fallback != null) {
+      return Event.fromJson(fallback as Map<String, dynamic>);
+    }
+
+    throw Exception('Event was created but could not be fetched. Check Supabase policies.');
   }
 
   Future<Event> updateEvent(Event event) async {
@@ -70,8 +84,17 @@ class EventRepository {
         .update(payload)
         .eq('id', eventId)
         .select('*')
-        .single();
-    return Event.fromJson(response as Map<String, dynamic>);
+        .maybeSingle();
+    if (response != null) {
+      return Event.fromJson(response as Map<String, dynamic>);
+    }
+
+    final fallback = await _readClient.from('events').select('*').eq('id', eventId).maybeSingle();
+    if (fallback != null) {
+      return Event.fromJson(fallback as Map<String, dynamic>);
+    }
+
+    throw Exception('Event not found after update.');
   }
 
   Future<void> deleteEvent(String eventId) async {
@@ -601,9 +624,18 @@ class EventRepository {
         .update({isSocialShare ? 'social_share_image' : 'website_image': metadata})
         .eq('id', eventId)
         .select('*')
-        .single();
+        .maybeSingle();
 
-    return Event.fromJson(response as Map<String, dynamic>);
+    if (response != null) {
+      return Event.fromJson(response as Map<String, dynamic>);
+    }
+
+    final fallback = await _readClient.from('events').select('*').eq('id', eventId).maybeSingle();
+    if (fallback != null) {
+      return Event.fromJson(fallback as Map<String, dynamic>);
+    }
+
+    throw Exception('Image uploaded, but event could not be loaded.');
   }
 
   Future<Uint8List> _resolveFileBytes(PlatformFile file) async {
