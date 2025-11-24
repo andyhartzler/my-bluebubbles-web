@@ -24,43 +24,27 @@ class MemberPortalRepository {
     if (!_isReady) return MemberPortalDashboardStats.empty;
 
     try {
-      final responses = await Future.wait([
+      final responses = await Future.wait<PostgrestResponse<dynamic>>([
         _readClient
             .from('member_profile_changes')
-            .select(
-              'id',
-              fetchOptions: const FetchOptions(head: true),
-              count: CountOption.exact,
-            )
+            .select('id')
             .eq('status', 'pending')
-            .execute(),
+            .count(CountOption.exact),
         _readClient
             .from('member_submitted_events')
-            .select(
-              'id',
-              fetchOptions: const FetchOptions(head: true),
-              count: CountOption.exact,
-            )
+            .select('id')
             .eq('approval_status', 'pending')
-            .execute(),
+            .count(CountOption.exact),
         _readClient
             .from('member_portal_meetings')
-            .select(
-              'id',
-              fetchOptions: const FetchOptions(head: true),
-              count: CountOption.exact,
-            )
+            .select('id')
             .eq('is_published', true)
-            .execute(),
+            .count(CountOption.exact),
         _readClient
             .from('member_portal_resources')
-            .select(
-              'id',
-              fetchOptions: const FetchOptions(head: true),
-              count: CountOption.exact,
-            )
+            .select('id')
             .eq('is_visible', true)
-            .execute(),
+            .count(CountOption.exact),
       ]);
 
       return MemberPortalDashboardStats(
@@ -122,6 +106,7 @@ class MemberPortalRepository {
     required bool publish,
     bool? visibleToAll,
     bool? visibleToAttendeesOnly,
+    bool? visibleToExecutives,
     String? adminId,
   }) async {
     if (!_isReady) return null;
@@ -136,6 +121,9 @@ class MemberPortalRepository {
       if (visibleToAll != null) payload['visible_to_all'] = visibleToAll;
       if (visibleToAttendeesOnly != null) {
         payload['visible_to_attendees_only'] = visibleToAttendeesOnly;
+      }
+      if (visibleToExecutives != null) {
+        payload['visible_to_executives'] = visibleToExecutives;
       }
 
       final response = await _writeClient
