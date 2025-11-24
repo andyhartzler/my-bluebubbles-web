@@ -25,6 +25,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   late Future<List<MemberProfileChange>> _profileChangesFuture;
   late Future<List<MemberPortalFieldVisibility>> _fieldVisibilityFuture;
 
+  String? _resourceTypeFilter;
+  bool _showOnlyVisibleResources = false;
+  final TextEditingController _resourceSearchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +38,12 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     _resourcesFuture = _repository.fetchPortalResources();
     _profileChangesFuture = _repository.fetchProfileChanges();
     _fieldVisibilityFuture = _repository.fetchFieldVisibility();
+  }
+
+  @override
+  void dispose() {
+    _resourceSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _reloadStats() async {
@@ -293,36 +303,561 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
           }
 
           final resources = snapshot.data ?? const [];
+          final filteredResources = resources.where((resource) {
+            final matchesType =
+                _resourceTypeFilter == null || resource.resourceType == _resourceTypeFilter;
+            final matchesVisibility =
+                !_showOnlyVisibleResources || resource.isVisible;
+            final query = _resourceSearchController.text.trim().toLowerCase();
+            final matchesSearch = query.isEmpty ||
+                resource.title.toLowerCase().contains(query) ||
+                (resource.category ?? '').toLowerCase().contains(query);
+            return matchesType && matchesVisibility && matchesSearch;
+          }).toList();
+
           if (resources.isEmpty) {
             return const Center(child: Text('No resources available.'));
           }
 
-          return ListView.separated(
+          return ListView(
             padding: const EdgeInsets.all(16),
-            itemCount: resources.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final resource = resources[index];
-              return Card(
-                child: ListTile(
-                  title: Text(resource.title),
-                  subtitle: Text(resource.resourceType),
-                  trailing: Switch(
-                    value: resource.isVisible,
-                    onChanged: (value) async {
-                      await _repository.savePortalResource(
-                        resource.copyWith(isVisible: value),
-                      );
-                      await _reloadResources();
-                    },
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 260,
+                            child: TextField(
+                              controller: _resourceSearchController,
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.search),
+                                labelText: 'Search resources',
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const Spacer(),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add Resource'),
+                            onPressed: () => _openResourceEditor(context),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          FilterChip(
+                            selected: _resourceTypeFilter == null,
+                            label: const Text('All Types'),
+                            onSelected: (_) => setState(() => _resourceTypeFilter = null),
+                          ),
+                          FilterChip(
+                            selected: _resourceTypeFilter == 'governing_document',
+                            label: const Text('Governing Documents'),
+                            onSelected: (_) =>
+                                setState(() => _resourceTypeFilter = 'governing_document'),
+                          ),
+                          FilterChip(
+                            selected: _resourceTypeFilter == 'digital_toolkit',
+                            label: const Text('Digital Toolkit'),
+                            onSelected: (_) =>
+                                setState(() => _resourceTypeFilter = 'digital_toolkit'),
+                          ),
+                          FilterChip(
+                            selected: _showOnlyVisibleResources,
+                            label: const Text('Visible Only'),
+                            onSelected: (_) => setState(
+                                () => _showOnlyVisibleResources = !_showOnlyVisibleResources),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+              const SizedBox(height: 12),
+              if (filteredResources.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24.0),
+                    child: Text('No resources match your filters.'),
+                  ),
+                )
+              else
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: filteredResources
+                      .map((resource) => SizedBox(
+                            width: 360,
+                            child: _buildResourceCard(resource),
+                          ))
+                      .toList(),
+                ),
+            ],
           );
         },
       ),
     );
+  }
+
+  Widget _buildResourceCard(MemberPortalResource resource) {
+    return Card(
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(resource.title,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      if (resource.description?.isNotEmpty ?? false)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            resource.description!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Switch.adaptive(
+                      value: resource.isVisible,
+                      onChanged: (value) async {
+                        await _repository.savePortalResource(
+                          resource.copyWith(isVisible: value),
+                        );
+                        await _reloadResources();
+                      },
+                    ),
+                    Text(resource.isVisible ? 'Visible' : 'Hidden'),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                Chip(
+                  label: Text(resource.resourceType.replaceAll('_', ' ')),
+                  avatar: const Icon(Icons.folder_open, size: 16),
+                ),
+                if (resource.category?.isNotEmpty ?? false)
+                  Chip(
+                    label: Text(resource.category!),
+                    avatar: const Icon(Icons.label, size: 16),
+                  ),
+                if (resource.version?.isNotEmpty ?? false)
+                  Chip(
+                    label: Text('v${resource.version}'),
+                    avatar: const Icon(Icons.verified, size: 16),
+                  ),
+                Chip(
+                  label: Text(resource.requiresExecutiveAccess ? 'Exec only' : 'All members'),
+                  avatar: Icon(
+                    resource.requiresExecutiveAccess ? Icons.lock : Icons.lock_open,
+                    size: 16,
+                  ),
+                ),
+                if (resource.lastUpdatedDate != null)
+                  Chip(
+                    label: Text('Updated ${resource.lastUpdatedDate!.toLocal().toString().split(' ').first}'),
+                    avatar: const Icon(Icons.history, size: 16),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (resource.url?.isNotEmpty ?? false)
+                        Text('Link: ${resource.url}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                            overflow: TextOverflow.ellipsis),
+                      if (resource.storageUrl?.isNotEmpty ?? false)
+                        Text('Storage: ${resource.storageUrl}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                            overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Edit resource',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () => _openResourceEditor(context, resource: resource),
+                ),
+                IconButton(
+                  tooltip: 'Toggle exec access',
+                  icon: Icon(resource.requiresExecutiveAccess ? Icons.lock : Icons.lock_open),
+                  onPressed: () async {
+                    await _repository.savePortalResource(
+                      resource.copyWith(requiresExecutiveAccess: !resource.requiresExecutiveAccess),
+                    );
+                    await _reloadResources();
+                  },
+                ),
+                IconButton(
+                  tooltip: 'Delete resource',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () => _deleteResource(resource),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteResource(MemberPortalResource resource) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete resource?'),
+        content: Text('This will remove "${resource.title}" from the portal.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _repository.deletePortalResource(resource.id);
+      await _reloadResources();
+      await _reloadStats();
+    }
+  }
+
+  Future<void> _openResourceEditor(BuildContext context, {MemberPortalResource? resource}) async {
+    final base = resource ??
+        MemberPortalResource(
+          id: '',
+          createdAt: DateTime.now(),
+          updatedAt: null,
+          title: '',
+          description: '',
+          resourceType: 'digital_toolkit',
+          url: '',
+          storageUrl: '',
+          isVisible: true,
+          sortOrder: 0,
+          category: '',
+          iconUrl: '',
+          thumbnailUrl: '',
+          fileSizeBytes: null,
+          fileType: '',
+          version: '',
+          lastUpdatedDate: DateTime.now(),
+          requiresExecutiveAccess: false,
+        );
+
+    final titleController = TextEditingController(text: base.title);
+    final descriptionController = TextEditingController(text: base.description ?? '');
+    final urlController = TextEditingController(text: base.url ?? '');
+    final storageUrlController = TextEditingController(text: base.storageUrl ?? '');
+    final categoryController = TextEditingController(text: base.category ?? '');
+    final iconUrlController = TextEditingController(text: base.iconUrl ?? '');
+    final thumbnailUrlController = TextEditingController(text: base.thumbnailUrl ?? '');
+    final fileTypeController = TextEditingController(text: base.fileType ?? '');
+    final versionController = TextEditingController(text: base.version ?? '');
+    final sortOrderController = TextEditingController(text: base.sortOrder?.toString() ?? '');
+    final fileSizeController = TextEditingController(text: base.fileSizeBytes?.toString() ?? '');
+    DateTime? lastUpdatedDate = base.lastUpdatedDate;
+    final lastUpdatedController = TextEditingController(
+      text: lastUpdatedDate == null
+          ? ''
+          : lastUpdatedDate.toLocal().toString().split(' ').first,
+    );
+    String resourceType = base.resourceType;
+    bool isVisible = base.isVisible;
+    bool requiresExecutiveAccess = base.requiresExecutiveAccess;
+
+    MemberPortalResource? result;
+    try {
+      result = await showModalBottomSheet<MemberPortalResource>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              return SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          resource == null ? 'Add Resource' : 'Edit Resource',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(labelText: 'Title *'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descriptionController,
+                      decoration: const InputDecoration(labelText: 'Description'),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: resourceType,
+                      decoration: const InputDecoration(labelText: 'Resource Type'),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'governing_document',
+                          child: Text('Governing Document'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'digital_toolkit',
+                          child: Text('Digital Toolkit'),
+                        ),
+                      ],
+                      onChanged: (value) => setModalState(() => resourceType = value ?? 'digital_toolkit'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: categoryController,
+                      decoration: const InputDecoration(labelText: 'Category'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: urlController,
+                      decoration: const InputDecoration(labelText: 'External URL'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: storageUrlController,
+                      decoration: const InputDecoration(labelText: 'Storage URL'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: iconUrlController,
+                      decoration: const InputDecoration(labelText: 'Icon URL'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: thumbnailUrlController,
+                      decoration: const InputDecoration(labelText: 'Thumbnail URL'),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: versionController,
+                            decoration: const InputDecoration(labelText: 'Version'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: fileTypeController,
+                            decoration: const InputDecoration(labelText: 'File Type'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: sortOrderController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: 'Sort Order'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: fileSizeController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: 'File Size (bytes)'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: lastUpdatedController,
+                            readOnly: true,
+                            decoration: const InputDecoration(labelText: 'Last Updated'),
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                                initialDate: lastUpdatedDate ?? DateTime.now(),
+                              );
+                              if (picked != null) {
+                                setModalState(() {
+                                  lastUpdatedDate = picked;
+                                  lastUpdatedController.text =
+                                      picked.toLocal().toString().split(' ').first;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Visible'),
+                                value: isVisible,
+                                onChanged: (value) => setModalState(() => isVisible = value),
+                              ),
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Exec access only'),
+                                value: requiresExecutiveAccess,
+                                onChanged: (value) =>
+                                    setModalState(() => requiresExecutiveAccess = value),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () {
+                            if (titleController.text.trim().isEmpty) return;
+                            final updated = base.copyWith(
+                              title: titleController.text.trim(),
+                              description: descriptionController.text.trim().isEmpty
+                                  ? null
+                                  : descriptionController.text.trim(),
+                              resourceType: resourceType,
+                              url: urlController.text.trim().isEmpty
+                                  ? null
+                                  : urlController.text.trim(),
+                              storageUrl: storageUrlController.text.trim().isEmpty
+                                  ? null
+                                  : storageUrlController.text.trim(),
+                              isVisible: isVisible,
+                              sortOrder: int.tryParse(sortOrderController.text.trim()),
+                              category: categoryController.text.trim().isEmpty
+                                  ? null
+                                  : categoryController.text.trim(),
+                              iconUrl: iconUrlController.text.trim().isEmpty
+                                  ? null
+                                  : iconUrlController.text.trim(),
+                              thumbnailUrl: thumbnailUrlController.text.trim().isEmpty
+                                  ? null
+                                  : thumbnailUrlController.text.trim(),
+                              fileSizeBytes: int.tryParse(fileSizeController.text.trim()),
+                              fileType: fileTypeController.text.trim().isEmpty
+                                  ? null
+                                  : fileTypeController.text.trim(),
+                              version: versionController.text.trim().isEmpty
+                                  ? null
+                                  : versionController.text.trim(),
+                              lastUpdatedDate: lastUpdatedDate,
+                              requiresExecutiveAccess: requiresExecutiveAccess,
+                            );
+
+                            Navigator.pop(context, updated);
+                          },
+                          child: const Text('Save Resource'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+      );
+    } finally {
+      titleController.dispose();
+      descriptionController.dispose();
+      urlController.dispose();
+      storageUrlController.dispose();
+      categoryController.dispose();
+      iconUrlController.dispose();
+      thumbnailUrlController.dispose();
+      fileTypeController.dispose();
+      versionController.dispose();
+      sortOrderController.dispose();
+      fileSizeController.dispose();
+      lastUpdatedController.dispose();
+    }
+
+    if (result != null) {
+      await _repository.savePortalResource(result);
+      await _reloadResources();
+      await _reloadStats();
+    }
   }
 
   Widget _buildProfileChangesTab() {
