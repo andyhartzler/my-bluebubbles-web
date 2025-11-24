@@ -621,204 +621,206 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            meeting.memberTitle.isNotEmpty
-                                ? meeting.memberTitle
-                                : meeting.meetingTitle ?? 'Meeting',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            meetingDate != null
-                                ? 'Meeting date: ${meetingDate.toLocal().toString().split(' ').first}'
-                                : 'Meeting date TBD',
-                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('Published'),
-                            Switch.adaptive(
-                              value: _selectedIsPublished,
-                              onChanged: (value) => setState(() => _selectedIsPublished = value),
-                              activeColor: Colors.white,
-                            ),
-                          ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                meeting.memberTitle.isNotEmpty
+                                    ? meeting.memberTitle
+                                    : meeting.meetingTitle ?? 'Meeting',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                meetingDate != null
+                                    ? 'Meeting date: ${meetingDate.toLocal().toString().split(' ').first}'
+                                    : 'Meeting date TBD',
+                                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                              ),
+                            ],
+                          ),
                         ),
-                        Row(
+                        Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('Show recording'),
-                            Switch.adaptive(
-                              value: _selectedShowRecording,
-                              onChanged: (value) => setState(() => _selectedShowRecording = value),
-                              activeColor: Colors.white,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Published'),
+                                Switch.adaptive(
+                                  value: _selectedIsPublished,
+                                  onChanged: (value) => setState(() => _selectedIsPublished = value),
+                                  activeColor: Colors.white,
+                                ),
+                              ],
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Show recording'),
+                                Switch.adaptive(
+                                  value: _selectedShowRecording,
+                                  onChanged: (value) => setState(() => _selectedShowRecording = value),
+                                  activeColor: Colors.white,
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildMeetingPill(
-                      icon: Icons.calendar_month_outlined,
-                      label: meetingDate != null
-                          ? meetingDate.toLocal().toString().split(' ').first
-                          : 'Date TBD',
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildMeetingPill(
+                          icon: Icons.calendar_month_outlined,
+                          label: meetingDate != null
+                              ? meetingDate.toLocal().toString().split(' ').first
+                              : 'Date TBD',
+                        ),
+                        _buildMeetingPill(
+                          icon: Icons.groups_outlined,
+                          label: attendeeCount != null
+                              ? '$attendeeCount attendees'
+                              : 'Attendance pending',
+                        ),
+                        _buildMeetingPill(
+                          icon: meeting.isPublished ? Icons.check_circle : Icons.drafts,
+                          label: meeting.isPublished
+                              ? (meeting.visibleToAll
+                                  ? 'Published · All'
+                                  : meeting.visibleToExecutives
+                                      ? 'Published · Exec/Attendees'
+                                      : 'Published · Attendees')
+                              : 'Draft',
+                        ),
+                        _buildMeetingPill(
+                          icon: _selectedShowRecording ? Icons.play_circle : Icons.play_disabled,
+                          label: _selectedShowRecording ? 'Recording visible' : 'Recording hidden',
+                        ),
+                      ],
                     ),
-                    _buildMeetingPill(
-                      icon: Icons.groups_outlined,
-                      label: attendeeCount != null
-                          ? '$attendeeCount attendees'
-                          : 'Attendance pending',
-                    ),
-                    _buildMeetingPill(
-                      icon: meeting.isPublished ? Icons.check_circle : Icons.drafts,
-                      label: meeting.isPublished
-                          ? (meeting.visibleToAll
-                              ? 'Published · All'
-                              : meeting.visibleToExecutives
-                                  ? 'Published · Exec/Attendees'
-                                  : 'Published · Attendees')
-                          : 'Draft',
-                    ),
-                    _buildMeetingPill(
-                      icon: _selectedShowRecording ? Icons.play_circle : Icons.play_disabled,
-                      label: _selectedShowRecording ? 'Recording visible' : 'Recording hidden',
-                    ),
-                  ],
-                ),
-                if (_meetingDetailsError != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _meetingDetailsError!,
-                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade200),
-                  ),
-                ],
-                if (_loadingMeetingDetails)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8.0),
-                    child: LinearProgressIndicator(
-                      minHeight: 4,
-                      backgroundColor: Colors.white24,
-                      color: Colors.white,
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildVisibilityCheckbox(
-                      label: 'Visible to all members',
-                      value: _selectedVisibleToAll,
-                      onChanged: (value) => setState(() {
-                        _selectedVisibleToAll = value ?? false;
-                      }),
-                    ),
-                    _buildVisibilityCheckbox(
-                      label: 'Visible to attendees only',
-                      value: _selectedVisibleToAttendeesOnly,
-                      onChanged: (value) => setState(() {
-                        _selectedVisibleToAttendeesOnly = value ?? false;
-                      }),
-                    ),
-                    _buildVisibilityCheckbox(
-                      label: 'Visible to executives',
-                      value: _selectedVisibleToExecutives,
-                      onChanged: (value) => setState(() {
-                        _selectedVisibleToExecutives = value ?? true;
-                      }),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildAttendanceSection(meeting, attendance, attendeeCount ?? 0),
-                const SizedBox(height: 12),
-                _buildRecordingSection(recordingEmbedUrl, recordingUrl),
-                const SizedBox(height: 12),
-                _buildRichTextSection(
-                  title: 'Description',
-                  helper: 'Shows at the top of the meeting page for members.',
-                  controller: _descriptionController!,
-                ),
-                const SizedBox(height: 12),
-                _buildRichTextSection(
-                  title: 'Summary',
-                  helper: 'Short recap of what happened.',
-                  controller: _summaryController!,
-                ),
-                const SizedBox(height: 12),
-                _buildRichTextSection(
-                  title: 'Key Points',
-                  helper: 'Bulleted discussion highlights.',
-                  controller: _keyPointsController!,
-                ),
-                const SizedBox(height: 12),
-                _buildRichTextSection(
-                  title: 'Action Items',
-                  helper: 'Next steps members should see.',
-                  controller: _actionItemsController!,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    if (_meetingSaveError != null || _meetingSaveSucceeded)
-                      Row(
-                        children: [
-                          Icon(
-                            _meetingSaveSucceeded ? Icons.check_circle : Icons.error_outline,
-                            color: statusColor,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _meetingSaveSucceeded
-                                ? 'Saved'
-                                : 'Save failed: ${_meetingSaveError}',
-                            style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
-                          ),
-                        ],
+                    if (_meetingDetailsError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _meetingDetailsError!,
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade200),
                       ),
-                    const Spacer(),
-                    ElevatedButton.icon(
-                      icon: _savingMeeting
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save),
-                      label: Text(_savingMeeting ? 'Saving...' : 'Save changes'),
-                      onPressed: _savingMeeting ? null : () => _saveMeeting(meeting),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: _unityBlue,
+                    ],
+                    if (_loadingMeetingDetails)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: LinearProgressIndicator(
+                          minHeight: 4,
+                          backgroundColor: Colors.white24,
+                          color: Colors.white,
+                        ),
                       ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildVisibilityCheckbox(
+                          label: 'Visible to all members',
+                          value: _selectedVisibleToAll,
+                          onChanged: (value) => setState(() {
+                            _selectedVisibleToAll = value ?? false;
+                          }),
+                        ),
+                        _buildVisibilityCheckbox(
+                          label: 'Visible to attendees only',
+                          value: _selectedVisibleToAttendeesOnly,
+                          onChanged: (value) => setState(() {
+                            _selectedVisibleToAttendeesOnly = value ?? false;
+                          }),
+                        ),
+                        _buildVisibilityCheckbox(
+                          label: 'Visible to executives',
+                          value: _selectedVisibleToExecutives,
+                          onChanged: (value) => setState(() {
+                            _selectedVisibleToExecutives = value ?? true;
+                          }),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildAttendanceSection(meeting, attendance, attendeeCount ?? 0),
+                    const SizedBox(height: 12),
+                    _buildRecordingSection(recordingEmbedUrl, recordingUrl),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Description',
+                      helper: 'Shows at the top of the meeting page for members.',
+                      controller: _descriptionController!,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Summary',
+                      helper: 'Short recap of what happened.',
+                      controller: _summaryController!,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Key Points',
+                      helper: 'Bulleted discussion highlights.',
+                      controller: _keyPointsController!,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Action Items',
+                      helper: 'Next steps members should see.',
+                      controller: _actionItemsController!,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        if (_meetingSaveError != null || _meetingSaveSucceeded)
+                          Row(
+                            children: [
+                              Icon(
+                                _meetingSaveSucceeded ? Icons.check_circle : Icons.error_outline,
+                                color: statusColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _meetingSaveSucceeded
+                                    ? 'Saved'
+                                    : 'Save failed: ${_meetingSaveError}',
+                                style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
+                              ),
+                            ],
+                          ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          icon: _savingMeeting
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.save),
+                          label: Text(_savingMeeting ? 'Saving...' : 'Save changes'),
+                          onPressed: _savingMeeting ? null : () => _saveMeeting(meeting),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: _unityBlue,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
