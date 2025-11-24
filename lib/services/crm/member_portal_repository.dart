@@ -1,4 +1,4 @@
-import 'package:postgrest/postgrest.dart' show CountOption, FetchOptions, PostgrestResponse;
+import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/models/crm/member_portal.dart';
@@ -27,19 +27,19 @@ class MemberPortalRepository {
       final responses = await Future.wait([
         _readClient
             .from('member_profile_changes')
-            .select('id', const FetchOptions(count: CountOption.exact, head: true))
+            .select('id', head: true, count: CountOption.exact)
             .eq('status', 'pending'),
         _readClient
             .from('member_submitted_events')
-            .select('id', const FetchOptions(count: CountOption.exact, head: true))
+            .select('id', head: true, count: CountOption.exact)
             .eq('approval_status', 'pending'),
         _readClient
             .from('member_portal_meetings')
-            .select('id', const FetchOptions(count: CountOption.exact, head: true))
+            .select('id', head: true, count: CountOption.exact)
             .eq('is_published', true),
         _readClient
             .from('member_portal_resources')
-            .select('id', const FetchOptions(count: CountOption.exact, head: true))
+            .select('id', head: true, count: CountOption.exact)
             .eq('is_visible', true),
       ]);
 
@@ -62,13 +62,13 @@ class MemberPortalRepository {
       var query = _readClient.from('member_portal_meetings').select(''',
             *,
             meetings(meeting_title, meeting_date, attendance_count)
-          ''').order('created_at', ascending: false);
+          ''');
 
       if (isPublished != null) {
         query = query.eq('is_published', isPublished);
       }
 
-      final response = await query;
+      final response = await query.order('created_at', ascending: false);
       return _coerceJsonList(response)
           .map(MemberPortalMeeting.fromJson)
           .toList(growable: false);
@@ -138,11 +138,11 @@ class MemberPortalRepository {
     if (!_isReady) return const [];
 
     try {
-      var query = _readClient.from('member_submitted_events').select('*').order('created_at', ascending: false);
+      var query = _readClient.from('member_submitted_events').select('*');
       if (status != null) {
         query = query.eq('approval_status', status);
       }
-      final response = await query;
+      final response = await query.order('created_at', ascending: false);
       return _coerceJsonList(response)
           .map(MemberSubmittedEvent.fromJson)
           .toList(growable: false);
@@ -244,17 +244,15 @@ class MemberPortalRepository {
     if (!_isReady) return const [];
 
     try {
-      var query = _readClient
-          .from('member_portal_resources')
-          .select('*')
-          .order('resource_type')
-          .order('sort_order');
+      var query = _readClient.from('member_portal_resources').select('*');
 
       if (resourceType != null) {
         query = query.eq('resource_type', resourceType);
       }
 
-      final response = await query;
+      final response = await query
+          .order('resource_type')
+          .order('sort_order');
       return _coerceJsonList(response)
           .map(MemberPortalResource.fromJson)
           .toList(growable: false);
