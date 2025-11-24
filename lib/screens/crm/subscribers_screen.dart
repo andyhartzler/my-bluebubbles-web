@@ -369,47 +369,41 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
 
   Widget _buildStats(BuildContext context) {
     final tiles = [
-      _StatHeroCard(
-        title: 'Total Subscribers',
-        value: _stats.totalSubscribers.toString(),
+      _StatsTile(
+        label: 'Total Subscribers',
+        value: _stats.totalSubscribers,
         icon: Icons.people_outline,
         color: Colors.blueGrey,
-        subtitle: 'All records',
       ),
-      _StatHeroCard(
-        title: 'Active Subscribers',
-        value: _stats.activeSubscribers.toString(),
+      _StatsTile(
+        label: 'Active Subscribers',
+        value: _stats.activeSubscribers,
         icon: Icons.mark_email_read_outlined,
         color: Colors.blue,
-        subtitle: 'Subscribed',
       ),
-      _StatHeroCard(
-        title: 'Unsubscribed',
-        value: _stats.unsubscribed.toString(),
+      _StatsTile(
+        label: 'Unsubscribed',
+        value: _stats.unsubscribed,
         icon: Icons.unsubscribe_outlined,
         color: Colors.red,
-        subtitle: 'Opted out',
       ),
-      _StatHeroCard(
-        title: 'Also Donors',
-        value: _stats.donorCount.toString(),
+      _StatsTile(
+        label: 'Also Donors',
+        value: _stats.donorCount,
         icon: Icons.volunteer_activism_outlined,
         color: Colors.purple,
-        subtitle: 'Has donor link',
       ),
-      _StatHeroCard(
-        title: 'With Contact Info',
-        value: _stats.contactInfoCount.toString(),
+      _StatsTile(
+        label: 'With Contact Info',
+        value: _stats.contactInfoCount,
         icon: Icons.contact_phone_outlined,
         color: Colors.teal,
-        subtitle: 'Phone or address',
       ),
-      _StatHeroCard(
-        title: 'Recent Opt-ins (30d)',
-        value: _stats.recentOptIns.toString(),
+      _StatsTile(
+        label: 'Recent Opt-ins (30d)',
+        value: _stats.recentOptIns,
         icon: Icons.fiber_new_outlined,
         color: Colors.orange,
-        subtitle: 'Past month',
       ),
     ];
 
@@ -667,10 +661,6 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
         return _SubscriberDetailSheet(
           subscriber: subscriber,
           canManage: _canManage,
-          onUpdated: () async {
-            await _loadSubscribers(reset: true);
-            await _loadStats();
-          },
         );
       },
     );
@@ -1018,37 +1008,16 @@ class _SubscriberCard extends StatelessWidget {
         return theme.colorScheme.primary;
     }
   }
-
 }
 
-class _SubscriberDetailSheet extends StatefulWidget {
+class _SubscriberDetailSheet extends StatelessWidget {
   final Subscriber subscriber;
   final bool canManage;
-  final VoidCallback? onUpdated;
 
   const _SubscriberDetailSheet({
     required this.subscriber,
     required this.canManage,
-    this.onUpdated,
   });
-
-  @override
-  State<_SubscriberDetailSheet> createState() => _SubscriberDetailSheetState();
-}
-
-class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
-  late Subscriber _subscriber;
-  bool _saving = false;
-  final SubscriberRepository _repository = SubscriberRepository();
-
-  Subscriber get subscriber => _subscriber;
-  bool get canManage => widget.canManage;
-
-  @override
-  void initState() {
-    super.initState();
-    _subscriber = widget.subscriber;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1140,9 +1109,9 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                 Row(
                   children: [
                     ElevatedButton.icon(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () => _showComingSoon(context),
                       icon: const Icon(Icons.visibility_outlined),
-                      label: const Text('Close'),
+                      label: const Text('View Full Details'),
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
@@ -1154,7 +1123,7 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                     OutlinedButton.icon(
                       onPressed: widget.canManage && !_saving ? _openEditDialog : null,
                       icon: const Icon(Icons.note_add_outlined),
-                      label: const Text('Edit Notes'),
+                      label: const Text('Add Note'),
                     ),
                   ],
                 ),
@@ -1338,138 +1307,10 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
     );
   }
 
-  Future<void> _openEditDialog() async {
-    final nameController = TextEditingController(text: _subscriber.name);
-    final emailController = TextEditingController(text: _subscriber.email);
-    final phoneController = TextEditingController(text: _subscriber.phone ?? '');
-    final phoneE164Controller = TextEditingController(text: _subscriber.phoneE164 ?? '');
-    final cityController = TextEditingController(text: _subscriber.city ?? '');
-    final stateController = TextEditingController(text: _subscriber.state ?? '');
-    final countyController = TextEditingController(text: _subscriber.county ?? '');
-    final sourceController = TextEditingController(text: _subscriber.source ?? '');
-    final tagsController = TextEditingController(text: _subscriber.tags ?? '');
-    final notesController = TextEditingController(text: _subscriber.notes ?? '');
-
-    String? status = _subscriber.subscriptionStatus;
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit subscriber'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                ),
-                TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                ),
-                TextField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(labelText: 'Phone'),
-                ),
-                TextField(
-                  controller: phoneE164Controller,
-                  decoration: const InputDecoration(labelText: 'Phone (E.164)'),
-                ),
-                DropdownButtonFormField<String>(
-                  value: status,
-                  decoration: const InputDecoration(labelText: 'Status'),
-                  items: const [
-                    DropdownMenuItem(value: 'subscribed', child: Text('Subscribed')),
-                    DropdownMenuItem(value: 'unsubscribed', child: Text('Unsubscribed')),
-                    DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                    DropdownMenuItem(value: 'cleaned', child: Text('Cleaned')),
-                  ],
-                  onChanged: (value) => status = value,
-                ),
-                TextField(
-                  controller: cityController,
-                  decoration: const InputDecoration(labelText: 'City'),
-                ),
-                TextField(
-                  controller: stateController,
-                  decoration: const InputDecoration(labelText: 'State'),
-                ),
-                TextField(
-                  controller: countyController,
-                  decoration: const InputDecoration(labelText: 'County'),
-                ),
-                TextField(
-                  controller: sourceController,
-                  decoration: const InputDecoration(labelText: 'Source'),
-                ),
-                TextField(
-                  controller: tagsController,
-                  decoration: const InputDecoration(labelText: 'Tags (comma or semicolon separated)'),
-                ),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(labelText: 'Notes'),
-                  minLines: 2,
-                  maxLines: 4,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
+  void _showComingSoon(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Management actions coming soon.')),
     );
-
-    if (result != true) return;
-
-    setState(() => _saving = true);
-
-    try {
-      final updated = await _repository.updateSubscriber(
-        _subscriber.id,
-        data: {
-          'name': nameController.text.trim(),
-          'email': emailController.text.trim(),
-          'phone': phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-          'phone_e164': phoneE164Controller.text.trim().isEmpty ? null : phoneE164Controller.text.trim(),
-          'subscription_status': status,
-          'city': cityController.text.trim().isEmpty ? null : cityController.text.trim(),
-          'state': stateController.text.trim().isEmpty ? null : stateController.text.trim(),
-          'county': countyController.text.trim().isEmpty ? null : countyController.text.trim(),
-          'source': sourceController.text.trim().isEmpty ? null : sourceController.text.trim(),
-          'tags': tagsController.text.trim().isEmpty ? null : tagsController.text.trim(),
-          'notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-        },
-      );
-
-      setState(() => _subscriber = updated);
-      widget.onUpdated?.call();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Subscriber updated')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Unable to save subscriber: $e')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _saving = false);
-      }
-    }
   }
 }
 
@@ -1561,45 +1402,17 @@ class _StatsTile extends StatelessWidget {
   }
 }
 
-class _StatusPill extends StatelessWidget {
+class _StatsTile extends StatelessWidget {
   final String label;
-  final Color color;
+  final int value;
   final IconData icon;
-  final String subtitle;
-
-  const _StatusPill({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      backgroundColor: color.withOpacity(0.12),
-      side: BorderSide(color: color.withOpacity(0.5)),
-      label: Text(
-        label,
-        style: const TextStyle(
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-        ),
-      ),
-    );
-  }
-}
-
-class _StatHeroCard extends StatelessWidget {
-  final String title;
-  final String value;
   final Color color;
-  final IconData icon;
-  final String subtitle;
 
-  const _StatHeroCard({
-    required this.title,
+  const _StatsTile({
+    required this.label,
     required this.value,
-    required this.color,
     required this.icon,
-    required this.subtitle,
+    required this.color,
   });
 
   @override
