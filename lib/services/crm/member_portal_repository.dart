@@ -1,5 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:mime_type/mime_type.dart';
+import 'package:universal_io/io.dart' as io;
+
+import 'package:bluebubbles/database/global/platform_file.dart';
 
 import 'package:bluebubbles/models/crm/member_portal.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
@@ -8,6 +14,7 @@ class MemberPortalRepository {
   MemberPortalRepository._();
 
   static final MemberPortalRepository _instance = MemberPortalRepository._();
+  static const String _resourceBucket = 'quick-access-files';
 
   factory MemberPortalRepository() => _instance;
 
@@ -65,7 +72,7 @@ class MemberPortalRepository {
     try {
       var query = _readClient.from('member_portal_meetings').select(''',
             *,
-            meetings(meeting_title, meeting_date, attendance_count)
+            meetings(meeting_title, meeting_date, attendance_count, recording_embed_url, recording_url)
           ''');
 
       if (isPublished != null) {
@@ -311,6 +318,33 @@ class MemberPortalRepository {
     }
   }
 
+  Future<Map<String, dynamic>> uploadResourceFile(PlatformFile file) async {
+    if (!_isReady) {
+      throw StateError('Supabase is not initialized');
+    }
+
+    final bytes = await _resolveFileBytes(file);
+    final sanitizedName = _sanitizeFileName(file.name);
+    final now = DateTime.now().toUtc();
+    final path = 'portal-resources/${now.millisecondsSinceEpoch}-$sanitizedName';
+    final contentType = mime(file.name) ?? 'application/octet-stream';
+
+    await _writeClient.storage.from(_resourceBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+
+    final publicUrl = _writeClient.storage.from(_resourceBucket).getPublicUrl(path);
+
+    return {
+      'storage_url': publicUrl,
+      'file_type': contentType,
+      'file_size_bytes': bytes.length,
+      'url': publicUrl,
+    };
+  }
+
   Future<List<MemberProfileChange>> fetchProfileChanges({String status = 'pending'}) async {
     if (!_isReady) return const [];
 
@@ -402,6 +436,26 @@ class MemberPortalRepository {
       print('❌ Failed to save field visibility: $e');
       rethrow;
     }
+  }
+
+  Future<Uint8List> _resolveFileBytes(PlatformFile file) async {
+    if (file.bytes != null && file.bytes!.isNotEmpty) {
+      return file.bytes!;
+    }
+
+    if (file.path != null && file.path!.isNotEmpty) {
+      final data = await io.File(file.path!).readAsBytes();
+      if (data.isNotEmpty) return data;
+    }
+
+    throw StateError('Unable to read bytes for ${file.name}');
+  }
+
+  String _sanitizeFileName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 'resource';
+    final safe = trimmed.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return safe.replaceAll(RegExp(r'_+'), '_');
   }
 }
 

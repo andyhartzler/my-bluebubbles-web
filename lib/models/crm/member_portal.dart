@@ -34,12 +34,15 @@ class MemberPortalMeeting {
   final bool visibleToAttendeesOnly;
   final bool visibleToExecutives;
   final bool isPublished;
+  final bool? showRecording;
   final List<PortalAttachment> attachments;
   final DateTime? publishedAt;
   final String? publishedBy;
   final String? meetingTitle;
   final DateTime? meetingDate;
   final int? attendeeCount;
+  final String? recordingEmbedUrl;
+  final String? recordingUrl;
 
   const MemberPortalMeeting({
     required this.id,
@@ -55,12 +58,15 @@ class MemberPortalMeeting {
     this.visibleToAttendeesOnly = true,
     this.visibleToExecutives = true,
     this.isPublished = false,
+    this.showRecording,
     this.attachments = const [],
     this.publishedAt,
     this.publishedBy,
     this.meetingTitle,
     this.meetingDate,
     this.attendeeCount,
+    this.recordingEmbedUrl,
+    this.recordingUrl,
   });
 
   factory MemberPortalMeeting.fromJson(Map<String, dynamic> json) {
@@ -85,6 +91,8 @@ class MemberPortalMeeting {
     final meetingDateValue = meeting?["meeting_date"] ?? json['meeting_date'];
     final meetingTitleValue = meeting?["meeting_title"] ?? json['meeting_title'];
     final attendanceCountValue = meeting?["attendance_count"] ?? json['attendance_count'];
+    final embedUrlValue = meeting?["recording_embed_url"] ?? json['recording_embed_url'];
+    final recordingUrlValue = meeting?["recording_url"] ?? json['recording_url'];
 
     return MemberPortalMeeting(
       id: json['id'].toString(),
@@ -100,12 +108,15 @@ class MemberPortalMeeting {
       visibleToAttendeesOnly: _normalizeBool(json['visible_to_attendees_only']) ?? true,
       visibleToExecutives: _normalizeBool(json['visible_to_executives']) ?? true,
       isPublished: _normalizeBool(json['is_published']) ?? false,
+      showRecording: _normalizeBool(json['show_recording']),
       attachments: List<PortalAttachment>.unmodifiable(attachments),
       publishedAt: DateTime.tryParse(json['published_at']?.toString() ?? ''),
       publishedBy: json['published_by']?.toString(),
       meetingTitle: meetingTitleValue?.toString(),
       meetingDate: DateTime.tryParse(meetingDateValue?.toString() ?? ''),
       attendeeCount: _normalizeInt(attendanceCountValue),
+      recordingEmbedUrl: embedUrlValue?.toString(),
+      recordingUrl: recordingUrlValue?.toString(),
     );
   }
 
@@ -113,6 +124,7 @@ class MemberPortalMeeting {
     bool? visibleToAll,
     bool? visibleToAttendeesOnly,
     bool? isPublished,
+    bool? showRecording,
     List<PortalAttachment>? attachments,
     String? memberTitle,
     String? memberDescription,
@@ -122,6 +134,8 @@ class MemberPortalMeeting {
     DateTime? publishedAt,
     String? publishedBy,
     bool? visibleToExecutives,
+    String? recordingEmbedUrl,
+    String? recordingUrl,
   }) {
     return MemberPortalMeeting(
       id: id,
@@ -137,12 +151,15 @@ class MemberPortalMeeting {
       visibleToAttendeesOnly: visibleToAttendeesOnly ?? this.visibleToAttendeesOnly,
       visibleToExecutives: visibleToExecutives ?? this.visibleToExecutives,
       isPublished: isPublished ?? this.isPublished,
+      showRecording: showRecording ?? this.showRecording,
       attachments: attachments ?? this.attachments,
       publishedAt: publishedAt ?? this.publishedAt,
       publishedBy: publishedBy ?? this.publishedBy,
       meetingTitle: meetingTitle,
       meetingDate: meetingDate,
       attendeeCount: attendeeCount,
+      recordingEmbedUrl: recordingEmbedUrl ?? this.recordingEmbedUrl,
+      recordingUrl: recordingUrl ?? this.recordingUrl,
     );
   }
 
@@ -159,9 +176,12 @@ class MemberPortalMeeting {
       'visible_to_attendees_only': visibleToAttendeesOnly,
       'visible_to_executives': visibleToExecutives,
       'is_published': isPublished,
+      'show_recording': showRecording,
       'attachments': attachments.map((a) => a.toJson()).toList(),
       'published_at': publishedAt?.toIso8601String(),
       'published_by': publishedBy,
+      'recording_embed_url': recordingEmbedUrl,
+      'recording_url': recordingUrl,
     }..removeWhere((key, value) => value == null);
   }
 }
