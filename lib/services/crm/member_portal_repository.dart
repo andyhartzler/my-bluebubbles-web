@@ -7,6 +7,7 @@ import 'package:universal_io/io.dart' as io;
 
 import 'package:bluebubbles/database/global/platform_file.dart';
 
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/member_portal.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
@@ -173,7 +174,7 @@ class MemberPortalRepository {
       final response = await _readClient
           .from('meetings')
           .select('id, meeting_date, meeting_title, attendance_count, recording_embed_url, recording_url')
-          .in_('id', missing.toList());
+          .inFilter('id', missing.toList());
 
       final meetingMap = <String, Map<String, dynamic>>{};
       for (final raw in _coerceJsonList(response)) {
@@ -208,23 +209,6 @@ class MemberPortalRepository {
       print('⚠️ Failed to hydrate meeting metadata: $e');
       return meetings;
     }
-
-    final response = await query.order('created_at', ascending: false);
-    return _parseMeetings(response);
-  }
-
-  List<MemberPortalMeeting> _parseMeetings(dynamic response) {
-    final meetings = _coerceJsonList(response)
-        .map(MemberPortalMeeting.fromJson)
-        .toList(growable: false);
-
-    meetings.sort((a, b) {
-      final aDate = a.meetingDate ?? a.createdAt;
-      final bDate = b.meetingDate ?? b.createdAt;
-      return bDate.compareTo(aDate);
-    });
-
-    return meetings;
   }
 
   Future<MemberPortalMeeting?> savePortalMeeting(MemberPortalMeeting meeting) async {
@@ -510,7 +494,7 @@ class MemberPortalRepository {
         final memberResponse = await _readClient
             .from('members')
             .select('id, name, profile_pictures')
-            .in_('id', memberIds.toList());
+            .inFilter('id', memberIds.toList());
 
         final memberMap = <String, Map<String, dynamic>>{};
         for (final raw in _coerceJsonList(memberResponse)) {
@@ -629,6 +613,14 @@ class MemberPortalRepository {
     if (trimmed.isEmpty) return 'resource';
     final safe = trimmed.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
     return safe.replaceAll(RegExp(r'_+'), '_');
+  }
+
+  int? _normalizeInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 }
 

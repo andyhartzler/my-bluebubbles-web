@@ -12,5 +12,6 @@ import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:mime/mime.dart';
+import 'package:uuid/uuid.dart';
 
 part 'event_repository_impl.dart';
