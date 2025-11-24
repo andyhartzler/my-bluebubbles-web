@@ -112,6 +112,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   bool _openingAttendeeEmail = false;
   bool _openingAttendeeMessage = false;
 
+  bool _hasText(String? value) => value?.trim().isNotEmpty == true;
+
+  String? get _displayLocationLabel {
+    if (_currentEvent.multipleLocations) {
+      return _hasText(_currentEvent.location) ? _currentEvent.location!.trim() : null;
+    }
+
+    if (_hasText(_currentEvent.location)) return _currentEvent.location!.trim();
+    if (_hasText(_currentEvent.locationAddress)) return _currentEvent.locationAddress!.trim();
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -248,6 +260,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       eventEndDate: _eventEndDate,
       location: _locationController.text.trim().isEmpty ? null : _locationController.text.trim(),
       locationAddress: _locationAddressController.text.trim().isEmpty ? null : _locationAddressController.text.trim(),
+      locationOneName: _currentEvent.locationOneName ?? widget.initialEvent.locationOneName,
+      locationOneAddress: _currentEvent.locationOneAddress ?? widget.initialEvent.locationOneAddress,
+      locationTwoName: _currentEvent.locationTwoName ?? widget.initialEvent.locationTwoName,
+      locationTwoAddress: _currentEvent.locationTwoAddress ?? widget.initialEvent.locationTwoAddress,
+      locationThreeName: _currentEvent.locationThreeName ?? widget.initialEvent.locationThreeName,
+      locationThreeAddress: _currentEvent.locationThreeAddress ?? widget.initialEvent.locationThreeAddress,
+      multipleLocations: _currentEvent.multipleLocations,
       hideAddressBeforeRsvp: _hideAddressBeforeRsvp,
       eventType: _eventType,
       rsvpEnabled: _rsvpEnabled,
@@ -1786,13 +1805,61 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   }
 
   Widget _buildMapCard() {
-    final location = _currentEvent.location ?? _currentEvent.locationAddress;
+    if (_currentEvent.multipleLocations) {
+      final additionalLocations = <Map<String, String>>[];
+
+      void addLocation(String? name, String? address) {
+        if (_hasText(address)) {
+          additionalLocations.add({
+            'name': name?.trim() ?? '',
+            'address': address!.trim(),
+          });
+        }
+      }
+
+      addLocation(_currentEvent.locationOneName, _currentEvent.locationOneAddress);
+      addLocation(_currentEvent.locationTwoName, _currentEvent.locationTwoAddress);
+      addLocation(_currentEvent.locationThreeName, _currentEvent.locationThreeAddress);
+
+      if (additionalLocations.isEmpty) return const SizedBox.shrink();
+
+      final locationName = _displayLocationLabel ?? 'Event location';
+      final double tileHeight = (420 / additionalLocations.length).clamp(160.0, 420.0).toDouble();
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < additionalLocations.length; i++) ...[
+            _buildMapTile(
+              displayName: _hasText(additionalLocations[i]['name'])
+                  ? additionalLocations[i]['name']!
+                  : locationName,
+              address: additionalLocations[i]['address']!,
+              height: tileHeight,
+            ),
+            if (i < additionalLocations.length - 1) const SizedBox(height: 12),
+          ]
+        ],
+      );
+    }
+
+    final location = _displayLocationLabel;
     if (location == null || location.isEmpty) return const SizedBox.shrink();
 
-    final address = _currentEvent.locationAddress ?? location;
+    final address = _hasText(_currentEvent.locationAddress) ? _currentEvent.locationAddress!.trim() : location;
+
+    return _buildMapTile(
+      displayName: location,
+      address: address,
+    );
+  }
+
+  Widget _buildMapTile({required String displayName, required String address, double? height}) {
     final mapsUri = Uri.https('maps.apple.com', '/', {
       'q': address,
     });
+
+    final titleText = displayName == address ? displayName : '$displayName — $address';
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -1801,13 +1868,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           EventMapWidget(
-            location: location,
-            locationAddress: _currentEvent.locationAddress,
+            location: displayName,
+            locationAddress: address,
             eventTitle: _currentEvent.title,
+            height: height,
           ),
           ListTile(
             leading: const Icon(Icons.map_outlined, color: _unityBlue),
-            title: Text(address, maxLines: 2, overflow: TextOverflow.ellipsis),
+            title: Text(titleText, maxLines: 2, overflow: TextOverflow.ellipsis),
             subtitle: const Text('Open full map in Apple Maps'),
             trailing: const Icon(Icons.open_in_new),
             onTap: () => launchUrl(mapsUri, mode: LaunchMode.externalApplication),
@@ -1823,6 +1891,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     }
 
     final dateFormat = DateFormat.yMMMd().add_jm();
+    final locationLabel = _displayLocationLabel;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -1892,7 +1961,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                         ],
                       ),
                     ],
-                    if (_currentEvent.location != null) ...[
+                    if (locationLabel != null) ...[
                       const SizedBox(height: 8),
                       Row(
                         children: [
@@ -1900,7 +1969,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              _currentEvent.location!,
+                              locationLabel,
                               style: const TextStyle(color: Colors.white),
                             ),
                           ),

@@ -132,6 +132,11 @@ class _EventsScreenState extends State<EventsScreen> {
   Widget _buildEventCard(Event event) {
     final theme = Theme.of(context);
     final dateFormat = DateFormat.yMMMd().add_jm();
+    final locationLabel = event.multipleLocations
+        ? event.location
+        : event.location?.isNotEmpty == true
+            ? event.location
+            : event.locationAddress;
 
     return Card(
       elevation: 4,
@@ -175,7 +180,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   dateFormat.format(event.eventDate),
                   style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
-                if (event.location?.isNotEmpty == true) ...[
+                if (locationLabel?.isNotEmpty == true) ...[
                   const SizedBox(height: 6),
                   Row(
                     children: [
@@ -183,7 +188,7 @@ class _EventsScreenState extends State<EventsScreen> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          event.location!,
+                          locationLabel!,
                           style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
                           overflow: TextOverflow.ellipsis,
                         ),
