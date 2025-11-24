@@ -1181,10 +1181,18 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
 
 class MeetingRecordingEmbed extends StatefulWidget {
   final Uri uri;
+  final VoidCallback? onFailure;
+
+  @visibleForTesting
+  static bool debugForceRegistrationFailure = false;
+
+  @visibleForTesting
+  static bool debugForceSrcFailure = false;
 
   const MeetingRecordingEmbed({
     super.key,
     required this.uri,
+    this.onFailure,
   });
 
   @override
@@ -1198,6 +1206,8 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
       <int, html.IFrameElement>{};
 
   int? _viewId;
+  bool _failed = false;
+  bool _notifiedFailure = false;
 
   @override
   void initState() {
@@ -1225,8 +1235,8 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
 
   @override
   Widget build(BuildContext context) {
-    if (!kIsWeb) {
-      return const SizedBox.shrink();
+    if (!kIsWeb || _failed) {
+      return _buildPlaceholder();
     }
 
     return HtmlElementView(
@@ -1241,29 +1251,72 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
   void _ensureRegistered() {
     if (_registered) return;
 
-    // ignore: undefined_prefixed_name
-    ui.platformViewRegistry.registerViewFactory(
-      _viewType,
-      (int viewId) {
-        final element = html.IFrameElement()
-          ..style.border = '0'
-          ..allowFullscreen = true
-          ..allow =
-              'autoplay; encrypted-media; picture-in-picture; fullscreen';
-        _iframes[viewId] = element;
-        return element;
-      },
-    );
+    try {
+      if (MeetingRecordingEmbed.debugForceRegistrationFailure) {
+        throw Exception('Forced registration failure for testing');
+      }
 
-    _registered = true;
+      // ignore: undefined_prefixed_name
+      ui.platformViewRegistry.registerViewFactory(
+        _viewType,
+        (int viewId) {
+          final element = html.IFrameElement()
+            ..style.border = '0'
+            ..allowFullscreen = true
+            ..allow =
+                'autoplay; encrypted-media; picture-in-picture; fullscreen';
+          _iframes[viewId] = element;
+          return element;
+        },
+      );
+
+      _registered = true;
+    } catch (error, stackTrace) {
+      _handleFailure(error, stackTrace);
+    }
   }
 
   void _setSource() {
-    if (!kIsWeb || _viewId == null) return;
+    if (!kIsWeb || _viewId == null || _failed) return;
 
     final element = _iframes[_viewId!];
-    if (element != null) {
-      element.src = widget.uri.toString();
+    try {
+      if (MeetingRecordingEmbed.debugForceSrcFailure) {
+        throw Exception('Forced iframe src failure for testing');
+      }
+
+      element?.src = widget.uri.toString();
+    } catch (error, stackTrace) {
+      _handleFailure(error, stackTrace);
     }
+  }
+
+  void _handleFailure(Object error, StackTrace stackTrace) {
+    debugPrint('Meeting recording embed failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+
+    if (mounted && !_failed) {
+      setState(() => _failed = true);
+    }
+
+    if (!_notifiedFailure) {
+      _notifiedFailure = true;
+      widget.onFailure?.call();
+    }
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      height: 320,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Text(
+        'Recording unavailable',
+        style: TextStyle(color: Colors.white70),
+      ),
+    );
   }
 }

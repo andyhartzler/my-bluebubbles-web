@@ -1,6 +1,7 @@
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member_portal.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
+import 'package:bluebubbles/screens/crm/meeting_detail_screen.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,8 @@ void main() {
 
   tearDown(() {
     MemberPortalManagementScreen.recordingEmbedBuilderOverride = null;
+    MeetingRecordingEmbed.debugForceRegistrationFailure = false;
+    MeetingRecordingEmbed.debugForceSrcFailure = false;
     CRMSupabaseService().debugSetInitialized(false);
   });
 
@@ -38,9 +41,7 @@ void main() {
         ErrorWidget.builder = originalErrorWidgetBuilder;
       });
 
-      MemberPortalManagementScreen.recordingEmbedBuilderOverride = (_) {
-        throw Exception('embed failed');
-      };
+      MeetingRecordingEmbed.debugForceRegistrationFailure = true;
 
       await tester.pumpWidget(
         const MaterialApp(
