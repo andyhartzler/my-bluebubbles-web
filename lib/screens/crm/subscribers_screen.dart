@@ -684,15 +684,14 @@ class _SubscriberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-      final theme = Theme.of(context);
-      final statusLabel = _statusLabelFor(subscriber);
-      final statusColor = _statusColor(statusLabel, theme);
+    final theme = Theme.of(context);
+    final statusLabel = _statusLabelFor(subscriber);
+    final statusColor = _statusColor(statusLabel, theme);
 
-      final tags = subscriber.tagList.take(3).toList();
-      final String? locationLabel =
-          (subscriber.city != null || subscriber.state != null)
-              ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
-              : null;
+    final tags = subscriber.tagList.take(3).toList();
+    final String? locationLabel = (subscriber.city != null || subscriber.state != null)
+        ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
+        : null;
 
     return Card(
       elevation: 2,
@@ -713,16 +712,12 @@ class _SubscriberCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                subscriber.name,
-                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        Expanded(
+                          child: Text(
+                            subscriber.name,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         _StatusPill(label: statusLabel, color: statusColor),
@@ -739,10 +734,26 @@ class _SubscriberCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            subscriber.email,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white70,
-                            ),
+                            subscriber.email ?? 'No email',
+                            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.phone_outlined,
+                          size: 16,
+                          color: Colors.white70,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            subscriber.phone ?? 'No phone number',
+                            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -751,27 +762,33 @@ class _SubscriberCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
-                      runSpacing: 4,
+                      runSpacing: 6,
                       children: [
-                        _StatusPill(status: status, color: statusColor),
-                        if (subscriber.city != null || subscriber.state != null)
+                        if (locationLabel != null)
                           _InfoPill(
                             icon: Icons.location_on_outlined,
-                            label:
-                                '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}',
+                            label: locationLabel,
                           ),
                         if (subscriber.county != null)
-                          _InfoPill(icon: Icons.map_outlined, label: subscriber.county!),
+                          _InfoPill(
+                            icon: Icons.map_outlined,
+                            label: subscriber.county!,
+                          ),
                         if (subscriber.congressionalDistrict != null)
                           _InfoPill(
-                              icon: Icons.account_balance_outlined,
-                              label: 'CD ${subscriber.congressionalDistrict}'),
+                            icon: Icons.account_balance_outlined,
+                            label: 'CD ${subscriber.congressionalDistrict}',
+                          ),
                         if (subscriber.optinDate != null)
                           _InfoPill(
-                              icon: Icons.calendar_month_outlined,
-                              label: 'Opt-in ${_dateFormat.format(subscriber.optinDate!)}'),
+                            icon: Icons.calendar_month_outlined,
+                            label: 'Opt-in ${_dateFormat.format(subscriber.optinDate!)}',
+                          ),
                         if (subscriber.source != null)
-                          _InfoPill(icon: Icons.source_outlined, label: subscriber.source!),
+                          _InfoPill(
+                            icon: Icons.source_outlined,
+                            label: subscriber.source!,
+                          ),
                         if (subscriber.eventAttendanceCount > 0)
                           _InfoPill(
                             icon: Icons.event_available_outlined,
@@ -780,163 +797,90 @@ class _SubscriberCard extends StatelessWidget {
                         if (subscriber.donor != null)
                           _InfoPill(
                             icon: Icons.volunteer_activism_outlined,
-                            label:
-                                'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                            label: 'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                          ),
+                        if (tags.isNotEmpty)
+                          Row(
+                            children: [
+                              ...tags
+                                  .map(
+                                    (tag) => Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.18),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        tag,
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ],
                           ),
                       ],
                     ),
-                    if (subscriber.phoneE164 != null &&
-                        subscriber.phoneE164!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.phone_outlined,
-                            size: 16,
-                            color: Colors.white70,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            subscriber.phoneE164!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (tags.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: tags
-                            .map((tag) => Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.18),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    tag,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ))
-                            .toList(),
-                      ),
-                    ],
                   ],
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 flex: 2,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    if (locationLabel != null)
-                      _InfoPill(
-                        icon: Icons.location_on_outlined,
-                        label: locationLabel,
-                      ),
-                    if (subscriber.county != null)
-                      _InfoPill(
-                        icon: Icons.map_outlined,
-                        label: subscriber.county!,
-                      ),
-                    if (subscriber.congressionalDistrict != null)
-                      _InfoPill(
-                        icon: Icons.account_balance_outlined,
-                        label: 'CD ${subscriber.congressionalDistrict}',
-                      ),
-                    if (subscriber.optinDate != null)
-                      _InfoPill(
-                        icon: Icons.calendar_month_outlined,
-                        label:
-                            'Opt-in ${_dateFormat.format(subscriber.optinDate!)}',
-                      ),
-                    if (subscriber.source != null)
-                      _InfoPill(
-                        icon: Icons.source_outlined,
-                        label: subscriber.source!,
-                      ),
-                    if (subscriber.eventAttendanceCount > 0)
-                      _InfoPill(
-                        icon: Icons.event_available_outlined,
-                        label: '${subscriber.eventAttendanceCount} events',
-                      ),
-                    if (subscriber.donor != null)
-                      _InfoPill(
-                        icon: Icons.volunteer_activism_outlined,
-                        label:
-                            'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: Builder(
-                    builder: (context) {
-                      final locationLabel =
-                          subscriber.city != null || subscriber.state != null
-                              ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
-                              : null;
+                child: Builder(
+                  builder: (context) {
+                    final locationLabel = (subscriber.city != null || subscriber.state != null)
+                        ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
+                        : null;
 
-                      return Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: [
-                          if (locationLabel != null)
-                            _InfoPill(
-                              icon: Icons.location_on_outlined,
-                              label: locationLabel,
-                            ),
-                          if (subscriber.county != null)
-                            _InfoPill(
-                              icon: Icons.map_outlined,
-                              label: subscriber.county!,
-                            ),
-                          if (subscriber.congressionalDistrict != null)
-                            _InfoPill(
-                              icon: Icons.account_balance_outlined,
-                              label: 'CD ${subscriber.congressionalDistrict}',
-                            ),
-                          if (subscriber.optinDate != null)
-                            _InfoPill(
-                              icon: Icons.calendar_month_outlined,
-                              label:
-                                  'Opt-in ${_dateFormat.format(subscriber.optinDate!)}',
-                            ),
-                          if (subscriber.source != null)
-                            _InfoPill(
-                              icon: Icons.source_outlined,
-                              label: subscriber.source!,
-                            ),
-                          if (subscriber.eventAttendanceCount > 0)
-                            _InfoPill(
-                              icon: Icons.event_available_outlined,
-                              label: '${subscriber.eventAttendanceCount} events',
-                            ),
-                          if (subscriber.donor != null)
-                            _InfoPill(
-                              icon: Icons.volunteer_activism_outlined,
-                              label:
-                                  'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
-                            ),
-                        ],
-                      );
-                    },
-                  ),
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        if (locationLabel != null)
+                          _InfoPill(
+                            icon: Icons.location_on_outlined,
+                            label: locationLabel,
+                          ),
+                        if (subscriber.county != null)
+                          _InfoPill(
+                            icon: Icons.map_outlined,
+                            label: subscriber.county!,
+                          ),
+                        if (subscriber.congressionalDistrict != null)
+                          _InfoPill(
+                            icon: Icons.account_balance_outlined,
+                            label: 'CD ${subscriber.congressionalDistrict}',
+                          ),
+                        if (subscriber.optinDate != null)
+                          _InfoPill(
+                            icon: Icons.calendar_month_outlined,
+                            label: 'Opt-in ${_dateFormat.format(subscriber.optinDate!)}',
+                          ),
+                        if (subscriber.source != null)
+                          _InfoPill(
+                            icon: Icons.source_outlined,
+                            label: subscriber.source!,
+                          ),
+                        if (subscriber.eventAttendanceCount > 0)
+                          _InfoPill(
+                            icon: Icons.event_available_outlined,
+                            label: '${subscriber.eventAttendanceCount} events',
+                          ),
+                        if (subscriber.donor != null)
+                          _InfoPill(
+                            icon: Icons.volunteer_activism_outlined,
+                            label: 'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                          ),
+                      ],
+                    );
+                  },
                 ),
-                const SizedBox(width: 12),
+              ),
+              const SizedBox(width: 12),
               Column(
                 children: [
                   IconButton(
@@ -1244,13 +1188,15 @@ class _SubscriberDetailSheet extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
-                      onPressed: widget.canManage && !_saving ? _openEditDialog : null,
+                      onPressed:
+                          canManage ? () => _showComingSoon(context) : null,
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Edit Subscriber'),
                     ),
                     const SizedBox(width: 12),
                     OutlinedButton.icon(
-                      onPressed: widget.canManage && !_saving ? _openEditDialog : null,
+                      onPressed:
+                          canManage ? () => _showComingSoon(context) : null,
                       icon: const Icon(Icons.note_add_outlined),
                       label: const Text('Add Note'),
                     ),
@@ -1261,12 +1207,6 @@ class _SubscriberDetailSheet extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('This action will be available soon.')),
     );
   }
 
@@ -1412,6 +1352,11 @@ class _SubscriberDetailSheet extends StatelessWidget {
     return items;
   }
 
+  String _formatCurrency(num amount) {
+    final format = NumberFormat.currency(symbol: '\$');
+    return format.format(amount);
+  }
+
   Widget _detailItem(String label, String value, {IconData? icon}) {
     return SizedBox(
       width: 280,
@@ -1531,64 +1476,27 @@ class _StatsTile extends StatelessWidget {
   }
 }
 
-class _StatsTile extends StatelessWidget {
+class _StatusPill extends StatelessWidget {
   final String label;
-  final int value;
-  final IconData icon;
   final Color color;
 
-  const _StatsTile({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
+  const _StatusPill({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 200,
-      child: Card(
-        color: color.withOpacity(0.06),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.white.withOpacity(0.2),
-                child: Icon(icon, color: Colors.white, size: 18),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: Colors.white.withOpacity(0.85)),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelMedium
-                    ?.copyWith(color: Colors.white.withOpacity(0.8)),
-              ),
-            ],
-          ),
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }
