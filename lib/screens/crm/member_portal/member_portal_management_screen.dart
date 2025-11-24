@@ -1120,7 +1120,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
               ? (_selectedShowRecording
                   ? 'Recording embed visible to members'
                   : 'Recording embed ready (hidden from members)')
-              : embedFailed
+              : _recordingEmbedFailed
                   ? 'Recording embed unavailable'
                   : 'Recording embed URL missing',
           style: const TextStyle(color: Colors.white),
@@ -1130,7 +1130,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
               ? _selectedShowRecording
                   ? 'Embedded player matches the main Meetings page.'
                   : 'Embed previewed here but hidden from portal visitors.'
-              : embedFailed
+              : _recordingEmbedFailed
                   ? 'Embed failed to load; showing the fallback link instead.'
                   : 'Add an embed URL in Supabase to stream the recording.',
           style: const TextStyle(color: Colors.white70),
@@ -1191,7 +1191,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
             borderRadius: BorderRadius.circular(12),
             child: Card(
               margin: EdgeInsets.zero,
-              color: Colors.grey.shade950,
+              color: Colors.grey.shade900,
               clipBehavior: Clip.antiAlias,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
