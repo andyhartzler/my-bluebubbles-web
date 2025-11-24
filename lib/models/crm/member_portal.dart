@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:bluebubbles/models/crm/member.dart';
+
 class PortalAttachment {
   final String name;
   final String url;
@@ -600,6 +602,42 @@ class MemberPortalDashboardStats {
     publishedMeetings: 0,
     visibleResources: 0,
   );
+}
+
+class MemberPortalRecentSignIn {
+  final String id;
+  final String name;
+  final String? email;
+  final String? chapterName;
+  final List<MemberProfilePhoto> profilePictures;
+  final DateTime lastSignInAt;
+
+  const MemberPortalRecentSignIn({
+    required this.id,
+    required this.name,
+    required this.lastSignInAt,
+    this.email,
+    this.chapterName,
+    this.profilePictures = const [],
+  });
+
+  factory MemberPortalRecentSignIn.fromJson(Map<String, dynamic> json) {
+    final profilePictures = (json['profile_pictures'] as List?)
+            ?.map((value) => MemberProfilePhoto.fromJson(value))
+            .toList() ??
+        const <MemberProfilePhoto>[];
+
+    return MemberPortalRecentSignIn(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Member',
+      email: json['email']?.toString(),
+      chapterName: json['chapter_name']?.toString(),
+      profilePictures: profilePictures,
+      lastSignInAt:
+          DateTime.tryParse(json['last_sign_in_at']?.toString() ?? '') ??
+              DateTime.now(),
+    );
+  }
 }
 
 bool? _normalizeBool(dynamic value) {
