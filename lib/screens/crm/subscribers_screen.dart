@@ -1188,13 +1188,15 @@ class _SubscriberDetailSheet extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
-                      onPressed: widget.canManage && !_saving ? _openEditDialog : null,
+                      onPressed:
+                          canManage ? () => _showComingSoon(context) : null,
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Edit Subscriber'),
                     ),
                     const SizedBox(width: 12),
                     OutlinedButton.icon(
-                      onPressed: widget.canManage && !_saving ? _openEditDialog : null,
+                      onPressed:
+                          canManage ? () => _showComingSoon(context) : null,
                       icon: const Icon(Icons.note_add_outlined),
                       label: const Text('Add Note'),
                     ),
@@ -1205,12 +1207,6 @@ class _SubscriberDetailSheet extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('This action will be available soon.')),
     );
   }
 
@@ -1356,6 +1352,11 @@ class _SubscriberDetailSheet extends StatelessWidget {
     return items;
   }
 
+  String _formatCurrency(num amount) {
+    final format = NumberFormat.currency(symbol: '\$');
+    return format.format(amount);
+  }
+
   Widget _detailItem(String label, String value, {IconData? icon}) {
     return SizedBox(
       width: 280,
@@ -1475,64 +1476,27 @@ class _StatsTile extends StatelessWidget {
   }
 }
 
-class _StatsTile extends StatelessWidget {
+class _StatusPill extends StatelessWidget {
   final String label;
-  final int value;
-  final IconData icon;
   final Color color;
 
-  const _StatsTile({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
+  const _StatusPill({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 200,
-      child: Card(
-        color: color.withOpacity(0.06),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.white.withOpacity(0.2),
-                child: Icon(icon, color: Colors.white, size: 18),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: Colors.white.withOpacity(0.85)),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelMedium
-                    ?.copyWith(color: Colors.white.withOpacity(0.8)),
-              ),
-            ],
-          ),
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }

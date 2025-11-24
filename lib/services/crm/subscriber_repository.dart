@@ -43,7 +43,7 @@ class SubscriberRepository {
         *,
         donor:donor_id(id,total_donated,donation_count,last_donation_date)
       ''')
-          ..is_('member_id', null);
+          ..filter('member_id', 'is', null);
 
     query = _applyFilters(
       query,
@@ -181,7 +181,7 @@ class SubscriberRepository {
     postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query = _readClient
         .from('subscribers')
         .select('id')
-      ..is_('member_id', null);
+      ..filter('member_id', 'is', null);
     filters.forEach((key, value) => query = query.eq(key, value));
     if (notNullColumn != null) {
       query = query.not(notNullColumn, 'is', null);
@@ -198,7 +198,7 @@ class SubscriberRepository {
     final data = await _readClient
         .from('subscribers')
         .select('source')
-        .is_('member_id', null);
+        .filter('member_id', 'is', null);
 
     final results = <String, int>{};
     for (final row in (data as List<dynamic>?) ?? []) {
@@ -213,7 +213,7 @@ class SubscriberRepository {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     final postgrest.PostgrestResponse response = await _readClient
         .from('subscribers')
-        .select<List<Map<String, dynamic>>>('id')
+        .select('id')
         .filter('member_id', 'is', null)
         .eq('subscribed', true)
         .gte('optin_date', thirtyDaysAgo.toIso8601String())
@@ -226,7 +226,7 @@ class SubscriberRepository {
     final response = await _readClient
         .from('subscribers')
         .select(column)
-        .is_('member_id', null)
+        .filter('member_id', 'is', null)
         .order(column, ascending: true);
 
     return ((response as List<dynamic>?) ?? [])
