@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -439,19 +441,36 @@ class _EventsScreenState extends State<EventsScreen> {
                         ),
                       ),
                     )
-                  : SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final event = _events[index];
-                          return Padding(
-                            padding: EdgeInsets.only(
-                              bottom: index == _events.length - 1 ? 0 : 12,
-                            ),
-                            child: _buildEventCard(event),
-                          );
-                        },
-                        childCount: _events.length,
-                      ),
+                  : SliverLayoutBuilder(
+                      builder: (context, constraints) {
+                        const spacing = 16.0;
+                        const heroAspectRatio = 1080 / 1350; // width / height
+                        const metadataHeightEstimate = 190.0;
+
+                        final crossAxisCount = math
+                            .max(1, math.min(4, (constraints.crossAxisExtent / 260).floor()));
+                        final itemWidth = (constraints.crossAxisExtent -
+                                (spacing * (crossAxisCount - 1))) /
+                            crossAxisCount;
+                        final itemHeight = (itemWidth / heroAspectRatio) + metadataHeightEstimate;
+                        final childAspectRatio = itemWidth / itemHeight;
+
+                        return SliverGrid(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final event = _events[index];
+                              return _buildEventCard(event);
+                            },
+                            childCount: _events.length,
+                          ),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: spacing,
+                            mainAxisSpacing: spacing,
+                            childAspectRatio: childAspectRatio,
+                          ),
+                        );
+                      },
                     ),
             ),
           ],
