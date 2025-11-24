@@ -37,6 +37,99 @@ class MemberPortalManagementScreen extends StatefulWidget {
   State<MemberPortalManagementScreen> createState() => _MemberPortalManagementScreenState();
 }
 
+class _RecordingEmbedPreview extends StatefulWidget {
+  final Uri embedUri;
+  final Widget Function(Uri uri)? embedBuilder;
+  final VoidCallback onFailure;
+
+  const _RecordingEmbedPreview({
+    required this.embedUri,
+    required this.onFailure,
+    this.embedBuilder,
+  });
+
+  @override
+  State<_RecordingEmbedPreview> createState() => _RecordingEmbedPreviewState();
+}
+
+class _RecordingEmbedPreviewState extends State<_RecordingEmbedPreview> {
+  late final Future<Widget?> _embedFuture = _buildEmbed();
+  bool _notifiedFailure = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Widget?>(
+      future: _embedFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 320,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError || snapshot.data == null) {
+          _notifyFailure();
+          return const _RecordingEmbedPlaceholder();
+        }
+
+        return snapshot.data!;
+      },
+    );
+  }
+
+  Future<Widget?> _buildEmbed() async {
+    try {
+      final embedBuilder = widget.embedBuilder;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          height: 320,
+          child: embedBuilder != null
+              ? embedBuilder(widget.embedUri)
+              : MeetingRecordingEmbed(
+                  uri: widget.embedUri,
+                  onFailure: _notifyFailure,
+                ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      _notifyFailure();
+      debugPrint(
+        'Failed to build meeting recording embed for ${widget.embedUri}: $error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+      return null;
+    }
+  }
+
+  void _notifyFailure() {
+    if (_notifiedFailure) return;
+    _notifiedFailure = true;
+    widget.onFailure();
+  }
+}
+
+class _RecordingEmbedPlaceholder extends StatelessWidget {
+  const _RecordingEmbedPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 320,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Text(
+        'Recording embed unavailable',
+        style: TextStyle(color: Colors.white70),
+      ),
+    );
+  }
+}
+
 enum _MeetingSwitchAction { save, discard, cancel }
 
 class _MemberPortalManagementScreenState extends State<MemberPortalManagementScreen>
@@ -76,6 +169,8 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   bool _selectedIsPublished = false;
   bool _selectedShowRecording = false;
   bool _recordingExpanded = false;
+  bool _recordingEmbedFailed = false;
+  String? _lastRecordingEmbedUrl;
   Meeting? _selectedMeetingDetails;
   bool _loadingMeetingDetails = false;
   String? _meetingDetailsError;
@@ -1061,6 +1156,16 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   Widget _buildRecordingSection(MemberPortalMeeting meeting, Meeting? details) {
     final resolvedUrl = _resolveRecordingUrl(meeting, details);
+    if (_lastRecordingEmbedUrl != resolvedUrl) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _lastRecordingEmbedUrl = resolvedUrl;
+          _recordingEmbedFailed = false;
+        });
+      });
+    }
+
     final embedUri = resolvedUrl != null ? Uri.tryParse(resolvedUrl) : null;
     final hasEmbed = embedUri != null && embedUri.hasScheme;
     final fallbackUrl = details?.recordingUrl?.trim().isNotEmpty == true
@@ -1071,31 +1176,18 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         : null;
 
     Widget? embedPreview;
-    bool embedFailed = false;
+    final embedFailed = _recordingEmbedFailed;
     if (hasEmbed && embedUri != null) {
-      try {
-        final embedBuilder =
-            MemberPortalManagementScreen.recordingEmbedBuilderOverride;
-        embedPreview = ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            height: 320,
-            child: embedBuilder != null
-                ? embedBuilder(embedUri)
-                : MeetingRecordingEmbed(uri: embedUri),
-          ),
-        );
-      } catch (error, stackTrace) {
-        embedFailed = true;
-        debugPrint(
-          'Failed to build meeting recording embed for $embedUri: $error',
-        );
-        debugPrintStack(stackTrace: stackTrace);
-      }
+      embedPreview = _RecordingEmbedPreview(
+        embedUri: embedUri,
+        embedBuilder:
+            MemberPortalManagementScreen.recordingEmbedBuilderOverride,
+        onFailure: _markRecordingEmbedFailed,
+      );
     }
 
     final showFallbackLink = fallbackUri != null;
-    final canEmbed = embedPreview != null;
+    final canEmbed = embedPreview != null && !embedFailed;
 
     return Card(
       color: Colors.grey.shade900,
@@ -1129,7 +1221,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          if (canEmbed)
+          if (embedPreview != null)
             embedPreview!
           else
             const Text(
@@ -1162,6 +1254,12 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         ],
       ),
     );
+  }
+
+  void _markRecordingEmbedFailed() {
+    if (_recordingEmbedFailed) return;
+    if (!mounted) return;
+    setState(() => _recordingEmbedFailed = true);
   }
 
   Future<void> _launchRecording(Uri uri) async {
