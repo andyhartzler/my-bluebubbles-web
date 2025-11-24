@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
@@ -24,6 +25,11 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
   bool _saving = false;
   late final Map<String, dynamic> _originalData;
   late final Map<String, _AttendanceFieldType> _fieldTypes;
+  final DateFormat _timeFormat = DateFormat('h:mma');
+  late final DateTime _meetingStart;
+  DateTime? _firstJoinTime;
+  DateTime? _lastLeaveTime;
+  int? _totalDurationMinutes;
 
   static const Map<String, _AttendanceFieldType> _meetingFieldTypes = {
     'member_id': _AttendanceFieldType.text,
@@ -59,6 +65,12 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
     _isHost = _fieldTypes.containsKey('is_host')
         ? widget.attendance.isHost
         : widget.attendance.checkedIn;
+    _meetingStart = widget.attendance.meetingDate ??
+        widget.attendance.meeting?.meetingDate ??
+        DateTime.now();
+    _firstJoinTime = widget.attendance.firstJoinTime;
+    _lastLeaveTime = widget.attendance.lastLeaveTime;
+    _totalDurationMinutes = widget.attendance.totalDurationMinutes;
 
     void assignController(String key, String? value) {
       _controllers[key] = TextEditingController(text: value ?? '');
@@ -86,16 +98,16 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
       assignController('notes', widget.attendance.notes);
     }
     if (_fieldTypes.containsKey('total_duration_minutes')) {
-      assignController('total_duration_minutes', widget.attendance.totalDurationMinutes?.toString());
+      assignController('total_duration_minutes', _totalDurationMinutes?.toString());
     }
     if (_fieldTypes.containsKey('number_of_joins')) {
       assignController('number_of_joins', widget.attendance.numberOfJoins?.toString());
     }
     if (_fieldTypes.containsKey('first_join_time')) {
-      assignController('first_join_time', widget.attendance.firstJoinTime?.toIso8601String());
+      assignController('first_join_time', _formatTime(_firstJoinTime ?? _meetingStart));
     }
     if (_fieldTypes.containsKey('last_leave_time')) {
-      assignController('last_leave_time', widget.attendance.lastLeaveTime?.toIso8601String());
+      assignController('last_leave_time', _formatTime(_lastLeaveTime));
     }
     if (_fieldTypes.containsKey('zoom_display_name')) {
       assignController('zoom_display_name', widget.attendance.zoomDisplayName);
@@ -106,6 +118,9 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
     if (_fieldTypes.containsKey('matched_by')) {
       assignController('matched_by', widget.attendance.matchedBy);
     }
+
+    _syncTimesFromDurationIfPossible();
+    _syncDurationFromTimes();
   }
 
   @override
@@ -114,6 +129,66 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
       controller.dispose();
     }
     super.dispose();
+  }
+
+  String _formatTime(DateTime? value) {
+    if (value == null) return '';
+    return _timeFormat.format(value.toLocal());
+  }
+
+  Future<void> _pickTime(String key) async {
+    final currentValue = key == 'first_join_time' ? _firstJoinTime : _lastLeaveTime;
+    final base = currentValue ?? _meetingStart;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(base),
+    );
+
+    if (picked == null) return;
+
+    final updated = DateTime(base.year, base.month, base.day, picked.hour, picked.minute);
+    setState(() {
+      if (key == 'first_join_time') {
+        _firstJoinTime = updated;
+        _controllers[key]?.text = _formatTime(_firstJoinTime);
+        _syncTimesFromDurationIfPossible();
+        _syncDurationFromTimes();
+      } else {
+        _lastLeaveTime = updated;
+        _controllers[key]?.text = _formatTime(_lastLeaveTime);
+        _syncDurationFromTimes();
+      }
+    });
+  }
+
+  void _syncDurationFromTimes() {
+    if (_firstJoinTime != null && _lastLeaveTime != null) {
+      final minutes = _lastLeaveTime!.difference(_firstJoinTime!).inMinutes;
+      _totalDurationMinutes = minutes >= 0 ? minutes : 0;
+      final durationController = _controllers['total_duration_minutes'];
+      if (durationController != null) {
+        durationController.text = _totalDurationMinutes.toString();
+      }
+    }
+  }
+
+  void _syncTimesFromDurationIfPossible() {
+    if (_totalDurationMinutes == null) return;
+    _firstJoinTime ??= _meetingStart;
+    _lastLeaveTime = _firstJoinTime!.add(Duration(minutes: _totalDurationMinutes!));
+    _controllers['first_join_time']?.text = _formatTime(_firstJoinTime);
+    _controllers['last_leave_time']?.text = _formatTime(_lastLeaveTime);
+  }
+
+  void _syncTimesFromDuration() {
+    final durationText = _controllers['total_duration_minutes']?.text.trim();
+    final parsed = int.tryParse(durationText ?? '');
+    _totalDurationMinutes = parsed;
+    if (parsed == null) return;
+    _firstJoinTime ??= _meetingStart;
+    _lastLeaveTime = _firstJoinTime!.add(Duration(minutes: parsed));
+    _controllers['first_join_time']?.text = _formatTime(_firstJoinTime);
+    _controllers['last_leave_time']?.text = _formatTime(_lastLeaveTime);
   }
 
   @override
@@ -234,24 +309,19 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
             }
             return null;
           },
+          onChanged: key == 'total_duration_minutes' ? (_) => _syncTimesFromDuration() : null,
         );
       case _AttendanceFieldType.dateTime:
         final controller = ensureController();
         return TextFormField(
           controller: controller,
+          readOnly: true,
           decoration: InputDecoration(
             labelText: _labelFor(key),
-            helperText: 'ISO timestamp',
             border: const OutlineInputBorder(),
+            suffixIcon: const Icon(Icons.access_time),
           ),
-          validator: (value) {
-            final text = value?.trim() ?? '';
-            if (text.isEmpty) return null;
-            if (DateTime.tryParse(text) == null) {
-              return 'Enter a valid ISO timestamp';
-            }
-            return null;
-          },
+          onTap: () => _pickTime(key),
         );
       case _AttendanceFieldType.multiline:
         final controller = ensureController();
@@ -322,6 +392,13 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
       }
     }
 
+    if (_totalDurationMinutes != null && _firstJoinTime == null) {
+      _firstJoinTime = _meetingStart;
+    }
+    if (_totalDurationMinutes != null && _firstJoinTime != null && _lastLeaveTime == null) {
+      _lastLeaveTime = _firstJoinTime!.add(Duration(minutes: _totalDurationMinutes!));
+    }
+
     for (final entry in _fieldTypes.entries) {
       final key = entry.key;
       switch (entry.value) {
@@ -334,16 +411,15 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
             compare(key, null);
           } else {
             final parsed = int.tryParse(text);
+            if (key == 'total_duration_minutes') {
+              _totalDurationMinutes = parsed;
+            }
             if (parsed != null) compare(key, parsed);
           }
           break;
         case _AttendanceFieldType.dateTime:
-          final text = _controllers[key]!.text.trim();
-          if (text.isEmpty) {
-            compare(key, null);
-          } else {
-            compare(key, text);
-          }
+          final value = key == 'first_join_time' ? _firstJoinTime : _lastLeaveTime;
+          compare(key, value?.toUtc().toIso8601String());
           break;
         case _AttendanceFieldType.multiline:
         case _AttendanceFieldType.text:

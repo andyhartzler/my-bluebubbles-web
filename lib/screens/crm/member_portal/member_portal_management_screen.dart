@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:file_picker/file_picker.dart' as file_picker;
+import 'package:characters/characters.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -13,6 +14,7 @@ import 'package:bluebubbles/models/crm/member_portal.dart';
 import 'package:bluebubbles/screens/crm/editors/member_search_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/meeting_detail_screen.dart' show MeetingRecordingEmbed;
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
@@ -67,6 +69,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   bool _selectedVisibleToExecutives = true;
   bool _selectedIsPublished = false;
   bool _selectedShowRecording = false;
+  bool _recordingExpanded = false;
   Meeting? _selectedMeetingDetails;
   bool _loadingMeetingDetails = false;
   String? _meetingDetailsError;
@@ -77,6 +80,8 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   final TextEditingController _fieldVisibilitySearchController = TextEditingController();
   final Set<String> _selectedFieldCategories = {};
+  String _profileChangeStatus = 'pending';
+  String? _profileChangesError;
 
   @override
   void initState() {
@@ -86,7 +91,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     _meetingsFuture = _repository.fetchPortalMeetings();
     _eventsFuture = _repository.fetchMemberSubmittedEvents(status: 'pending');
     _resourcesFuture = _repository.fetchPortalResources();
-    _profileChangesFuture = _repository.fetchProfileChanges();
+    _profileChangesFuture = _repository.fetchProfileChanges(status: _profileChangeStatus);
     _fieldVisibilityFuture = _repository.fetchFieldVisibility();
   }
 
@@ -127,7 +132,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   Future<void> _reloadProfileChanges() async {
     setState(() {
-      _profileChangesFuture = _repository.fetchProfileChanges();
+      _profileChangesError = null;
+      _profileChangesFuture = _repository.fetchProfileChanges(
+        status: _profileChangeStatus == 'all' ? null : _profileChangeStatus,
+      );
       _statsFuture = _repository.fetchDashboardStats();
     });
   }
@@ -472,6 +480,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       _selectedVisibleToExecutives = meeting.visibleToExecutives;
       _selectedIsPublished = meeting.isPublished;
       _selectedShowRecording = meeting.showRecording ?? false;
+      _recordingExpanded = false;
       _meetingSaveError = null;
       _meetingSaveSucceeded = false;
       _meetingHasUnsavedChanges = false;
@@ -617,10 +626,20 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   Widget _buildMeetingCard(MemberPortalMeeting meeting, bool isSelected) {
     final theme = Theme.of(context);
-    final attendeeLabel = meeting.attendeeCount != null ? '${meeting.attendeeCount} attendees' : 'Attendance TBD';
-    final meetingDateLabel = meeting.meetingDate != null
-        ? '${meeting.meetingDate!.toLocal().toString().split(' ').first}'
-        : 'Date TBD';
+    final selectedDetails = _selectedMeetingDetails;
+    final effectiveAttendeeCount = meeting.attendeeCount ??
+        (selectedDetails != null && selectedDetails.id == meeting.meetingId
+            ? selectedDetails.attendanceCount
+            : null);
+    final attendeeLabel = effectiveAttendeeCount != null
+        ? '$effectiveAttendeeCount attendee${effectiveAttendeeCount == 1 ? '' : 's'}'
+        : 'Attendance TBD';
+    final effectiveDate = meeting.meetingDate ??
+        (selectedDetails != null && selectedDetails.id == meeting.meetingId
+            ? selectedDetails.meetingDate
+            : null) ??
+        meeting.createdAt;
+    final meetingDateLabel = DateFormat('MMM d, y').format(effectiveDate.toLocal());
 
     return Card(
       color: _unityBlue,
@@ -1019,54 +1038,58 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   }
 
   Widget _buildRecordingSection(String? recordingEmbedUrl, String? recordingUrl) {
-    if (!_selectedShowRecording) {
-      return Card(
-        color: Colors.grey.shade900,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: const ListTile(
-          leading: Icon(Icons.play_disabled, color: Colors.white70),
-          title: Text('Recording is hidden for members', style: TextStyle(color: Colors.white)),
-          subtitle: Text(
-            'Enable "Show recording" to surface the embed on the portal.',
-            style: TextStyle(color: Colors.white70),
-          ),
-        ),
-      );
-    }
+    final hasEmbed = recordingEmbedUrl?.isNotEmpty == true;
+    final embedUri = hasEmbed ? Uri.tryParse(recordingEmbedUrl!) : null;
 
     return Card(
       color: Colors.grey.shade900,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: ListTile(
-        leading: const Icon(Icons.play_circle, color: Colors.white),
+      child: ExpansionTile(
+        initiallyExpanded: _recordingExpanded && hasEmbed,
+        onExpansionChanged: (expanded) => setState(() => _recordingExpanded = expanded),
+        leading: Icon(
+          _selectedShowRecording ? Icons.play_circle : Icons.play_disabled,
+          color: Colors.white,
+        ),
         title: Text(
-          recordingEmbedUrl?.isNotEmpty == true
-              ? 'Embed URL ready for members'
-              : 'Recording embed URL missing',
+          !_selectedShowRecording
+              ? 'Recording is hidden for members'
+              : hasEmbed
+                  ? 'Recording embed ready'
+                  : 'Recording embed URL missing',
           style: const TextStyle(color: Colors.white),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (recordingEmbedUrl != null && recordingEmbedUrl.isNotEmpty)
-              SelectableText(
-                recordingEmbedUrl,
-                style: const TextStyle(color: Colors.white70),
-              )
-            else
-              const Text(
-                'Add an embed URL to the meeting in Supabase to stream the recording.',
-                style: TextStyle(color: Colors.white70),
-              ),
-            if (recordingUrl != null && recordingUrl.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Fallback URL: $recordingUrl',
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ],
-          ],
+        subtitle: Text(
+          !_selectedShowRecording
+              ? 'Enable "Show recording" to surface the embed on the portal.'
+              : hasEmbed
+                  ? 'Tap to preview the embedded player.'
+                  : 'Add an embed URL in Supabase to stream the recording.',
+          style: const TextStyle(color: Colors.white70),
         ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          if (_selectedShowRecording && hasEmbed && embedUri != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 320,
+                child: MeetingRecordingEmbed(uri: embedUri),
+              ),
+            )
+          else if (_selectedShowRecording)
+            const Text(
+              'No valid embed URL was provided.',
+              style: TextStyle(color: Colors.white70),
+            ),
+          if (recordingUrl != null && recordingUrl.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SelectableText(
+              'Fallback URL: $recordingUrl',
+              style: const TextStyle(color: Colors.white70),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -2193,54 +2216,137 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   }
 
   Widget _buildProfileChangesTab() {
+    const statuses = ['pending', 'approved', 'rejected', 'all'];
+
     return RefreshIndicator(
       onRefresh: _reloadProfileChanges,
       child: FutureBuilder<List<MemberProfileChange>>(
         future: _profileChangesFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
+          final isLoading = snapshot.connectionState == ConnectionState.waiting;
+          _profileChangesError = snapshot.error?.toString();
           final changes = snapshot.data ?? const [];
-          if (changes.isEmpty) {
-            return const Center(child: Text('No pending profile changes.'));
-          }
 
-          return ListView.separated(
+          return ListView(
             padding: const EdgeInsets.all(16),
-            itemCount: changes.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final change = changes[index];
-              return Card(
-                child: ListTile(
-                  title: Text(change.displayLabel ?? change.fieldName),
-                  subtitle: Text('Pending ${change.changeType} for member ${change.memberId}'),
-                  trailing: Wrap(
-                    spacing: 8,
-                    children: [
-                      TextButton(
-                        onPressed: () async {
-                          await _repository.approveProfileChange(change.id);
-                          await _reloadProfileChanges();
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: statuses
+                    .map(
+                      (status) => ChoiceChip(
+                        label: Text(status[0].toUpperCase() + status.substring(1)),
+                        selected: _profileChangeStatus == status,
+                        onSelected: (selected) {
+                          if (!selected) return;
+                          setState(() {
+                            _profileChangeStatus = status;
+                          });
+                          _reloadProfileChanges();
                         },
-                        child: const Text('Approve'),
                       ),
-                      TextButton(
-                        onPressed: () async {
-                          await _repository.rejectProfileChange(change.id, reason: 'Rejected by admin');
-                          await _reloadProfileChanges();
-                        },
-                        child: const Text('Reject'),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 16),
+              if (isLoading)
+                const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
+              else if (_profileChangesError != null)
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Text('Unable to load profile changes: $_profileChangesError'),
+                )
+              else if (changes.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(12.0),
+                  child: Text('No profile changes found for this status.'),
+                )
+              else
+                ...changes.map(_buildProfileChangeCard),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildProfileChangeCard(MemberProfileChange change) {
+    final statusColor = switch (change.status) {
+      'approved' => Colors.green,
+      'rejected' => Colors.red,
+      _ => Colors.amber,
+    };
+
+    final avatarSeed = (change.memberName?.trim().isNotEmpty == true)
+        ? change.memberName!.trim()
+        : change.memberId;
+    final avatarLetter = avatarSeed.isNotEmpty ? avatarSeed.characters.first.toUpperCase() : 'M';
+
+    String valueDelta;
+    if ((change.oldValue ?? '').isEmpty && (change.newValue ?? '').isNotEmpty) {
+      valueDelta = 'Set to: ${change.newValue}';
+    } else if ((change.newValue ?? '').isEmpty && (change.oldValue ?? '').isNotEmpty) {
+      valueDelta = 'Cleared value (was ${change.oldValue})';
+    } else {
+      valueDelta = '"${change.oldValue ?? ''}" → "${change.newValue ?? ''}"';
+    }
+
+    return Card(
+      elevation: 3,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.blueGrey.shade100,
+          child: Text(avatarLetter),
+        ),
+        title: Text(change.memberName ?? change.memberId),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(change.displayLabel ?? change.fieldName, style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text(valueDelta),
+            const SizedBox(height: 4),
+            Text('Requested ${_signInFormat.format(change.createdAt.toLocal())}'),
+          ],
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: statusColor.withOpacity(0.6)),
+              ),
+              child: Text(change.status.toUpperCase(), style: TextStyle(color: statusColor)),
+            ),
+            if (change.status == 'pending')
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton(
+                    onPressed: () async {
+                      await _repository.approveProfileChange(change.id);
+                      await _reloadProfileChanges();
+                    },
+                    child: const Text('Approve'),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      await _repository.rejectProfileChange(change.id, reason: 'Rejected by admin');
+                      await _reloadProfileChanges();
+                    },
+                    child: const Text('Reject'),
+                  ),
+                ],
+              ),
+            if (change.status == 'rejected' && change.rejectionReason != null)
+              Text('Reason: ${change.rejectionReason}', textAlign: TextAlign.right),
+          ],
+        ),
       ),
     );
   }

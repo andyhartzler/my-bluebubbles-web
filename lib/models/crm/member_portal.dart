@@ -451,6 +451,8 @@ class MemberProfileChange {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final String memberId;
+  final String? memberName;
+  final String? memberAvatar;
   final String fieldName;
   final String? displayLabel;
   final String? fieldCategory;
@@ -468,6 +470,8 @@ class MemberProfileChange {
     required this.createdAt,
     this.updatedAt,
     required this.memberId,
+    this.memberName,
+    this.memberAvatar,
     required this.fieldName,
     this.displayLabel,
     this.fieldCategory,
@@ -483,11 +487,14 @@ class MemberProfileChange {
 
   factory MemberProfileChange.fromJson(Map<String, dynamic> json) {
     final visibility = json['member_portal_field_visibility'] as Map<String, dynamic>?;
+    final member = json['members'] as Map<String, dynamic>?;
     return MemberProfileChange(
       id: json['id'].toString(),
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? ''),
       memberId: json['member_id']?.toString() ?? '',
+      memberName: member?['name']?.toString(),
+      memberAvatar: member?['profile_pictures']?.toString(),
       fieldName: json['field_name']?.toString() ?? '',
       displayLabel: visibility?['display_label']?.toString(),
       fieldCategory: visibility?['field_category']?.toString(),

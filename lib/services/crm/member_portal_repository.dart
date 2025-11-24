@@ -406,15 +406,21 @@ class MemberPortalRepository {
     };
   }
 
-  Future<List<MemberProfileChange>> fetchProfileChanges({String status = 'pending'}) async {
+  Future<List<MemberProfileChange>> fetchProfileChanges({String? status}) async {
     if (!_isReady) return const [];
 
     try {
-      final response = await _readClient
-          .from('member_profile_changes')
-          .select('*, member_portal_field_visibility(field_name, display_label, field_category)')
-          .eq('status', status)
-          .order('created_at', ascending: false);
+      var query = _readClient.from('member_profile_changes').select(''',
+            *,
+            members (id, name, profile_pictures),
+            member_portal_field_visibility(field_name, display_label, field_category)
+          ''');
+
+      if (status != null) {
+        query = query.eq('status', status);
+      }
+
+      final response = await query.order('created_at', ascending: false);
 
       return _coerceJsonList(response)
           .map(MemberProfileChange.fromJson)
