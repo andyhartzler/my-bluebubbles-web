@@ -777,7 +777,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     final attendance = details?.attendance ?? const <MeetingAttendance>[];
     final attendeeCount = attendance.isNotEmpty ? attendance.length : meeting.attendeeCount;
     final recordingEmbedUrl =
-        details?.resolvedRecordingEmbedUrl ?? details?.recordingEmbedUrl ?? meeting.recordingEmbedUrl ?? meeting.recordingUrl;
+        details?.resolvedRecordingEmbedUrl ?? meeting.resolvedRecordingEmbedUrl ?? details?.recordingEmbedUrl ?? meeting.recordingEmbedUrl;
     final recordingUrl = details?.recordingUrl ?? meeting.recordingUrl;
 
     return DecoratedBox(
