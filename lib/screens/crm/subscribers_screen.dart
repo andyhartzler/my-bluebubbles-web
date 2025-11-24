@@ -938,8 +938,10 @@ class _SubscriberCard extends StatelessWidget {
   List<Widget> _buildInfoPills(Subscriber subscriber) {
     final pills = <Widget>[];
 
-    final locationLabel = subscriber.city != null || subscriber.state != null
-        ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
+    final hasCity = subscriber.city != null && subscriber.city!.isNotEmpty;
+    final hasState = subscriber.state != null && subscriber.state!.isNotEmpty;
+    final locationLabel = (hasCity || hasState)
+        ? '${subscriber.city ?? ''}${hasCity && hasState ? ', ' : ''}${subscriber.state ?? ''}'
         : null;
 
     if (locationLabel != null) {
@@ -1212,11 +1214,15 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
       );
     }
 
-    if (subscriber.city != null || subscriber.state != null) {
+    final hasCity = subscriber.city != null && subscriber.city!.isNotEmpty;
+    final hasState = subscriber.state != null && subscriber.state!.isNotEmpty;
+    if (hasCity || hasState) {
+      final locationLabel =
+          '${subscriber.city ?? ''}${hasCity && hasState ? ', ' : ''}${subscriber.state ?? ''}';
       items.add(
         _detailItem(
           'Location',
-          '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}',
+          locationLabel,
           icon: Icons.location_city_outlined,
         ),
       );
