@@ -73,6 +73,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   late TextEditingController _descriptionController;
   late TextEditingController _locationController;
   late TextEditingController _locationAddressController;
+  late TextEditingController _locationOneNameController;
+  late TextEditingController _locationOneAddressController;
+  late TextEditingController _locationTwoNameController;
+  late TextEditingController _locationTwoAddressController;
+  late TextEditingController _locationThreeNameController;
+  late TextEditingController _locationThreeAddressController;
   late TextEditingController _maxAttendeesController;
   late TextEditingController _phoneController;
   late TextEditingController _eventDateDisplayController;
@@ -95,6 +101,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   DateTime? _rsvpDeadline;
   String? _eventType;
   String _status = 'draft';
+  bool _multipleLocations = false;
   bool _hideAddressBeforeRsvp = false;
   bool _rsvpEnabled = true;
   bool _checkinEnabled = false;
@@ -114,9 +121,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
   bool _hasText(String? value) => value?.trim().isNotEmpty == true;
 
+  String? _trimmed(TextEditingController controller) {
+    final value = controller.text.trim();
+    return value.isEmpty ? null : value;
+  }
+
   String? get _displayLocationLabel {
     if (_currentEvent.multipleLocations) {
-      return _hasText(_currentEvent.location) ? _currentEvent.location!.trim() : null;
+      if (_hasText(_currentEvent.location)) return _currentEvent.location!.trim();
+      if (_hasText(_currentEvent.locationOneName)) return _currentEvent.locationOneName!.trim();
+      if (_hasText(_currentEvent.locationOneAddress)) return _currentEvent.locationOneAddress!.trim();
+      return 'Multiple locations';
     }
 
     if (_hasText(_currentEvent.location)) return _currentEvent.location!.trim();
@@ -133,6 +148,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _descriptionController = TextEditingController(text: event.description ?? '');
     _locationController = TextEditingController(text: event.location ?? '');
     _locationAddressController = TextEditingController(text: event.locationAddress ?? '');
+    _locationOneNameController = TextEditingController(text: event.locationOneName ?? '');
+    _locationOneAddressController = TextEditingController(text: event.locationOneAddress ?? '');
+    _locationTwoNameController = TextEditingController(text: event.locationTwoName ?? '');
+    _locationTwoAddressController = TextEditingController(text: event.locationTwoAddress ?? '');
+    _locationThreeNameController = TextEditingController(text: event.locationThreeName ?? '');
+    _locationThreeAddressController = TextEditingController(text: event.locationThreeAddress ?? '');
     _maxAttendeesController = TextEditingController(
       text: event.maxAttendees != null ? event.maxAttendees.toString() : '',
     );
@@ -144,6 +165,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _rsvpDeadline = event.rsvpDeadline;
     _eventType = event.eventType;
     _status = event.status;
+    _multipleLocations = event.multipleLocations;
     _hideAddressBeforeRsvp = event.hideAddressBeforeRsvp;
     _rsvpEnabled = event.rsvpEnabled;
     _checkinEnabled = event.checkinEnabled;
@@ -200,6 +222,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _descriptionController.dispose();
     _locationController.dispose();
     _locationAddressController.dispose();
+    _locationOneNameController.dispose();
+    _locationOneAddressController.dispose();
+    _locationTwoNameController.dispose();
+    _locationTwoAddressController.dispose();
+    _locationThreeNameController.dispose();
+    _locationThreeAddressController.dispose();
     _maxAttendeesController.dispose();
     _phoneController.dispose();
     _eventDateDisplayController.dispose();
@@ -259,14 +287,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       eventDate: _eventDate ?? _currentEvent.eventDate ?? DateTime.now(),
       eventEndDate: _eventEndDate,
       location: _locationController.text.trim().isEmpty ? null : _locationController.text.trim(),
-      locationAddress: _locationAddressController.text.trim().isEmpty ? null : _locationAddressController.text.trim(),
-      locationOneName: _currentEvent.locationOneName ?? widget.initialEvent.locationOneName,
-      locationOneAddress: _currentEvent.locationOneAddress ?? widget.initialEvent.locationOneAddress,
-      locationTwoName: _currentEvent.locationTwoName ?? widget.initialEvent.locationTwoName,
-      locationTwoAddress: _currentEvent.locationTwoAddress ?? widget.initialEvent.locationTwoAddress,
-      locationThreeName: _currentEvent.locationThreeName ?? widget.initialEvent.locationThreeName,
-      locationThreeAddress: _currentEvent.locationThreeAddress ?? widget.initialEvent.locationThreeAddress,
-      multipleLocations: _currentEvent.multipleLocations,
+      locationAddress:
+          _locationAddressController.text.trim().isEmpty ? null : _locationAddressController.text.trim(),
+      locationOneName: _multipleLocations ? _trimmed(_locationOneNameController) : null,
+      locationOneAddress: _multipleLocations ? _trimmed(_locationOneAddressController) : null,
+      locationTwoName: _multipleLocations ? _trimmed(_locationTwoNameController) : null,
+      locationTwoAddress: _multipleLocations ? _trimmed(_locationTwoAddressController) : null,
+      locationThreeName: _multipleLocations ? _trimmed(_locationThreeNameController) : null,
+      locationThreeAddress: _multipleLocations ? _trimmed(_locationThreeAddressController) : null,
+      multipleLocations: _multipleLocations,
       hideAddressBeforeRsvp: _hideAddressBeforeRsvp,
       eventType: _eventType,
       rsvpEnabled: _rsvpEnabled,
@@ -279,6 +308,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       updatedAt: DateTime.now(),
       socialShareImage: _currentEvent.socialShareImage,
       websiteImage: _currentEvent.websiteImage,
+      websiteImages: _currentEvent.websiteImages,
     );
   }
 
@@ -305,6 +335,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         _saving = false;
         _currentEvent = saved;
         _hideAddressBeforeRsvp = saved.hideAddressBeforeRsvp;
+        _multipleLocations = saved.multipleLocations;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1739,7 +1770,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
   Widget _buildImageUploadSection() {
     final socialName = _currentEvent.socialShareImage?['file_name'] ?? 'No image uploaded';
-    final websiteName = _currentEvent.websiteImage?['file_name'] ?? 'No image uploaded';
+    final websiteImages = _currentEvent.websiteImages;
+    final websiteName = websiteImages.isEmpty
+        ? 'No image uploaded'
+        : websiteImages.length == 1
+            ? (websiteImages.first.fileName ?? '1 image uploaded')
+            : '${websiteImages.length} images uploaded';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1804,17 +1840,244 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     );
   }
 
+  Widget _buildWebsiteImages() {
+    final images = _currentEvent.websiteImages;
+    if (images.isEmpty) return const SizedBox.shrink();
+
+    if (images.length == 1) {
+      return _buildEventImageTile(images.first);
+    }
+
+    return SizedBox(
+      height: 160,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: images.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final image = images[index];
+          return SizedBox(
+            width: 220,
+            child: _buildEventImageTile(image, height: 160, showIndexLabel: '${index + 1}/${images.length}'),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEventImageTile(EventImage image, {double height = 220, String? showIndexLabel}) {
+    return SizedBox(
+      height: height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: NetworkImage(image.url),
+                    fit: BoxFit.cover,
+                    onError: (_, __) {},
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: Container(
+                height: height,
+                foregroundDecoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.black.withOpacity(0.55), Colors.transparent],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                  ),
+                ),
+              ),
+            ),
+            if (image.fileName != null)
+              Positioned(
+                left: 12,
+                bottom: 12,
+                right: 12,
+                child: Text(
+                  image.fileName!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    shadows: [Shadow(blurRadius: 10, color: Colors.black)],
+                  ),
+                ),
+              ),
+            if (showIndexLabel != null)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.65),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    showIndexLabel,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget? _buildLocationDetailsSection() {
+    final locations = <Map<String, String>>[];
+
+    void addLocation({String? name, String? address, required bool allowNameAsAddress}) {
+      final hasName = _hasText(name);
+      final hasAddress = _hasText(address);
+
+      if (!hasName && !hasAddress) return;
+
+      final resolvedAddress = hasAddress
+          ? address!.trim()
+          : allowNameAsAddress && hasName
+              ? name!.trim()
+              : '';
+
+      if (resolvedAddress.isEmpty) return;
+
+      locations.add({
+        'label': hasName ? name!.trim() : resolvedAddress,
+        'address': resolvedAddress,
+      });
+    }
+
+    if (_currentEvent.multipleLocations) {
+      addLocation(
+        name: _currentEvent.locationOneName,
+        address: _currentEvent.locationOneAddress,
+        allowNameAsAddress: true,
+      );
+      addLocation(
+        name: _currentEvent.locationTwoName,
+        address: _currentEvent.locationTwoAddress,
+        allowNameAsAddress: true,
+      );
+      addLocation(
+        name: _currentEvent.locationThreeName,
+        address: _currentEvent.locationThreeAddress,
+        allowNameAsAddress: true,
+      );
+    } else {
+      addLocation(
+        name: _currentEvent.location,
+        address: _currentEvent.locationAddress ?? _currentEvent.location,
+        allowNameAsAddress: true,
+      );
+    }
+
+    if (locations.isEmpty) return null;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.place_outlined, color: _unityBlue),
+                const SizedBox(width: 8),
+                Text(
+                  _currentEvent.multipleLocations ? 'Multiple locations' : 'Event location',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...locations.asMap().entries.map((entry) {
+              final location = entry.value;
+              final label = location['label'];
+              final address = location['address'];
+
+              return Padding(
+                padding: EdgeInsets.only(bottom: entry.key == locations.length - 1 ? 0 : 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (label != null && label.isNotEmpty)
+                      Text(
+                        _currentEvent.multipleLocations ? 'Location ${entry.key + 1}: $label' : label,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    if (address != null && address.isNotEmpty)
+                      Text(
+                        address,
+                        style: TextStyle(color: Colors.grey.shade700),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationRow({
+    required String title,
+    required TextEditingController nameController,
+    required TextEditingController addressController,
+    required InputDecoration Function(String) decorator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: nameController,
+                decoration: decorator('Location name'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: addressController,
+                decoration: decorator('Location address'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildMapCard() {
     if (_currentEvent.multipleLocations) {
       final additionalLocations = <Map<String, String>>[];
 
       void addLocation(String? name, String? address) {
-        if (_hasText(address)) {
-          additionalLocations.add({
-            'name': name?.trim() ?? '',
-            'address': address!.trim(),
-          });
-        }
+        final hasName = _hasText(name);
+        final hasAddress = _hasText(address);
+
+        if (!hasName && !hasAddress) return;
+
+        final fallbackAddress = hasAddress ? address!.trim() : name!.trim();
+
+        additionalLocations.add({
+          'name': hasName ? name!.trim() : fallbackAddress,
+          'address': fallbackAddress,
+        });
       }
 
       addLocation(_currentEvent.locationOneName, _currentEvent.locationOneAddress);
@@ -1892,6 +2155,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
 
     final dateFormat = DateFormat.yMMMd().add_jm();
     final locationLabel = _displayLocationLabel;
+    final hasWebsiteImages = _currentEvent.websiteImages.isNotEmpty;
+    final locationSection = _buildLocationDetailsSection();
+    final mapCard = _buildMapCard();
+    final hasMap = mapCard is! SizedBox;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -2020,8 +2287,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
             ),
           ),
           const SizedBox(height: 12),
-          _buildMapCard(),
-          const SizedBox(height: 12),
+          if (hasWebsiteImages) ...[
+            _buildWebsiteImages(),
+            const SizedBox(height: 12),
+          ],
+          if (locationSection != null) ...[
+            locationSection,
+            const SizedBox(height: 12),
+          ],
+          if (hasMap) ...[
+            mapCard,
+            const SizedBox(height: 12),
+          ],
           _buildImageUploadSection(),
           _buildDeleteButton(),
         ],
@@ -2236,6 +2513,40 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
               ],
             ),
             const SizedBox(height: 12),
+            SwitchListTile(
+              value: _multipleLocations,
+              onChanged: (value) => setState(() {
+                _multipleLocations = value;
+                _currentEvent = _currentEvent.copyWith(multipleLocations: value);
+              }),
+              title: const Text('Multiple locations'),
+              subtitle: const Text('Enable to capture up to three different locations'),
+            ),
+            if (_multipleLocations) ...[
+              const SizedBox(height: 8),
+              _buildLocationRow(
+                title: 'Location 1',
+                nameController: _locationOneNameController,
+                addressController: _locationOneAddressController,
+                decorator: _decor,
+              ),
+              const SizedBox(height: 12),
+              _buildLocationRow(
+                title: 'Location 2',
+                nameController: _locationTwoNameController,
+                addressController: _locationTwoAddressController,
+                decorator: _decor,
+              ),
+              const SizedBox(height: 12),
+              _buildLocationRow(
+                title: 'Location 3',
+                nameController: _locationThreeNameController,
+                addressController: _locationThreeAddressController,
+                decorator: _decor,
+              ),
+              const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 4),
             SwitchListTile(
               value: _hideAddressBeforeRsvp,
               onChanged: (value) => setState(() => _hideAddressBeforeRsvp = value),
