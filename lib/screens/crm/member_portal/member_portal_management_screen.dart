@@ -1270,10 +1270,20 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                     showSuperscript: false,
                     showSubscript: false,
                     showDirection: false,
-                    iconTheme: const quill.QuillIconTheme(
-                      iconUnselectedColor: Colors.white70,
-                      iconSelectedColor: Colors.white,
-                      iconSelectedFillColor: Color(0xFF273351),
+                    buttonOptions: quill.QuillSimpleToolbarButtonOptions(
+                      base: quill.QuillToolbarBaseButtonOptions(
+                        iconTheme: quill.QuillIconTheme(
+                          iconButtonUnselectedData: const quill.IconButtonData(
+                            color: Colors.white70,
+                          ),
+                          iconButtonSelectedData: quill.IconButtonData(
+                            color: Colors.white,
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFF273351),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
