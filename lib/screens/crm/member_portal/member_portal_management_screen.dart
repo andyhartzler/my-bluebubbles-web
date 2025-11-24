@@ -602,18 +602,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            _unityBlue.withOpacity(0.95),
-            _unityBlue.withOpacity(0.9),
-            _momentumBlue.withOpacity(0.9),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.black,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 12, offset: Offset(0, 8)),
+          BoxShadow(color: Colors.black54, blurRadius: 18, offset: Offset(0, 10)),
         ],
       ),
       child: ClipRRect(
@@ -622,9 +614,13 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
           padding: const EdgeInsets.all(16.0),
           child: DefaultTextStyle.merge(
             style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(right: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -760,75 +756,67 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                 const SizedBox(height: 12),
                 _buildAttendanceSection(meeting, attendance, attendeeCount ?? 0),
                 const SizedBox(height: 12),
-                Expanded(
-                  child: ListView(
-                    children: [
-                      _buildRecordingSection(recordingEmbedUrl, recordingUrl),
-                      const SizedBox(height: 12),
-                      _buildRichTextSection(
-                        title: 'Description',
-                        helper: 'Shows at the top of the meeting page for members.',
-                        controller: _descriptionController!,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildRichTextSection(
-                        title: 'Summary',
-                        helper: 'Short recap of what happened.',
-                        controller: _summaryController!,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildRichTextSection(
-                        title: 'Key Points',
-                        helper: 'Bulleted discussion highlights.',
-                        controller: _keyPointsController!,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildRichTextSection(
-                        title: 'Action Items',
-                        helper: 'Next steps members should see.',
-                        controller: _actionItemsController!,
-                      ),
-                      const SizedBox(height: 16),
+                _buildRecordingSection(recordingEmbedUrl, recordingUrl),
+                const SizedBox(height: 12),
+                _buildRichTextSection(
+                  title: 'Description',
+                  helper: 'Shows at the top of the meeting page for members.',
+                  controller: _descriptionController!,
+                ),
+                const SizedBox(height: 12),
+                _buildRichTextSection(
+                  title: 'Summary',
+                  helper: 'Short recap of what happened.',
+                  controller: _summaryController!,
+                ),
+                const SizedBox(height: 12),
+                _buildRichTextSection(
+                  title: 'Key Points',
+                  helper: 'Bulleted discussion highlights.',
+                  controller: _keyPointsController!,
+                ),
+                const SizedBox(height: 12),
+                _buildRichTextSection(
+                  title: 'Action Items',
+                  helper: 'Next steps members should see.',
+                  controller: _actionItemsController!,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    if (_meetingSaveError != null || _meetingSaveSucceeded)
                       Row(
                         children: [
-                          if (_meetingSaveError != null || _meetingSaveSucceeded)
-                            Row(
-                              children: [
-                                Icon(
-                                  _meetingSaveSucceeded
-                                      ? Icons.check_circle
-                                      : Icons.error_outline,
-                                  color: statusColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _meetingSaveSucceeded
-                                      ? 'Saved'
-                                      : 'Save failed: ${_meetingSaveError}',
-                                  style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
-                                ),
-                              ],
-                            ),
-                          const Spacer(),
-                          ElevatedButton.icon(
-                            icon: _savingMeeting
-                                ? const SizedBox(
-                                    height: 18,
-                                    width: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.save),
-                            label: Text(_savingMeeting ? 'Saving...' : 'Save changes'),
-                            onPressed: _savingMeeting ? null : () => _saveMeeting(meeting),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: _unityBlue,
-                            ),
+                          Icon(
+                            _meetingSaveSucceeded ? Icons.check_circle : Icons.error_outline,
+                            color: statusColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _meetingSaveSucceeded
+                                ? 'Saved'
+                                : 'Save failed: ${_meetingSaveError}',
+                            style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      icon: _savingMeeting
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save),
+                      label: Text(_savingMeeting ? 'Saving...' : 'Save changes'),
+                      onPressed: _savingMeeting ? null : () => _saveMeeting(meeting),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: _unityBlue,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -860,25 +848,29 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   Widget _buildRecordingSection(String? recordingEmbedUrl, String? recordingUrl) {
     if (!_selectedShowRecording) {
       return Card(
-        color: Colors.white,
+        color: Colors.grey.shade900,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: const ListTile(
-          leading: Icon(Icons.play_disabled),
-          title: Text('Recording is hidden for members'),
-          subtitle: Text('Enable "Show recording" to surface the embed on the portal.'),
+          leading: Icon(Icons.play_disabled, color: Colors.white70),
+          title: Text('Recording is hidden for members', style: TextStyle(color: Colors.white)),
+          subtitle: Text(
+            'Enable "Show recording" to surface the embed on the portal.',
+            style: TextStyle(color: Colors.white70),
+          ),
         ),
       );
     }
 
     return Card(
-      color: Colors.white,
+      color: Colors.grey.shade900,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ListTile(
-        leading: const Icon(Icons.play_circle),
+        leading: const Icon(Icons.play_circle, color: Colors.white),
         title: Text(
           recordingEmbedUrl?.isNotEmpty == true
               ? 'Embed URL ready for members'
               : 'Recording embed URL missing',
+          style: const TextStyle(color: Colors.white),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -886,15 +878,18 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
             if (recordingEmbedUrl != null && recordingEmbedUrl.isNotEmpty)
               SelectableText(
                 recordingEmbedUrl,
-                style: const TextStyle(color: Colors.black87),
+                style: const TextStyle(color: Colors.white70),
               )
             else
-              const Text('Add an embed URL to the meeting in Supabase to stream the recording.'),
+              const Text(
+                'Add an embed URL to the meeting in Supabase to stream the recording.',
+                style: TextStyle(color: Colors.white70),
+              ),
             if (recordingUrl != null && recordingUrl.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(
                 'Fallback URL: $recordingUrl',
-                style: const TextStyle(color: Colors.black87),
+                style: const TextStyle(color: Colors.white70),
               ),
             ],
           ],
@@ -909,7 +904,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     int attendeeCount,
   ) {
     return Card(
-      color: Colors.white,
+      color: Colors.grey.shade900,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -923,14 +918,14 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                   children: [
                     const Text(
                       'Attendance',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Colors.white),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       attendeeCount == 1
-                          ? '1 member checked in'
-                          : '$attendeeCount members checked in',
-                      style: const TextStyle(color: Colors.black54),
+                          ? '1 member attended'
+                          : '$attendeeCount members attended',
+                      style: const TextStyle(color: Colors.white70),
                     ),
                   ],
                 ),
@@ -952,12 +947,12 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Row(
                   children: const [
-                    Icon(Icons.info_outline, color: Colors.black45),
+                    Icon(Icons.info_outline, color: Colors.white54),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'No attendees have been linked yet. Add members to mirror the official attendance list.',
-                        style: TextStyle(color: Colors.black54),
+                        style: TextStyle(color: Colors.white70),
                       ),
                     ),
                   ],
@@ -991,27 +986,29 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
       leading: CircleAvatar(
-        backgroundColor: attendance.isHost == true ? _momentumBlue : Colors.grey.shade300,
-        foregroundColor: attendance.isHost == true ? Colors.white : Colors.black87,
+        backgroundColor: attendance.checkedIn == true ? _momentumBlue : Colors.grey.shade800,
+        foregroundColor: Colors.white,
         child: Text(attendance.participantName.isNotEmpty
             ? attendance.participantName.substring(0, 1).toUpperCase()
             : '?'),
       ),
       title: Text(
         attendance.participantName,
-        style: const TextStyle(fontWeight: FontWeight.w600),
+        style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
       ),
-      subtitle: Text(subtitleParts.join(' • ')),
+      subtitle: Text(subtitleParts.join(' • '), style: const TextStyle(color: Colors.white70)),
       trailing: Wrap(
         spacing: 4,
         children: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
+            color: Colors.white70,
             tooltip: 'Edit attendance',
             onPressed: () => _editAttendance(attendance),
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
+            color: Colors.white70,
             tooltip: 'Remove attendee',
             onPressed: () => _removeAttendance(attendance),
           ),

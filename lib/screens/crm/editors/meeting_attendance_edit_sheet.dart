@@ -26,14 +26,13 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
 
   static final Map<String, _AttendanceFieldType> _fieldTypes = {
     'member_id': _AttendanceFieldType.text,
-    'zoom_display_name': _AttendanceFieldType.text,
-    'zoom_email': _AttendanceFieldType.text,
-    'total_duration_minutes': _AttendanceFieldType.integer,
-    'number_of_joins': _AttendanceFieldType.integer,
-    'first_join_time': _AttendanceFieldType.dateTime,
-    'last_leave_time': _AttendanceFieldType.dateTime,
-    'matched_by': _AttendanceFieldType.text,
-    'is_host': _AttendanceFieldType.bool,
+    'guest_name': _AttendanceFieldType.text,
+    'guest_email': _AttendanceFieldType.text,
+    'guest_phone': _AttendanceFieldType.text,
+    'rsvp_status': _AttendanceFieldType.text,
+    'guest_count': _AttendanceFieldType.integer,
+    'notes': _AttendanceFieldType.multiline,
+    'checked_in': _AttendanceFieldType.bool,
   };
 
   @override
@@ -42,21 +41,15 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
     _originalData = widget.attendance.toJson(includeMeeting: false, includeMember: false);
     _isHost = widget.attendance.isHost;
     _controllers['member_id'] = TextEditingController(text: widget.attendance.memberId ?? '');
-    _controllers['zoom_display_name'] = TextEditingController(text: widget.attendance.zoomDisplayName ?? '');
-    _controllers['zoom_email'] = TextEditingController(text: widget.attendance.zoomEmail ?? '');
-    _controllers['total_duration_minutes'] = TextEditingController(
-      text: widget.attendance.totalDurationMinutes?.toString() ?? '',
+    _controllers['guest_name'] = TextEditingController(text: widget.attendance.guestName ?? widget.attendance.zoomDisplayName ?? '');
+    _controllers['guest_email'] = TextEditingController(text: widget.attendance.guestEmail ?? widget.attendance.zoomEmail ?? '');
+    _controllers['guest_phone'] = TextEditingController(text: widget.attendance.guestPhone ?? '');
+    _controllers['rsvp_status'] = TextEditingController(text: widget.attendance.rsvpStatus ?? 'attending');
+    _controllers['guest_count'] = TextEditingController(
+      text: widget.attendance.guestCount?.toString() ?? '',
     );
-    _controllers['number_of_joins'] = TextEditingController(
-      text: widget.attendance.numberOfJoins?.toString() ?? '',
-    );
-    _controllers['first_join_time'] = TextEditingController(
-      text: widget.attendance.firstJoinTime?.toIso8601String() ?? '',
-    );
-    _controllers['last_leave_time'] = TextEditingController(
-      text: widget.attendance.lastLeaveTime?.toIso8601String() ?? '',
-    );
-    _controllers['matched_by'] = TextEditingController(text: widget.attendance.matchedBy ?? '');
+    _controllers['notes'] = TextEditingController(text: widget.attendance.notes ?? '');
+    _isHost = widget.attendance.checkedIn;
   }
 
   @override
@@ -150,7 +143,7 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
         return DropdownButtonFormField<bool?>(
           value: _isHost,
           decoration: const InputDecoration(
-            labelText: 'Is Host',
+            labelText: 'Checked In',
             border: OutlineInputBorder(),
           ),
           items: const [
@@ -317,20 +310,18 @@ class _MeetingAttendanceEditSheetState extends State<MeetingAttendanceEditSheet>
     switch (key) {
       case 'member_id':
         return 'Member ID';
-      case 'zoom_display_name':
-        return 'Zoom Display Name';
-      case 'zoom_email':
-        return 'Zoom Email';
-      case 'total_duration_minutes':
-        return 'Total Duration (minutes)';
-      case 'number_of_joins':
-        return 'Number of Joins';
-      case 'first_join_time':
-        return 'First Join Time';
-      case 'last_leave_time':
-        return 'Last Leave Time';
-      case 'matched_by':
-        return 'Matched By';
+      case 'guest_name':
+        return 'Name';
+      case 'guest_email':
+        return 'Email';
+      case 'guest_phone':
+        return 'Phone';
+      case 'rsvp_status':
+        return 'RSVP Status';
+      case 'guest_count':
+        return 'Guest Count';
+      case 'notes':
+        return 'Notes';
       default:
         return key;
     }

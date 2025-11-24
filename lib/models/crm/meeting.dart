@@ -427,6 +427,13 @@ class MeetingAttendance {
   final String id;
   final String? meetingId;
   final String? memberId;
+  final String? guestName;
+  final String? guestEmail;
+  final String? guestPhone;
+  final String? rsvpStatus;
+  final int? guestCount;
+  final String? notes;
+  final bool? checkedIn;
   final int? totalDurationMinutes;
   final DateTime? firstJoinTime;
   final DateTime? lastLeaveTime;
@@ -447,6 +454,13 @@ class MeetingAttendance {
     required this.id,
     this.meetingId,
     this.memberId,
+    this.guestName,
+    this.guestEmail,
+    this.guestPhone,
+    this.rsvpStatus,
+    this.guestCount,
+    this.notes,
+    this.checkedIn,
     this.totalDurationMinutes,
     this.firstJoinTime,
     this.lastLeaveTime,
@@ -468,6 +482,13 @@ class MeetingAttendance {
     String? id,
     String? meetingId,
     String? memberId,
+    String? guestName,
+    String? guestEmail,
+    String? guestPhone,
+    String? rsvpStatus,
+    int? guestCount,
+    String? notes,
+    bool? checkedIn,
     int? totalDurationMinutes,
     DateTime? firstJoinTime,
     DateTime? lastLeaveTime,
@@ -488,6 +509,13 @@ class MeetingAttendance {
       id: id ?? this.id,
       meetingId: meetingId ?? this.meetingId,
       memberId: memberId ?? this.memberId,
+      guestName: guestName ?? this.guestName,
+      guestEmail: guestEmail ?? this.guestEmail,
+      guestPhone: guestPhone ?? this.guestPhone,
+      rsvpStatus: rsvpStatus ?? this.rsvpStatus,
+      guestCount: guestCount ?? this.guestCount,
+      notes: notes ?? this.notes,
+      checkedIn: checkedIn ?? this.checkedIn,
       totalDurationMinutes: totalDurationMinutes ?? this.totalDurationMinutes,
       firstJoinTime: firstJoinTime ?? this.firstJoinTime,
       lastLeaveTime: lastLeaveTime ?? this.lastLeaveTime,
@@ -511,6 +539,13 @@ class MeetingAttendance {
       'id': id,
       'meeting_id': meetingId,
       'member_id': memberId,
+      'guest_name': guestName,
+      'guest_email': guestEmail,
+      'guest_phone': guestPhone,
+      'rsvp_status': rsvpStatus,
+      'guest_count': guestCount,
+      'notes': notes,
+      'checked_in': checkedIn,
       'total_duration_minutes': totalDurationMinutes,
       'first_join_time': firstJoinTime?.toIso8601String(),
       'last_leave_time': lastLeaveTime?.toIso8601String(),
@@ -544,11 +579,26 @@ class MeetingAttendance {
 
     final meetingTitle = json['meeting_title'] as String? ?? meetingRef?.meetingTitle;
     final meetingDate = _parseDateTime(json['meeting_date']) ?? meetingRef?.meetingDate;
+    final guestCount = _parseInt(json['guest_count']);
+    final rsvpStatus = json['rsvp_status'] as String?;
+    final guestName = json['guest_name'] as String?;
+    final guestEmail = json['guest_email'] as String?;
+    final guestPhone = json['guest_phone'] as String?;
+    final notes = json['notes'] as String?;
+    final checkedIn = json['checked_in'] as bool?;
+    final meetingId = json['meeting_id'] as String? ?? json['event_id'] as String?;
 
     return MeetingAttendance(
       id: json['id'] as String,
-      meetingId: json['meeting_id'] as String? ?? meetingRef?.id,
+      meetingId: meetingId ?? meetingRef?.id,
       memberId: json['member_id'] as String?,
+      guestName: guestName,
+      guestEmail: guestEmail,
+      guestPhone: guestPhone,
+      rsvpStatus: rsvpStatus,
+      guestCount: guestCount,
+      notes: notes,
+      checkedIn: checkedIn,
       totalDurationMinutes: _parseInt(json['total_duration_minutes']),
       firstJoinTime: _parseDateTime(json['first_join_time']),
       lastLeaveTime: _parseDateTime(json['last_leave_time']),
@@ -567,7 +617,8 @@ class MeetingAttendance {
     );
   }
 
-  String get participantName => member?.name ?? zoomDisplayName ?? 'Unknown Participant';
+  String get participantName =>
+      member?.name ?? zoomDisplayName ?? guestName ?? guestEmail ?? guestPhone ?? 'Unknown Participant';
 
   String get meetingLabel => meetingTitle ?? meeting?.meetingTitle ?? 'Meeting';
 
