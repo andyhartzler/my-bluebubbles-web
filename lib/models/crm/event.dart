@@ -56,6 +56,13 @@ class Event {
   final DateTime? eventEndDate;
   final String? location;
   final String? locationAddress;
+  final String? locationOneName;
+  final String? locationOneAddress;
+  final String? locationTwoName;
+  final String? locationTwoAddress;
+  final String? locationThreeName;
+  final String? locationThreeAddress;
+  final bool multipleLocations;
   final bool hideAddressBeforeRsvp;
   final String? eventType;
   final bool rsvpEnabled;
@@ -75,11 +82,18 @@ class Event {
     required this.eventDate,
     required this.status,
     this.hideAddressBeforeRsvp = false,
+    this.multipleLocations = false,
     this.id,
     this.description,
     this.eventEndDate,
     this.location,
     this.locationAddress,
+    this.locationOneName,
+    this.locationOneAddress,
+    this.locationTwoName,
+    this.locationTwoAddress,
+    this.locationThreeName,
+    this.locationThreeAddress,
     this.eventType,
     this.rsvpEnabled = true,
     this.rsvpDeadline,
@@ -101,6 +115,13 @@ class Event {
     DateTime? eventEndDate,
     String? location,
     String? locationAddress,
+    String? locationOneName,
+    String? locationOneAddress,
+    String? locationTwoName,
+    String? locationTwoAddress,
+    String? locationThreeName,
+    String? locationThreeAddress,
+    bool? multipleLocations,
     bool? hideAddressBeforeRsvp,
     String? eventType,
     bool? rsvpEnabled,
@@ -123,6 +144,13 @@ class Event {
       eventEndDate: eventEndDate ?? this.eventEndDate,
       location: location ?? this.location,
       locationAddress: locationAddress ?? this.locationAddress,
+      locationOneName: locationOneName ?? this.locationOneName,
+      locationOneAddress: locationOneAddress ?? this.locationOneAddress,
+      locationTwoName: locationTwoName ?? this.locationTwoName,
+      locationTwoAddress: locationTwoAddress ?? this.locationTwoAddress,
+      locationThreeName: locationThreeName ?? this.locationThreeName,
+      locationThreeAddress: locationThreeAddress ?? this.locationThreeAddress,
+      multipleLocations: multipleLocations ?? this.multipleLocations,
       hideAddressBeforeRsvp: hideAddressBeforeRsvp ?? this.hideAddressBeforeRsvp,
       eventType: eventType ?? this.eventType,
       rsvpEnabled: rsvpEnabled ?? this.rsvpEnabled,
@@ -147,6 +175,13 @@ class Event {
       'event_end_date': eventEndDate?.toUtc().toIso8601String(),
       'location': location,
       'location_address': locationAddress,
+      'location_one_name': locationOneName,
+      'location_one_address': locationOneAddress,
+      'location_two_name': locationTwoName,
+      'location_two_address': locationTwoAddress,
+      'location_three_name': locationThreeName,
+      'location_three_address': locationThreeAddress,
+      'multiple_locations': multipleLocations,
       'hide_address_before_rsvp': hideAddressBeforeRsvp,
       'event_type': eventType,
       'rsvp_enabled': rsvpEnabled,
@@ -168,6 +203,13 @@ class Event {
       'event_end_date': eventEndDate?.toUtc().toIso8601String(),
       'location': location,
       'location_address': locationAddress,
+      'location_one_name': locationOneName,
+      'location_one_address': locationOneAddress,
+      'location_two_name': locationTwoName,
+      'location_two_address': locationTwoAddress,
+      'location_three_name': locationThreeName,
+      'location_three_address': locationThreeAddress,
+      'multiple_locations': multipleLocations,
       'hide_address_before_rsvp': hideAddressBeforeRsvp,
       'event_type': eventType,
       'rsvp_enabled': rsvpEnabled,
@@ -198,6 +240,13 @@ class Event {
       eventEndDate: _parseDateTime(json['event_end_date'], fieldName: 'event_end_date'),
       location: json['location'] as String?,
       locationAddress: json['location_address'] as String?,
+      locationOneName: json['location_one_name'] as String?,
+      locationOneAddress: json['location_one_address'] as String?,
+      locationTwoName: json['location_two_name'] as String?,
+      locationTwoAddress: json['location_two_address'] as String?,
+      locationThreeName: json['location_three_name'] as String?,
+      locationThreeAddress: json['location_three_address'] as String?,
+      multipleLocations: json['multiple_locations'] as bool? ?? false,
       hideAddressBeforeRsvp: json['hide_address_before_rsvp'] as bool? ?? false,
       eventType: json['event_type'] as String?,
       rsvpEnabled: json['rsvp_enabled'] as bool? ?? true,
