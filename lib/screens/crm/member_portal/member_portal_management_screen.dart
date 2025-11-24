@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:file_picker/file_picker.dart' as file_picker;
+import 'package:intl/intl.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/member_portal.dart';
 import 'package:bluebubbles/screens/crm/editors/member_search_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/member_portal_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/markdown_quill_loader.dart';
@@ -24,6 +29,8 @@ class MemberPortalManagementScreen extends StatefulWidget {
   State<MemberPortalManagementScreen> createState() => _MemberPortalManagementScreenState();
 }
 
+enum _MeetingSwitchAction { save, discard, cancel }
+
 class _MemberPortalManagementScreenState extends State<MemberPortalManagementScreen>
     with SingleTickerProviderStateMixin {
   static const _unityBlue = Color(0xFF273351);
@@ -32,9 +39,12 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   late final TabController _tabController = TabController(length: 6, vsync: this);
   final MemberPortalRepository _repository = MemberPortalRepository();
   final MeetingRepository _meetingRepository = MeetingRepository();
+  final MemberRepository _memberRepository = MemberRepository();
   final CRMSupabaseService _supabase = CRMSupabaseService();
+  final DateFormat _signInFormat = DateFormat('MMM d, y • h:mm a');
 
   late Future<MemberPortalDashboardStats> _statsFuture;
+  late Future<List<MemberPortalRecentSignIn>> _recentSignInsFuture;
   late Future<List<MemberPortalMeeting>> _meetingsFuture;
   late Future<List<MemberSubmittedEvent>> _eventsFuture;
   late Future<List<MemberPortalResource>> _resourcesFuture;
@@ -47,9 +57,11 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   String? _selectedMeetingId;
   String? _editingMeetingId;
+  MemberPortalMeeting? _currentMeeting;
   bool _savingMeeting = false;
   bool _meetingSaveSucceeded = false;
   String? _meetingSaveError;
+  bool _meetingHasUnsavedChanges = false;
   bool _selectedVisibleToAll = false;
   bool _selectedVisibleToAttendeesOnly = true;
   bool _selectedVisibleToExecutives = true;
@@ -70,6 +82,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   void initState() {
     super.initState();
     _statsFuture = _repository.fetchDashboardStats();
+    _recentSignInsFuture = _repository.fetchRecentSignIns();
     _meetingsFuture = _repository.fetchPortalMeetings();
     _eventsFuture = _repository.fetchMemberSubmittedEvents(status: 'pending');
     _resourcesFuture = _repository.fetchPortalResources();
@@ -88,6 +101,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   Future<void> _reloadStats() async {
     setState(() {
       _statsFuture = _repository.fetchDashboardStats();
+      _recentSignInsFuture = _repository.fetchRecentSignIns();
     });
   }
 
@@ -122,6 +136,21 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     setState(() {
       _fieldVisibilityFuture = _repository.fetchFieldVisibility();
     });
+  }
+
+  void _markMeetingDirty() {
+    if (_meetingHasUnsavedChanges) return;
+    setState(() {
+      _meetingHasUnsavedChanges = true;
+      _meetingSaveSucceeded = false;
+    });
+  }
+
+  void _attachEditorListeners() {
+    _descriptionController?.addListener(_markMeetingDirty);
+    _summaryController?.addListener(_markMeetingDirty);
+    _keyPointsController?.addListener(_markMeetingDirty);
+    _actionItemsController?.addListener(_markMeetingDirty);
   }
 
   @override
@@ -170,42 +199,100 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   }
 
   Widget _buildOverviewTab() {
+    final theme = Theme.of(context);
     return RefreshIndicator(
       onRefresh: _reloadStats,
-      child: FutureBuilder<MemberPortalDashboardStats>(
-        future: _statsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1B2336), Color(0xFF0F1624)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: ListView(
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              padding: const EdgeInsets.all(24),
+              children: [
+                FutureBuilder<MemberPortalDashboardStats>(
+                  future: _statsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-          final stats = snapshot.data ?? MemberPortalDashboardStats.empty;
-          return ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  _buildStatCard('Pending Profile Changes', stats.pendingProfileChanges, Icons.fact_check),
-                  _buildStatCard('Pending Event Submissions', stats.pendingEventSubmissions, Icons.event_note),
-                  _buildStatCard('Published Meetings', stats.publishedMeetings, Icons.video_camera_front_outlined),
-                  _buildStatCard('Visible Resources', stats.visibleResources, Icons.folder_open),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Recent Activity',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Use the tabs above to approve submissions, publish meeting minutes, and manage resources.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-          );
-        },
+                    final stats = snapshot.data ?? MemberPortalDashboardStats.empty;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF273351), Color(0xFF32A6DE)],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Member Portal Dashboard',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Monitor portal activity and keep members up to date.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 16,
+                                runSpacing: 16,
+                                children: [
+                                  _buildStatCard('Pending Profile Changes', stats.pendingProfileChanges, Icons.fact_check),
+                                  _buildStatCard('Pending Event Submissions', stats.pendingEventSubmissions, Icons.event_note),
+                                  _buildStatCard('Published Meetings', stats.publishedMeetings,
+                                      Icons.video_camera_front_outlined),
+                                  _buildStatCard('Visible Resources', stats.visibleResources, Icons.folder_open),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildRecentSignInsCard(),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Use the tabs above to approve submissions, publish meeting minutes, and manage resources.',
+                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -218,6 +305,18 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Text(
+                  'Failed to load meetings: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
           }
 
           final meetings = snapshot.data ?? const [];
@@ -318,6 +417,46 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     return meetings.first;
   }
 
+  Future<_MeetingSwitchAction?> _promptForUnsavedChanges() {
+    return showDialog<_MeetingSwitchAction>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save changes?'),
+        content:
+            const Text('You have unsaved edits for this meeting. What would you like to do?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_MeetingSwitchAction.discard),
+            child: const Text('Discard'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_MeetingSwitchAction.cancel),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(_MeetingSwitchAction.save),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _onMeetingTapped(MemberPortalMeeting meeting) async {
+    if (_currentMeeting != null &&
+        _meetingHasUnsavedChanges &&
+        meeting.id != _currentMeeting!.id) {
+      final action = await _promptForUnsavedChanges();
+      if (action == null || action == _MeetingSwitchAction.cancel) return;
+      if (action == _MeetingSwitchAction.save) {
+        await _saveMeeting(_currentMeeting!);
+      }
+    }
+
+    if (!mounted) return;
+    _selectMeeting(meeting);
+  }
+
   void _selectMeeting(MemberPortalMeeting meeting) {
     _disposeMeetingControllers();
     final descriptionDoc = _controllerFromHtml(meeting.memberDescription);
@@ -335,12 +474,16 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       _selectedShowRecording = meeting.showRecording ?? false;
       _meetingSaveError = null;
       _meetingSaveSucceeded = false;
+      _meetingHasUnsavedChanges = false;
+      _currentMeeting = meeting;
       _descriptionController = descriptionDoc;
       _summaryController = summaryDoc;
       _keyPointsController = keyPointsDoc;
       _actionItemsController = actionItemsDoc;
       _meetingDetailsError = null;
     });
+
+    _attachEditorListeners();
 
     _loadMeetingDetails(meeting);
   }
@@ -392,6 +535,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   }
 
   void _disposeMeetingControllers() {
+    _descriptionController?.removeListener(_markMeetingDirty);
+    _summaryController?.removeListener(_markMeetingDirty);
+    _keyPointsController?.removeListener(_markMeetingDirty);
+    _actionItemsController?.removeListener(_markMeetingDirty);
     _descriptionController?.dispose();
     _summaryController?.dispose();
     _keyPointsController?.dispose();
@@ -448,9 +595,13 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     MemberPortalMeeting? selectedMeeting,
   ) {
     return Card(
-      color: Colors.white.withOpacity(0.86),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      color: Colors.black.withOpacity(0.25),
+      surfaceTintColor: Colors.transparent,
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: Colors.white.withOpacity(0.12)),
+      ),
       child: ListView.separated(
         padding: const EdgeInsets.all(12),
         itemBuilder: (context, index) {
@@ -477,7 +628,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _selectMeeting(meeting),
+        onTap: () => _onMeetingTapped(meeting),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
@@ -621,204 +772,226 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            meeting.memberTitle.isNotEmpty
-                                ? meeting.memberTitle
-                                : meeting.meetingTitle ?? 'Meeting',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            meetingDate != null
-                                ? 'Meeting date: ${meetingDate.toLocal().toString().split(' ').first}'
-                                : 'Meeting date TBD',
-                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('Published'),
-                            Switch.adaptive(
-                              value: _selectedIsPublished,
-                              onChanged: (value) => setState(() => _selectedIsPublished = value),
-                              activeColor: Colors.white,
-                            ),
-                          ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                meeting.memberTitle.isNotEmpty
+                                    ? meeting.memberTitle
+                                    : meeting.meetingTitle ?? 'Meeting',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                meetingDate != null
+                                    ? 'Meeting date: ${meetingDate.toLocal().toString().split(' ').first}'
+                                    : 'Meeting date TBD',
+                                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                              ),
+                            ],
+                          ),
                         ),
-                        Row(
+                        Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('Show recording'),
-                            Switch.adaptive(
-                              value: _selectedShowRecording,
-                              onChanged: (value) => setState(() => _selectedShowRecording = value),
-                              activeColor: Colors.white,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Published'),
+                                Switch.adaptive(
+                                  value: _selectedIsPublished,
+                                  onChanged: (value) => setState(() {
+                                    _selectedIsPublished = value;
+                                    _markMeetingDirty();
+                                  }),
+                                  activeColor: Colors.white,
+                                ),
+                              ],
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Show recording'),
+                                Switch.adaptive(
+                                  value: _selectedShowRecording,
+                                  onChanged: (value) => setState(() {
+                                    _selectedShowRecording = value;
+                                    _markMeetingDirty();
+                                  }),
+                                  activeColor: Colors.white,
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildMeetingPill(
-                      icon: Icons.calendar_month_outlined,
-                      label: meetingDate != null
-                          ? meetingDate.toLocal().toString().split(' ').first
-                          : 'Date TBD',
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildMeetingPill(
+                          icon: Icons.calendar_month_outlined,
+                          label: meetingDate != null
+                              ? meetingDate.toLocal().toString().split(' ').first
+                              : 'Date TBD',
+                        ),
+                        _buildMeetingPill(
+                          icon: Icons.groups_outlined,
+                          label: attendeeCount != null
+                              ? '$attendeeCount attendees'
+                              : 'Attendance pending',
+                        ),
+                        _buildMeetingPill(
+                          icon: meeting.isPublished ? Icons.check_circle : Icons.drafts,
+                          label: meeting.isPublished
+                              ? (meeting.visibleToAll
+                                  ? 'Published · All'
+                                  : meeting.visibleToExecutives
+                                      ? 'Published · Exec/Attendees'
+                                      : 'Published · Attendees')
+                              : 'Draft',
+                        ),
+                        _buildMeetingPill(
+                          icon: _selectedShowRecording ? Icons.play_circle : Icons.play_disabled,
+                          label: _selectedShowRecording ? 'Recording visible' : 'Recording hidden',
+                        ),
+                      ],
                     ),
-                    _buildMeetingPill(
-                      icon: Icons.groups_outlined,
-                      label: attendeeCount != null
-                          ? '$attendeeCount attendees'
-                          : 'Attendance pending',
-                    ),
-                    _buildMeetingPill(
-                      icon: meeting.isPublished ? Icons.check_circle : Icons.drafts,
-                      label: meeting.isPublished
-                          ? (meeting.visibleToAll
-                              ? 'Published · All'
-                              : meeting.visibleToExecutives
-                                  ? 'Published · Exec/Attendees'
-                                  : 'Published · Attendees')
-                          : 'Draft',
-                    ),
-                    _buildMeetingPill(
-                      icon: _selectedShowRecording ? Icons.play_circle : Icons.play_disabled,
-                      label: _selectedShowRecording ? 'Recording visible' : 'Recording hidden',
-                    ),
-                  ],
-                ),
-                if (_meetingDetailsError != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _meetingDetailsError!,
-                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade200),
-                  ),
-                ],
-                if (_loadingMeetingDetails)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8.0),
-                    child: LinearProgressIndicator(
-                      minHeight: 4,
-                      backgroundColor: Colors.white24,
-                      color: Colors.white,
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildVisibilityCheckbox(
-                      label: 'Visible to all members',
-                      value: _selectedVisibleToAll,
-                      onChanged: (value) => setState(() {
-                        _selectedVisibleToAll = value ?? false;
-                      }),
-                    ),
-                    _buildVisibilityCheckbox(
-                      label: 'Visible to attendees only',
-                      value: _selectedVisibleToAttendeesOnly,
-                      onChanged: (value) => setState(() {
-                        _selectedVisibleToAttendeesOnly = value ?? false;
-                      }),
-                    ),
-                    _buildVisibilityCheckbox(
-                      label: 'Visible to executives',
-                      value: _selectedVisibleToExecutives,
-                      onChanged: (value) => setState(() {
-                        _selectedVisibleToExecutives = value ?? true;
-                      }),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildAttendanceSection(meeting, attendance, attendeeCount ?? 0),
-                const SizedBox(height: 12),
-                _buildRecordingSection(recordingEmbedUrl, recordingUrl),
-                const SizedBox(height: 12),
-                _buildRichTextSection(
-                  title: 'Description',
-                  helper: 'Shows at the top of the meeting page for members.',
-                  controller: _descriptionController!,
-                ),
-                const SizedBox(height: 12),
-                _buildRichTextSection(
-                  title: 'Summary',
-                  helper: 'Short recap of what happened.',
-                  controller: _summaryController!,
-                ),
-                const SizedBox(height: 12),
-                _buildRichTextSection(
-                  title: 'Key Points',
-                  helper: 'Bulleted discussion highlights.',
-                  controller: _keyPointsController!,
-                ),
-                const SizedBox(height: 12),
-                _buildRichTextSection(
-                  title: 'Action Items',
-                  helper: 'Next steps members should see.',
-                  controller: _actionItemsController!,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    if (_meetingSaveError != null || _meetingSaveSucceeded)
-                      Row(
-                        children: [
-                          Icon(
-                            _meetingSaveSucceeded ? Icons.check_circle : Icons.error_outline,
-                            color: statusColor,
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        if (_meetingHasUnsavedChanges)
+                          Row(
+                            children: [
+                              const Icon(Icons.edit, color: Colors.amberAccent),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Unsaved changes',
+                                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.amberAccent),
+                              ),
+                            ],
+                          )
+                        else if (_meetingSaveError != null || _meetingSaveSucceeded)
+                          Row(
+                            children: [
+                              Icon(
+                                _meetingSaveSucceeded ? Icons.check_circle : Icons.error_outline,
+                                color: statusColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _meetingSaveSucceeded
+                                    ? 'Saved'
+                                    : 'Save failed: ${_meetingSaveError}',
+                                style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _meetingSaveSucceeded
-                                ? 'Saved'
-                                : 'Save failed: ${_meetingSaveError}',
-                            style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          icon: _savingMeeting
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.save),
+                          label: Text(_savingMeeting ? 'Saving...' : 'Save changes'),
+                          onPressed: _savingMeeting ? null : () => _saveMeeting(meeting),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: _unityBlue,
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                    if (_meetingDetailsError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _meetingDetailsError!,
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade200),
                       ),
-                    const Spacer(),
-                    ElevatedButton.icon(
-                      icon: _savingMeeting
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save),
-                      label: Text(_savingMeeting ? 'Saving...' : 'Save changes'),
-                      onPressed: _savingMeeting ? null : () => _saveMeeting(meeting),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: _unityBlue,
+                    ],
+                    if (_loadingMeetingDetails)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: LinearProgressIndicator(
+                          minHeight: 4,
+                          backgroundColor: Colors.white24,
+                          color: Colors.white,
+                        ),
                       ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildVisibilityCheckbox(
+                          label: 'Visible to all members',
+                          value: _selectedVisibleToAll,
+                          onChanged: (value) => setState(() {
+                            _selectedVisibleToAll = value ?? false;
+                            _markMeetingDirty();
+                          }),
+                        ),
+                        _buildVisibilityCheckbox(
+                          label: 'Visible to attendees only',
+                          value: _selectedVisibleToAttendeesOnly,
+                          onChanged: (value) => setState(() {
+                            _selectedVisibleToAttendeesOnly = value ?? false;
+                            _markMeetingDirty();
+                          }),
+                        ),
+                        _buildVisibilityCheckbox(
+                          label: 'Visible to executives',
+                          value: _selectedVisibleToExecutives,
+                          onChanged: (value) => setState(() {
+                            _selectedVisibleToExecutives = value ?? true;
+                            _markMeetingDirty();
+                          }),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildAttendanceSection(meeting, attendance, attendeeCount ?? 0),
+                    const SizedBox(height: 12),
+                    _buildRecordingSection(recordingEmbedUrl, recordingUrl),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Description',
+                      helper: 'Shows at the top of the meeting page for members.',
+                      controller: _descriptionController!,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Summary',
+                      helper: 'Short recap of what happened.',
+                      controller: _summaryController!,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Key Points',
+                      helper: 'Bulleted discussion highlights.',
+                      controller: _keyPointsController!,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Action Items',
+                      helper: 'Next steps members should see.',
+                      controller: _actionItemsController!,
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -1130,19 +1303,24 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   }) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.grey.shade900,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: Colors.white24),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: CheckboxListTile(
           value: value,
           onChanged: onChanged,
-          title: Text(label),
+          title: Text(
+            label,
+            style: const TextStyle(color: Colors.white),
+          ),
           dense: true,
           controlAffinity: ListTileControlAffinity.leading,
           contentPadding: EdgeInsets.zero,
+          activeColor: _momentumBlue,
+          checkColor: Colors.white,
         ),
       ),
     );
@@ -1165,49 +1343,73 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
           style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 4),
-        Text(helper, style: theme.textTheme.bodySmall),
+        Text(helper, style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: theme.dividerColor),
-            color: Colors.white,
+            border: Border.all(color: Colors.white24),
+            color: Colors.grey.shade900,
           ),
           child: Column(
             children: [
-              quill.QuillToolbar.simple(
-                configurations: quill.QuillSimpleToolbarConfigurations(
-                  controller: controller,
-                  sharedConfigurations: shared,
-                  multiRowsDisplay: false,
-                  showFontSize: false,
-                  showBackgroundColorButton: false,
-                  showDividers: false,
-                  showSearchButton: false,
-                  toolbarSize: 36,
-                  showAlignmentButtons: false,
-                  showQuote: false,
-                  showInlineCode: false,
-                  showSmallButton: false,
-                  showSuperscript: false,
-                  showSubscript: false,
-                  showDirection: false,
+              Theme(
+                data: theme.copyWith(
+                  iconTheme: const IconThemeData(color: Colors.white),
+                  tooltipTheme: theme.tooltipTheme.copyWith(textStyle: const TextStyle(color: Colors.white)),
+                ),
+                child: quill.QuillToolbar.simple(
+                  configurations: quill.QuillSimpleToolbarConfigurations(
+                    controller: controller,
+                    sharedConfigurations: shared,
+                    multiRowsDisplay: false,
+                    showFontSize: false,
+                    showBackgroundColorButton: false,
+                    showDividers: false,
+                    showSearchButton: false,
+                    toolbarSize: 36,
+                    showAlignmentButtons: false,
+                    showQuote: false,
+                    showInlineCode: false,
+                    showSmallButton: false,
+                    showSuperscript: false,
+                    showSubscript: false,
+                    showDirection: false,
+                    buttonOptions: quill.QuillSimpleToolbarButtonOptions(
+                      base: quill.QuillToolbarBaseButtonOptions(
+                        iconTheme: quill.QuillIconTheme(
+                          iconButtonUnselectedData: const quill.IconButtonData(
+                            color: Colors.white70,
+                          ),
+                          iconButtonSelectedData: quill.IconButtonData(
+                            color: Colors.white,
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFF273351),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const Divider(height: 1),
               SizedBox(
                 height: 180,
-                child: quill.QuillEditor(
-                  focusNode: FocusNode(),
-                  scrollController: ScrollController(),
-                  configurations: quill.QuillEditorConfigurations(
-                    controller: controller,
-                    sharedConfigurations: shared,
-                    scrollable: true,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    expands: false,
-                    checkBoxReadOnly: false,
-                    keyboardAppearance: Theme.of(context).brightness,
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(color: Colors.white),
+                  child: quill.QuillEditor(
+                    focusNode: FocusNode(),
+                    scrollController: ScrollController(),
+                    configurations: quill.QuillEditorConfigurations(
+                      controller: controller,
+                      sharedConfigurations: shared,
+                      scrollable: true,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      expands: false,
+                      checkBoxReadOnly: false,
+                      keyboardAppearance: Theme.of(context).brightness,
+                    ),
                   ),
                 ),
               ),
@@ -1246,7 +1448,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
           _editingMeetingId = savedMeeting.id;
           _meetingsFuture = _repository.fetchPortalMeetings();
           _statsFuture = _repository.fetchDashboardStats();
+          _meetingHasUnsavedChanges = false;
+          _currentMeeting = savedMeeting;
         });
+        _selectMeeting(savedMeeting);
       } else {
         setState(() {
           _meetingSaveError = 'Save did not return updated data.';
@@ -1268,6 +1473,18 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     final delta = controller.document.toDelta().toJson();
     final plainText = controller.document.toPlainText();
     return QuillHtmlConverter.generateHtml(delta, plainText);
+  }
+
+  String _formatRelativeTime(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+    if (difference.inHours < 24) return '${difference.inHours}h ago';
+    if (difference.inDays < 7) return '${difference.inDays}d ago';
+    if (difference.inDays < 30) return '${(difference.inDays / 7).floor()}w ago';
+    return '${(difference.inDays / 30).floor()}mo ago';
   }
 
   Widget _buildSubmittedEventsTab() {
@@ -2259,28 +2476,278 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     await _reloadFieldVisibility();
   }
 
-  Widget _buildStatCard(String title, int value, IconData icon) {
-    return SizedBox(
-      width: 260,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Icon(icon, size: 32),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: Theme.of(context).textTheme.bodyLarge),
-                  Text(
-                    value.toString(),
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+  Widget _buildRecentSignInsCard() {
+    final theme = Theme.of(context);
+    return FutureBuilder<List<MemberPortalRecentSignIn>>(
+      future: _recentSignInsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white10),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.red.shade900.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.red.shade200.withOpacity(0.5)),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Unable to load recent sign-ins. Please try again.',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
                   ),
-                ],
+                ),
+              ],
+            ),
+          );
+        }
+
+        final signIns = snapshot.data ?? const [];
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 18,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF43A047),
+                      shape: BoxShape.circle,
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(Icons.login, color: Colors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Recent Sign-Ins',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (signIns.isEmpty)
+                Text(
+                  'No recent sign-ins',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                )
+              else
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Row(
+                    children: signIns
+                        .map(
+                          (signIn) => Padding(
+                            padding: const EdgeInsets.only(right: 12.0),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
+                              child: Card(
+                                elevation: 2,
+                                color: _unityBlue,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(18),
+                                  onTap: () => _openMemberProfile(signIn.id),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        _buildAvatar(signIn),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                signIn.name,
+                                                style: theme.textTheme.titleMedium?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              if (signIn.chapterName != null && signIn.chapterName!.isNotEmpty)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(top: 2.0),
+                                                  child: Text(
+                                                    signIn.chapterName!,
+                                                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 4.0),
+                                                child: Text(
+                                                  _formatCentralSignIn(signIn.lastSignInAt),
+                                                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAvatar(MemberPortalRecentSignIn signIn) {
+    final primaryPhoto = signIn.profilePictures.firstWhere(
+      (photo) => photo.isPrimary,
+      orElse: () => signIn.profilePictures.isNotEmpty ? signIn.profilePictures.first : MemberProfilePhoto(path: ''),
+    );
+
+    final imageUrl = primaryPhoto.publicUrl;
+    final initials = signIn.name.isNotEmpty ? signIn.name.trim()[0].toUpperCase() : '?';
+
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundImage: NetworkImage(imageUrl),
+        backgroundColor: Colors.white,
+      );
+    }
+
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: Colors.white.withOpacity(0.1),
+      foregroundColor: Colors.white,
+      child: Text(initials),
+    );
+  }
+
+  String _formatCentralSignIn(DateTime lastSignIn) {
+    try {
+      final location = tz.getLocation('America/Chicago');
+      final centralTime = tz.TZDateTime.from(lastSignIn.toUtc(), location);
+      return '${_signInFormat.format(centralTime)} CT';
+    } catch (_) {
+      return _signInFormat.format(lastSignIn.toLocal());
+    }
+  }
+
+  Future<void> _openMemberProfile(String memberId) async {
+    if (!_supabase.isInitialized) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final member = await _memberRepository.getMemberById(memberId);
+      if (!mounted) return;
+
+      Navigator.of(context).pop();
+
+      if (member == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to load member profile')),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => MemberDetailScreen(member: member)),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to open member profile: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildStatCard(String title, int value, IconData icon) {
+    return SizedBox(
+      width: 260,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white24),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              padding: const EdgeInsets.all(10),
+              child: Icon(icon, size: 24, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
+                ),
+                Text(
+                  value.toString(),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
