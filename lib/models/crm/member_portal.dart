@@ -32,6 +32,7 @@ class MemberPortalMeeting {
   final String? memberActionItems;
   final bool visibleToAll;
   final bool visibleToAttendeesOnly;
+  final bool visibleToExecutives;
   final bool isPublished;
   final List<PortalAttachment> attachments;
   final DateTime? publishedAt;
@@ -52,6 +53,7 @@ class MemberPortalMeeting {
     this.memberActionItems,
     this.visibleToAll = false,
     this.visibleToAttendeesOnly = true,
+    this.visibleToExecutives = true,
     this.isPublished = false,
     this.attachments = const [],
     this.publishedAt,
@@ -96,6 +98,7 @@ class MemberPortalMeeting {
       memberActionItems: json['member_action_items']?.toString(),
       visibleToAll: _normalizeBool(json['visible_to_all']) ?? false,
       visibleToAttendeesOnly: _normalizeBool(json['visible_to_attendees_only']) ?? true,
+      visibleToExecutives: _normalizeBool(json['visible_to_executives']) ?? true,
       isPublished: _normalizeBool(json['is_published']) ?? false,
       attachments: List<PortalAttachment>.unmodifiable(attachments),
       publishedAt: DateTime.tryParse(json['published_at']?.toString() ?? ''),
@@ -118,6 +121,7 @@ class MemberPortalMeeting {
     String? memberActionItems,
     DateTime? publishedAt,
     String? publishedBy,
+    bool? visibleToExecutives,
   }) {
     return MemberPortalMeeting(
       id: id,
@@ -131,6 +135,7 @@ class MemberPortalMeeting {
       memberActionItems: memberActionItems ?? this.memberActionItems,
       visibleToAll: visibleToAll ?? this.visibleToAll,
       visibleToAttendeesOnly: visibleToAttendeesOnly ?? this.visibleToAttendeesOnly,
+      visibleToExecutives: visibleToExecutives ?? this.visibleToExecutives,
       isPublished: isPublished ?? this.isPublished,
       attachments: attachments ?? this.attachments,
       publishedAt: publishedAt ?? this.publishedAt,
@@ -152,6 +157,7 @@ class MemberPortalMeeting {
       'member_action_items': memberActionItems,
       'visible_to_all': visibleToAll,
       'visible_to_attendees_only': visibleToAttendeesOnly,
+      'visible_to_executives': visibleToExecutives,
       'is_published': isPublished,
       'attachments': attachments.map((a) => a.toJson()).toList(),
       'published_at': publishedAt?.toIso8601String(),

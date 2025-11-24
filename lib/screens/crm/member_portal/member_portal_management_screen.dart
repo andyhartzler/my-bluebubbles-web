@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/member_portal.dart';
 import 'package:bluebubbles/services/crm/member_portal_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/utils/markdown_quill_loader.dart';
+import 'package:bluebubbles/utils/quill_html_converter.dart';
 
 class MemberPortalManagementScreen extends StatefulWidget {
   const MemberPortalManagementScreen({super.key});
@@ -14,6 +18,9 @@ class MemberPortalManagementScreen extends StatefulWidget {
 
 class _MemberPortalManagementScreenState extends State<MemberPortalManagementScreen>
     with SingleTickerProviderStateMixin {
+  static const _unityBlue = Color(0xFF273351);
+  static const _momentumBlue = Color(0xFF32A6DE);
+
   late final TabController _tabController = TabController(length: 6, vsync: this);
   final MemberPortalRepository _repository = MemberPortalRepository();
   final CRMSupabaseService _supabase = CRMSupabaseService();
@@ -29,6 +36,20 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   bool _showOnlyVisibleResources = false;
   final TextEditingController _resourceSearchController = TextEditingController();
 
+  String? _selectedMeetingId;
+  String? _editingMeetingId;
+  bool _savingMeeting = false;
+  bool _meetingSaveSucceeded = false;
+  String? _meetingSaveError;
+  bool _selectedVisibleToAll = false;
+  bool _selectedVisibleToAttendeesOnly = true;
+  bool _selectedVisibleToExecutives = true;
+  bool _selectedIsPublished = false;
+  quill.QuillController? _descriptionController;
+  quill.QuillController? _summaryController;
+  quill.QuillController? _keyPointsController;
+  quill.QuillController? _actionItemsController;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +63,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   @override
   void dispose() {
+    _disposeMeetingControllers();
     _resourceSearchController.dispose();
     super.dispose();
   }
@@ -182,55 +204,633 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
           }
 
           final meetings = snapshot.data ?? const [];
-          if (meetings.isEmpty) {
-            return const Center(child: Text('No meetings found.')); 
+          final selectedMeeting = _resolveSelectedMeeting(meetings);
+
+          if (selectedMeeting != null && _editingMeetingId != selectedMeeting.id) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _selectMeeting(selectedMeeting);
+              }
+            });
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: meetings.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final meeting = meetings[index];
-              return Card(
-                child: ListTile(
-                  title: Text(meeting.memberTitle.isNotEmpty ? meeting.memberTitle : meeting.meetingTitle ?? 'Meeting'),
-                  subtitle: Text(
-                    [
-                      if (meeting.meetingDate != null)
-                        'Meeting Date: ${meeting.meetingDate!.toLocal().toString().split(' ').first}',
-                      if (meeting.attendeeCount != null)
-                        'Attendees: ${meeting.attendeeCount}',
-                    ].join(' • '),
-                  ),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
+          if (meetings.isEmpty) {
+            return const Center(child: Text('No meetings found.'));
+          }
+
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/images/Blue-Gradient-Background.png',
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Positioned.fill(
+                child: Container(
+                  color: Colors.white.withOpacity(0.18),
+                ),
+              ),
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(meeting.isPublished
-                          ? (meeting.visibleToAll ? 'Published (All Members)' : 'Published (Attendees)')
-                          : 'Draft'),
-                      Switch(
-                        value: meeting.isPublished,
-                        onChanged: (value) async {
-                          await _repository.publishPortalMeeting(
-                            meetingId: meeting.id,
-                            publish: value,
-                            adminId: null,
-                          );
-                          await _reloadMeetings();
-                          await _reloadStats();
-                        },
+                      _buildMeetingManagementHeader(meetings.length),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isNarrow = constraints.maxWidth < 1000;
+                            if (isNarrow) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    height: 320,
+                                    child: _buildMeetingList(meetings, selectedMeeting),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Expanded(
+                                    child: selectedMeeting == null
+                                        ? _buildMeetingPlaceholder()
+                                        : _buildMeetingEditor(selectedMeeting),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 5,
+                                  child: _buildMeetingList(meetings, selectedMeeting),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  flex: 6,
+                                  child: selectedMeeting == null
+                                      ? _buildMeetingPlaceholder()
+                                      : _buildMeetingEditor(selectedMeeting),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
                     ],
                   ),
                 ),
-              );
-            },
+              ),
+            ],
           );
         },
       ),
     );
+  }
+
+  MemberPortalMeeting? _resolveSelectedMeeting(List<MemberPortalMeeting> meetings) {
+    if (meetings.isEmpty) return null;
+
+    for (final meeting in meetings) {
+      if (meeting.id == _selectedMeetingId) return meeting;
+    }
+
+    return meetings.first;
+  }
+
+  void _selectMeeting(MemberPortalMeeting meeting) {
+    _disposeMeetingControllers();
+    final descriptionDoc = _controllerFromHtml(meeting.memberDescription);
+    final summaryDoc = _controllerFromHtml(meeting.memberSummary);
+    final keyPointsDoc = _controllerFromHtml(meeting.memberKeyPoints);
+    final actionItemsDoc = _controllerFromHtml(meeting.memberActionItems);
+
+    setState(() {
+      _editingMeetingId = meeting.id;
+      _selectedMeetingId = meeting.id;
+      _selectedVisibleToAll = meeting.visibleToAll;
+      _selectedVisibleToAttendeesOnly = meeting.visibleToAttendeesOnly;
+      _selectedVisibleToExecutives = meeting.visibleToExecutives;
+      _selectedIsPublished = meeting.isPublished;
+      _meetingSaveError = null;
+      _meetingSaveSucceeded = false;
+      _descriptionController = descriptionDoc;
+      _summaryController = summaryDoc;
+      _keyPointsController = keyPointsDoc;
+      _actionItemsController = actionItemsDoc;
+    });
+  }
+
+  quill.QuillController _controllerFromHtml(String? html) {
+    final trimmed = html?.trim() ?? '';
+    final document = trimmed.isEmpty
+        ? quill.Document()
+        : MarkdownQuillLoader.fromHtml(trimmed);
+
+    return quill.QuillController(
+      document: document,
+      selection: TextSelection.collapsed(offset: document.length),
+    );
+  }
+
+  void _disposeMeetingControllers() {
+    _descriptionController?.dispose();
+    _summaryController?.dispose();
+    _keyPointsController?.dispose();
+    _actionItemsController?.dispose();
+    _descriptionController = null;
+    _summaryController = null;
+    _keyPointsController = null;
+    _actionItemsController = null;
+  }
+
+  Widget _buildMeetingManagementHeader(int meetingCount) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Container(
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: _momentumBlue,
+          ),
+          padding: const EdgeInsets.all(10),
+          child: const Icon(Icons.video_camera_front_outlined, color: Colors.white),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Member Portal Meetings',
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              Text(
+                meetingCount == 1
+                    ? '1 meeting ready to curate for the portal.'
+                    : '$meetingCount meetings ready to curate for the portal.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Refresh',
+          icon: const Icon(Icons.refresh),
+          onPressed: _reloadMeetings,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMeetingList(
+    List<MemberPortalMeeting> meetings,
+    MemberPortalMeeting? selectedMeeting,
+  ) {
+    return Card(
+      color: Colors.white.withOpacity(0.86),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: ListView.separated(
+        padding: const EdgeInsets.all(12),
+        itemBuilder: (context, index) {
+          final meeting = meetings[index];
+          final isSelected = meeting.id == selectedMeeting?.id;
+          return _buildMeetingCard(meeting, isSelected);
+        },
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemCount: meetings.length,
+      ),
+    );
+  }
+
+  Widget _buildMeetingCard(MemberPortalMeeting meeting, bool isSelected) {
+    final theme = Theme.of(context);
+    final attendeeLabel = meeting.attendeeCount != null ? '${meeting.attendeeCount} attendees' : 'Attendance TBD';
+    final meetingDateLabel = meeting.meetingDate != null
+        ? '${meeting.meetingDate!.toLocal().toString().split(' ').first}'
+        : 'Date TBD';
+
+    return Card(
+      color: _unityBlue,
+      elevation: isSelected ? 6 : 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _selectMeeting(meeting),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      meeting.memberTitle.isNotEmpty
+                          ? meeting.memberTitle
+                          : meeting.meetingTitle ?? 'Meeting',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        _buildChip(Icons.calendar_month_outlined, meetingDateLabel),
+                        _buildChip(Icons.groups_outlined, attendeeLabel),
+                        _buildChip(
+                          meeting.isPublished ? Icons.check_circle : Icons.drafts,
+                          meeting.isPublished
+                              ? (meeting.visibleToAll
+                                  ? 'Published · All'
+                                  : meeting.visibleToExecutives
+                                      ? 'Published · Exec/Attendees'
+                                      : 'Published · Attendees')
+                              : 'Draft',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Icon(
+                isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: Colors.white,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMeetingPlaceholder() {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.description_outlined, size: 36, color: theme.colorScheme.primary),
+            const SizedBox(height: 12),
+            Text(
+              'Select a meeting to edit the minutes members see in the portal.',
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMeetingEditor(MemberPortalMeeting meeting) {
+    if (_descriptionController == null ||
+        _summaryController == null ||
+        _keyPointsController == null ||
+        _actionItemsController == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final theme = Theme.of(context);
+    final statusColor = _meetingSaveSucceeded
+        ? Colors.green
+        : _meetingSaveError != null
+            ? theme.colorScheme.error
+            : theme.colorScheme.outline;
+
+    return Card(
+      color: Colors.white.withOpacity(0.94),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        meeting.memberTitle.isNotEmpty
+                            ? meeting.memberTitle
+                            : meeting.meetingTitle ?? 'Meeting',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        meeting.meetingDate != null
+                            ? 'Meeting date: ${meeting.meetingDate!.toLocal().toString().split(' ').first}'
+                            : 'Meeting date TBD',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Published'),
+                    Switch.adaptive(
+                      value: _selectedIsPublished,
+                      onChanged: (value) => setState(() {
+                        _selectedIsPublished = value;
+                      }),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildVisibilityCheckbox(
+                  label: 'Visible to all members',
+                  value: _selectedVisibleToAll,
+                  onChanged: (value) => setState(() {
+                    _selectedVisibleToAll = value ?? false;
+                  }),
+                ),
+                _buildVisibilityCheckbox(
+                  label: 'Visible to attendees only',
+                  value: _selectedVisibleToAttendeesOnly,
+                  onChanged: (value) => setState(() {
+                    _selectedVisibleToAttendeesOnly = value ?? false;
+                  }),
+                ),
+                _buildVisibilityCheckbox(
+                  label: 'Visible to executives',
+                  value: _selectedVisibleToExecutives,
+                  onChanged: (value) => setState(() {
+                    _selectedVisibleToExecutives = value ?? true;
+                  }),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                children: [
+                  _buildRichTextSection(
+                    title: 'Description',
+                    helper: 'Shows at the top of the meeting page for members.',
+                    controller: _descriptionController!,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRichTextSection(
+                    title: 'Summary',
+                    helper: 'Short recap of what happened.',
+                    controller: _summaryController!,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRichTextSection(
+                    title: 'Key Points',
+                    helper: 'Bulleted discussion highlights.',
+                    controller: _keyPointsController!,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRichTextSection(
+                    title: 'Action Items',
+                    helper: 'Next steps members should see.',
+                    controller: _actionItemsController!,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      if (_meetingSaveError != null || _meetingSaveSucceeded)
+                        Row(
+                          children: [
+                            Icon(
+                              _meetingSaveSucceeded ? Icons.check_circle : Icons.error_outline,
+                              color: statusColor,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _meetingSaveSucceeded
+                                  ? 'Saved'
+                                  : 'Save failed: ${_meetingSaveError}',
+                              style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
+                            ),
+                          ],
+                        ),
+                      const Spacer(),
+                      ElevatedButton.icon(
+                        icon: _savingMeeting
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.save),
+                        label: Text(_savingMeeting ? 'Saving...' : 'Save changes'),
+                        onPressed: _savingMeeting ? null : () => _saveMeeting(meeting),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _unityBlue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVisibilityCheckbox({
+    required String label,
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: CheckboxListTile(
+          value: value,
+          onChanged: onChanged,
+          title: Text(label),
+          dense: true,
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRichTextSection({
+    required String title,
+    required String helper,
+    required quill.QuillController controller,
+  }) {
+    final theme = Theme.of(context);
+    final locale = Localizations.localeOf(context);
+    final shared = quill.QuillSharedConfigurations(locale: locale);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 4),
+        Text(helper, style: theme.textTheme.bodySmall),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.dividerColor),
+            color: Colors.white,
+          ),
+          child: Column(
+            children: [
+              quill.QuillToolbar.simple(
+                configurations: quill.QuillSimpleToolbarConfigurations(
+                  controller: controller,
+                  sharedConfigurations: shared,
+                  multiRowsDisplay: false,
+                  showFontSize: false,
+                  showBackgroundColorButton: false,
+                  showDividers: false,
+                  showSearchButton: false,
+                  toolbarSize: 36,
+                  showAlignmentButtons: false,
+                  showQuote: false,
+                  showInlineCode: false,
+                  showSmallButton: false,
+                  showSuperscript: false,
+                  showSubscript: false,
+                  showDirection: false,
+                ),
+              ),
+              const Divider(height: 1),
+              SizedBox(
+                height: 180,
+                child: quill.QuillEditor(
+                  focusNode: FocusNode(),
+                  scrollController: ScrollController(),
+                  configurations: quill.QuillEditorConfigurations(
+                    controller: controller,
+                    sharedConfigurations: shared,
+                    scrollable: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    expands: false,
+                    checkBoxReadOnly: false,
+                    keyboardAppearance: Theme.of(context).brightness,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveMeeting(MemberPortalMeeting meeting) async {
+    setState(() {
+      _savingMeeting = true;
+      _meetingSaveError = null;
+      _meetingSaveSucceeded = false;
+    });
+
+    try {
+      final updatedMeeting = meeting.copyWith(
+        visibleToAll: _selectedVisibleToAll,
+        visibleToAttendeesOnly: _selectedVisibleToAttendeesOnly,
+        visibleToExecutives: _selectedVisibleToExecutives,
+        isPublished: _selectedIsPublished,
+        memberDescription: _generateHtml(_descriptionController),
+        memberSummary: _generateHtml(_summaryController),
+        memberKeyPoints: _generateHtml(_keyPointsController),
+        memberActionItems: _generateHtml(_actionItemsController),
+      );
+
+      final savedMeeting = await _repository.savePortalMeeting(updatedMeeting);
+      if (savedMeeting != null) {
+        setState(() {
+          _meetingSaveSucceeded = true;
+          _selectedMeetingId = savedMeeting.id;
+          _editingMeetingId = savedMeeting.id;
+          _meetingsFuture = _repository.fetchPortalMeetings();
+          _statsFuture = _repository.fetchDashboardStats();
+        });
+      } else {
+        setState(() {
+          _meetingSaveError = 'Save did not return updated data.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _meetingSaveError = e.toString();
+      });
+    } finally {
+      setState(() {
+        _savingMeeting = false;
+      });
+    }
+  }
+
+  String _generateHtml(quill.QuillController? controller) {
+    if (controller == null) return '';
+    final delta = controller.document.toDelta().toJson();
+    final plainText = controller.document.toPlainText();
+    return QuillHtmlConverter.generateHtml(delta, plainText);
   }
 
   Widget _buildSubmittedEventsTab() {

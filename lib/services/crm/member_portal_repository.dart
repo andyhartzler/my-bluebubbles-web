@@ -106,6 +106,7 @@ class MemberPortalRepository {
     required bool publish,
     bool? visibleToAll,
     bool? visibleToAttendeesOnly,
+    bool? visibleToExecutives,
     String? adminId,
   }) async {
     if (!_isReady) return null;
@@ -120,6 +121,9 @@ class MemberPortalRepository {
       if (visibleToAll != null) payload['visible_to_all'] = visibleToAll;
       if (visibleToAttendeesOnly != null) {
         payload['visible_to_attendees_only'] = visibleToAttendeesOnly;
+      }
+      if (visibleToExecutives != null) {
+        payload['visible_to_executives'] = visibleToExecutives;
       }
 
       final response = await _writeClient
