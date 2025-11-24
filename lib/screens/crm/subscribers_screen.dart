@@ -684,10 +684,15 @@ class _SubscriberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final statusLabel = _statusLabelFor(subscriber);
-    final statusColor = _statusColor(statusLabel, theme);
-    final tags = subscriber.tagList.take(3).toList();
+      final theme = Theme.of(context);
+      final statusLabel = _statusLabelFor(subscriber);
+      final statusColor = _statusColor(statusLabel, theme);
+
+      final tags = subscriber.tagList.take(3).toList();
+      final String? locationLabel =
+          (subscriber.city != null || subscriber.state != null)
+              ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
+              : null;
 
     return Card(
       elevation: 2,
@@ -835,7 +840,45 @@ class _SubscriberCard extends StatelessWidget {
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 6,
-                  children: _buildInfoPills(subscriber),
+                  children: [
+                    if (locationLabel != null)
+                      _InfoPill(
+                        icon: Icons.location_on_outlined,
+                        label: locationLabel,
+                      ),
+                    if (subscriber.county != null)
+                      _InfoPill(
+                        icon: Icons.map_outlined,
+                        label: subscriber.county!,
+                      ),
+                    if (subscriber.congressionalDistrict != null)
+                      _InfoPill(
+                        icon: Icons.account_balance_outlined,
+                        label: 'CD ${subscriber.congressionalDistrict}',
+                      ),
+                    if (subscriber.optinDate != null)
+                      _InfoPill(
+                        icon: Icons.calendar_month_outlined,
+                        label:
+                            'Opt-in ${_dateFormat.format(subscriber.optinDate!)}',
+                      ),
+                    if (subscriber.source != null)
+                      _InfoPill(
+                        icon: Icons.source_outlined,
+                        label: subscriber.source!,
+                      ),
+                    if (subscriber.eventAttendanceCount > 0)
+                      _InfoPill(
+                        icon: Icons.event_available_outlined,
+                        label: '${subscriber.eventAttendanceCount} events',
+                      ),
+                    if (subscriber.donor != null)
+                      _InfoPill(
+                        icon: Icons.volunteer_activism_outlined,
+                        label:
+                            'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1022,7 +1065,14 @@ class _SubscriberDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final subscriber = _subscriber;
+    final statusLabel = _statusLabelFor(subscriber);
+    final statusColor = subscriber.subscribed == false
+        ? _actionRed
+        : _grassrootsGreen;
+    final String? locationLabel =
+        (subscriber.city != null || subscriber.state != null)
+            ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
+            : null;
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1060,7 +1110,86 @@ class _SubscriberDetailSheet extends StatelessWidget {
                 Wrap(
                   spacing: 12,
                   runSpacing: 8,
-                  children: _buildDetailItems(subscriber, statusLabel),
+                  children: [
+                    _detailItem(
+                      'Email',
+                      subscriber.email,
+                      icon: Icons.email_outlined,
+                    ),
+                    if (subscriber.phoneE164?.isNotEmpty ?? false)
+                      _detailItem(
+                        'Phone',
+                        subscriber.phoneE164!,
+                        icon: Icons.phone_outlined,
+                      ),
+                    if (subscriber.dateOfBirth != null)
+                      _detailItem(
+                        'Date of Birth',
+                        DateFormat('MMM d, y').format(subscriber.dateOfBirth!),
+                        icon: Icons.cake_outlined,
+                      ),
+                    if (subscriber.address != null)
+                      _detailItem(
+                        'Address',
+                        subscriber.address!,
+                        icon: Icons.home_outlined,
+                      ),
+                    if (locationLabel != null)
+                      _detailItem(
+                        'Location',
+                        locationLabel,
+                        icon: Icons.location_city_outlined,
+                      ),
+                    if (subscriber.zipCode != null)
+                      _detailItem(
+                        'ZIP',
+                        subscriber.zipCode!,
+                        icon: Icons.local_post_office_outlined,
+                      ),
+                    if (subscriber.county != null)
+                      _detailItem(
+                        'County',
+                        subscriber.county!,
+                        icon: Icons.map_outlined,
+                      ),
+                    if (subscriber.congressionalDistrict != null)
+                      _detailItem(
+                        'Congressional District',
+                        subscriber.congressionalDistrict!,
+                      ),
+                    if (subscriber.houseDistrict != null)
+                      _detailItem('House District', subscriber.houseDistrict!),
+                    if (subscriber.senateDistrict != null)
+                      _detailItem(
+                        'Senate District',
+                        subscriber.senateDistrict!,
+                      ),
+                    if (subscriber.employer != null)
+                      _detailItem(
+                        'Employer',
+                        subscriber.employer!,
+                        icon: Icons.badge_outlined,
+                      ),
+                    if (subscriber.source != null)
+                      _detailItem(
+                        'Source',
+                        subscriber.source!,
+                        icon: Icons.source_outlined,
+                      ),
+                    if (subscriber.optinDate != null)
+                      _detailItem(
+                        'Opt-in Date',
+                        DateFormat('MMM d, y').format(subscriber.optinDate!),
+                        icon: Icons.event_available_outlined,
+                      ),
+                    if (subscriber.lastSyncedAt != null)
+                      _detailItem(
+                        'Last Synced',
+                        DateFormat('MMM d, y').format(subscriber.lastSyncedAt!),
+                        icon: Icons.sync_outlined,
+                      ),
+                    _detailItem('Status', statusLabel),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 if (subscriber.tagList.isNotEmpty) ...[
