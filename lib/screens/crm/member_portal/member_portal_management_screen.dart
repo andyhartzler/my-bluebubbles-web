@@ -2278,10 +2278,18 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       _ => Colors.amber,
     };
 
-    final avatarSeed = (change.memberName?.trim().isNotEmpty == true)
+    final displayName = (change.memberName?.trim().isNotEmpty == true)
         ? change.memberName!.trim()
-        : change.memberId;
+        : 'Member';
+    final avatarSeed = displayName.isNotEmpty ? displayName : change.memberId;
     final avatarLetter = avatarSeed.isNotEmpty ? avatarSeed.characters.first.toUpperCase() : 'M';
+    final primaryPhoto = change.profilePhotos.firstWhere(
+      (photo) => photo.isPrimary,
+      orElse: () => change.profilePhotos.isNotEmpty
+          ? change.profilePhotos.first
+          : MemberProfilePhoto(path: ''),
+    );
+    final avatarUrl = primaryPhoto.publicUrl;
 
     String valueDelta;
     if ((change.oldValue ?? '').isEmpty && (change.newValue ?? '').isNotEmpty) {
@@ -2295,11 +2303,14 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     return Card(
       elevation: 3,
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.blueGrey.shade100,
-          child: Text(avatarLetter),
-        ),
-        title: Text(change.memberName ?? change.memberId),
+        onTap: () => _openMemberProfile(change.memberId),
+        leading: avatarUrl != null && avatarUrl.isNotEmpty
+            ? CircleAvatar(backgroundImage: NetworkImage(avatarUrl))
+            : CircleAvatar(
+                backgroundColor: Colors.blueGrey.shade100,
+                child: Text(avatarLetter),
+              ),
+        title: Text(displayName),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

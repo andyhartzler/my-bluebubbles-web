@@ -452,7 +452,7 @@ class MemberProfileChange {
   final DateTime? updatedAt;
   final String memberId;
   final String? memberName;
-  final String? memberAvatar;
+  final List<MemberProfilePhoto> profilePhotos;
   final String fieldName;
   final String? displayLabel;
   final String? fieldCategory;
@@ -471,7 +471,7 @@ class MemberProfileChange {
     this.updatedAt,
     required this.memberId,
     this.memberName,
-    this.memberAvatar,
+    this.profilePhotos = const [],
     required this.fieldName,
     this.displayLabel,
     this.fieldCategory,
@@ -494,7 +494,7 @@ class MemberProfileChange {
       updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? ''),
       memberId: json['member_id']?.toString() ?? '',
       memberName: member?['name']?.toString(),
-      memberAvatar: member?['profile_pictures']?.toString(),
+      profilePhotos: MemberProfilePhoto.parseList(member?['profile_pictures']),
       fieldName: json['field_name']?.toString() ?? '',
       displayLabel: visibility?['display_label']?.toString(),
       fieldCategory: visibility?['field_category']?.toString(),
@@ -629,17 +629,12 @@ class MemberPortalRecentSignIn {
   });
 
   factory MemberPortalRecentSignIn.fromJson(Map<String, dynamic> json) {
-    final profilePictures = (json['profile_pictures'] as List?)
-            ?.map((value) => MemberProfilePhoto.fromJson(value))
-            .toList() ??
-        const <MemberProfilePhoto>[];
-
     return MemberPortalRecentSignIn(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Member',
       email: json['email']?.toString(),
       chapterName: json['chapter_name']?.toString(),
-      profilePictures: profilePictures,
+      profilePictures: MemberProfilePhoto.parseList(json['profile_pictures']),
       lastSignInAt:
           DateTime.tryParse(json['last_sign_in_at']?.toString() ?? '') ??
               DateTime.now(),
