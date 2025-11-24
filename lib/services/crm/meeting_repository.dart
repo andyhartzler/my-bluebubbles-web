@@ -301,13 +301,18 @@ class MeetingRepository {
     if (!_isReady || updates.isEmpty) return null;
 
     final payload = Map<String, dynamic>.from(updates);
+    final targetTable = _resolveAttendanceTable(payload);
 
     try {
       final response = await _supabase.privilegedClient
-          .from('meeting_attendance')
+          .from(targetTable)
           .update(payload)
           .eq('id', attendanceId)
-          .select('*, member:members(*), meeting:meetings(id, meeting_date, meeting_title, recording_url, recording_embed_url, duration_minutes, meeting_host)')
+          .select(
+            targetTable == 'event_attendees'
+                ? '*, member:members(*), meeting:events!event_attendees_event_id_fkey(id, meeting_date:meeting_date, meeting_title:name, duration_minutes:duration_minutes, recording_url:recording_url, recording_embed_url:recording_embed_url, meeting_host:meeting_host)'
+                : '*, member:members(*), meeting:meetings(id, meeting_date, meeting_title, recording_url, recording_embed_url, duration_minutes, meeting_host)',
+          )
           .maybeSingle();
 
       if (response == null) return null;
@@ -315,11 +320,27 @@ class MeetingRepository {
       if (json == null) {
         throw const FormatException('Supabase returned an unexpected meeting attendance payload');
       }
+      if (targetTable == 'event_attendees') {
+        json['meeting_id'] = json['event_id'] ?? json['meeting_id'];
+      }
       return MeetingAttendance.fromJson(json);
     } catch (e) {
       print('❌ Error updating meeting attendance: $e');
       rethrow;
     }
+  }
+
+  String _resolveAttendanceTable(Map<String, dynamic> updates) {
+    const eventKeys = {
+      'checked_in',
+      'guest_name',
+      'guest_email',
+      'guest_phone',
+      'guest_count',
+      'notes',
+      'rsvp_status'
+    };
+    return updates.keys.any(eventKeys.contains) ? 'event_attendees' : 'meeting_attendance';
   }
 
   Future<MeetingAttendance?> upsertAttendance({
