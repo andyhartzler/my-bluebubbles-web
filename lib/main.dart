@@ -31,6 +31,7 @@ import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:bluebubbles/screens/crm/events_screen.dart';
 import 'package:bluebubbles/screens/crm/donors_list_screen.dart';
+import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
 import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
@@ -475,6 +476,7 @@ enum _HomeSection {
   chapters,
   meetings,
   events,
+  memberPortal,
   walletNotifications,
   conversations
 }
@@ -757,6 +759,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                       ),
                       const MeetingsScreen(key: PageStorageKey('meetings-view')),
                       const EventsScreen(key: PageStorageKey('events-view')),
+                      const MemberPortalManagementScreen(
+                        key: PageStorageKey('member-portal-view'),
+                      ),
                       const WalletNotificationComposer(
                         key: PageStorageKey('wallet-notification-view'),
                         embedded: true,
@@ -794,6 +799,13 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       _buildNavButton(context, _HomeSection.chapters, 'Chapters', Icons.account_tree_outlined, enabled: crmReady),
       _buildNavButton(context, _HomeSection.meetings, 'Meetings', Icons.video_camera_front_outlined, enabled: crmReady),
       _buildNavButton(context, _HomeSection.events, 'Events', Icons.event_available_outlined, enabled: crmReady),
+      _buildNavButton(
+        context,
+        _HomeSection.memberPortal,
+        'Member Portal',
+        Icons.admin_panel_settings_outlined,
+        enabled: crmReady,
+      ),
       _buildNavButton(
         context,
         _HomeSection.walletNotifications,
@@ -1101,6 +1113,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   ),
                   buildItem(
                     order: 7,
+                    icon: Icons.admin_panel_settings_outlined,
+                    label: 'Member Portal',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady ? () => _setSection(_HomeSection.memberPortal) : null,
+                  ),
+                  buildItem(
+                    order: 8,
                     icon: Icons.notifications_active_outlined,
                     label: 'Wallet Notifications',
                     enabled: crmReady,
@@ -1108,7 +1128,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.walletNotifications) : null,
                   ),
                   buildItem(
-                    order: 8,
+                    order: 9,
                     icon: Icons.chat_bubble_outline,
                     label: 'Conversations',
                     onActivate: () => _setSection(_HomeSection.conversations),
