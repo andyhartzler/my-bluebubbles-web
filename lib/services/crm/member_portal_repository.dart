@@ -70,6 +70,10 @@ class MemberPortalRepository {
             .eq('is_published', true)
             .count(CountOption.exact),
         _readClient
+            .from('member_portal_meetings')
+            .select('id')
+            .count(CountOption.exact),
+        _readClient
             .from('member_portal_resources')
             .select('id')
             .eq('is_visible', true)
@@ -80,7 +84,8 @@ class MemberPortalRepository {
         pendingProfileChanges: responses[0].count ?? 0,
         pendingEventSubmissions: responses[1].count ?? 0,
         publishedMeetings: responses[2].count ?? 0,
-        visibleResources: responses[3].count ?? 0,
+        totalMeetings: responses[3].count ?? 0,
+        visibleResources: responses[4].count ?? 0,
       );
     } catch (e) {
       print('❌ Failed to load member portal dashboard stats: $e');
@@ -157,24 +162,18 @@ class MemberPortalRepository {
 
   Future<List<MemberPortalMeeting>> _hydrateMeetingMetadata(
       List<MemberPortalMeeting> meetings) async {
-    final missing = meetings
-        .where((m) => m.meetingId.isNotEmpty)
-        .where((m) =>
-            m.meetingDate == null ||
-            m.attendeeCount == null ||
-            (m.recordingEmbedUrl == null && m.recordingUrl == null) ||
-            m.meetingTitle == null ||
-            m.meetingTitle!.isEmpty)
+    final meetingIds = meetings
         .map((m) => m.meetingId)
+        .where((id) => id.isNotEmpty)
         .toSet();
 
-    if (missing.isEmpty) return meetings;
+    if (meetingIds.isEmpty) return meetings;
 
     try {
       final response = await _readClient
           .from('meetings')
           .select('id, meeting_date, meeting_title, attendance_count, recording_embed_url, recording_url')
-          .inFilter('id', missing.toList());
+          .inFilter('id', meetingIds.toList());
 
       final meetingMap = <String, Map<String, dynamic>>{};
       for (final raw in _coerceJsonList(response)) {
@@ -188,12 +187,22 @@ class MemberPortalRepository {
             final metadata = meetingMap[meeting.meetingId];
             if (metadata == null) return meeting;
 
+            String? normalizeNullableString(dynamic value) {
+              final str = value?.toString().trim();
+              return str != null && str.isNotEmpty ? str : null;
+            }
+
             return meeting.copyWith(
-              meetingDate: DateTime.tryParse(metadata['meeting_date']?.toString() ?? ''),
-              meetingTitle: metadata['meeting_title']?.toString(),
-              attendeeCount: _normalizeInt(metadata['attendance_count']),
-              recordingEmbedUrl: metadata['recording_embed_url']?.toString(),
-              recordingUrl: metadata['recording_url']?.toString(),
+              meetingDate: DateTime.tryParse(metadata['meeting_date']?.toString() ?? '') ??
+                  meeting.meetingDate,
+              meetingTitle: normalizeNullableString(metadata['meeting_title']) ??
+                  meeting.meetingTitle,
+              attendeeCount:
+                  _normalizeInt(metadata['attendance_count']) ?? meeting.attendeeCount,
+              recordingEmbedUrl: normalizeNullableString(metadata['recording_embed_url']) ??
+                  meeting.recordingEmbedUrl,
+              recordingUrl: normalizeNullableString(metadata['recording_url']) ??
+                  meeting.recordingUrl,
             );
           })
           .toList(growable: false);

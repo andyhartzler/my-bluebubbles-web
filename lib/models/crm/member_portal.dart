@@ -637,12 +637,14 @@ class MemberPortalDashboardStats {
   final int pendingProfileChanges;
   final int pendingEventSubmissions;
   final int publishedMeetings;
+  final int totalMeetings;
   final int visibleResources;
 
   const MemberPortalDashboardStats({
     required this.pendingProfileChanges,
     required this.pendingEventSubmissions,
     required this.publishedMeetings,
+    required this.totalMeetings,
     required this.visibleResources,
   });
 
@@ -650,6 +652,7 @@ class MemberPortalDashboardStats {
     pendingProfileChanges: 0,
     pendingEventSubmissions: 0,
     publishedMeetings: 0,
+    totalMeetings: 0,
     visibleResources: 0,
   );
 }
