@@ -75,7 +75,8 @@ class Event {
   final DateTime? updatedAt;
   final Member? createdByMember;
   final Map<String, dynamic>? socialShareImage;
-  final Map<String, dynamic>? websiteImage;
+  final dynamic websiteImage;
+  final List<EventImage> websiteImages;
 
   const Event({
     required this.title,
@@ -105,6 +106,7 @@ class Event {
     this.createdByMember,
     this.socialShareImage,
     this.websiteImage,
+    this.websiteImages = const [],
   });
 
   Event copyWith({
@@ -134,7 +136,8 @@ class Event {
     DateTime? updatedAt,
     Member? createdByMember,
     Map<String, dynamic>? socialShareImage,
-    Map<String, dynamic>? websiteImage,
+    dynamic websiteImage,
+    List<EventImage>? websiteImages,
   }) {
     return Event(
       id: id ?? this.id,
@@ -164,6 +167,7 @@ class Event {
       createdByMember: createdByMember ?? this.createdByMember,
       socialShareImage: socialShareImage ?? this.socialShareImage,
       websiteImage: websiteImage ?? this.websiteImage,
+      websiteImages: websiteImages ?? this.websiteImages,
     );
   }
 
@@ -191,7 +195,8 @@ class Event {
       'status': status,
       'created_by': createdBy,
       'social_share_image': socialShareImage,
-      'website_image': websiteImage,
+      'website_image': websiteImage ??
+          (websiteImages.isNotEmpty ? websiteImages.map((img) => img.toJson()).toList() : null),
     };
   }
 
@@ -218,7 +223,8 @@ class Event {
       'checkin_enabled': checkinEnabled,
       'status': status,
       'social_share_image': socialShareImage,
-      'website_image': websiteImage,
+      'website_image': websiteImage ??
+          (websiteImages.isNotEmpty ? websiteImages.map((img) => img.toJson()).toList() : null),
     };
   }
 
@@ -259,8 +265,59 @@ class Event {
       updatedAt: _parseDateTime(json['updated_at'], fieldName: 'updated_at'),
       createdByMember: createdByMember,
       socialShareImage: rawSocialShare is Map<String, dynamic> ? rawSocialShare : null,
-      websiteImage: rawWebsiteImage is Map<String, dynamic> ? rawWebsiteImage : null,
+      websiteImage: rawWebsiteImage,
+      websiteImages: EventImage.parseMany(rawWebsiteImage),
     );
+  }
+}
+
+class EventImage {
+  final String url;
+  final String? fileName;
+  final String? mimeType;
+  final DateTime? uploadedAt;
+  final Map<String, dynamic> raw;
+
+  EventImage({
+    required this.url,
+    required this.raw,
+    this.fileName,
+    this.mimeType,
+    this.uploadedAt,
+  });
+
+  Map<String, dynamic> toJson() => raw;
+
+  static EventImage? fromJson(Map<String, dynamic> json) {
+    final url = (json['storage_url'] ?? json['url'] ?? json['path']) as String?;
+    if (url == null || url.isEmpty) return null;
+
+    return EventImage(
+      url: url,
+      fileName: json['file_name'] as String?,
+      mimeType: json['mime_type'] as String? ?? json['content_type'] as String?,
+      uploadedAt: _parseDateTime(json['uploaded_at'], fieldName: 'uploaded_at'),
+      raw: json,
+    );
+  }
+
+  static List<EventImage> parseMany(dynamic raw) {
+    if (raw == null) return [];
+
+    if (raw is List) {
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(EventImage.fromJson)
+          .whereType<EventImage>()
+          .toList();
+    }
+
+    if (raw is Map<String, dynamic>) {
+      final single = EventImage.fromJson(raw);
+      return single == null ? [] : [single];
+    }
+
+    return [];
   }
 }
 
