@@ -697,7 +697,6 @@ class _SubscriberCard extends StatelessWidget {
     final theme = Theme.of(context);
     final statusLabel = _statusLabelFor(subscriber);
     final statusColor = _statusColor(statusLabel, theme);
-
     final tags = subscriber.tagList.take(3).toList();
 
     return Card(
@@ -817,25 +816,23 @@ class _SubscriberCard extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 6,
                         children: tags
-                            .map(
-                              (tag) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.18),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  tag,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
+                            .map((tag) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
                                   ),
-                                ),
-                              ),
-                            )
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    tag,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ))
                             .toList(),
                       ),
                     ],
