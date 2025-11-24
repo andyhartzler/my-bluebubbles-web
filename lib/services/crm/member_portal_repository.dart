@@ -208,6 +208,23 @@ class MemberPortalRepository {
       print('⚠️ Failed to hydrate meeting metadata: $e');
       return meetings;
     }
+
+    final response = await query.order('created_at', ascending: false);
+    return _parseMeetings(response);
+  }
+
+  List<MemberPortalMeeting> _parseMeetings(dynamic response) {
+    final meetings = _coerceJsonList(response)
+        .map(MemberPortalMeeting.fromJson)
+        .toList(growable: false);
+
+    meetings.sort((a, b) {
+      final aDate = a.meetingDate ?? a.createdAt;
+      final bDate = b.meetingDate ?? b.createdAt;
+      return bDate.compareTo(aDate);
+    });
+
+    return meetings;
   }
 
   Future<MemberPortalMeeting?> savePortalMeeting(MemberPortalMeeting meeting) async {
