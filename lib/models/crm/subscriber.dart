@@ -21,6 +21,7 @@ class Subscriber {
   final DateTime? optinDate;
   final String? tags;
   final String? subscriptionStatus;
+  final bool? subscribed;
   final String? memberId;
   final String? donorId;
   final String? source;
@@ -50,6 +51,7 @@ class Subscriber {
     this.optinDate,
     this.tags,
     this.subscriptionStatus,
+    this.subscribed,
     this.memberId,
     this.donorId,
     this.source,
@@ -81,6 +83,7 @@ class Subscriber {
       optinDate: _parseDate(json['optin_date']),
       tags: json['tags'] as String?,
       subscriptionStatus: json['subscription_status'] as String?,
+      subscribed: json['subscribed'] as bool?,
       memberId: json['member_id'] as String?,
       donorId: json['donor_id'] as String?,
       source: json['source'] as String?,
@@ -93,7 +96,7 @@ class Subscriber {
     );
   }
 
-  Subscriber copyWith({int? eventAttendanceCount, Donor? donor}) {
+  Subscriber copyWith({int? eventAttendanceCount, Donor? donor, bool? subscribedStatus}) {
     return Subscriber(
       id: id,
       email: email,
@@ -115,6 +118,7 @@ class Subscriber {
       optinDate: optinDate,
       tags: tags,
       subscriptionStatus: subscriptionStatus,
+      subscribed: subscribedStatus ?? subscribed,
       memberId: memberId,
       donorId: donorId,
       source: source,
