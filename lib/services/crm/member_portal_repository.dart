@@ -27,6 +27,27 @@ class MemberPortalRepository {
 
   SupabaseClient get _writeClient => _supabase.privilegedClient;
 
+  Future<List<MemberPortalRecentSignIn>> fetchRecentSignIns() async {
+    if (!_isReady) return const [];
+
+    try {
+      final response = await _readClient
+          .from('members')
+          .select(
+              'id, name, email, chapter_name, profile_pictures, last_sign_in_at')
+          .not('last_sign_in_at', 'is', null)
+          .order('last_sign_in_at', ascending: false)
+          .limit(10);
+
+      return _coerceJsonList(response)
+          .map(MemberPortalRecentSignIn.fromJson)
+          .toList(growable: false);
+    } catch (e) {
+      print('❌ Failed to load recent sign-ins: $e');
+      rethrow;
+    }
+  }
+
   Future<MemberPortalDashboardStats> fetchDashboardStats() async {
     if (!_isReady) return MemberPortalDashboardStats.empty;
 
@@ -79,10 +100,20 @@ class MemberPortalRepository {
         query = query.eq('is_published', isPublished);
       }
 
-      final response = await query.order('created_at', ascending: false);
-      return _coerceJsonList(response)
+      final response = await query
+          .order('meeting_date', ascending: false, referencedTable: 'meetings')
+          .order('created_at', ascending: false);
+      final meetings = _coerceJsonList(response)
           .map(MemberPortalMeeting.fromJson)
           .toList(growable: false);
+
+      meetings.sort((a, b) {
+        final aDate = a.meetingDate ?? a.createdAt;
+        final bDate = b.meetingDate ?? b.createdAt;
+        return bDate.compareTo(aDate);
+      });
+
+      return meetings;
     } catch (e) {
       print('❌ Error loading portal meetings: $e');
       rethrow;
