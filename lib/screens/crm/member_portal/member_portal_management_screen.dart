@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:characters/characters.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tzdata;
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
@@ -43,7 +44,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   final MeetingRepository _meetingRepository = MeetingRepository();
   final MemberRepository _memberRepository = MemberRepository();
   final CRMSupabaseService _supabase = CRMSupabaseService();
-  final DateFormat _signInFormat = DateFormat('MMM d, y • h:mm a');
+  final DateFormat _signInFormat = DateFormat('MMM d, y h:mm a');
 
   late Future<MemberPortalDashboardStats> _statsFuture;
   late Future<List<MemberPortalRecentSignIn>> _recentSignInsFuture;
@@ -82,10 +83,12 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   final Set<String> _selectedFieldCategories = {};
   String _profileChangeStatus = 'pending';
   String? _profileChangesError;
+  static bool _tzInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    _ensureTzInitialized();
     _statsFuture = _repository.fetchDashboardStats();
     _recentSignInsFuture = _repository.fetchRecentSignIns();
     _meetingsFuture = _repository.fetchPortalMeetings();
@@ -108,6 +111,12 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       _statsFuture = _repository.fetchDashboardStats();
       _recentSignInsFuture = _repository.fetchRecentSignIns();
     });
+  }
+
+  void _ensureTzInitialized() {
+    if (_tzInitialized) return;
+    tzdata.initializeTimeZones();
+    _tzInitialized = true;
   }
 
   Future<void> _reloadMeetings() async {
@@ -767,7 +776,8 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     final meetingDate = details?.meetingDate ?? meeting.meetingDate;
     final attendance = details?.attendance ?? const <MeetingAttendance>[];
     final attendeeCount = attendance.isNotEmpty ? attendance.length : meeting.attendeeCount;
-    final recordingEmbedUrl = details?.recordingEmbedUrl ?? meeting.recordingEmbedUrl;
+    final recordingEmbedUrl =
+        details?.resolvedRecordingEmbedUrl ?? details?.recordingEmbedUrl ?? meeting.recordingEmbedUrl ?? meeting.recordingUrl;
     final recordingUrl = details?.recordingUrl ?? meeting.recordingUrl;
 
     return DecoratedBox(
@@ -2280,7 +2290,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
     final displayName = (change.memberName?.trim().isNotEmpty == true)
         ? change.memberName!.trim()
-        : 'Member';
+        : (change.memberId.isNotEmpty ? 'Member ${change.memberId.substring(0, 6)}' : 'Unknown member');
     final avatarSeed = displayName.isNotEmpty ? displayName : change.memberId;
     final avatarLetter = avatarSeed.isNotEmpty ? avatarSeed.characters.first.toUpperCase() : 'M';
     final primaryPhoto = change.profilePhotos.firstWhere(
@@ -2679,16 +2689,21 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                   style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
                 )
               else
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Row(
-                    children: signIns
-                        .map(
-                          (signIn) => Padding(
-                            padding: const EdgeInsets.only(right: 12.0),
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isTwoColumn = constraints.maxWidth > 900;
+                    final spacing = 12.0;
+                    final columnWidth = isTwoColumn
+                        ? (constraints.maxWidth - spacing) / 2
+                        : constraints.maxWidth;
+
+                    return Wrap(
+                      spacing: spacing,
+                      runSpacing: spacing,
+                      children: signIns
+                          .map(
+                            (signIn) => SizedBox(
+                              width: columnWidth,
                               child: Card(
                                 elevation: 2,
                                 color: _unityBlue,
@@ -2742,10 +2757,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                                 ),
                               ),
                             ),
-                          ),
-                        )
-                        .toList(),
-                  ),
+                          )
+                          .toList(),
+                    );
+                  },
                 ),
             ],
           ),
@@ -2785,7 +2800,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       final centralTime = tz.TZDateTime.from(lastSignIn.toUtc(), location);
       return '${_signInFormat.format(centralTime)} CT';
     } catch (_) {
-      return _signInFormat.format(lastSignIn.toLocal());
+      return '${_signInFormat.format(lastSignIn.toLocal())}';
     }
   }
 

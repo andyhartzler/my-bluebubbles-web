@@ -92,16 +92,20 @@ class MemberPortalRepository {
 
     try {
       final meetings = await _loadMeetingsWithJoin(isPublished: isPublished);
-      if (meetings.isNotEmpty) return meetings;
+      if (meetings.isNotEmpty) {
+        return _hydrateMeetingMetadata(meetings);
+      }
 
       // If the relational join fails (e.g., RLS on meetings), fall back to a simple query
       // so the portal still renders existing curated content.
-      return await _loadMeetingsWithoutJoin(isPublished: isPublished);
+      final fallback = await _loadMeetingsWithoutJoin(isPublished: isPublished);
+      return _hydrateMeetingMetadata(fallback);
     } catch (e) {
       print('❌ Error loading portal meetings: $e');
       // Attempt a minimal fallback to avoid a blank portal when the joined query fails.
       try {
-        return await _loadMeetingsWithoutJoin(isPublished: isPublished);
+        final fallback = await _loadMeetingsWithoutJoin(isPublished: isPublished);
+        return _hydrateMeetingMetadata(fallback);
       } catch (_) {
         rethrow;
       }
@@ -130,6 +134,79 @@ class MemberPortalRepository {
 
     if (isPublished != null) {
       query = query.eq('is_published', isPublished);
+    }
+
+    final response = await query.order('created_at', ascending: false);
+    return _parseMeetings(response);
+  }
+
+  List<MemberPortalMeeting> _parseMeetings(dynamic response) {
+    final meetings = _coerceJsonList(response)
+        .map(MemberPortalMeeting.fromJson)
+        .toList(growable: false);
+
+    meetings.sort((a, b) {
+      final aDate = a.meetingDate ?? a.createdAt;
+      final bDate = b.meetingDate ?? b.createdAt;
+      return bDate.compareTo(aDate);
+    });
+
+    return meetings;
+  }
+
+  Future<List<MemberPortalMeeting>> _hydrateMeetingMetadata(
+      List<MemberPortalMeeting> meetings) async {
+    final missing = meetings
+        .where((m) => m.meetingId.isNotEmpty)
+        .where((m) =>
+            m.meetingDate == null ||
+            m.attendeeCount == null ||
+            (m.recordingEmbedUrl == null && m.recordingUrl == null) ||
+            m.meetingTitle == null ||
+            m.meetingTitle!.isEmpty)
+        .map((m) => m.meetingId)
+        .toSet();
+
+    if (missing.isEmpty) return meetings;
+
+    try {
+      final response = await _readClient
+          .from('meetings')
+          .select('id, meeting_date, meeting_title, attendance_count, recording_embed_url, recording_url')
+          .in_('id', missing.toList());
+
+      final meetingMap = <String, Map<String, dynamic>>{};
+      for (final raw in _coerceJsonList(response)) {
+        final id = raw['id']?.toString();
+        if (id == null) continue;
+        meetingMap[id] = raw;
+      }
+
+      final hydrated = meetings
+          .map((meeting) {
+            final metadata = meetingMap[meeting.meetingId];
+            if (metadata == null) return meeting;
+
+            return meeting.copyWith(
+              meetingDate: DateTime.tryParse(metadata['meeting_date']?.toString() ?? ''),
+              meetingTitle: metadata['meeting_title']?.toString(),
+              attendeeCount: _normalizeInt(metadata['attendance_count']),
+              recordingEmbedUrl: metadata['recording_embed_url']?.toString(),
+              recordingUrl: metadata['recording_url']?.toString(),
+            );
+          })
+          .toList(growable: false);
+
+      hydrated.sort((a, b) {
+        final aDate = a.meetingDate ?? a.createdAt;
+        final bDate = b.meetingDate ?? b.createdAt;
+        return bDate.compareTo(aDate);
+      });
+
+      return hydrated;
+    } catch (e) {
+      print('⚠️ Failed to hydrate meeting metadata: $e');
+      return meetings;
     }
 
     final response = await query.order('created_at', ascending: false);
@@ -410,7 +487,7 @@ class MemberPortalRepository {
     if (!_isReady) return const [];
 
     try {
-      var query = _readClient.from('member_profile_changes').select(''',
+      var query = _readClient.from('member_profile_changes').select('''
             *,
             members (id, name, profile_pictures),
             member_portal_field_visibility(field_name, display_label, field_category)
@@ -422,9 +499,38 @@ class MemberPortalRepository {
 
       final response = await query.order('created_at', ascending: false);
 
-      return _coerceJsonList(response)
+      final rawChanges = _coerceJsonList(response)
           .map(MemberProfileChange.fromJson)
           .toList(growable: false);
+
+      final memberIds = rawChanges.map((c) => c.memberId).where((id) => id.isNotEmpty).toSet();
+      if (memberIds.isEmpty) return rawChanges;
+
+      try {
+        final memberResponse = await _readClient
+            .from('members')
+            .select('id, name, profile_pictures')
+            .in_('id', memberIds.toList());
+
+        final memberMap = <String, Map<String, dynamic>>{};
+        for (final raw in _coerceJsonList(memberResponse)) {
+          final id = raw['id']?.toString();
+          if (id != null) memberMap[id] = raw as Map<String, dynamic>;
+        }
+
+        return rawChanges.map((change) {
+          final member = memberMap[change.memberId];
+          if (member == null) return change;
+          final profilePhotos = MemberProfilePhoto.parseList(member['profile_pictures']);
+          return change.copyWith(
+            memberName: member['name']?.toString(),
+            profilePhotos: profilePhotos,
+          );
+        }).toList(growable: false);
+      } catch (e) {
+        print('⚠️ Failed to hydrate member names for profile changes: $e');
+        return rawChanges;
+      }
     } catch (e) {
       print('❌ Error loading profile changes: $e');
       rethrow;

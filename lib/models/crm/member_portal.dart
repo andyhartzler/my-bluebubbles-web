@@ -138,6 +138,9 @@ class MemberPortalMeeting {
     bool? visibleToExecutives,
     String? recordingEmbedUrl,
     String? recordingUrl,
+    DateTime? meetingDate,
+    String? meetingTitle,
+    int? attendeeCount,
   }) {
     return MemberPortalMeeting(
       id: id,
@@ -157,9 +160,9 @@ class MemberPortalMeeting {
       attachments: attachments ?? this.attachments,
       publishedAt: publishedAt ?? this.publishedAt,
       publishedBy: publishedBy ?? this.publishedBy,
-      meetingTitle: meetingTitle,
-      meetingDate: meetingDate,
-      attendeeCount: attendeeCount,
+      meetingTitle: meetingTitle ?? this.meetingTitle,
+      meetingDate: meetingDate ?? this.meetingDate,
+      attendeeCount: attendeeCount ?? this.attendeeCount,
       recordingEmbedUrl: recordingEmbedUrl ?? this.recordingEmbedUrl,
       recordingUrl: recordingUrl ?? this.recordingUrl,
     );
@@ -506,6 +509,31 @@ class MemberProfileChange {
       reviewedAt: DateTime.tryParse(json['reviewed_at']?.toString() ?? ''),
       rejectionReason: json['rejection_reason']?.toString(),
       appliedAt: DateTime.tryParse(json['applied_at']?.toString() ?? ''),
+    );
+  }
+
+  MemberProfileChange copyWith({
+    String? memberName,
+    List<MemberProfilePhoto>? profilePhotos,
+  }) {
+    return MemberProfileChange(
+      id: id,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      memberId: memberId,
+      memberName: memberName ?? this.memberName,
+      profilePhotos: profilePhotos ?? this.profilePhotos,
+      fieldName: fieldName,
+      displayLabel: displayLabel,
+      fieldCategory: fieldCategory,
+      oldValue: oldValue,
+      newValue: newValue,
+      changeType: changeType,
+      status: status,
+      reviewedBy: reviewedBy,
+      reviewedAt: reviewedAt,
+      rejectionReason: rejectionReason,
+      appliedAt: appliedAt,
     );
   }
 }
