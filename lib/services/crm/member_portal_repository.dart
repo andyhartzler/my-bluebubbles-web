@@ -27,20 +27,40 @@ class MemberPortalRepository {
       final responses = await Future.wait([
         _readClient
             .from('member_profile_changes')
-            .select('id', head: true, count: CountOption.exact)
-            .eq('status', 'pending'),
+            .select(
+              'id',
+              fetchOptions: const FetchOptions(head: true),
+              count: CountOption.exact,
+            )
+            .eq('status', 'pending')
+            .execute(),
         _readClient
             .from('member_submitted_events')
-            .select('id', head: true, count: CountOption.exact)
-            .eq('approval_status', 'pending'),
+            .select(
+              'id',
+              fetchOptions: const FetchOptions(head: true),
+              count: CountOption.exact,
+            )
+            .eq('approval_status', 'pending')
+            .execute(),
         _readClient
             .from('member_portal_meetings')
-            .select('id', head: true, count: CountOption.exact)
-            .eq('is_published', true),
+            .select(
+              'id',
+              fetchOptions: const FetchOptions(head: true),
+              count: CountOption.exact,
+            )
+            .eq('is_published', true)
+            .execute(),
         _readClient
             .from('member_portal_resources')
-            .select('id', head: true, count: CountOption.exact)
-            .eq('is_visible', true),
+            .select(
+              'id',
+              fetchOptions: const FetchOptions(head: true),
+              count: CountOption.exact,
+            )
+            .eq('is_visible', true)
+            .execute(),
       ]);
 
       return MemberPortalDashboardStats(
