@@ -61,6 +61,29 @@ class _AttendeeProspect {
   String? get phone => member?.phone ?? member?.phoneE164 ?? donor?.phoneE164 ?? donor?.phone ?? attendee?.guestPhone;
 }
 
+class _ImagePagerButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _ImagePagerButton({required this.icon, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withOpacity(0.45),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Icon(icon, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
 class _EventDetailScreenState extends State<EventDetailScreen> with TickerProviderStateMixin {
   final EventRepository _repository = EventRepository();
   final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
@@ -118,6 +141,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   StreamSubscription<List<EventAttendee>>? _attendeeSub;
   bool _openingAttendeeEmail = false;
   bool _openingAttendeeMessage = false;
+  late final PageController _websiteImagePageController;
+  int _currentWebsiteImageIndex = 0;
 
   bool _hasText(String? value) => value?.trim().isNotEmpty == true;
 
@@ -170,6 +195,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _rsvpEnabled = event.rsvpEnabled;
     _checkinEnabled = event.checkinEnabled;
     _editingDetails = event.id == null;
+
+    _websiteImagePageController = PageController();
 
     _titleController.addListener(_maybeAutoSaveDraft);
 
@@ -232,6 +259,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _phoneController.dispose();
     _eventDateDisplayController.dispose();
     _eventEndDateDisplayController.dispose();
+    _websiteImagePageController.dispose();
     _disposeFocusNodes();
     _attendeeSub?.cancel();
     super.dispose();
@@ -243,6 +271,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         _eventDate != null ? formatter.format(_eventDate!.toLocal()) : '';
     _eventEndDateDisplayController.text =
         _eventEndDate != null ? formatter.format(_eventEndDate!.toLocal()) : '';
+  }
+
+  void _resetWebsiteImageCarousel() {
+    _currentWebsiteImageIndex = 0;
+    if (_websiteImagePageController.hasClients) {
+      _websiteImagePageController.jumpToPage(0);
+    }
   }
 
   void _maybeAutoSaveDraft() {
@@ -268,6 +303,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         _hideAddressBeforeRsvp = saved.hideAddressBeforeRsvp;
         _autoSavingDraft = false;
       });
+      _resetWebsiteImageCarousel();
       _loadAttendees();
       _startAttendeeStream();
     } catch (e) {
@@ -337,6 +373,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         _hideAddressBeforeRsvp = saved.hideAddressBeforeRsvp;
         _multipleLocations = saved.multipleLocations;
       });
+      _resetWebsiteImageCarousel();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Event saved successfully.')),
@@ -402,6 +439,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         _currentEvent = updated;
         _saving = false;
       });
+      _resetWebsiteImageCarousel();
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -1844,92 +1882,103 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     final images = _currentEvent.websiteImages;
     if (images.isEmpty) return const SizedBox.shrink();
 
-    if (images.length == 1) {
-      return _buildEventImageTile(images.first);
+    final pageIndex = _currentWebsiteImageIndex >= images.length ? 0 : _currentWebsiteImageIndex;
+    if (pageIndex != _currentWebsiteImageIndex) {
+      _currentWebsiteImageIndex = pageIndex;
+      if (_websiteImagePageController.hasClients) {
+        _websiteImagePageController.jumpToPage(pageIndex);
+      }
     }
 
-    return SizedBox(
-      height: 160,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: images.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final image = images[index];
-          return SizedBox(
-            width: 220,
-            child: _buildEventImageTile(image, height: 160, showIndexLabel: '${index + 1}/${images.length}'),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildEventImageTile(EventImage image, {double height = 220, String? showIndexLabel}) {
-    return SizedBox(
-      height: height,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 420,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                PageView.builder(
+                  controller: _websiteImagePageController,
+                  onPageChanged: (index) => setState(() => _currentWebsiteImageIndex = index),
+                  itemCount: images.length,
+                  itemBuilder: (context, index) {
+                    final image = images[index];
+                    return Container(
+                      color: Colors.black,
+                      alignment: Alignment.center,
+                      child: AspectRatio(
+                        aspectRatio: 1080 / 1350,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            image: DecorationImage(
+                              image: NetworkImage(image.url),
+                              fit: BoxFit.cover,
+                              alignment: Alignment.topCenter,
+                              onError: (_, __) {},
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                if (images.length > 1)
+                  Positioned(
+                    left: 12,
+                    top: 0,
+                    bottom: 0,
+                    child: _ImagePagerButton(
+                      icon: Icons.chevron_left,
+                      onPressed: () {
+                        final previous = (_currentWebsiteImageIndex - 1 + images.length) % images.length;
+                        _websiteImagePageController.animateToPage(
+                          previous,
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                    ),
+                  ),
+                if (images.length > 1)
+                  Positioned(
+                    right: 12,
+                    top: 0,
+                    bottom: 0,
+                    child: _ImagePagerButton(
+                      icon: Icons.chevron_right,
+                      onPressed: () {
+                        final next = (_currentWebsiteImageIndex + 1) % images.length;
+                        _websiteImagePageController.animateToPage(
+                          next,
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: NetworkImage(image.url),
-                    fit: BoxFit.cover,
-                    onError: (_, __) {},
-                  ),
-                ),
-              ),
+            Text(
+              images[pageIndex].fileName ?? 'Website image',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
             ),
-            Positioned.fill(
-              child: Container(
-                height: height,
-                foregroundDecoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.black.withOpacity(0.55), Colors.transparent],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                  ),
-                ),
-              ),
-            ),
-            if (image.fileName != null)
-              Positioned(
-                left: 12,
-                bottom: 12,
-                right: 12,
-                child: Text(
-                  image.fileName!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    shadows: [Shadow(blurRadius: 10, color: Colors.black)],
-                  ),
-                ),
-              ),
-            if (showIndexLabel != null)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.65),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    showIndexLabel,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
-                  ),
-                ),
+            if (images.length > 1)
+              Text(
+                '${pageIndex + 1} / ${images.length}',
+                style: const TextStyle(color: Colors.grey),
               ),
           ],
         ),
-      ),
+      ],
     );
   }
 

@@ -281,17 +281,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                                 ),
                               ),
                               const SizedBox(height: 16),
-                              Wrap(
-                                spacing: 16,
-                                runSpacing: 16,
-                                children: [
-                                  _buildStatCard('Pending Profile Changes', stats.pendingProfileChanges, Icons.fact_check),
-                                  _buildStatCard('Pending Event Submissions', stats.pendingEventSubmissions, Icons.event_note),
-                                  _buildStatCard('Published Meetings', stats.publishedMeetings,
-                                      Icons.video_camera_front_outlined),
-                                  _buildStatCard('Visible Resources', stats.visibleResources, Icons.folder_open),
-                                ],
-                              ),
+                              _buildStatsGrid(stats),
                             ],
                           ),
                         ),
@@ -776,9 +766,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     final meetingDate = details?.meetingDate ?? meeting.meetingDate;
     final attendance = details?.attendance ?? const <MeetingAttendance>[];
     final attendeeCount = attendance.isNotEmpty ? attendance.length : meeting.attendeeCount;
-    final recordingEmbedUrl =
-        details?.resolvedRecordingEmbedUrl ?? details?.recordingEmbedUrl ?? meeting.recordingEmbedUrl ?? meeting.recordingUrl;
-    final recordingUrl = details?.recordingUrl ?? meeting.recordingUrl;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -993,7 +980,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                     const SizedBox(height: 12),
                     _buildAttendanceSection(meeting, attendance, attendeeCount ?? 0),
                     const SizedBox(height: 12),
-                    _buildRecordingSection(recordingEmbedUrl, recordingUrl),
+                    _buildRecordingSection(meeting, details),
                     const SizedBox(height: 12),
                     _buildRichTextSection(
                       title: 'Description',
@@ -1047,11 +1034,33 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     );
   }
 
-  Widget _buildRecordingSection(String? recordingEmbedUrl, String? recordingUrl) {
-    final resolvedUrl =
-        recordingEmbedUrl?.isNotEmpty == true ? recordingEmbedUrl : recordingUrl;
+  String? _resolveRecordingUrl(MemberPortalMeeting meeting, Meeting? details) {
+    final candidates = [
+      details?.resolvedRecordingEmbedUrl,
+      details?.recordingUrl,
+      meeting.resolvedRecordingEmbedUrl,
+      meeting.recordingUrl,
+    ];
+
+    for (final candidate in candidates) {
+      final trimmed = candidate?.trim();
+      if (trimmed == null || trimmed.isEmpty) continue;
+      final uri = Uri.tryParse(trimmed);
+      if (uri != null && uri.hasScheme) {
+        return uri.toString();
+      }
+    }
+
+    return null;
+  }
+
+  Widget _buildRecordingSection(MemberPortalMeeting meeting, Meeting? details) {
+    final resolvedUrl = _resolveRecordingUrl(meeting, details);
     final embedUri = resolvedUrl != null ? Uri.tryParse(resolvedUrl) : null;
-    final hasEmbed = embedUri != null;
+    final hasEmbed = embedUri != null && embedUri.hasScheme;
+    final fallbackUrl = details?.recordingUrl?.trim().isNotEmpty == true
+        ? details?.recordingUrl
+        : meeting.recordingUrl;
 
     return Card(
       color: Colors.grey.shade900,
@@ -1094,10 +1103,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
               'No valid embed URL was provided.',
               style: TextStyle(color: Colors.white70),
             ),
-          if (recordingUrl != null && recordingUrl.isNotEmpty) ...[
+          if (fallbackUrl != null && fallbackUrl.isNotEmpty) ...[
             const SizedBox(height: 12),
             SelectableText(
-              'Fallback URL: $recordingUrl',
+              'Fallback URL: $fallbackUrl',
               style: const TextStyle(color: Colors.white70),
             ),
           ],
@@ -2790,11 +2799,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                   ],
                 ),
                 const SizedBox(height: 12),
-                _buildRecentSignInDetail('Member ID', signIn.id, labelStyle, valueStyle),
-                detailSpacing,
                 _buildRecentSignInDetail('Email', orPlaceholder(signIn.email), labelStyle, valueStyle),
-                detailSpacing,
-                _buildRecentSignInDetail('Chapter', orPlaceholder(signIn.chapterName), labelStyle, valueStyle),
                 detailSpacing,
                 _buildRecentSignInDetail('Last Sign-In', _formatCentralSignIn(signIn.lastSignInAt), labelStyle, valueStyle),
               ],
@@ -2875,9 +2880,65 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     }
   }
 
-  Widget _buildStatCard(String title, int value, IconData icon) {
+  Widget _buildStatsGrid(MemberPortalDashboardStats stats) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        int columns = 1;
+
+        if (maxWidth >= 1200) {
+          columns = 4;
+        } else if (maxWidth >= 900) {
+          columns = 3;
+        } else if (maxWidth >= 600) {
+          columns = 2;
+        }
+
+        const spacing = 16.0;
+        final cardWidth =
+            columns > 0 ? (maxWidth - spacing * (columns - 1)) / columns : maxWidth;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            _buildStatCard(
+              'Pending Profile Changes',
+              stats.pendingProfileChanges,
+              Icons.fact_check,
+              width: cardWidth,
+            ),
+            _buildStatCard(
+              'Pending Event Submissions',
+              stats.pendingEventSubmissions,
+              Icons.event_note,
+              width: cardWidth,
+            ),
+            _buildStatCard(
+              'Published Meetings',
+              stats.publishedMeetings,
+              Icons.video_camera_front_outlined,
+              subtitle: stats.totalMeetings > 0
+                  ? '${stats.publishedMeetings} of ${stats.totalMeetings} meetings published'
+                  : 'No meetings available',
+              width: cardWidth,
+            ),
+            _buildStatCard(
+              'Visible Resources',
+              stats.visibleResources,
+              Icons.folder_open,
+              width: cardWidth,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCard(String title, int value, IconData icon,
+      {String? subtitle, double? width}) {
     return SizedBox(
-      width: 260,
+      width: width,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.08),
@@ -2912,6 +2973,16 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                         fontWeight: FontWeight.w700,
                       ),
                 ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.white70),
+                  ),
+                ],
               ],
             ),
           ],

@@ -137,78 +137,101 @@ class _EventsScreenState extends State<EventsScreen> {
         : event.location?.isNotEmpty == true
             ? event.location
             : event.locationAddress;
+    final heroImage = event.websiteImages.isNotEmpty ? event.websiteImages.first : null;
 
     return Card(
-      elevation: 4,
-      color: Colors.transparent,
+      elevation: 6,
+      color: Colors.grey.shade900,
+      margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: InkWell(
         onTap: () => _openEvent(event),
         borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [_unityBlue, _momentumBlue],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(18.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        event.title,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+              child: heroImage != null
+                  ? AspectRatio(
+                      aspectRatio: 1080 / 1350,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          image: DecorationImage(
+                            image: NetworkImage(heroImage.url),
+                            fit: BoxFit.cover,
+                            alignment: Alignment.topCenter,
+                            onError: (_, __) {},
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )
+                  : Container(
+                      color: Colors.black,
+                      height: 260,
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported_outlined, color: Colors.white54, size: 48),
                       ),
                     ),
-                    _buildStatusChip(event.status),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  dateFormat.format(event.eventDate),
-                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-                ),
-                if (locationLabel?.isNotEmpty == true) ...[
-                  const SizedBox(height: 6),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(18.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Row(
                     children: [
-                      const Icon(Icons.place_outlined, size: 18, color: Colors.white70),
-                      const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          locationLabel!,
-                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
+                          event.title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      _buildStatusChip(event.status),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    dateFormat.format(event.eventDate),
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  ),
+                  if (locationLabel?.isNotEmpty == true) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.place_outlined, size: 18, color: Colors.white70),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            locationLabel!,
+                            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: [
+                      _buildInfoChip(Icons.category_outlined, event.eventType ?? 'Other'),
+                      _buildInfoChip(
+                          Icons.event_available_outlined, event.rsvpEnabled ? 'RSVPs on' : 'RSVPs off'),
+                      _buildInfoChip(Icons.verified_outlined, event.checkinEnabled ? 'Check-in on' : 'Check-in off'),
                     ],
                   ),
                 ],
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 8,
-                  children: [
-                    _buildInfoChip(Icons.category_outlined, event.eventType ?? 'Other'),
-                    _buildInfoChip(Icons.event_available_outlined, event.rsvpEnabled ? 'RSVPs on' : 'RSVPs off'),
-                    _buildInfoChip(Icons.verified_outlined, event.checkinEnabled ? 'Check-in on' : 'Check-in off'),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
