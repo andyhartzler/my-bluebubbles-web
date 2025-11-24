@@ -1055,6 +1055,7 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                // Subscriber metadata and engagement details
                 Wrap(
                   spacing: 12,
                   runSpacing: 8,
@@ -1400,6 +1401,8 @@ class _InfoPill extends StatelessWidget {
 class _StatusPill extends StatelessWidget {
   final String status;
   final Color color;
+  final IconData icon;
+  final String subtitle;
 
   const _StatusPill({required this.status, required this.color});
 
