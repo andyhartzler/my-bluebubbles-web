@@ -653,14 +653,22 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
     );
   }
 
-  void _openDetail(Subscriber subscriber) {
-    showModalBottomSheet(
+  Future<void> _openDetail(Subscriber subscriber) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) {
         return _SubscriberDetailSheet(
           subscriber: subscriber,
           canManage: _canManage,
+          repository: _repository,
+          onUpdated: (updated) {
+            setState(() {
+              _subscribers = _subscribers
+                  .map((s) => s.id == updated.id ? updated : s)
+                  .toList();
+            });
+          },
         );
       },
     );
@@ -688,7 +696,6 @@ class _SubscriberCard extends StatelessWidget {
     final statusLabel = _statusLabelFor(subscriber);
     final statusColor = _statusColor(statusLabel, theme);
 
-    final tags = subscriber.tagList.take(3).toList();
     final String? locationLabel = (subscriber.city != null || subscriber.state != null)
         ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
         : null;
@@ -701,29 +708,20 @@ class _SubscriberCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                flex: 3,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            subscriber.name,
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _StatusPill(label: statusLabel, color: statusColor),
-                      ],
+                    Text(
+                      subscriber.name,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         const Icon(
@@ -741,7 +739,7 @@ class _SubscriberCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Row(
                       children: [
                         const Icon(
@@ -764,6 +762,7 @@ class _SubscriberCard extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 6,
                       children: [
+                        _StatusPill(label: statusLabel, color: statusColor),
                         if (locationLabel != null)
                           _InfoPill(
                             icon: Icons.location_on_outlined,
@@ -798,86 +797,10 @@ class _SubscriberCard extends StatelessWidget {
                           _InfoPill(
                             icon: Icons.volunteer_activism_outlined,
                             label: 'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
-                          ),
-                        if (tags.isNotEmpty)
-                          Row(
-                            children: [
-                              ...tags
-                                  .map(
-                                    (tag) => Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.18),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        tag,
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ],
                           ),
                       ],
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: Builder(
-                  builder: (context) {
-                    final locationLabel = (subscriber.city != null || subscriber.state != null)
-                        ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
-                        : null;
-
-                    return Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        if (locationLabel != null)
-                          _InfoPill(
-                            icon: Icons.location_on_outlined,
-                            label: locationLabel,
-                          ),
-                        if (subscriber.county != null)
-                          _InfoPill(
-                            icon: Icons.map_outlined,
-                            label: subscriber.county!,
-                          ),
-                        if (subscriber.congressionalDistrict != null)
-                          _InfoPill(
-                            icon: Icons.account_balance_outlined,
-                            label: 'CD ${subscriber.congressionalDistrict}',
-                          ),
-                        if (subscriber.optinDate != null)
-                          _InfoPill(
-                            icon: Icons.calendar_month_outlined,
-                            label: 'Opt-in ${_dateFormat.format(subscriber.optinDate!)}',
-                          ),
-                        if (subscriber.source != null)
-                          _InfoPill(
-                            icon: Icons.source_outlined,
-                            label: subscriber.source!,
-                          ),
-                        if (subscriber.eventAttendanceCount > 0)
-                          _InfoPill(
-                            icon: Icons.event_available_outlined,
-                            label: '${subscriber.eventAttendanceCount} events',
-                          ),
-                        if (subscriber.donor != null)
-                          _InfoPill(
-                            icon: Icons.volunteer_activism_outlined,
-                            label: 'Donor • ${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
-                          ),
-                      ],
-                    );
-                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -997,26 +920,41 @@ class _SubscriberCard extends StatelessWidget {
   }
 }
 
-class _SubscriberDetailSheet extends StatelessWidget {
+class _SubscriberDetailSheet extends StatefulWidget {
   final Subscriber subscriber;
   final bool canManage;
+  final SubscriberRepository repository;
+  final ValueChanged<Subscriber>? onUpdated;
 
   const _SubscriberDetailSheet({
     required this.subscriber,
     required this.canManage,
+    required this.repository,
+    this.onUpdated,
   });
+
+  @override
+  State<_SubscriberDetailSheet> createState() => _SubscriberDetailSheetState();
+}
+
+class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
+  late Subscriber _subscriber;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscriber = widget.subscriber;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final statusLabel = _statusLabelFor(subscriber);
-    final statusColor = subscriber.subscribed == false
-        ? _actionRed
-        : _grassrootsGreen;
-    final String? locationLabel =
-        (subscriber.city != null || subscriber.state != null)
-            ? '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}'
-            : null;
+    final statusLabel = _statusLabelFor(_subscriber);
+    final statusColor = _subscriber.subscribed == false ? _actionRed : _grassrootsGreen;
+    final String? locationLabel = (_subscriber.city != null || _subscriber.state != null)
+        ? '${_subscriber.city ?? ''}${_subscriber.city != null && _subscriber.state != null ? ', ' : ''}${_subscriber.state ?? ''}'
+        : null;
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1036,7 +974,7 @@ class _SubscriberDetailSheet extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        subscriber.name,
+                        _subscriber.name,
                         style: theme.textTheme.headlineSmall,
                       ),
                     ),
@@ -1050,32 +988,31 @@ class _SubscriberDetailSheet extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Subscriber metadata and engagement details
                 Wrap(
                   spacing: 12,
                   runSpacing: 8,
                   children: [
                     _detailItem(
                       'Email',
-                      subscriber.email,
+                      _subscriber.email,
                       icon: Icons.email_outlined,
                     ),
-                    if (subscriber.phoneE164?.isNotEmpty ?? false)
+                    if (_subscriber.phoneE164?.isNotEmpty ?? false)
                       _detailItem(
                         'Phone',
-                        subscriber.phoneE164!,
+                        _subscriber.phoneE164!,
                         icon: Icons.phone_outlined,
                       ),
-                    if (subscriber.dateOfBirth != null)
+                    if (_subscriber.dateOfBirth != null)
                       _detailItem(
                         'Date of Birth',
-                        DateFormat('MMM d, y').format(subscriber.dateOfBirth!),
+                        DateFormat('MMM d, y').format(_subscriber.dateOfBirth!),
                         icon: Icons.cake_outlined,
                       ),
-                    if (subscriber.address != null)
+                    if (_subscriber.address != null)
                       _detailItem(
                         'Address',
-                        subscriber.address!,
+                        _subscriber.address!,
                         icon: Icons.home_outlined,
                       ),
                     if (locationLabel != null)
@@ -1084,119 +1021,128 @@ class _SubscriberDetailSheet extends StatelessWidget {
                         locationLabel,
                         icon: Icons.location_city_outlined,
                       ),
-                    if (subscriber.zipCode != null)
+                    if (_subscriber.zipCode != null)
                       _detailItem(
                         'ZIP',
-                        subscriber.zipCode!,
+                        _subscriber.zipCode!,
                         icon: Icons.local_post_office_outlined,
                       ),
-                    if (subscriber.county != null)
+                    if (_subscriber.county != null)
                       _detailItem(
                         'County',
-                        subscriber.county!,
+                        _subscriber.county!,
                         icon: Icons.map_outlined,
                       ),
-                    if (subscriber.congressionalDistrict != null)
+                    if (_subscriber.congressionalDistrict != null)
                       _detailItem(
                         'Congressional District',
-                        subscriber.congressionalDistrict!,
+                        _subscriber.congressionalDistrict!,
                       ),
-                    if (subscriber.houseDistrict != null)
-                      _detailItem('House District', subscriber.houseDistrict!),
-                    if (subscriber.senateDistrict != null)
+                    if (_subscriber.houseDistrict != null)
+                      _detailItem('House District', _subscriber.houseDistrict!),
+                    if (_subscriber.senateDistrict != null)
                       _detailItem(
                         'Senate District',
-                        subscriber.senateDistrict!,
+                        _subscriber.senateDistrict!,
                       ),
-                    if (subscriber.employer != null)
+                    if (_subscriber.employer != null)
                       _detailItem(
                         'Employer',
-                        subscriber.employer!,
+                        _subscriber.employer!,
                         icon: Icons.badge_outlined,
                       ),
-                    if (subscriber.source != null)
+                    if (_subscriber.source != null)
                       _detailItem(
                         'Source',
-                        subscriber.source!,
+                        _subscriber.source!,
                         icon: Icons.source_outlined,
                       ),
-                    if (subscriber.optinDate != null)
+                    if (_subscriber.optinDate != null)
                       _detailItem(
                         'Opt-in Date',
-                        DateFormat('MMM d, y').format(subscriber.optinDate!),
+                        DateFormat('MMM d, y').format(_subscriber.optinDate!),
                         icon: Icons.event_available_outlined,
                       ),
-                    if (subscriber.lastSyncedAt != null)
+                    if (_subscriber.lastSyncedAt != null)
                       _detailItem(
                         'Last Synced',
-                        DateFormat('MMM d, y').format(subscriber.lastSyncedAt!),
+                        DateFormat('MMM d, y').format(_subscriber.lastSyncedAt!),
                         icon: Icons.sync_outlined,
                       ),
-                    _detailItem('Status', statusLabel),
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (subscriber.tagList.isNotEmpty) ...[
-                  Text('Tags', style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: subscriber.tagList
-                        .map(
-                          (tag) => Chip(
-                            label: Text(tag),
-                            backgroundColor:
-                                theme.colorScheme.primary.withOpacity(0.08),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if (subscriber.donor != null) ...[
+                const Divider(),
+                const SizedBox(height: 12),
+                Text('Engagement', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    _detailItem('Subscription Status', _statusLabelFor(_subscriber), icon: Icons.check_circle_outline),
+                    if (_subscriber.subscribed != null)
+                      _detailItem(
+                        'Subscribed',
+                        _subscriber.subscribed! ? 'Yes' : 'No',
+                        icon: Icons.notifications_active_outlined,
+                      ),
+                    if (_subscriber.tagList.isNotEmpty)
+                      _detailItem(
+                        'Tags',
+                        _subscriber.tagList.join(', '),
+                        icon: Icons.label_outline,
+                      ),
+                    if (_subscriber.notes?.isNotEmpty ?? false)
+                      _detailItem(
+                        'Notes',
+                        _subscriber.notes!,
+                        icon: Icons.sticky_note_2_outlined,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (_subscriber.donor != null) ...[
                   Text('Donor Profile', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Text(
-                    'Total Donated: ${_formatCurrency(subscriber.donor!.totalDonated ?? 0)}',
+                    'Total Donated: ${_formatCurrency(_subscriber.donor!.totalDonated ?? 0)}',
                   ),
-                  Text('Donation Count: ${subscriber.donor!.donationCount}'),
-                  if (subscriber.donor!.lastDonationDate != null)
+                  Text('Donation Count: ${_subscriber.donor!.donationCount}'),
+                  if (_subscriber.donor!.lastDonationDate != null)
                     Text(
-                      'Last Donation: ${DateFormat('MMM d, y').format(subscriber.donor!.lastDonationDate!)}',
+                      'Last Donation: ${DateFormat('MMM d, y').format(_subscriber.donor!.lastDonationDate!)}',
                     ),
                   const SizedBox(height: 12),
                 ],
-                if (subscriber.eventAttendanceCount > 0) ...[
+                if (_subscriber.eventAttendanceCount > 0) ...[
                   Text('Events Attended', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  Text('${subscriber.eventAttendanceCount} events recorded'),
+                  Text('${_subscriber.eventAttendanceCount} events recorded'),
                   const SizedBox(height: 12),
                 ],
-                if (subscriber.notes?.isNotEmpty ?? false) ...[
+                if (_subscriber.notes?.isNotEmpty ?? false) ...[
                   Text('Notes', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 4),
-                  Text(subscriber.notes!),
+                  Text(_subscriber.notes!),
                   const SizedBox(height: 12),
                 ],
                 Row(
                   children: [
                     ElevatedButton.icon(
-                      onPressed: () => _showComingSoon(context),
+                      onPressed: _showFullDetails,
                       icon: const Icon(Icons.visibility_outlined),
                       label: const Text('View Full Details'),
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
-                      onPressed:
-                          canManage ? () => _showComingSoon(context) : null,
+                      onPressed: widget.canManage ? _openEditSubscriber : null,
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Edit Subscriber'),
                     ),
                     const SizedBox(width: 12),
                     OutlinedButton.icon(
-                      onPressed:
-                          canManage ? () => _showComingSoon(context) : null,
+                      onPressed: widget.canManage ? _addNote : null,
                       icon: const Icon(Icons.note_add_outlined),
                       label: const Text('Add Note'),
                     ),
@@ -1207,6 +1153,114 @@ class _SubscriberDetailSheet extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  Future<void> _openEditSubscriber() async {
+    final updated = await showModalBottomSheet<Subscriber>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _SubscriberEditSheet(
+        subscriber: _subscriber,
+        repository: widget.repository,
+      ),
+    );
+
+    if (updated != null) {
+      setState(() => _subscriber = updated);
+      widget.onUpdated?.call(updated);
+    }
+  }
+
+  Future<void> _addNote() async {
+    final controller = TextEditingController(text: _subscriber.notes ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Add Note'),
+          content: TextField(
+            controller: controller,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: 'Notes',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null) {
+      try {
+        final updated = await widget.repository.updateSubscriber(
+          _subscriber.id,
+          data: {'notes': result.isEmpty ? null : result},
+        );
+        setState(() => _subscriber = updated);
+        widget.onUpdated?.call(updated);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Note saved.')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to save note: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showFullDetails() async {
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Subscriber Details'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _buildDetailItems(_subscriber, _statusLabelFor(_subscriber)),
+                ),
+                if (_subscriber.notes?.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 12),
+                  const Text('Notes', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(_subscriber.notes!),
+                ],
+                if (_subscriber.tagList.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text('Tags', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(_subscriber.tagList.join(', ')),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1252,8 +1306,7 @@ class _SubscriberDetailSheet extends StatelessWidget {
     final hasCity = subscriber.city != null && subscriber.city!.isNotEmpty;
     final hasState = subscriber.state != null && subscriber.state!.isNotEmpty;
     if (hasCity || hasState) {
-      final locationLabel =
-          '${subscriber.city ?? ''}${hasCity && hasState ? ', ' : ''}${subscriber.state ?? ''}';
+      final locationLabel = '${subscriber.city ?? ''}${hasCity && hasState ? ', ' : ''}${subscriber.state ?? ''}';
       items.add(
         _detailItem(
           'Location',
@@ -1380,11 +1433,227 @@ class _SubscriberDetailSheet extends StatelessWidget {
       ),
     );
   }
+}
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Management actions coming soon.')),
+class _SubscriberEditSheet extends StatefulWidget {
+  final Subscriber subscriber;
+  final SubscriberRepository repository;
+
+  const _SubscriberEditSheet({
+    required this.subscriber,
+    required this.repository,
+  });
+
+  @override
+  State<_SubscriberEditSheet> createState() => _SubscriberEditSheetState();
+}
+
+class _SubscriberEditSheetState extends State<_SubscriberEditSheet> {
+  final _formKey = GlobalKey<FormState>();
+
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
+  late TextEditingController _phoneController;
+  late TextEditingController _cityController;
+  late TextEditingController _stateController;
+  late TextEditingController _countyController;
+  late TextEditingController _sourceController;
+  late TextEditingController _tagsController;
+  late TextEditingController _notesController;
+  late TextEditingController _statusController;
+
+  bool _saving = false;
+  bool _subscribed = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.subscriber.name);
+    _emailController = TextEditingController(text: widget.subscriber.email);
+    _phoneController = TextEditingController(text: widget.subscriber.phone ?? widget.subscriber.phoneE164 ?? '');
+    _cityController = TextEditingController(text: widget.subscriber.city ?? '');
+    _stateController = TextEditingController(text: widget.subscriber.state ?? '');
+    _countyController = TextEditingController(text: widget.subscriber.county ?? '');
+    _sourceController = TextEditingController(text: widget.subscriber.source ?? '');
+    _tagsController = TextEditingController(text: widget.subscriber.tags ?? '');
+    _notesController = TextEditingController(text: widget.subscriber.notes ?? '');
+    _statusController = TextEditingController(text: widget.subscriber.subscriptionStatus ?? '');
+    _subscribed = widget.subscriber.subscribed ?? true;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _countyController.dispose();
+    _sourceController.dispose();
+    _tagsController.dispose();
+    _notesController.dispose();
+    _statusController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Edit Subscriber',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Name'),
+                validator: (value) => (value == null || value.trim().isEmpty) ? 'Name is required' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                validator: (value) => (value == null || value.trim().isEmpty) ? 'Email is required' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _phoneController,
+                decoration: const InputDecoration(labelText: 'Phone (E.164 preferred)'),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _cityController,
+                      decoration: const InputDecoration(labelText: 'City'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _stateController,
+                      decoration: const InputDecoration(labelText: 'State'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _countyController,
+                decoration: const InputDecoration(labelText: 'County'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _sourceController,
+                decoration: const InputDecoration(labelText: 'Source'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _statusController,
+                decoration: const InputDecoration(labelText: 'Subscription Status'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _tagsController,
+                decoration: const InputDecoration(labelText: 'Tags (comma or semicolon separated)'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _notesController,
+                decoration: const InputDecoration(labelText: 'Notes'),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 10),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Subscribed'),
+                value: _subscribed,
+                onChanged: (value) => setState(() => _subscribed = value),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(_saving ? 'Saving...' : 'Save Changes'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _saving = true);
+
+    final trimmedPhone = _phoneController.text.trim();
+    final payload = <String, dynamic>{
+      'name': _nameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'phone': trimmedPhone.isEmpty ? null : trimmedPhone,
+      'phone_e164': trimmedPhone.startsWith('+') ? trimmedPhone : widget.subscriber.phoneE164,
+      'city': _cityController.text.trim().isEmpty ? null : _cityController.text.trim(),
+      'state': _stateController.text.trim().isEmpty ? null : _stateController.text.trim(),
+      'county': _countyController.text.trim().isEmpty ? null : _countyController.text.trim(),
+      'source': _sourceController.text.trim().isEmpty ? null : _sourceController.text.trim(),
+      'tags': _tagsController.text.trim().isEmpty ? null : _tagsController.text.trim(),
+      'notes': _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      'subscription_status': _statusController.text.trim().isEmpty ? null : _statusController.text.trim(),
+      'subscribed': _subscribed,
+    };
+
+    try {
+      final updated = await widget.repository.updateSubscriber(
+        widget.subscriber.id,
+        data: payload,
+      );
+      if (mounted) {
+        Navigator.of(context).pop(updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Subscriber updated.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update subscriber: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 }
 
