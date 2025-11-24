@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:bluebubbles/models/crm/member.dart';
+
 class PortalAttachment {
   final String name;
   final String url;
@@ -449,6 +451,8 @@ class MemberProfileChange {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final String memberId;
+  final String? memberName;
+  final List<MemberProfilePhoto> profilePhotos;
   final String fieldName;
   final String? displayLabel;
   final String? fieldCategory;
@@ -466,6 +470,8 @@ class MemberProfileChange {
     required this.createdAt,
     this.updatedAt,
     required this.memberId,
+    this.memberName,
+    this.profilePhotos = const [],
     required this.fieldName,
     this.displayLabel,
     this.fieldCategory,
@@ -481,11 +487,14 @@ class MemberProfileChange {
 
   factory MemberProfileChange.fromJson(Map<String, dynamic> json) {
     final visibility = json['member_portal_field_visibility'] as Map<String, dynamic>?;
+    final member = json['members'] as Map<String, dynamic>?;
     return MemberProfileChange(
       id: json['id'].toString(),
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? ''),
       memberId: json['member_id']?.toString() ?? '',
+      memberName: member?['name']?.toString(),
+      profilePhotos: MemberProfilePhoto.parseList(member?['profile_pictures']),
       fieldName: json['field_name']?.toString() ?? '',
       displayLabel: visibility?['display_label']?.toString(),
       fieldCategory: visibility?['field_category']?.toString(),
@@ -600,6 +609,37 @@ class MemberPortalDashboardStats {
     publishedMeetings: 0,
     visibleResources: 0,
   );
+}
+
+class MemberPortalRecentSignIn {
+  final String id;
+  final String name;
+  final String? email;
+  final String? chapterName;
+  final List<MemberProfilePhoto> profilePictures;
+  final DateTime lastSignInAt;
+
+  const MemberPortalRecentSignIn({
+    required this.id,
+    required this.name,
+    required this.lastSignInAt,
+    this.email,
+    this.chapterName,
+    this.profilePictures = const [],
+  });
+
+  factory MemberPortalRecentSignIn.fromJson(Map<String, dynamic> json) {
+    return MemberPortalRecentSignIn(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Member',
+      email: json['email']?.toString(),
+      chapterName: json['chapter_name']?.toString(),
+      profilePictures: MemberProfilePhoto.parseList(json['profile_pictures']),
+      lastSignInAt:
+          DateTime.tryParse(json['last_sign_in_at']?.toString() ?? '') ??
+              DateTime.now(),
+    );
+  }
 }
 
 bool? _normalizeBool(dynamic value) {
