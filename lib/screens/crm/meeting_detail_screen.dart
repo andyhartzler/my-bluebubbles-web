@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 
@@ -1202,6 +1203,7 @@ class MeetingRecordingEmbed extends StatefulWidget {
 class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
   static const String _viewType = 'meetings-recording-view';
   static bool _registered = false;
+  static Completer<void>? _registrationCompleter;
   static final Map<int, html.IFrameElement> _iframes =
       <int, html.IFrameElement>{};
 
@@ -1269,6 +1271,13 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
   Future<void> _ensureRegistered() async {
     if (_registered) return;
 
+    if (_registrationCompleter != null) {
+      return _registrationCompleter!.future;
+    }
+
+    final completer = Completer<void>();
+    _registrationCompleter = completer;
+
     try {
       if (MeetingRecordingEmbed.debugForceRegistrationFailure) {
         throw Exception('Forced registration failure for testing');
@@ -1289,8 +1298,11 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
     );
 
       _registered = true;
+      completer.complete();
     } catch (error, stackTrace) {
       _handleFailure(error, stackTrace);
+      completer.completeError(error, stackTrace);
+      _registrationCompleter = null;
       rethrow;
     }
   }
