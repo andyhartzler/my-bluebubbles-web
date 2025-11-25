@@ -16,7 +16,6 @@ import 'package:bluebubbles/models/crm/member_portal.dart';
 import 'package:bluebubbles/screens/crm/editors/member_search_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
-import 'package:bluebubbles/screens/crm/meeting_detail_screen.dart' show MeetingRecordingEmbed;
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_content_tiles.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_text_utils.dart';
@@ -27,7 +26,6 @@ import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/markdown_quill_loader.dart';
 import 'package:bluebubbles/utils/quill_html_converter.dart';
 import 'package:mime_type/mime_type.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class MemberPortalManagementScreen extends StatefulWidget {
   const MemberPortalManagementScreen({super.key});
@@ -77,9 +75,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   bool _selectedVisibleToExecutives = true;
   bool _selectedIsPublished = false;
   bool _selectedShowRecording = false;
-  bool _recordingExpanded = false;
-  bool _recordingEmbedFailed = false;
-  String? _lastRecordingEmbedUrl;
   Meeting? _selectedMeetingDetails;
   bool _loadingMeetingDetails = false;
   String? _meetingDetailsError;
@@ -488,7 +483,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       _selectedVisibleToExecutives = meeting.visibleToExecutives;
       _selectedIsPublished = meeting.isPublished;
       _selectedShowRecording = meeting.showRecording ?? false;
-      _recordingExpanded = false;
       _meetingSaveError = null;
       _meetingSaveSucceeded = false;
       _meetingHasUnsavedChanges = false;
@@ -989,8 +983,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                     const SizedBox(height: 12),
                     _buildAttendanceSection(meeting, attendance, attendeeCount ?? 0),
                     const SizedBox(height: 12),
-                    _buildRecordingSection(meeting, details),
-                    const SizedBox(height: 12),
                     _buildRichTextSection(
                       title: 'Description',
                       helper: 'Shows at the top of the meeting page for members.',
@@ -1100,212 +1092,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         ),
       ),
     );
-  }
-
-  String? _resolveRecordingUrl(MemberPortalMeeting meeting, Meeting? details) {
-    final candidates = [
-      details?.resolvedRecordingEmbedUrl,
-      details?.recordingUrl,
-      meeting.resolvedRecordingEmbedUrl,
-      meeting.recordingUrl,
-    ];
-
-    for (final candidate in candidates) {
-      final trimmed = candidate?.trim();
-      if (trimmed == null || trimmed.isEmpty) continue;
-      final uri = Uri.tryParse(trimmed);
-      if (uri != null && uri.hasScheme) {
-        return uri.toString();
-      }
-    }
-
-    return null;
-  }
-
-  Widget _buildRecordingSection(MemberPortalMeeting meeting, Meeting? details) {
-    final resolvedUrl = _resolveRecordingUrl(meeting, details);
-    if (_lastRecordingEmbedUrl != resolvedUrl) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          _lastRecordingEmbedUrl = resolvedUrl;
-          _recordingEmbedFailed = false;
-        });
-      });
-    }
-
-    final embedUri = resolvedUrl != null ? Uri.tryParse(resolvedUrl) : null;
-    final hasEmbed = embedUri != null && embedUri.hasScheme;
-    final fallbackUrl = details?.recordingUrl?.trim().isNotEmpty == true
-        ? details?.recordingUrl
-        : meeting.recordingUrl;
-    final fallbackUri = fallbackUrl != null && fallbackUrl.isNotEmpty
-        ? Uri.tryParse(fallbackUrl)
-        : null;
-
-    final canEmbed = hasEmbed && !_recordingEmbedFailed;
-    final showFallbackLink = fallbackUri != null;
-
-    return Card(
-      color: Colors.grey.shade900,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: ExpansionTile(
-        initiallyExpanded: _recordingExpanded && (canEmbed || showFallbackLink),
-        onExpansionChanged: (expanded) => setState(() => _recordingExpanded = expanded),
-        leading: Icon(
-          canEmbed ? Icons.play_circle : Icons.play_disabled,
-          color: Colors.white,
-        ),
-        title: Text(
-          canEmbed
-              ? (_selectedShowRecording
-                  ? 'Recording embed visible to members'
-                  : 'Recording embed ready (hidden from members)')
-              : _recordingEmbedFailed
-                  ? 'Recording embed unavailable'
-                  : 'Recording embed URL missing',
-          style: const TextStyle(color: Colors.white),
-        ),
-        subtitle: Text(
-          canEmbed
-              ? _selectedShowRecording
-                  ? 'Embedded player matches the main Meetings page.'
-                  : 'Embed previewed here but hidden from portal visitors.'
-              : _recordingEmbedFailed
-                  ? 'Embed failed to load; showing the fallback link instead.'
-                  : 'Add an embed URL in Supabase to stream the recording.',
-          style: const TextStyle(color: Colors.white70),
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        children: [
-          if (hasEmbed && embedUri != null && !_recordingEmbedFailed)
-            _buildRecordingEmbedPreview(embedUri)
-          else if (_recordingEmbedFailed)
-            _buildRecordingEmbedContainer(
-              child: _buildRecordingPlaceholderBody('Recording embed unavailable'),
-            )
-          else
-            _buildRecordingEmbedContainer(
-              child: _buildRecordingPlaceholderBody('No valid embed URL was provided.'),
-            ),
-          if (fallbackUrl != null && fallbackUrl.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: showFallbackLink
-                  ? TextButton.icon(
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: () {
-                        if (fallbackUri != null) {
-                          _launchRecording(fallbackUri);
-                        }
-                      },
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text('Open recording'),
-                    )
-                  : SelectableText(
-                      'Fallback URL: $fallbackUrl',
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecordingEmbedPreview(Uri embedUri) {
-    final embedBuilder = MemberPortalManagementScreen.recordingEmbedBuilderOverride;
-
-    final embedFuture = Future<Widget>.sync(() {
-      return embedBuilder != null
-          ? embedBuilder(embedUri)
-          : MeetingRecordingEmbed(
-              key: ValueKey(embedUri.toString()),
-              uri: embedUri,
-              onFailure: _markRecordingEmbedFailed,
-            );
-    });
-
-    return _buildRecordingEmbedContainer(
-      child: FutureBuilder<Widget>(
-        future: embedFuture,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            _markRecordingEmbedFailed();
-            debugPrint('Failed to render recording embed for $embedUri: ${snapshot.error}');
-            debugPrintStack(stackTrace: snapshot.stackTrace);
-            return _buildRecordingPlaceholderBody('Recording embed unavailable');
-          }
-
-          if (snapshot.connectionState != ConnectionState.done) {
-            return _buildRecordingPlaceholderBody('Loading recording embed...');
-          }
-
-          return snapshot.data ??
-              _buildRecordingPlaceholderBody('Recording embed unavailable');
-        },
-      ),
-    );
-  }
-
-  Widget _buildRecordingEmbedContainer({required Widget child}) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            color: theme.colorScheme.surfaceVariant,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Text(
-              'Recording',
-              style: theme.textTheme.titleMedium,
-            ),
-          ),
-          SizedBox(
-            height: 360,
-            child: child,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecordingPlaceholderBody(String message) {
-    return Container(
-      color: Colors.grey.shade900,
-      alignment: Alignment.center,
-      child: Text(
-        message,
-        style: const TextStyle(color: Colors.white70),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
-
-  void _markRecordingEmbedFailed() {
-    if (_recordingEmbedFailed) return;
-    if (!mounted) return;
-    setState(() => _recordingEmbedFailed = true);
-  }
-
-  Future<void> _launchRecording(Uri uri) async {
-    try {
-      await launchUrl(
-        uri,
-        mode: LaunchMode.platformDefault,
-        webOnlyWindowName: kIsWeb ? '_blank' : null,
-      );
-    } catch (error, stackTrace) {
-      debugPrint('Failed to open recording link $uri: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
   }
 
   Widget _buildAttendanceSection(
