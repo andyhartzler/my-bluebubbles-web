@@ -1311,12 +1311,13 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
 
         _registered = true;
       } catch (error, stackTrace) {
+        final message = error.toString().toLowerCase();
         final isDuplicateRegistration =
-            error.toString().toLowerCase().contains('viewtype already registered');
+            message.contains('viewtype already registered');
 
         if (isDuplicateRegistration) {
-          // Some environments try to register the view factory more than once;
-          // treat that as a successful registration so embeds keep working.
+          // Hot reloads and host portals may re-register the view factory;
+          // treat duplicate registrations as success so future builds skip it.
           _registered = true;
         } else {
           _handleFailure(error, stackTrace);
