@@ -224,6 +224,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       ),
       body: TabBarView(
         controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(),
         children: [
           _buildOverviewTab(),
           _buildMeetingsTab(),
@@ -525,9 +526,24 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   quill.QuillController _controllerFromHtml(String? html) {
     final trimmed = html?.trim() ?? '';
-    final document = trimmed.isEmpty
-        ? quill.Document()
-        : MarkdownQuillLoader.fromHtml(trimmed);
+    quill.Document document;
+
+    if (trimmed.isEmpty) {
+      document = quill.Document();
+    } else {
+      final hasHtmlTags = RegExp(r'<[a-zA-Z][^>]*>').hasMatch(trimmed);
+      try {
+        document = hasHtmlTags
+            ? MarkdownQuillLoader.fromHtml(trimmed)
+            : MarkdownQuillLoader.fromMarkdown(trimmed);
+      } catch (_) {
+        try {
+          document = MarkdownQuillLoader.fromMarkdown(trimmed);
+        } catch (_) {
+          document = quill.Document();
+        }
+      }
+    }
 
     return quill.QuillController(
       document: document,
@@ -996,19 +1012,19 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                     _buildAttendanceSection(meeting, attendance, attendeeCount ?? 0),
                     const SizedBox(height: 12),
                     _buildRichTextSection(
-                      title: 'Description',
-                      helper: 'Shows at the top of the meeting page for members.',
-                      controller: _descriptionController!,
-                      focusNode: _descriptionFocusNode,
-                      scrollController: _descriptionScrollController,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildRichTextSection(
                       title: 'Summary',
                       helper: 'Short recap of what happened.',
                       controller: _summaryController!,
                       focusNode: _summaryFocusNode,
                       scrollController: _summaryScrollController,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRichTextSection(
+                      title: 'Description',
+                      helper: 'Shows at the top of the meeting page for members.',
+                      controller: _descriptionController!,
+                      focusNode: _descriptionFocusNode,
+                      scrollController: _descriptionScrollController,
                     ),
                     const SizedBox(height: 12),
                     _buildRichTextSection(
@@ -1093,8 +1109,8 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       previewTiles.add(MemberPortalContentTile(title: title, html: html));
     }
 
-    addTile('Description', _descriptionController);
     addTile('Summary', _summaryController);
+    addTile('Description', _descriptionController);
     addTile('Key Points', _keyPointsController);
     addTile('Action Items', _actionItemsController);
 
@@ -1229,14 +1245,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       }
 
       // Get profile picture from member if available
-      String? profileImageUrl;
-      if (attendance.member?.profilePictures != null && attendance.member!.profilePictures.isNotEmpty) {
-        final primaryPhoto = attendance.member!.profilePictures.firstWhere(
-          (photo) => photo.isPrimary,
-          orElse: () => attendance.member!.profilePictures.first,
-        );
-        profileImageUrl = primaryPhoto.publicUrl;
-      }
+      String? profileImageUrl = attendance.member?.primaryProfilePhotoUrl;
 
       final initials = attendance.participantName.isNotEmpty
           ? attendance.participantName.substring(0, 1).toUpperCase()
