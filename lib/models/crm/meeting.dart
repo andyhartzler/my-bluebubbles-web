@@ -656,10 +656,14 @@ class MeetingAttendance {
     final start = firstJoinTime;
     final end = lastLeaveTime;
     if (start == null && end == null) return null;
-    String format(DateTime value) =>
-        '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+    String format(DateTime value) {
+      final hour = value.hour == 0 ? 12 : (value.hour > 12 ? value.hour - 12 : value.hour);
+      final minute = value.minute.toString().padLeft(2, '0');
+      final period = value.hour >= 12 ? 'PM' : 'AM';
+      return '$hour:$minute $period';
+    }
     if (start != null && end != null) {
-      return '${format(start)} – ${format(end)}';
+      return '${format(start)} - ${format(end)}';
     }
     return start != null ? 'Joined at ${format(start)}' : 'Left at ${format(end!)}';
   }
