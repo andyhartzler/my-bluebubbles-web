@@ -98,41 +98,15 @@ class MemberPortalRepository {
     if (!_isReady) return const [];
 
     try {
-      final meetings = await _loadMeetingsWithJoin(isPublished: isPublished);
-      if (meetings.isNotEmpty) {
-        return _hydrateMeetingMetadata(meetings);
-      }
+      final meetings = await _loadMeetingsWithoutJoin(isPublished: isPublished);
+      return _hydrateMeetingMetadata(meetings);
     } on PostgrestException catch (e) {
-      final isMissingRelationship = e.code == 'PGRST108';
-      final prefix = isMissingRelationship
-          ? '⚠️ Skipping meeting join; embedded relationship unavailable'
-          : '❌ Error loading portal meetings';
-      print('$prefix: $e');
+      print('❌ Error loading portal meetings: $e');
+      return const [];
     } catch (e) {
       print('❌ Error loading portal meetings: $e');
+      return const [];
     }
-
-    // If the relational join fails (e.g., missing FK on meetings), fall back to a simple query
-    // so the portal still renders existing curated content.
-    final fallback = await _loadMeetingsWithoutJoin(isPublished: isPublished);
-    return _hydrateMeetingMetadata(fallback);
-  }
-
-  Future<List<MemberPortalMeeting>> _loadMeetingsWithJoin({bool? isPublished}) async {
-    var query = _readClient.from('member_portal_meetings').select(''',
-          *,
-          meetings(meeting_title, meeting_date, attendance_count, recording_embed_url, recording_url)
-        ''');
-
-    if (isPublished != null) {
-      query = query.eq('is_published', isPublished);
-    }
-
-    final response = await query
-        .order('meeting_date', ascending: false, referencedTable: 'meetings')
-        .order('created_at', ascending: false);
-
-    return _parseMeetings(response);
   }
 
   Future<List<MemberPortalMeeting>> _loadMeetingsWithoutJoin({bool? isPublished}) async {
