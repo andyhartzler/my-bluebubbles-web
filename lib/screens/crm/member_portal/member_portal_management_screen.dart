@@ -37,26 +37,6 @@ class MemberPortalManagementScreen extends StatefulWidget {
   State<MemberPortalManagementScreen> createState() => _MemberPortalManagementScreenState();
 }
 
-class _RecordingEmbedPlaceholder extends StatelessWidget {
-  const _RecordingEmbedPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 360,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade900,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Text(
-        'Recording embed unavailable',
-        style: TextStyle(color: Colors.white70),
-      ),
-    );
-  }
-}
-
 enum _MeetingSwitchAction { save, discard, cancel }
 
 class _MemberPortalManagementScreenState extends State<MemberPortalManagementScreen>
@@ -1140,11 +1120,12 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
           if (hasEmbed && embedUri != null && !_recordingEmbedFailed)
             _buildRecordingEmbedPreview(embedUri)
           else if (_recordingEmbedFailed)
-            const _RecordingEmbedPlaceholder()
+            _buildRecordingEmbedContainer(
+              child: _buildRecordingPlaceholderBody('Recording embed unavailable'),
+            )
           else
-            const Text(
-              'No valid embed URL was provided.',
-              style: TextStyle(color: Colors.white70),
+            _buildRecordingEmbedContainer(
+              child: _buildRecordingPlaceholderBody('No valid embed URL was provided.'),
             ),
           if (fallbackUrl != null && fallbackUrl.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -1177,52 +1158,63 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   Widget _buildRecordingEmbedPreview(Uri embedUri) {
     final embedBuilder = MemberPortalManagementScreen.recordingEmbedBuilderOverride;
 
-    return Builder(
-      builder: (context) {
-        try {
-          final embed = embedBuilder != null
-              ? embedBuilder(embedUri)
-              : MeetingRecordingEmbed(
-                  uri: embedUri,
-                  onFailure: _markRecordingEmbedFailed,
-                );
+    return _buildRecordingEmbedContainer(
+      child: Builder(
+        builder: (context) {
+          try {
+            return embedBuilder != null
+                ? embedBuilder(embedUri)
+                : MeetingRecordingEmbed(
+                    key: ValueKey(embedUri.toString()),
+                    uri: embedUri,
+                    onFailure: _markRecordingEmbedFailed,
+                  );
+          } catch (error, stackTrace) {
+            _markRecordingEmbedFailed();
+            debugPrint('Failed to render recording embed for $embedUri: $error');
+            debugPrintStack(stackTrace: stackTrace);
+            return _buildRecordingPlaceholderBody('Recording embed unavailable');
+          }
+        },
+      ),
+    );
+  }
 
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Card(
-              margin: EdgeInsets.zero,
-              color: Colors.grey.shade900,
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    color: Colors.grey.shade800,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    child: const Text(
-                      'Recording Preview',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 360,
-                    child: embed,
-                  ),
-                ],
-              ),
+  Widget _buildRecordingEmbedContainer({required Widget child}) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            color: theme.colorScheme.surfaceVariant,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Text(
+              'Recording',
+              style: theme.textTheme.titleMedium,
             ),
-          );
-        } catch (error, stackTrace) {
-          _markRecordingEmbedFailed();
-          debugPrint('Failed to render recording embed for $embedUri: $error');
-          debugPrintStack(stackTrace: stackTrace);
-          return const _RecordingEmbedPlaceholder();
-        }
-      },
+          ),
+          SizedBox(
+            height: 360,
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecordingPlaceholderBody(String message) {
+    return Container(
+      color: Colors.grey.shade900,
+      alignment: Alignment.center,
+      child: Text(
+        message,
+        style: const TextStyle(color: Colors.white70),
+        textAlign: TextAlign.center,
+      ),
     );
   }
 

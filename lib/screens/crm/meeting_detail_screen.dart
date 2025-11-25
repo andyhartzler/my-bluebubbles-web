@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 
@@ -1202,9 +1203,11 @@ class MeetingRecordingEmbed extends StatefulWidget {
 class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
   static const String _viewType = 'meetings-recording-view';
   static bool _registered = false;
+  static Completer<void>? _registrationCompleter;
   static final Map<int, html.IFrameElement> _iframes =
       <int, html.IFrameElement>{};
 
+  Future<void>? _registrationFuture;
   int? _viewId;
   bool _failed = false;
   bool _notifiedFailure = false;
@@ -1212,15 +1215,18 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
-      _ensureRegistered();
-    }
+    _registrationFuture = kIsWeb ? _ensureRegistered() : Future.value();
   }
 
   @override
   void didUpdateWidget(MeetingRecordingEmbed oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.uri != oldWidget.uri) {
+      if (_failed) {
+        _failed = false;
+        _notifiedFailure = false;
+        _registrationFuture = kIsWeb ? _ensureRegistered() : Future.value();
+      }
       _setSource();
     }
   }
@@ -1239,41 +1245,74 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
       return _buildPlaceholder();
     }
 
-    return HtmlElementView(
-      viewType: _viewType,
-      onPlatformViewCreated: (int viewId) {
-        _viewId = viewId;
-        _setSource();
+    final registrationFuture =
+        _registrationFuture ??= kIsWeb ? _ensureRegistered() : Future.value();
+
+    return FutureBuilder<void>(
+      future: registrationFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return _buildLoadingPlaceholder();
+        }
+
+        try {
+          return HtmlElementView(
+            viewType: _viewType,
+            onPlatformViewCreated: (int viewId) {
+              _viewId = viewId;
+              _setSource();
+            },
+          );
+        } catch (error, stackTrace) {
+          _handleFailure(error, stackTrace);
+          return _buildPlaceholder();
+        }
       },
     );
   }
 
-  void _ensureRegistered() {
-    if (_registered) return;
+  Future<void> _ensureRegistered() {
+    if (_registered) return Future.value();
 
-    try {
-      if (MeetingRecordingEmbed.debugForceRegistrationFailure) {
-        throw Exception('Forced registration failure for testing');
-      }
-
-      // ignore: undefined_prefixed_name
-      ui.platformViewRegistry.registerViewFactory(
-        _viewType,
-        (int viewId) {
-          final element = html.IFrameElement()
-            ..style.border = '0'
-            ..allowFullscreen = true
-            ..allow =
-                'autoplay; encrypted-media; picture-in-picture; fullscreen';
-          _iframes[viewId] = element;
-          return element;
-        },
-      );
-
-      _registered = true;
-    } catch (error, stackTrace) {
-      _handleFailure(error, stackTrace);
+    if (_registrationCompleter != null) {
+      return _registrationCompleter!.future;
     }
+
+    final completer = Completer<void>();
+    _registrationCompleter = completer;
+
+    Future.microtask(() {
+      try {
+        if (MeetingRecordingEmbed.debugForceRegistrationFailure) {
+          throw Exception('Forced registration failure for testing');
+        }
+
+        // ignore: undefined_prefixed_name
+        ui.platformViewRegistry.registerViewFactory(
+          _viewType,
+          (int viewId) {
+            final element = html.IFrameElement()
+              ..style.border = '0'
+              ..allowFullscreen = true
+              ..allow =
+                  'autoplay; encrypted-media; picture-in-picture; fullscreen';
+            _iframes[viewId] = element;
+            return element;
+          },
+        );
+
+        _registered = true;
+      } catch (error, stackTrace) {
+        _handleFailure(error, stackTrace);
+      } finally {
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+        _registrationCompleter = null;
+      }
+    });
+
+    return completer.future;
   }
 
   void _setSource() {
@@ -1316,6 +1355,22 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
       child: const Text(
         'Recording unavailable',
         style: TextStyle(color: Colors.white70),
+      ),
+    );
+  }
+
+  Widget _buildLoadingPlaceholder() {
+    return Container(
+      height: 320,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const SizedBox(
+        height: 24,
+        width: 24,
+        child: CircularProgressIndicator(strokeWidth: 2),
       ),
     );
   }
