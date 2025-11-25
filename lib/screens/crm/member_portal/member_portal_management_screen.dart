@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -29,9 +28,6 @@ import 'package:mime_type/mime_type.dart';
 
 class MemberPortalManagementScreen extends StatefulWidget {
   const MemberPortalManagementScreen({super.key});
-
-  @visibleForTesting
-  static Widget Function(Uri uri)? recordingEmbedBuilderOverride;
 
   @override
   State<MemberPortalManagementScreen> createState() => _MemberPortalManagementScreenState();
@@ -74,7 +70,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   bool _selectedVisibleToAttendeesOnly = true;
   bool _selectedVisibleToExecutives = true;
   bool _selectedIsPublished = false;
-  bool _selectedShowRecording = false;
   Meeting? _selectedMeetingDetails;
   bool _loadingMeetingDetails = false;
   String? _meetingDetailsError;
@@ -482,7 +477,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       _selectedVisibleToAttendeesOnly = meeting.visibleToAttendeesOnly;
       _selectedVisibleToExecutives = meeting.visibleToExecutives;
       _selectedIsPublished = meeting.isPublished;
-      _selectedShowRecording = meeting.showRecording ?? false;
       _meetingSaveError = null;
       _meetingSaveSucceeded = false;
       _meetingHasUnsavedChanges = false;
@@ -834,20 +828,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                                 ),
                               ],
                             ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text('Show recording'),
-                                Switch.adaptive(
-                                  value: _selectedShowRecording,
-                                  onChanged: (value) => setState(() {
-                                    _selectedShowRecording = value;
-                                    _markMeetingDirty();
-                                  }),
-                                  activeColor: Colors.white,
-                                ),
-                              ],
-                            ),
                           ],
                         ),
                       ],
@@ -878,10 +858,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                                       ? 'Published · Exec/Attendees'
                                       : 'Published · Attendees')
                               : 'Draft',
-                        ),
-                        _buildMeetingPill(
-                          icon: _selectedShowRecording ? Icons.play_circle : Icons.play_disabled,
-                          label: _selectedShowRecording ? 'Recording visible' : 'Recording hidden',
                         ),
                       ],
                     ),
@@ -1456,7 +1432,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         visibleToAttendeesOnly: _selectedVisibleToAttendeesOnly,
         visibleToExecutives: _selectedVisibleToExecutives,
         isPublished: _selectedIsPublished,
-        showRecording: _selectedShowRecording,
         memberDescription: _generateHtml(_descriptionController),
         memberSummary: _generateHtml(_summaryController),
         memberKeyPoints: _generateHtml(_keyPointsController),
