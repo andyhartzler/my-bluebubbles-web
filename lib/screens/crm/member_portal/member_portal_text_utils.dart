@@ -11,13 +11,13 @@ String normalizeMemberPortalText(String? input) {
   if (raw == null || raw.isEmpty) return '';
 
   var normalized = raw
-      .replaceAll(RegExp(r'(?i)<br\s*/?>'), '\n')
-      .replaceAll(RegExp(r'(?i)</div>'), '\n')
-      .replaceAll(RegExp(r'(?i)</p>'), '\n')
-      .replaceAll(RegExp(r'(?i)</li>'), '\n')
-      .replaceAll(RegExp(r'(?i)<div[^>]*>'), '')
-      .replaceAll(RegExp(r'(?i)<p[^>]*>'), '')
-      .replaceAll(RegExp(r'(?i)<li[^>]*>'), '- ')
+      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'</div>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'</li>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'<div[^>]*>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<p[^>]*>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '- ')
       .replaceAll(RegExp(r'&nbsp;', caseSensitive: false), ' ')
       .replaceAll(RegExp(r'\r'), '');
 
