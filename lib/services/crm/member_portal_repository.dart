@@ -38,8 +38,7 @@ class MemberPortalRepository {
           .select(
               'id, name, email, chapter_name, profile_pictures, last_sign_in_at')
           .not('last_sign_in_at', 'is', null)
-          .order('last_sign_in_at', ascending: false)
-          .limit(10);
+          .order('last_sign_in_at', ascending: false);
 
       return _coerceJsonList(response)
           .map(MemberPortalRecentSignIn.fromJson)
