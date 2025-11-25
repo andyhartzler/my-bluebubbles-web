@@ -70,6 +70,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   bool _selectedVisibleToAttendeesOnly = true;
   bool _selectedVisibleToExecutives = true;
   bool _selectedIsPublished = false;
+  bool _selectedShowRecording = false;
   Meeting? _selectedMeetingDetails;
   bool _loadingMeetingDetails = false;
   String? _meetingDetailsError;
@@ -499,6 +500,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       _selectedVisibleToAttendeesOnly = meeting.visibleToAttendeesOnly;
       _selectedVisibleToExecutives = meeting.visibleToExecutives;
       _selectedIsPublished = meeting.isPublished;
+      _selectedShowRecording = meeting.showRecording;
       _meetingSaveError = null;
       _meetingSaveSucceeded = false;
       _meetingHasUnsavedChanges = false;
@@ -696,9 +698,11 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                           meeting.isPublished
                               ? (meeting.visibleToAll
                                   ? 'Published · All'
-                                  : meeting.visibleToExecutives
+                                  : meeting.visibleToExecutives && meeting.visibleToAttendeesOnly
                                       ? 'Published · Exec/Attendees'
-                                      : 'Published · Attendees')
+                                      : meeting.visibleToExecutives
+                                          ? 'Published · Exec'
+                                          : 'Published · Attendees')
                               : 'Draft',
                         ),
                       ],
@@ -872,13 +876,15 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                               : 'Attendance pending',
                         ),
                         _buildMeetingPill(
-                          icon: meeting.isPublished ? Icons.check_circle : Icons.drafts,
-                          label: meeting.isPublished
-                              ? (meeting.visibleToAll
+                          icon: _selectedIsPublished ? Icons.check_circle : Icons.drafts,
+                          label: _selectedIsPublished
+                              ? (_selectedVisibleToAll
                                   ? 'Published · All'
-                                  : meeting.visibleToExecutives
+                                  : _selectedVisibleToExecutives && _selectedVisibleToAttendeesOnly
                                       ? 'Published · Exec/Attendees'
-                                      : 'Published · Attendees')
+                                      : _selectedVisibleToExecutives
+                                          ? 'Published · Exec'
+                                          : 'Published · Attendees')
                               : 'Draft',
                         ),
                       ],
@@ -973,6 +979,14 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                           value: _selectedVisibleToExecutives,
                           onChanged: (value) => setState(() {
                             _selectedVisibleToExecutives = value ?? true;
+                            _markMeetingDirty();
+                          }),
+                        ),
+                        _buildVisibilityCheckbox(
+                          label: 'Display Recording',
+                          value: _selectedShowRecording,
+                          onChanged: (value) => setState(() {
+                            _selectedShowRecording = value ?? false;
                             _markMeetingDirty();
                           }),
                         ),
@@ -1508,6 +1522,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         visibleToAttendeesOnly: _selectedVisibleToAttendeesOnly,
         visibleToExecutives: _selectedVisibleToExecutives,
         isPublished: _selectedIsPublished,
+        showRecording: _selectedShowRecording,
         memberDescription: _generateHtml(_descriptionController),
         memberSummary: _generateHtml(_summaryController),
         memberKeyPoints: _generateHtml(_keyPointsController),

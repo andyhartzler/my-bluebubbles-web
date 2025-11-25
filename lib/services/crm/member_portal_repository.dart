@@ -452,8 +452,7 @@ class MemberPortalRepository {
     try {
       var query = _readClient.from('member_profile_changes').select('''
             *,
-            members!member_profile_changes_member_id_fkey (id, name, profile_pictures),
-            member_portal_field_visibility(field_name, display_label, field_category)
+            members!member_profile_changes_member_id_fkey (id, name, profile_pictures)
           ''');
 
       if (status != null) {
