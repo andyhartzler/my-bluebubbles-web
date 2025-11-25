@@ -146,7 +146,7 @@ class MemberPortalRepository {
     try {
       final response = await _readClient
           .from('meetings')
-          .select('id, meeting_date, meeting_title, attendance_count, recording_embed_url, recording_url')
+          .select('id, meeting_date, meeting_title, attendance_count')
           .inFilter('id', meetingIds.toList());
 
       final meetingMap = <String, Map<String, dynamic>>{};
@@ -173,10 +173,6 @@ class MemberPortalRepository {
                   meeting.meetingTitle,
               attendeeCount:
                   _normalizeInt(metadata['attendance_count']) ?? meeting.attendeeCount,
-              recordingEmbedUrl: normalizeNullableString(metadata['recording_embed_url']) ??
-                  meeting.recordingEmbedUrl,
-              recordingUrl: normalizeNullableString(metadata['recording_url']) ??
-                  meeting.recordingUrl,
             );
           })
           .toList(growable: false);
