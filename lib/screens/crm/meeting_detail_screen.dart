@@ -1207,8 +1207,7 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
   static final Map<int, html.IFrameElement> _iframes =
       <int, html.IFrameElement>{};
 
-  late final Future<void> _registrationFuture =
-      kIsWeb ? _ensureRegistered() : Future.value();
+  Future<void>? _registrationFuture;
   int? _viewId;
   bool _failed = false;
   bool _notifiedFailure = false;
@@ -1216,12 +1215,18 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
   @override
   void initState() {
     super.initState();
+    _registrationFuture = kIsWeb ? _ensureRegistered() : Future.value();
   }
 
   @override
   void didUpdateWidget(MeetingRecordingEmbed oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.uri != oldWidget.uri) {
+      if (_failed) {
+        _failed = false;
+        _notifiedFailure = false;
+        _registrationFuture = kIsWeb ? _ensureRegistered() : Future.value();
+      }
       _setSource();
     }
   }
@@ -1240,14 +1245,12 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
       return _buildPlaceholder();
     }
 
-    return FutureBuilder<void>(
-      future: _registrationFuture,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          _handleFailure(snapshot.error!, StackTrace.current);
-          return _buildPlaceholder();
-        }
+    final registrationFuture =
+        _registrationFuture ??= kIsWeb ? _ensureRegistered() : Future.value();
 
+    return FutureBuilder<void>(
+      future: registrationFuture,
+      builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return _buildLoadingPlaceholder();
         }
@@ -1268,8 +1271,8 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
     );
   }
 
-  Future<void> _ensureRegistered() async {
-    if (_registered) return;
+  Future<void> _ensureRegistered() {
+    if (_registered) return Future.value();
 
     if (_registrationCompleter != null) {
       return _registrationCompleter!.future;
@@ -1278,34 +1281,38 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
     final completer = Completer<void>();
     _registrationCompleter = completer;
 
-    try {
-      if (MeetingRecordingEmbed.debugForceRegistrationFailure) {
-        throw Exception('Forced registration failure for testing');
-      }
+    Future.microtask(() {
+      try {
+        if (MeetingRecordingEmbed.debugForceRegistrationFailure) {
+          throw Exception('Forced registration failure for testing');
+        }
 
-      // ignore: undefined_prefixed_name
-      ui.platformViewRegistry.registerViewFactory(
-        _viewType,
-        (int viewId) {
-          final element = html.IFrameElement()
-            ..style.border = '0'
-            ..allowFullscreen = true
-            ..allow =
-                'autoplay; encrypted-media; picture-in-picture; fullscreen';
-      _iframes[viewId] = element;
-      return element;
-    },
-    );
+        // ignore: undefined_prefixed_name
+        ui.platformViewRegistry.registerViewFactory(
+          _viewType,
+          (int viewId) {
+            final element = html.IFrameElement()
+              ..style.border = '0'
+              ..allowFullscreen = true
+              ..allow =
+                  'autoplay; encrypted-media; picture-in-picture; fullscreen';
+            _iframes[viewId] = element;
+            return element;
+          },
+        );
 
-      _registered = true;
-      completer.complete();
-    } catch (error, stackTrace) {
-      _handleFailure(error, stackTrace);
-      if (!completer.isCompleted) {
-        completer.completeError(error, stackTrace);
+        _registered = true;
+      } catch (error, stackTrace) {
+        _handleFailure(error, stackTrace);
+      } finally {
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+        _registrationCompleter = null;
       }
-      _registrationCompleter = null;
-    }
+    });
+
+    return completer.future;
   }
 
   void _setSource() {

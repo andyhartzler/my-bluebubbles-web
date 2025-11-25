@@ -1226,6 +1226,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
             return embedBuilder != null
                 ? embedBuilder(embedUri)
                 : MeetingRecordingEmbed(
+                    key: ValueKey(embedUri.toString()),
                     uri: embedUri,
                     onFailure: _markRecordingEmbedFailed,
                   );
