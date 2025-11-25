@@ -1219,23 +1219,33 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   Widget _buildRecordingEmbedPreview(Uri embedUri) {
     final embedBuilder = MemberPortalManagementScreen.recordingEmbedBuilderOverride;
 
+    final embedFuture = Future<Widget>.sync(() {
+      return embedBuilder != null
+          ? embedBuilder(embedUri)
+          : MeetingRecordingEmbed(
+              key: ValueKey(embedUri.toString()),
+              uri: embedUri,
+              onFailure: _markRecordingEmbedFailed,
+            );
+    });
+
     return _buildRecordingEmbedContainer(
-      child: Builder(
-        builder: (context) {
-          try {
-            return embedBuilder != null
-                ? embedBuilder(embedUri)
-                : MeetingRecordingEmbed(
-                    key: ValueKey(embedUri.toString()),
-                    uri: embedUri,
-                    onFailure: _markRecordingEmbedFailed,
-                  );
-          } catch (error, stackTrace) {
+      child: FutureBuilder<Widget>(
+        future: embedFuture,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
             _markRecordingEmbedFailed();
-            debugPrint('Failed to render recording embed for $embedUri: $error');
-            debugPrintStack(stackTrace: stackTrace);
+            debugPrint('Failed to render recording embed for $embedUri: ${snapshot.error}');
+            debugPrintStack(stackTrace: snapshot.stackTrace);
             return _buildRecordingPlaceholderBody('Recording embed unavailable');
           }
+
+          if (snapshot.connectionState != ConnectionState.done) {
+            return _buildRecordingPlaceholderBody('Loading recording embed...');
+          }
+
+          return snapshot.data ??
+              _buildRecordingPlaceholderBody('Recording embed unavailable');
         },
       ),
     );

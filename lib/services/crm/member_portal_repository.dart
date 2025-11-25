@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
-import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
+import 'package:postgrest/postgrest.dart'
+    show CountOption, PostgrestException, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mime_type/mime_type.dart';
 import 'package:universal_io/io.dart' as io;
@@ -101,21 +102,20 @@ class MemberPortalRepository {
       if (meetings.isNotEmpty) {
         return _hydrateMeetingMetadata(meetings);
       }
-
-      // If the relational join fails (e.g., RLS on meetings), fall back to a simple query
-      // so the portal still renders existing curated content.
-      final fallback = await _loadMeetingsWithoutJoin(isPublished: isPublished);
-      return _hydrateMeetingMetadata(fallback);
+    } on PostgrestException catch (e) {
+      final isMissingRelationship = e.code == 'PGRST108';
+      final prefix = isMissingRelationship
+          ? '⚠️ Skipping meeting join; embedded relationship unavailable'
+          : '❌ Error loading portal meetings';
+      print('$prefix: $e');
     } catch (e) {
       print('❌ Error loading portal meetings: $e');
-      // Attempt a minimal fallback to avoid a blank portal when the joined query fails.
-      try {
-        final fallback = await _loadMeetingsWithoutJoin(isPublished: isPublished);
-        return _hydrateMeetingMetadata(fallback);
-      } catch (_) {
-        rethrow;
-      }
     }
+
+    // If the relational join fails (e.g., missing FK on meetings), fall back to a simple query
+    // so the portal still renders existing curated content.
+    final fallback = await _loadMeetingsWithoutJoin(isPublished: isPublished);
+    return _hydrateMeetingMetadata(fallback);
   }
 
   Future<List<MemberPortalMeeting>> _loadMeetingsWithJoin({bool? isPublished}) async {
