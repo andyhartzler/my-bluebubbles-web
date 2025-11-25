@@ -1301,9 +1301,10 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
       completer.complete();
     } catch (error, stackTrace) {
       _handleFailure(error, stackTrace);
-      completer.completeError(error, stackTrace);
+      if (!completer.isCompleted) {
+        completer.completeError(error, stackTrace);
+      }
       _registrationCompleter = null;
-      rethrow;
     }
   }
 
