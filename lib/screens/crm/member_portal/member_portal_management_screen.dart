@@ -1228,15 +1228,32 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         subtitleParts.add(attendance.zoomEmail!);
       }
 
+      // Get profile picture from member if available
+      String? profileImageUrl;
+      if (attendance.member?.profilePictures != null && attendance.member!.profilePictures.isNotEmpty) {
+        final primaryPhoto = attendance.member!.profilePictures.firstWhere(
+          (photo) => photo.isPrimary,
+          orElse: () => attendance.member!.profilePictures.first,
+        );
+        profileImageUrl = primaryPhoto.publicUrl;
+      }
+
+      final initials = attendance.participantName.isNotEmpty
+          ? attendance.participantName.substring(0, 1).toUpperCase()
+          : '?';
+
       return ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-        leading: CircleAvatar(
-          backgroundColor: attendance.checkedIn == true ? _momentumBlue : Colors.grey.shade800,
-          foregroundColor: Colors.white,
-          child: Text(attendance.participantName.isNotEmpty
-              ? attendance.participantName.substring(0, 1).toUpperCase()
-              : '?'),
-        ),
+        leading: profileImageUrl != null && profileImageUrl.isNotEmpty
+            ? CircleAvatar(
+                backgroundImage: NetworkImage(profileImageUrl),
+                backgroundColor: attendance.checkedIn == true ? _momentumBlue : Colors.grey.shade800,
+              )
+            : CircleAvatar(
+                backgroundColor: attendance.checkedIn == true ? _momentumBlue : Colors.grey.shade800,
+                foregroundColor: Colors.white,
+                child: Text(initials),
+              ),
         title: Text(
           attendance.participantName,
           style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
