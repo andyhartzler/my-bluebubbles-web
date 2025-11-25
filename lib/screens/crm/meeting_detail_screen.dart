@@ -1252,6 +1252,7 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
       future: registrationFuture,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
+          _registrationFuture = null;
           _handleFailure(
             snapshot.error ?? Exception('Unknown registration error'),
             snapshot.stackTrace ?? StackTrace.current,
@@ -1318,8 +1319,15 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
           // Some environments try to register the view factory more than once;
           // treat that as a successful registration so embeds keep working.
           _registered = true;
+          if (!completer.isCompleted) {
+            completer.complete();
+          }
         } else {
           _handleFailure(error, stackTrace);
+
+          if (!completer.isCompleted) {
+            completer.completeError(error, stackTrace);
+          }
         }
       } finally {
         if (!completer.isCompleted) {
