@@ -78,6 +78,16 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   quill.QuillController? _keyPointsController;
   quill.QuillController? _actionItemsController;
 
+  // Focus nodes and scroll controllers for QuillEditor widgets
+  final FocusNode _descriptionFocusNode = FocusNode();
+  final ScrollController _descriptionScrollController = ScrollController();
+  final FocusNode _summaryFocusNode = FocusNode();
+  final ScrollController _summaryScrollController = ScrollController();
+  final FocusNode _keyPointsFocusNode = FocusNode();
+  final ScrollController _keyPointsScrollController = ScrollController();
+  final FocusNode _actionItemsFocusNode = FocusNode();
+  final ScrollController _actionItemsScrollController = ScrollController();
+
   final TextEditingController _fieldVisibilitySearchController = TextEditingController();
   final Set<String> _selectedFieldCategories = {};
   String _profileChangeStatus = 'pending';
@@ -102,6 +112,17 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     _disposeMeetingControllers();
     _resourceSearchController.dispose();
     _fieldVisibilitySearchController.dispose();
+
+    // Dispose focus nodes and scroll controllers
+    _descriptionFocusNode.dispose();
+    _descriptionScrollController.dispose();
+    _summaryFocusNode.dispose();
+    _summaryScrollController.dispose();
+    _keyPointsFocusNode.dispose();
+    _keyPointsScrollController.dispose();
+    _actionItemsFocusNode.dispose();
+    _actionItemsScrollController.dispose();
+
     super.dispose();
   }
 
@@ -963,24 +984,32 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                       title: 'Description',
                       helper: 'Shows at the top of the meeting page for members.',
                       controller: _descriptionController!,
+                      focusNode: _descriptionFocusNode,
+                      scrollController: _descriptionScrollController,
                     ),
                     const SizedBox(height: 12),
                     _buildRichTextSection(
                       title: 'Summary',
                       helper: 'Short recap of what happened.',
                       controller: _summaryController!,
+                      focusNode: _summaryFocusNode,
+                      scrollController: _summaryScrollController,
                     ),
                     const SizedBox(height: 12),
                     _buildRichTextSection(
                       title: 'Key Points',
                       helper: 'Bulleted discussion highlights.',
                       controller: _keyPointsController!,
+                      focusNode: _keyPointsFocusNode,
+                      scrollController: _keyPointsScrollController,
                     ),
                     const SizedBox(height: 12),
                     _buildRichTextSection(
                       title: 'Action Items',
                       helper: 'Next steps members should see.',
                       controller: _actionItemsController!,
+                      focusNode: _actionItemsFocusNode,
+                      scrollController: _actionItemsScrollController,
                     ),
                     const SizedBox(height: 12),
                     _buildMemberPortalPreview(),
@@ -1329,6 +1358,8 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     required String title,
     required String helper,
     required quill.QuillController controller,
+    required FocusNode focusNode,
+    required ScrollController scrollController,
   }) {
     final theme = Theme.of(context);
     final locale = Localizations.localeOf(context);
@@ -1397,7 +1428,9 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                 height: 180,
                 child: DefaultTextStyle.merge(
                   style: const TextStyle(color: Colors.white),
-                  child: quill.QuillEditor.basic(
+                  child: quill.QuillEditor(
+                    focusNode: focusNode,
+                    scrollController: scrollController,
                     configurations: quill.QuillEditorConfigurations(
                       controller: controller,
                       sharedConfigurations: shared,

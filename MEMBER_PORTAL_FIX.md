@@ -46,12 +46,15 @@ Refactored `_selectMeeting()` and `_loadMeetingDetails()` methods:
 4. **Simplified** `_loadMeetingDetails()` to only update state when async operations complete
 
 ### Fix #3: Remove resource leaks in QuillEditor (CRITICAL FIX)
-Changed `_buildRichTextSection()` to use `QuillEditor.basic()` instead of `QuillEditor()`:
+Properly implemented resource management for QuillEditor widgets:
 
-1. **Removed** explicit `focusNode: FocusNode()` parameter
-2. **Removed** explicit `scrollController: ScrollController()` parameter
-3. **Changed** to `QuillEditor.basic()` which manages its own resources internally
-4. **Eliminated** 8 controller instances being created and leaked on every rebuild
+1. **Created** 8 instance variables (4 FocusNodes + 4 ScrollControllers) as class fields
+2. **Updated** dispose() method to properly dispose all controllers
+3. **Modified** `_buildRichTextSection()` to accept focusNode and scrollController parameters
+4. **Updated** all 4 calls to pass the correct instance variables
+5. **Eliminated** 8 controller instances being created and leaked on every rebuild
+
+This follows the correct Flutter pattern used in bulk_email_screen.dart and email_reply_dialog.dart.
 
 Now the meetings tab will:
 - Load and display all meetings successfully
@@ -128,7 +131,33 @@ final selectedMeeting = _selectedMeetingId != null
 - Consolidated loading state updates into async completion handlers
 
 ### Change #3: Fix QuillEditor resource leaks (CRITICAL FIX)
-**In `_buildRichTextSection()` line 1400:**
+**Added instance variables (lines 81-89):**
+```dart
+// Created FocusNode and ScrollController as instance variables
+final FocusNode _descriptionFocusNode = FocusNode();
+final ScrollController _descriptionScrollController = ScrollController();
+final FocusNode _summaryFocusNode = FocusNode();
+final ScrollController _summaryScrollController = ScrollController();
+final FocusNode _keyPointsFocusNode = FocusNode();
+final ScrollController _keyPointsScrollController = ScrollController();
+final FocusNode _actionItemsFocusNode = FocusNode();
+final ScrollController _actionItemsScrollController = ScrollController();
+```
+
+**Updated dispose() method (lines 116-124):**
+```dart
+// Properly dispose all controllers
+_descriptionFocusNode.dispose();
+_descriptionScrollController.dispose();
+_summaryFocusNode.dispose();
+_summaryScrollController.dispose();
+_keyPointsFocusNode.dispose();
+_keyPointsScrollController.dispose();
+_actionItemsFocusNode.dispose();
+_actionItemsScrollController.dispose();
+```
+
+**Updated _buildRichTextSection (lines 1353-1354, 1424-1425):**
 ```dart
 // Before: Created new instances on EVERY rebuild - 8 per meeting selection!
 child: quill.QuillEditor(
@@ -137,16 +166,26 @@ child: quill.QuillEditor(
   configurations: ...
 )
 
-// After: Uses basic constructor that manages resources internally
-child: quill.QuillEditor.basic(  // ✅ No leaks
-  configurations: ...
-)
+// After: Uses instance variables passed as parameters
+Widget _buildRichTextSection({
+  required FocusNode focusNode,
+  required ScrollController scrollController,
+  ...
+}) {
+  ...
+  child: quill.QuillEditor(
+    focusNode: focusNode,           // ✅ Instance variable
+    scrollController: scrollController,  // ✅ Instance variable
+    configurations: ...
+  )
+}
 ```
 
-This was the **root cause** of the persistent crash. Every time you selected a meeting, 8 new controller instances were created (4 editors × 2 controllers each) and never disposed, causing Flutter to crash.
+This was the **root cause** of the persistent crash. The proper Flutter pattern is to create disposable resources (FocusNode, ScrollController) as instance variables (created once in the class) and dispose them in the dispose() method. Creating them in build methods causes severe resource leaks.
 
 ## Related Commits
-- Current fix (part 3) - Fix QuillEditor resource leaks causing persistent crash
+- a5a1fff - Fix QuillEditor properly with instance-level controllers (ACTUAL FIX)
+- 08b329e - Fix QuillEditor resource leaks causing persistent crash (incorrect approach)
 - 1b6d95c - Fix meeting selection crash with proper setState scheduling (part 2)
 - 23f0b7e - Fix member portal meetings tab rendering crash (part 1)
 - 796a1e4 - Add rebuild instructions for member portal meetings tab fix
