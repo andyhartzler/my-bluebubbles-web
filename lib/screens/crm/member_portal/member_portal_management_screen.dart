@@ -1397,9 +1397,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                 height: 180,
                 child: DefaultTextStyle.merge(
                   style: const TextStyle(color: Colors.white),
-                  child: quill.QuillEditor(
-                    focusNode: FocusNode(),
-                    scrollController: ScrollController(),
+                  child: quill.QuillEditor.basic(
                     configurations: quill.QuillEditorConfigurations(
                       controller: controller,
                       sharedConfigurations: shared,

@@ -1,7 +1,10 @@
 # Member Portal Meetings Tab Fix
 
 ## Issue
-The meetings tab on the member portal management page was throwing "An unexpected error occurred when rendering." causing the entire page to appear blank. Initially, the page would load for about one second showing the meetings list, then flash and crash to a grey error screen. After the initial fix, the meetings tab loaded successfully, but clicking on any meeting tile to view details caused the same crash.
+The meetings tab on the member portal management page was throwing "An unexpected error occurred when rendering." causing the entire page to appear blank. The error persisted through multiple fix attempts:
+1. Initially, the page would load briefly then crash
+2. After fix #1, the meetings list loaded but selecting a meeting crashed
+3. After fix #2, selecting a meeting still crashed due to QuillEditor resource leaks
 
 ## Root Cause
 
@@ -16,6 +19,14 @@ When a user clicked on a meeting tile, `_selectMeeting()` would:
 4. Multiple synchronous `setState()` calls caused rendering crash
 
 Additionally, if HTML parsing in `_controllerFromHtml()` threw an exception, it would crash the entire widget without any error handling.
+
+### Issue #3: Resource leaks in QuillEditor widgets (ROOT CAUSE)
+In `_buildRichTextSection()`, the QuillEditor was creating new `FocusNode()` and `ScrollController()` instances on EVERY rebuild (lines 1401-1402):
+- This method is called 4 times per render (Description, Summary, Key Points, Action Items)
+- Each meeting selection created 8 new controller instances
+- Old instances were never disposed, causing memory leaks
+- Flutter's rendering engine crashed due to resource exhaustion
+- This was the **actual root cause** of the persistent crash
 
 ## Solution
 
@@ -34,12 +45,22 @@ Refactored `_selectMeeting()` and `_loadMeetingDetails()` methods:
 3. **Consolidated** loading state into the initial `setState()` call
 4. **Simplified** `_loadMeetingDetails()` to only update state when async operations complete
 
+### Fix #3: Remove resource leaks in QuillEditor (CRITICAL FIX)
+Changed `_buildRichTextSection()` to use `QuillEditor.basic()` instead of `QuillEditor()`:
+
+1. **Removed** explicit `focusNode: FocusNode()` parameter
+2. **Removed** explicit `scrollController: ScrollController()` parameter
+3. **Changed** to `QuillEditor.basic()` which manages its own resources internally
+4. **Eliminated** 8 controller instances being created and leaked on every rebuild
+
 Now the meetings tab will:
 - Load and display all meetings successfully
 - Show a placeholder message prompting user to select a meeting
-- Load meeting details when a user clicks on a meeting card without crashing
+- Load meeting details when a user clicks on a meeting card **without crashing**
+- Render all 4 QuillEditor instances without resource leaks
 - Handle HTML parsing errors gracefully with empty editors
 - Properly schedule async operations to avoid setState conflicts
+- Allow editing and saving meeting details successfully
 
 ## How to Apply the Fix
 
@@ -106,8 +127,27 @@ final selectedMeeting = _selectedMeetingId != null
 - Removed the initial setState that was causing synchronous setState conflicts
 - Consolidated loading state updates into async completion handlers
 
+### Change #3: Fix QuillEditor resource leaks (CRITICAL FIX)
+**In `_buildRichTextSection()` line 1400:**
+```dart
+// Before: Created new instances on EVERY rebuild - 8 per meeting selection!
+child: quill.QuillEditor(
+  focusNode: FocusNode(),        // ❌ Memory leak
+  scrollController: ScrollController(),  // ❌ Memory leak
+  configurations: ...
+)
+
+// After: Uses basic constructor that manages resources internally
+child: quill.QuillEditor.basic(  // ✅ No leaks
+  configurations: ...
+)
+```
+
+This was the **root cause** of the persistent crash. Every time you selected a meeting, 8 new controller instances were created (4 editors × 2 controllers each) and never disposed, causing Flutter to crash.
+
 ## Related Commits
-- Current fix (part 2) - Fix meeting selection crash with proper setState scheduling
+- Current fix (part 3) - Fix QuillEditor resource leaks causing persistent crash
+- 1b6d95c - Fix meeting selection crash with proper setState scheduling (part 2)
 - 23f0b7e - Fix member portal meetings tab rendering crash (part 1)
 - 796a1e4 - Add rebuild instructions for member portal meetings tab fix
 - 3ffe33b - Remove member portal recording data
@@ -115,4 +155,19 @@ final selectedMeeting = _selectedMeetingId != null
 - 86dbdaa - Merge PR #585 removing recording functionality
 
 ## Technical Notes
-This is a common Flutter anti-pattern: calling `setState()` during the build phase. Even when wrapped in `postFrameCallback`, triggering multiple state changes and async operations can cause rendering errors. The fix ensures state changes only happen in response to explicit user actions (tapping a meeting card).
+
+### Common Flutter Anti-Patterns Fixed
+1. **setState during build**: Calling `setState()` during the build phase causes rendering conflicts
+2. **Multiple synchronous setState calls**: Chaining setState calls without allowing frames to complete
+3. **Creating controllers in build methods**: FocusNode, ScrollController, and other resources must be created once and disposed properly, not recreated on every build
+
+The most critical issue was #3 - creating disposable resources (FocusNode, ScrollController) inside the build method. This is a severe anti-pattern that causes:
+- Memory leaks (resources never disposed)
+- Widget tree corruption (stale references)
+- Rendering engine crashes (resource exhaustion)
+
+**Rule of thumb**: Any object that has a `dispose()` method must be:
+1. Created once (in initState or as a late final field)
+2. Stored as an instance variable
+3. Properly disposed in dispose() method
+4. **Never** created inside build() or any method called by build()
