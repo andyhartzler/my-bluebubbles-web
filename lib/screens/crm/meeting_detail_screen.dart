@@ -1251,6 +1251,14 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
     return FutureBuilder<void>(
       future: registrationFuture,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          _handleFailure(
+            snapshot.error ?? Exception('Unknown registration error'),
+            snapshot.stackTrace ?? StackTrace.current,
+          );
+          return _buildPlaceholder();
+        }
+
         if (snapshot.connectionState != ConnectionState.done) {
           return _buildLoadingPlaceholder();
         }
@@ -1337,6 +1345,8 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
     if (mounted && !_failed) {
       setState(() => _failed = true);
     }
+
+    _registrationFuture = null;
 
     if (!_notifiedFailure) {
       _notifiedFailure = true;
