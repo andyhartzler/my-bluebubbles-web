@@ -650,7 +650,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       final response = await _supabaseService.client
           .from('donors')
           .select(
-            'id,name,profile_url,total_donated,donation_count,first_donation_at,last_donation_at,'
+            'id,name,total_donated,donation_count,first_donation_date,last_donation_date,'
             'is_recurring_donor,donations(id,amount,created_at,designation)',
           )
           .eq('member_id', _member.id)
@@ -723,11 +723,16 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       totalDonated: totalDonated,
       donationCount: donationCount,
       firstDonationAt:
-          _parseDate(donorRow['first_donation_at']) ?? donations.lastOrNull?.createdAt,
+          _parseDate(donorRow['first_donation_date']) ??
+              _parseDate(donorRow['first_donation_at']) ??
+              donations.lastOrNull?.createdAt,
       lastDonationAt:
-          _parseDate(donorRow['last_donation_at']) ?? donations.firstOrNull?.createdAt,
+          _parseDate(donorRow['last_donation_date']) ??
+              _parseDate(donorRow['last_donation_at']) ??
+              donations.firstOrNull?.createdAt,
       isRecurringDonor: donorRow['is_recurring_donor'] == true,
-      profileUrl: donorRow['profile_url'] as String?,
+      profileUrl:
+          donorRow['profile_url'] as String? ?? donorRow['profile_link'] as String?,
       donations: donations,
     );
   }

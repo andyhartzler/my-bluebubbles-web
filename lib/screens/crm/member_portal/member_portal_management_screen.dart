@@ -18,6 +18,8 @@ import 'package:bluebubbles/screens/crm/editors/meeting_attendance_edit_sheet.da
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/meeting_detail_screen.dart' show MeetingRecordingEmbed;
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
+import 'package:bluebubbles/screens/crm/member_portal/member_portal_content_tiles.dart';
+import 'package:bluebubbles/screens/crm/member_portal/member_portal_text_utils.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/member_portal_repository.dart';
@@ -1012,6 +1014,8 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                       helper: 'Next steps members should see.',
                       controller: _actionItemsController!,
                     ),
+                    const SizedBox(height: 12),
+                    _buildMemberPortalPreview(),
                   ],
                 ),
               ),
@@ -1037,6 +1041,63 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
           const SizedBox(width: 6),
           Text(label, style: const TextStyle(color: Colors.white)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMemberPortalPreview() {
+    final theme = Theme.of(context);
+    final previewTiles = <Widget>[];
+
+    void addTile(String title, quill.QuillController? controller) {
+      final html = _generateHtml(controller);
+      if (normalizeMemberPortalText(html).isEmpty) return;
+      previewTiles.add(MemberPortalContentTile(title: title, html: html));
+    }
+
+    addTile('Description', _descriptionController);
+    addTile('Summary', _summaryController);
+    addTile('Key Points', _keyPointsController);
+    addTile('Action Items', _actionItemsController);
+
+    return Card(
+      color: Colors.grey.shade900,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.visibility_outlined, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  'Member-facing preview',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (previewTiles.isEmpty)
+              const Text(
+                'Add description, summary, key points, or action items to preview the member view.',
+                style: TextStyle(color: Colors.white70),
+              )
+            else
+              Column(
+                children: previewTiles
+                    .map((tile) => Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: tile,
+                        ))
+                    .toList(),
+              ),
+          ],
+        ),
       ),
     );
   }
