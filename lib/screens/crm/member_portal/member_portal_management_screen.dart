@@ -326,15 +326,12 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
           }
 
           final meetings = snapshot.data ?? const [];
-          final selectedMeeting = _resolveSelectedMeeting(meetings);
-
-          if (selectedMeeting != null && _editingMeetingId != selectedMeeting.id) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                _selectMeeting(selectedMeeting);
-              }
-            });
-          }
+          final selectedMeeting = _selectedMeetingId != null
+              ? meetings.cast<MemberPortalMeeting?>().firstWhere(
+                  (m) => m?.id == _selectedMeetingId,
+                  orElse: () => null,
+                )
+              : null;
 
           if (meetings.isEmpty) {
             return const Center(child: Text('No meetings found.'));
@@ -411,16 +408,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         },
       ),
     );
-  }
-
-  MemberPortalMeeting? _resolveSelectedMeeting(List<MemberPortalMeeting> meetings) {
-    if (meetings.isEmpty) return null;
-
-    for (final meeting in meetings) {
-      if (meeting.id == _selectedMeetingId) return meeting;
-    }
-
-    return meetings.first;
   }
 
   Future<_MeetingSwitchAction?> _promptForUnsavedChanges() {
