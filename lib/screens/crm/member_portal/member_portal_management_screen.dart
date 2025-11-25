@@ -1229,14 +1229,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       }
 
       // Get profile picture from member if available
-      String? profileImageUrl;
-      if (attendance.member?.profilePictures != null && attendance.member!.profilePictures.isNotEmpty) {
-        final primaryPhoto = attendance.member!.profilePictures.firstWhere(
-          (photo) => photo.isPrimary,
-          orElse: () => attendance.member!.profilePictures.first,
-        );
-        profileImageUrl = primaryPhoto.publicUrl;
-      }
+      String? profileImageUrl = attendance.member?.primaryProfilePhotoUrl;
 
       final initials = attendance.participantName.isNotEmpty
           ? attendance.participantName.substring(0, 1).toUpperCase()
