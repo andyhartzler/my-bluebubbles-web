@@ -617,8 +617,15 @@ class MeetingAttendance {
     );
   }
 
-  String get participantName =>
-      member?.name ?? zoomDisplayName ?? guestName ?? guestEmail ?? guestPhone ?? 'Unknown Participant';
+  String get participantName {
+    final name = member?.name;
+    if (name != null && name.isNotEmpty) return name;
+    if (zoomDisplayName != null && zoomDisplayName!.isNotEmpty) return zoomDisplayName!;
+    if (guestName != null && guestName!.isNotEmpty) return guestName!;
+    if (guestEmail != null && guestEmail!.isNotEmpty) return guestEmail!;
+    if (guestPhone != null && guestPhone!.isNotEmpty) return guestPhone!;
+    return 'Unknown Participant';
+  }
 
   String get meetingLabel => meetingTitle ?? meeting?.meetingTitle ?? 'Meeting';
 

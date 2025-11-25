@@ -767,23 +767,24 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   }
 
   Widget _buildMeetingEditor(MemberPortalMeeting meeting) {
-    if (_descriptionController == null ||
-        _summaryController == null ||
-        _keyPointsController == null ||
-        _actionItemsController == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    try {
+      if (_descriptionController == null ||
+          _summaryController == null ||
+          _keyPointsController == null ||
+          _actionItemsController == null) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-    final theme = Theme.of(context);
-    final statusColor = _meetingSaveSucceeded
-        ? Colors.green
-        : _meetingSaveError != null
-            ? theme.colorScheme.error
-            : theme.colorScheme.outline;
-    final details = _selectedMeetingDetails;
-    final meetingDate = details?.meetingDate ?? meeting.meetingDate;
-    final attendance = details?.attendance ?? const <MeetingAttendance>[];
-    final attendeeCount = attendance.isNotEmpty ? attendance.length : meeting.attendeeCount;
+      final theme = Theme.of(context);
+      final statusColor = _meetingSaveSucceeded
+          ? Colors.green
+          : _meetingSaveError != null
+              ? theme.colorScheme.error
+              : theme.colorScheme.outline;
+      final details = _selectedMeetingDetails;
+      final meetingDate = details?.meetingDate ?? meeting.meetingDate;
+      final attendance = details?.attendance ?? const <MeetingAttendance>[];
+      final attendeeCount = attendance.isNotEmpty ? attendance.length : meeting.attendeeCount;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1021,6 +1022,32 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
         ),
       ),
     );
+    } catch (error, stackTrace) {
+      debugPrint('Error building meeting editor: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'Error loading meeting editor',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Details: $error',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildMeetingPill({required IconData icon, required String label}) {
@@ -1123,9 +1150,11 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      attendeeCount == 1
-                          ? '1 member attended'
-                          : '$attendeeCount members attended',
+                      attendeeCount == null
+                          ? 'Attendance pending'
+                          : attendeeCount == 1
+                              ? '1 member attended'
+                              : '$attendeeCount members attended',
                       style: const TextStyle(color: Colors.white70),
                     ),
                   ],
@@ -1177,45 +1206,61 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   }
 
   Widget _buildAttendanceTile(MeetingAttendance attendance) {
-    final subtitleParts = <String>[];
-    subtitleParts.add(attendance.durationSummary);
-    if (attendance.joinWindow != null) subtitleParts.add(attendance.joinWindow!);
-    if (attendance.zoomEmail != null && attendance.zoomEmail!.isNotEmpty) {
-      subtitleParts.add(attendance.zoomEmail!);
-    }
+    try {
+      final subtitleParts = <String>[];
+      subtitleParts.add(attendance.durationSummary);
+      if (attendance.joinWindow != null) subtitleParts.add(attendance.joinWindow!);
+      if (attendance.zoomEmail != null && attendance.zoomEmail!.isNotEmpty) {
+        subtitleParts.add(attendance.zoomEmail!);
+      }
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      leading: CircleAvatar(
-        backgroundColor: attendance.checkedIn == true ? _momentumBlue : Colors.grey.shade800,
-        foregroundColor: Colors.white,
-        child: Text(attendance.participantName.isNotEmpty
-            ? attendance.participantName.substring(0, 1).toUpperCase()
-            : '?'),
-      ),
-      title: Text(
-        attendance.participantName,
-        style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-      ),
-      subtitle: Text(subtitleParts.join(' • '), style: const TextStyle(color: Colors.white70)),
-      trailing: Wrap(
-        spacing: 4,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            color: Colors.white70,
-            tooltip: 'Edit attendance',
-            onPressed: () => _editAttendance(attendance),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            color: Colors.white70,
-            tooltip: 'Remove attendee',
-            onPressed: () => _removeAttendance(attendance),
-          ),
-        ],
-      ),
-    );
+      return ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+        leading: CircleAvatar(
+          backgroundColor: attendance.checkedIn == true ? _momentumBlue : Colors.grey.shade800,
+          foregroundColor: Colors.white,
+          child: Text(attendance.participantName.isNotEmpty
+              ? attendance.participantName.substring(0, 1).toUpperCase()
+              : '?'),
+        ),
+        title: Text(
+          attendance.participantName,
+          style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+        ),
+        subtitle: Text(subtitleParts.join(' • '), style: const TextStyle(color: Colors.white70)),
+        trailing: Wrap(
+          spacing: 4,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              color: Colors.white70,
+              tooltip: 'Edit attendance',
+              onPressed: () => _editAttendance(attendance),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              color: Colors.white70,
+              tooltip: 'Remove attendee',
+              onPressed: () => _removeAttendance(attendance),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      return ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+        leading: const CircleAvatar(
+          backgroundColor: Colors.grey,
+          foregroundColor: Colors.white,
+          child: Icon(Icons.error_outline),
+        ),
+        title: const Text(
+          'Error loading attendee',
+          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+        ),
+        subtitle: Text('$error', style: const TextStyle(color: Colors.orange)),
+      );
+    }
   }
 
   Future<void> _addMemberToAttendance(MemberPortalMeeting meeting) async {
