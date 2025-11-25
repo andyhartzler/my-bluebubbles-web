@@ -452,10 +452,24 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   void _selectMeeting(MemberPortalMeeting meeting) {
     _disposeMeetingControllers();
-    final descriptionDoc = _controllerFromHtml(meeting.memberDescription);
-    final summaryDoc = _controllerFromHtml(meeting.memberSummary);
-    final keyPointsDoc = _controllerFromHtml(meeting.memberKeyPoints);
-    final actionItemsDoc = _controllerFromHtml(meeting.memberActionItems);
+
+    quill.QuillController? descriptionDoc;
+    quill.QuillController? summaryDoc;
+    quill.QuillController? keyPointsDoc;
+    quill.QuillController? actionItemsDoc;
+
+    try {
+      descriptionDoc = _controllerFromHtml(meeting.memberDescription);
+      summaryDoc = _controllerFromHtml(meeting.memberSummary);
+      keyPointsDoc = _controllerFromHtml(meeting.memberKeyPoints);
+      actionItemsDoc = _controllerFromHtml(meeting.memberActionItems);
+    } catch (error) {
+      // If HTML parsing fails, create empty controllers
+      descriptionDoc = quill.QuillController.basic();
+      summaryDoc = quill.QuillController.basic();
+      keyPointsDoc = quill.QuillController.basic();
+      actionItemsDoc = quill.QuillController.basic();
+    }
 
     setState(() {
       _editingMeetingId = meeting.id;
@@ -473,11 +487,17 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       _keyPointsController = keyPointsDoc;
       _actionItemsController = actionItemsDoc;
       _meetingDetailsError = null;
+      _loadingMeetingDetails = true;
     });
 
     _attachEditorListeners();
 
-    _loadMeetingDetails(meeting);
+    // Schedule loading details after this frame to avoid multiple setState calls
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadMeetingDetails(meeting);
+      }
+    });
   }
 
   quill.QuillController _controllerFromHtml(String? html) {
@@ -494,35 +514,28 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   Future<void> _loadMeetingDetails(MemberPortalMeeting meeting) async {
     if (meeting.meetingId.isEmpty) {
+      if (!mounted) return;
       setState(() {
         _selectedMeetingDetails = null;
         _meetingDetailsError = 'Meeting record is missing an ID.';
+        _loadingMeetingDetails = false;
       });
       return;
     }
-
-    setState(() {
-      _loadingMeetingDetails = true;
-      _meetingDetailsError = null;
-    });
 
     try {
       final details = await _meetingRepository.getMeetingById(meeting.meetingId);
       if (!mounted) return;
       setState(() {
         _selectedMeetingDetails = details;
+        _loadingMeetingDetails = false;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _meetingDetailsError = error.toString();
+        _loadingMeetingDetails = false;
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loadingMeetingDetails = false;
-        });
-      }
     }
   }
 
