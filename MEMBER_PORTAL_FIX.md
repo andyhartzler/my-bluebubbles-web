@@ -1,30 +1,45 @@
 # Member Portal Meetings Tab Fix
 
 ## Issue
-The meetings tab on the member portal management page was throwing "An unexpected error occurred when rendering." causing the entire page to appear blank. The page would load for about one second showing the meetings list, then flash and crash to a grey error screen.
+The meetings tab on the member portal management page was throwing "An unexpected error occurred when rendering." causing the entire page to appear blank. Initially, the page would load for about one second showing the meetings list, then flash and crash to a grey error screen. After the initial fix, the meetings tab loaded successfully, but clicking on any meeting tile to view details caused the same crash.
 
 ## Root Cause
-The code was attempting to auto-select the first meeting using `WidgetsBinding.instance.addPostFrameCallback()` in the build method. This triggered `_selectMeeting()` which called multiple `setState()` operations during the render cycle, causing a Flutter rendering error. The pattern was:
 
-1. Meetings tab loads and renders successfully
-2. `_resolveSelectedMeeting()` returns the first meeting
-3. PostFrameCallback schedules `_selectMeeting(selectedMeeting)`
-4. `_selectMeeting()` calls `setState()` (line 473)
-5. `_selectMeeting()` also calls async `_loadMeetingDetails()` which triggers additional `setState()` calls
-6. Multiple `setState()` operations during build/render cycle cause crash
+### Issue #1: Auto-selection during build
+The code was attempting to auto-select the first meeting using `WidgetsBinding.instance.addPostFrameCallback()` in the build method. This triggered `_selectMeeting()` which called multiple `setState()` operations during the render cycle, causing a Flutter rendering error.
+
+### Issue #2: Multiple synchronous setState calls on meeting selection
+When a user clicked on a meeting tile, `_selectMeeting()` would:
+1. Call `setState()` to update the meeting state (line 460)
+2. Immediately call `_loadMeetingDetails(meeting)` synchronously (line 480)
+3. `_loadMeetingDetails()` would immediately call `setState()` again (line 504)
+4. Multiple synchronous `setState()` calls caused rendering crash
+
+Additionally, if HTML parsing in `_controllerFromHtml()` threw an exception, it would crash the entire widget without any error handling.
 
 ## Solution
+
+### Fix #1: Remove auto-selection during build
 Removed the problematic auto-selection logic in `lib/screens/crm/member_portal/member_portal_management_screen.dart`:
 
 1. **Removed** the `postFrameCallback` that was auto-selecting the first meeting (lines 331-337)
 2. **Removed** the `_resolveSelectedMeeting()` helper function that was no longer needed
 3. **Changed** selectedMeeting logic to only select a meeting when explicitly set by user interaction
 
+### Fix #2: Refactor meeting selection to avoid synchronous setState calls
+Refactored `_selectMeeting()` and `_loadMeetingDetails()` methods:
+
+1. **Added** try-catch around HTML parsing to handle malformed HTML gracefully
+2. **Moved** `_loadMeetingDetails()` call into a `postFrameCallback` to run after the current frame
+3. **Consolidated** loading state into the initial `setState()` call
+4. **Simplified** `_loadMeetingDetails()` to only update state when async operations complete
+
 Now the meetings tab will:
 - Load and display all meetings successfully
 - Show a placeholder message prompting user to select a meeting
-- Only load meeting details when a user clicks on a meeting card
-- Avoid setState() calls during the build/render cycle
+- Load meeting details when a user clicks on a meeting card without crashing
+- Handle HTML parsing errors gracefully with empty editors
+- Properly schedule async operations to avoid setState conflicts
 
 ## How to Apply the Fix
 
@@ -57,6 +72,7 @@ After applying the fix, the meetings tab should:
 ## Code Changes
 **File:** `lib/screens/crm/member_portal/member_portal_management_screen.dart`
 
+### Change #1: Remove auto-selection during build
 **Lines 328-337:** Replaced auto-selection postFrameCallback with explicit selection logic
 ```dart
 // Before: Auto-selected first meeting causing setState during build
@@ -80,8 +96,19 @@ final selectedMeeting = _selectedMeetingId != null
 
 **Lines 413-423:** Removed unused `_resolveSelectedMeeting()` function
 
+### Change #2: Fix meeting selection to avoid synchronous setState
+**In `_selectMeeting()`:**
+- Added try-catch around `_controllerFromHtml()` calls
+- Set `_loadingMeetingDetails = true` in the initial setState
+- Moved `_loadMeetingDetails()` call into postFrameCallback
+
+**In `_loadMeetingDetails()`:**
+- Removed the initial setState that was causing synchronous setState conflicts
+- Consolidated loading state updates into async completion handlers
+
 ## Related Commits
-- Current fix - Remove auto-selection logic causing setState during build
+- Current fix (part 2) - Fix meeting selection crash with proper setState scheduling
+- 23f0b7e - Fix member portal meetings tab rendering crash (part 1)
 - 796a1e4 - Add rebuild instructions for member portal meetings tab fix
 - 3ffe33b - Remove member portal recording data
 - 33cbe37 - Remove recording embed from member portal meetings
