@@ -179,7 +179,7 @@ class CampaignService {
 
       final response = await _readClient
           .from('members')
-          .select('id', count: CountOption.exact)
+          .select('id', const FetchOptions(count: CountOption.exact))
           .match(_filterToSupabaseMatch(filter));
 
       final count = response.count;

@@ -1,4 +1,4 @@
-import 'package:postgrest/postgrest.dart' show CountOption, PostgrestFilterBuilder, PostgrestResponse;
+import 'package:postgrest/postgrest.dart' show CountOption, FetchOptions, PostgrestFilterBuilder, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -148,6 +148,27 @@ class DonorRepository {
     final allowedSorts = <String>{'name', 'total_donated', 'created_at', 'phone', 'member_id'};
     final resolvedSort = allowedSorts.contains(sortBy) ? sortBy : 'name';
 
+    if (fetchTotalCount) {
+      var countQuery = _applyFilters(
+        _readClient.from('donors').select('*, donations(*)', const FetchOptions(count: CountOption.exact)),
+        searchQuery: searchQuery,
+        recurring: recurring,
+        linkedToMember: linkedToMember,
+        minTotal: minTotal,
+        maxTotal: maxTotal,
+      ).order(resolvedSort, ascending: ascending).order('id', ascending: true);
+
+      if (limit != null && offset != null) {
+        countQuery = countQuery.range(offset, offset + limit - 1);
+      } else if (limit != null) {
+        countQuery = countQuery.limit(limit);
+      }
+
+      final PostgrestResponse response = await countQuery;
+      final donors = _mapDonors(response.data);
+      return DonorFetchResult(donors: donors, totalCount: response.count);
+    }
+
     var query = _applyFilters(
       _readClient.from('donors').select('*, donations(*)'),
       searchQuery: searchQuery,
@@ -161,12 +182,6 @@ class DonorRepository {
       query = query.range(offset, offset + limit - 1);
     } else if (limit != null) {
       query = query.limit(limit);
-    }
-
-    if (fetchTotalCount) {
-      final PostgrestResponse response = await query.count(CountOption.exact);
-      final donors = _mapDonors(response.data);
-      return DonorFetchResult(donors: donors, totalCount: response.count);
     }
 
     final data = await query;
