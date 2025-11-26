@@ -177,19 +177,13 @@ class CampaignService {
         if (response is int) return response;
       }
 
-      final data = await _readClient
+      final response = await _readClient
           .from('members')
-          .select(
-            'id',
-            fetchOptions:
-                const FetchOptions(count: CountOption.exact, head: true),
-          )
-          .match(_filterToSupabaseMatch(filter))
-          .single();
+          .select('id', head: true, count: CountOption.exact)
+          .match(_filterToSupabaseMatch(filter));
 
-      if (data is Map<String, dynamic> && data['count'] is int) {
-        return data['count'] as int;
-      }
+      final count = response.count;
+      if (count != null) return count;
     } catch (e, s) {
       Logger.warn('Failed to estimate recipients', error: e, trace: s);
     }
