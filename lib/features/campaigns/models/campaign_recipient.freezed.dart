@@ -1,10 +1,18 @@
 // coverage:ignore-file
-// GENERATED CODE - MANUALLY WRITTEN UNTIL BUILD RUNNER IS AVAILABLE.
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'campaign_recipient.dart';
 
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
 T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
 CampaignRecipient _$CampaignRecipientFromJson(Map<String, dynamic> json) {
   return _CampaignRecipient.fromJson(json);
@@ -12,27 +20,42 @@ CampaignRecipient _$CampaignRecipientFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$CampaignRecipient {
-  String get id => throw UnimplementedError();
-  String get campaignId => throw UnimplementedError();
-  String? get recipientId => throw UnimplementedError();
-  String? get name => throw UnimplementedError();
-  String get address => throw UnimplementedError();
-  CampaignChannel get channel => throw UnimplementedError();
-  CampaignRecipientStatus get status => throw UnimplementedError();
-  String? get errorMessage => throw UnimplementedError();
-  DateTime? get queuedAt => throw UnimplementedError();
-  DateTime? get sentAt => throw UnimplementedError();
-  DateTime? get deliveredAt => throw UnimplementedError();
-  DateTime? get openedAt => throw UnimplementedError();
-  DateTime? get clickedAt => throw UnimplementedError();
-  DateTime? get unsubscribedAt => throw UnimplementedError();
-  DateTime? get createdAt => throw UnimplementedError();
-  DateTime? get updatedAt => throw UnimplementedError();
+  String get id => throw _privateConstructorUsedError;
+  @JsonKey(name: 'campaign_id')
+  String get campaignId => throw _privateConstructorUsedError;
+  @JsonKey(name: 'recipient_id')
+  String? get recipientId => throw _privateConstructorUsedError;
+  String? get name => throw _privateConstructorUsedError;
+  String get address => throw _privateConstructorUsedError;
+  CampaignChannel get channel => throw _privateConstructorUsedError;
+  CampaignRecipientStatus get status => throw _privateConstructorUsedError;
+  @JsonKey(name: 'error_message')
+  String? get errorMessage => throw _privateConstructorUsedError;
+  @JsonKey(name: 'queued_at')
+  DateTime? get queuedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'sent_at')
+  DateTime? get sentAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'delivered_at')
+  DateTime? get deliveredAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'opened_at')
+  DateTime? get openedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'clicked_at')
+  DateTime? get clickedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'unsubscribed_at')
+  DateTime? get unsubscribedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'created_at')
+  DateTime? get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt => throw _privateConstructorUsedError;
 
-  Map<String, dynamic> toJson() => throw UnimplementedError();
-  @JsonKey(ignore: true)
+  /// Serializes this CampaignRecipient to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of CampaignRecipient
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $CampaignRecipientCopyWith<CampaignRecipient> get copyWith =>
-      throw UnimplementedError();
+      throw _privateConstructorUsedError;
 }
 
 /// @nodoc
@@ -40,24 +63,24 @@ abstract class $CampaignRecipientCopyWith<$Res> {
   factory $CampaignRecipientCopyWith(
           CampaignRecipient value, $Res Function(CampaignRecipient) then) =
       _$CampaignRecipientCopyWithImpl<$Res, CampaignRecipient>;
-  $Res call({
-    String id,
-    String campaignId,
-    String? recipientId,
-    String? name,
-    String address,
-    CampaignChannel channel,
-    CampaignRecipientStatus status,
-    String? errorMessage,
-    DateTime? queuedAt,
-    DateTime? sentAt,
-    DateTime? deliveredAt,
-    DateTime? openedAt,
-    DateTime? clickedAt,
-    DateTime? unsubscribedAt,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  });
+  @useResult
+  $Res call(
+      {String id,
+      @JsonKey(name: 'campaign_id') String campaignId,
+      @JsonKey(name: 'recipient_id') String? recipientId,
+      String? name,
+      String address,
+      CampaignChannel channel,
+      CampaignRecipientStatus status,
+      @JsonKey(name: 'error_message') String? errorMessage,
+      @JsonKey(name: 'queued_at') DateTime? queuedAt,
+      @JsonKey(name: 'sent_at') DateTime? sentAt,
+      @JsonKey(name: 'delivered_at') DateTime? deliveredAt,
+      @JsonKey(name: 'opened_at') DateTime? openedAt,
+      @JsonKey(name: 'clicked_at') DateTime? clickedAt,
+      @JsonKey(name: 'unsubscribed_at') DateTime? unsubscribedAt,
+      @JsonKey(name: 'created_at') DateTime? createdAt,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
 }
 
 /// @nodoc
@@ -65,18 +88,23 @@ class _$CampaignRecipientCopyWithImpl<$Res, $Val extends CampaignRecipient>
     implements $CampaignRecipientCopyWith<$Res> {
   _$CampaignRecipientCopyWithImpl(this._value, this._then);
 
+  // ignore: unused_field
   final $Val _value;
+  // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of CampaignRecipient
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? id = freezed,
-    Object? campaignId = freezed,
+    Object? id = null,
+    Object? campaignId = null,
     Object? recipientId = freezed,
     Object? name = freezed,
-    Object? address = freezed,
-    Object? channel = freezed,
-    Object? status = freezed,
+    Object? address = null,
+    Object? channel = null,
+    Object? status = null,
     Object? errorMessage = freezed,
     Object? queuedAt = freezed,
     Object? sentAt = freezed,
@@ -88,93 +116,231 @@ class _$CampaignRecipientCopyWithImpl<$Res, $Val extends CampaignRecipient>
     Object? updatedAt = freezed,
   }) {
     return _then(_value.copyWith(
-      id: id == freezed ? _value.id : id as String,
-      campaignId: campaignId == freezed ? _value.campaignId : campaignId as String,
-      recipientId: recipientId == freezed ? _value.recipientId : recipientId as String?,
-      name: name == freezed ? _value.name : name as String?,
-      address: address == freezed ? _value.address : address as String,
-      channel: channel == freezed ? _value.channel : channel as CampaignChannel,
-      status: status == freezed ? _value.status : status as CampaignRecipientStatus,
-      errorMessage: errorMessage == freezed ? _value.errorMessage : errorMessage as String?,
-      queuedAt: queuedAt == freezed ? _value.queuedAt : queuedAt as DateTime?,
-      sentAt: sentAt == freezed ? _value.sentAt : sentAt as DateTime?,
-      deliveredAt: deliveredAt == freezed ? _value.deliveredAt : deliveredAt as DateTime?,
-      openedAt: openedAt == freezed ? _value.openedAt : openedAt as DateTime?,
-      clickedAt: clickedAt == freezed ? _value.clickedAt : clickedAt as DateTime?,
-      unsubscribedAt:
-          unsubscribedAt == freezed ? _value.unsubscribedAt : unsubscribedAt as DateTime?,
-      createdAt: createdAt == freezed ? _value.createdAt : createdAt as DateTime?,
-      updatedAt: updatedAt == freezed ? _value.updatedAt : updatedAt as DateTime?,
+      id: null == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      campaignId: null == campaignId
+          ? _value.campaignId
+          : campaignId // ignore: cast_nullable_to_non_nullable
+              as String,
+      recipientId: freezed == recipientId
+          ? _value.recipientId
+          : recipientId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      name: freezed == name
+          ? _value.name
+          : name // ignore: cast_nullable_to_non_nullable
+              as String?,
+      address: null == address
+          ? _value.address
+          : address // ignore: cast_nullable_to_non_nullable
+              as String,
+      channel: null == channel
+          ? _value.channel
+          : channel // ignore: cast_nullable_to_non_nullable
+              as CampaignChannel,
+      status: null == status
+          ? _value.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as CampaignRecipientStatus,
+      errorMessage: freezed == errorMessage
+          ? _value.errorMessage
+          : errorMessage // ignore: cast_nullable_to_non_nullable
+              as String?,
+      queuedAt: freezed == queuedAt
+          ? _value.queuedAt
+          : queuedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      sentAt: freezed == sentAt
+          ? _value.sentAt
+          : sentAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      deliveredAt: freezed == deliveredAt
+          ? _value.deliveredAt
+          : deliveredAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      openedAt: freezed == openedAt
+          ? _value.openedAt
+          : openedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      clickedAt: freezed == clickedAt
+          ? _value.clickedAt
+          : clickedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      unsubscribedAt: freezed == unsubscribedAt
+          ? _value.unsubscribedAt
+          : unsubscribedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ) as $Val);
   }
 }
 
 /// @nodoc
-abstract class _$$_CampaignRecipientCopyWith<$Res>
+abstract class _$$CampaignRecipientImplCopyWith<$Res>
     implements $CampaignRecipientCopyWith<$Res> {
-  factory _$$_CampaignRecipientCopyWith(
-          _$_CampaignRecipient value, $Res Function(_$_CampaignRecipient) then) =
-      __$$_CampaignRecipientCopyWithImpl<$Res>;
+  factory _$$CampaignRecipientImplCopyWith(_$CampaignRecipientImpl value,
+          $Res Function(_$CampaignRecipientImpl) then) =
+      __$$CampaignRecipientImplCopyWithImpl<$Res>;
   @override
-  $Res call({
-    String id,
-    String campaignId,
-    String? recipientId,
-    String? name,
-    String address,
-    CampaignChannel channel,
-    CampaignRecipientStatus status,
-    String? errorMessage,
-    DateTime? queuedAt,
-    DateTime? sentAt,
-    DateTime? deliveredAt,
-    DateTime? openedAt,
-    DateTime? clickedAt,
-    DateTime? unsubscribedAt,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  });
+  @useResult
+  $Res call(
+      {String id,
+      @JsonKey(name: 'campaign_id') String campaignId,
+      @JsonKey(name: 'recipient_id') String? recipientId,
+      String? name,
+      String address,
+      CampaignChannel channel,
+      CampaignRecipientStatus status,
+      @JsonKey(name: 'error_message') String? errorMessage,
+      @JsonKey(name: 'queued_at') DateTime? queuedAt,
+      @JsonKey(name: 'sent_at') DateTime? sentAt,
+      @JsonKey(name: 'delivered_at') DateTime? deliveredAt,
+      @JsonKey(name: 'opened_at') DateTime? openedAt,
+      @JsonKey(name: 'clicked_at') DateTime? clickedAt,
+      @JsonKey(name: 'unsubscribed_at') DateTime? unsubscribedAt,
+      @JsonKey(name: 'created_at') DateTime? createdAt,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
 }
 
 /// @nodoc
-class __$$_CampaignRecipientCopyWithImpl<$Res>
-    extends _$CampaignRecipientCopyWithImpl<$Res, _$_CampaignRecipient>
-    implements _$$_CampaignRecipientCopyWith<$Res> {
-  __$$_CampaignRecipientCopyWithImpl(
-      _$_CampaignRecipient _value, $Res Function(_$_CampaignRecipient) _then)
+class __$$CampaignRecipientImplCopyWithImpl<$Res>
+    extends _$CampaignRecipientCopyWithImpl<$Res, _$CampaignRecipientImpl>
+    implements _$$CampaignRecipientImplCopyWith<$Res> {
+  __$$CampaignRecipientImplCopyWithImpl(_$CampaignRecipientImpl _value,
+      $Res Function(_$CampaignRecipientImpl) _then)
       : super(_value, _then);
+
+  /// Create a copy of CampaignRecipient
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? campaignId = null,
+    Object? recipientId = freezed,
+    Object? name = freezed,
+    Object? address = null,
+    Object? channel = null,
+    Object? status = null,
+    Object? errorMessage = freezed,
+    Object? queuedAt = freezed,
+    Object? sentAt = freezed,
+    Object? deliveredAt = freezed,
+    Object? openedAt = freezed,
+    Object? clickedAt = freezed,
+    Object? unsubscribedAt = freezed,
+    Object? createdAt = freezed,
+    Object? updatedAt = freezed,
+  }) {
+    return _then(_$CampaignRecipientImpl(
+      id: null == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      campaignId: null == campaignId
+          ? _value.campaignId
+          : campaignId // ignore: cast_nullable_to_non_nullable
+              as String,
+      recipientId: freezed == recipientId
+          ? _value.recipientId
+          : recipientId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      name: freezed == name
+          ? _value.name
+          : name // ignore: cast_nullable_to_non_nullable
+              as String?,
+      address: null == address
+          ? _value.address
+          : address // ignore: cast_nullable_to_non_nullable
+              as String,
+      channel: null == channel
+          ? _value.channel
+          : channel // ignore: cast_nullable_to_non_nullable
+              as CampaignChannel,
+      status: null == status
+          ? _value.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as CampaignRecipientStatus,
+      errorMessage: freezed == errorMessage
+          ? _value.errorMessage
+          : errorMessage // ignore: cast_nullable_to_non_nullable
+              as String?,
+      queuedAt: freezed == queuedAt
+          ? _value.queuedAt
+          : queuedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      sentAt: freezed == sentAt
+          ? _value.sentAt
+          : sentAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      deliveredAt: freezed == deliveredAt
+          ? _value.deliveredAt
+          : deliveredAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      openedAt: freezed == openedAt
+          ? _value.openedAt
+          : openedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      clickedAt: freezed == clickedAt
+          ? _value.clickedAt
+          : clickedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      unsubscribedAt: freezed == unsubscribedAt
+          ? _value.unsubscribedAt
+          : unsubscribedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ));
+  }
 }
 
 /// @nodoc
 @JsonSerializable()
-class _$_CampaignRecipient implements _CampaignRecipient {
-  const _$_CampaignRecipient({
-    required this.id,
-    required this.campaignId,
-    this.recipientId,
-    this.name,
-    required this.address,
-    this.channel = CampaignChannel.sms,
-    this.status = CampaignRecipientStatus.pending,
-    this.errorMessage,
-    this.queuedAt,
-    this.sentAt,
-    this.deliveredAt,
-    this.openedAt,
-    this.clickedAt,
-    this.unsubscribedAt,
-    this.createdAt,
-    this.updatedAt,
-  });
+class _$CampaignRecipientImpl implements _CampaignRecipient {
+  const _$CampaignRecipientImpl(
+      {required this.id,
+      @JsonKey(name: 'campaign_id') required this.campaignId,
+      @JsonKey(name: 'recipient_id') this.recipientId,
+      this.name,
+      required this.address,
+      this.channel = CampaignChannel.sms,
+      this.status = CampaignRecipientStatus.pending,
+      @JsonKey(name: 'error_message') this.errorMessage,
+      @JsonKey(name: 'queued_at') this.queuedAt,
+      @JsonKey(name: 'sent_at') this.sentAt,
+      @JsonKey(name: 'delivered_at') this.deliveredAt,
+      @JsonKey(name: 'opened_at') this.openedAt,
+      @JsonKey(name: 'clicked_at') this.clickedAt,
+      @JsonKey(name: 'unsubscribed_at') this.unsubscribedAt,
+      @JsonKey(name: 'created_at') this.createdAt,
+      @JsonKey(name: 'updated_at') this.updatedAt});
 
-  factory _$_CampaignRecipient.fromJson(Map<String, dynamic> json) =>
-      _$CampaignRecipientFromJson(json);
+  factory _$CampaignRecipientImpl.fromJson(Map<String, dynamic> json) =>
+      _$$CampaignRecipientImplFromJson(json);
 
   @override
   final String id;
   @override
+  @JsonKey(name: 'campaign_id')
   final String campaignId;
   @override
+  @JsonKey(name: 'recipient_id')
   final String? recipientId;
   @override
   final String? name;
@@ -187,112 +353,139 @@ class _$_CampaignRecipient implements _CampaignRecipient {
   @JsonKey()
   final CampaignRecipientStatus status;
   @override
+  @JsonKey(name: 'error_message')
   final String? errorMessage;
   @override
+  @JsonKey(name: 'queued_at')
   final DateTime? queuedAt;
   @override
+  @JsonKey(name: 'sent_at')
   final DateTime? sentAt;
   @override
+  @JsonKey(name: 'delivered_at')
   final DateTime? deliveredAt;
   @override
+  @JsonKey(name: 'opened_at')
   final DateTime? openedAt;
   @override
+  @JsonKey(name: 'clicked_at')
   final DateTime? clickedAt;
   @override
+  @JsonKey(name: 'unsubscribed_at')
   final DateTime? unsubscribedAt;
   @override
+  @JsonKey(name: 'created_at')
   final DateTime? createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
 
   @override
   String toString() {
-    return 'CampaignRecipient(id: $id, address: $address, status: $status)';
+    return 'CampaignRecipient(id: $id, campaignId: $campaignId, recipientId: $recipientId, name: $name, address: $address, channel: $channel, status: $status, errorMessage: $errorMessage, queuedAt: $queuedAt, sentAt: $sentAt, deliveredAt: $deliveredAt, openedAt: $openedAt, clickedAt: $clickedAt, unsubscribedAt: $unsubscribedAt, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
-        (other is _$_CampaignRecipient &&
-            other.id == id &&
-            other.campaignId == campaignId &&
-            other.recipientId == recipientId &&
-            other.name == name &&
-            other.address == address &&
-            other.channel == channel &&
-            other.status == status &&
-            other.errorMessage == errorMessage &&
-            other.queuedAt == queuedAt &&
-            other.sentAt == sentAt &&
-            other.deliveredAt == deliveredAt &&
-            other.openedAt == openedAt &&
-            other.clickedAt == clickedAt &&
-            other.unsubscribedAt == unsubscribedAt &&
-            other.createdAt == createdAt &&
-            other.updatedAt == updatedAt);
+        (other.runtimeType == runtimeType &&
+            other is _$CampaignRecipientImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.campaignId, campaignId) ||
+                other.campaignId == campaignId) &&
+            (identical(other.recipientId, recipientId) ||
+                other.recipientId == recipientId) &&
+            (identical(other.name, name) || other.name == name) &&
+            (identical(other.address, address) || other.address == address) &&
+            (identical(other.channel, channel) || other.channel == channel) &&
+            (identical(other.status, status) || other.status == status) &&
+            (identical(other.errorMessage, errorMessage) ||
+                other.errorMessage == errorMessage) &&
+            (identical(other.queuedAt, queuedAt) ||
+                other.queuedAt == queuedAt) &&
+            (identical(other.sentAt, sentAt) || other.sentAt == sentAt) &&
+            (identical(other.deliveredAt, deliveredAt) ||
+                other.deliveredAt == deliveredAt) &&
+            (identical(other.openedAt, openedAt) ||
+                other.openedAt == openedAt) &&
+            (identical(other.clickedAt, clickedAt) ||
+                other.clickedAt == clickedAt) &&
+            (identical(other.unsubscribedAt, unsubscribedAt) ||
+                other.unsubscribedAt == unsubscribedAt) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt));
   }
 
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
-        runtimeType,
-        id,
-        campaignId,
-        recipientId,
-        name,
-        address,
-        channel,
-        status,
-        errorMessage,
-        queuedAt,
-        sentAt,
-        deliveredAt,
-        openedAt,
-        clickedAt,
-        unsubscribedAt,
-        createdAt,
-        updatedAt,
-      );
+      runtimeType,
+      id,
+      campaignId,
+      recipientId,
+      name,
+      address,
+      channel,
+      status,
+      errorMessage,
+      queuedAt,
+      sentAt,
+      deliveredAt,
+      openedAt,
+      clickedAt,
+      unsubscribedAt,
+      createdAt,
+      updatedAt);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of CampaignRecipient
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  _$$_CampaignRecipientCopyWith<_$_CampaignRecipient> get copyWith =>
-      __$$_CampaignRecipientCopyWithImpl<_$_CampaignRecipient>(this, _$identity);
+  @pragma('vm:prefer-inline')
+  _$$CampaignRecipientImplCopyWith<_$CampaignRecipientImpl> get copyWith =>
+      __$$CampaignRecipientImplCopyWithImpl<_$CampaignRecipientImpl>(
+          this, _$identity);
 
   @override
   Map<String, dynamic> toJson() {
-    return _$CampaignRecipientToJson(this);
+    return _$$CampaignRecipientImplToJson(
+      this,
+    );
   }
 }
 
-/// @nodoc
 abstract class _CampaignRecipient implements CampaignRecipient {
-  const factory _CampaignRecipient({
-    required String id,
-    required String campaignId,
-    String? recipientId,
-    String? name,
-    required String address,
-    CampaignChannel channel,
-    CampaignRecipientStatus status,
-    String? errorMessage,
-    DateTime? queuedAt,
-    DateTime? sentAt,
-    DateTime? deliveredAt,
-    DateTime? openedAt,
-    DateTime? clickedAt,
-    DateTime? unsubscribedAt,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) = _$_CampaignRecipient;
+  const factory _CampaignRecipient(
+          {required final String id,
+          @JsonKey(name: 'campaign_id') required final String campaignId,
+          @JsonKey(name: 'recipient_id') final String? recipientId,
+          final String? name,
+          required final String address,
+          final CampaignChannel channel,
+          final CampaignRecipientStatus status,
+          @JsonKey(name: 'error_message') final String? errorMessage,
+          @JsonKey(name: 'queued_at') final DateTime? queuedAt,
+          @JsonKey(name: 'sent_at') final DateTime? sentAt,
+          @JsonKey(name: 'delivered_at') final DateTime? deliveredAt,
+          @JsonKey(name: 'opened_at') final DateTime? openedAt,
+          @JsonKey(name: 'clicked_at') final DateTime? clickedAt,
+          @JsonKey(name: 'unsubscribed_at') final DateTime? unsubscribedAt,
+          @JsonKey(name: 'created_at') final DateTime? createdAt,
+          @JsonKey(name: 'updated_at') final DateTime? updatedAt}) =
+      _$CampaignRecipientImpl;
 
   factory _CampaignRecipient.fromJson(Map<String, dynamic> json) =
-      _$_CampaignRecipient.fromJson;
+      _$CampaignRecipientImpl.fromJson;
 
   @override
   String get id;
   @override
+  @JsonKey(name: 'campaign_id')
   String get campaignId;
   @override
+  @JsonKey(name: 'recipient_id')
   String? get recipientId;
   @override
   String? get name;
@@ -303,25 +496,37 @@ abstract class _CampaignRecipient implements CampaignRecipient {
   @override
   CampaignRecipientStatus get status;
   @override
+  @JsonKey(name: 'error_message')
   String? get errorMessage;
   @override
+  @JsonKey(name: 'queued_at')
   DateTime? get queuedAt;
   @override
+  @JsonKey(name: 'sent_at')
   DateTime? get sentAt;
   @override
+  @JsonKey(name: 'delivered_at')
   DateTime? get deliveredAt;
   @override
+  @JsonKey(name: 'opened_at')
   DateTime? get openedAt;
   @override
+  @JsonKey(name: 'clicked_at')
   DateTime? get clickedAt;
   @override
+  @JsonKey(name: 'unsubscribed_at')
   DateTime? get unsubscribedAt;
   @override
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
+
+  /// Create a copy of CampaignRecipient
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
-  _$$_CampaignRecipientCopyWith<_$_CampaignRecipient> get copyWith =>
-      throw UnimplementedError();
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$CampaignRecipientImplCopyWith<_$CampaignRecipientImpl> get copyWith =>
+      throw _privateConstructorUsedError;
 }

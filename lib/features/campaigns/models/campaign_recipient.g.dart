@@ -1,19 +1,23 @@
-// GENERATED CODE - MANUALLY WRITTEN UNTIL BUILD RUNNER IS AVAILABLE.
-// ignore_for_file: type=lint
+// GENERATED CODE - DO NOT MODIFY BY HAND
 
 part of 'campaign_recipient.dart';
 
-_$_CampaignRecipient _$CampaignRecipientFromJson(Map<String, dynamic> json) =>
-    _$_CampaignRecipient(
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+_$CampaignRecipientImpl _$$CampaignRecipientImplFromJson(
+        Map<String, dynamic> json) =>
+    _$CampaignRecipientImpl(
       id: json['id'] as String,
       campaignId: json['campaign_id'] as String,
       recipientId: json['recipient_id'] as String?,
       name: json['name'] as String?,
       address: json['address'] as String,
-      channel:
-          $enumDecodeNullable(_$CampaignChannelEnumMap, json['channel']) ??
-              CampaignChannel.sms,
-      status: $enumDecodeNullable(_$CampaignRecipientStatusEnumMap, json['status']) ??
+      channel: $enumDecodeNullable(_$CampaignChannelEnumMap, json['channel']) ??
+          CampaignChannel.sms,
+      status: $enumDecodeNullable(
+              _$CampaignRecipientStatusEnumMap, json['status']) ??
           CampaignRecipientStatus.pending,
       errorMessage: json['error_message'] as String?,
       queuedAt: json['queued_at'] == null
@@ -42,7 +46,8 @@ _$_CampaignRecipient _$CampaignRecipientFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['updated_at'] as String),
     );
 
-Map<String, dynamic> _$CampaignRecipientToJson(CampaignRecipient instance) =>
+Map<String, dynamic> _$$CampaignRecipientImplToJson(
+        _$CampaignRecipientImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'campaign_id': instance.campaignId,

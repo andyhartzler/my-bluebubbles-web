@@ -7,17 +7,17 @@ part 'campaign_analytics.g.dart';
 class CampaignAnalytics with _$CampaignAnalytics {
   const factory CampaignAnalytics({
     @JsonKey(name: 'campaign_id') required String campaignId,
-    @JsonKey(defaultValue: 0) int totalRecipients,
-    @JsonKey(defaultValue: 0) int pendingCount,
-    @JsonKey(defaultValue: 0) int queuedCount,
-    @JsonKey(defaultValue: 0) int processingCount,
-    @JsonKey(defaultValue: 0) int sentCount,
-    @JsonKey(defaultValue: 0) int deliveredCount,
-    @JsonKey(defaultValue: 0) int failedCount,
-    @JsonKey(defaultValue: 0) int bouncedCount,
-    @JsonKey(defaultValue: 0) int openedCount,
-    @JsonKey(defaultValue: 0) int clickedCount,
-    @JsonKey(defaultValue: 0) int unsubscribedCount,
+    @Default(0) int totalRecipients,
+    @Default(0) int pendingCount,
+    @Default(0) int queuedCount,
+    @Default(0) int processingCount,
+    @Default(0) int sentCount,
+    @Default(0) int deliveredCount,
+    @Default(0) int failedCount,
+    @Default(0) int bouncedCount,
+    @Default(0) int openedCount,
+    @Default(0) int clickedCount,
+    @Default(0) int unsubscribedCount,
     @JsonKey(name: 'refreshed_at') DateTime? refreshedAt,
   }) = _CampaignAnalytics;
 

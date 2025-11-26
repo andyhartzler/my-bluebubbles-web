@@ -1,9 +1,13 @@
-// GENERATED CODE - MANUALLY WRITTEN UNTIL BUILD RUNNER IS AVAILABLE.
-// ignore_for_file: type=lint
+// GENERATED CODE - DO NOT MODIFY BY HAND
 
 part of 'campaign.dart';
 
-_$_Campaign _$CampaignFromJson(Map<String, dynamic> json) => _$_Campaign(
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+_$CampaignImpl _$$CampaignImplFromJson(Map<String, dynamic> json) =>
+    _$CampaignImpl(
       id: json['id'] as String,
       name: json['name'] as String,
       description: json['description'] as String?,
@@ -11,9 +15,8 @@ _$_Campaign _$CampaignFromJson(Map<String, dynamic> json) => _$_Campaign(
       segmentId: json['segment_id'] as String?,
       templateId: json['template_id'] as String?,
       creatorId: json['creator_id'] as String?,
-      status:
-          $enumDecodeNullable(_$CampaignStatusEnumMap, json['status']) ??
-              CampaignStatus.draft,
+      status: $enumDecodeNullable(_$CampaignStatusEnumMap, json['status']) ??
+          CampaignStatus.draft,
       scheduledFor: json['scheduled_for'] == null
           ? null
           : DateTime.parse(json['scheduled_for'] as String),
@@ -25,7 +28,8 @@ _$_Campaign _$CampaignFromJson(Map<String, dynamic> json) => _$_Campaign(
           : DateTime.parse(json['updated_at'] as String),
     );
 
-Map<String, dynamic> _$CampaignToJson(Campaign instance) => <String, dynamic>{
+Map<String, dynamic> _$$CampaignImplToJson(_$CampaignImpl instance) =>
+    <String, dynamic>{
       'id': instance.id,
       'name': instance.name,
       'description': instance.description,
