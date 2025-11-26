@@ -1,10 +1,18 @@
 // coverage:ignore-file
-// GENERATED CODE - MANUALLY WRITTEN UNTIL BUILD RUNNER IS AVAILABLE.
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'campaign_analytics.dart';
 
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
 T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
 CampaignAnalytics _$CampaignAnalyticsFromJson(Map<String, dynamic> json) {
   return _CampaignAnalytics.fromJson(json);
@@ -12,24 +20,30 @@ CampaignAnalytics _$CampaignAnalyticsFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$CampaignAnalytics {
-  String get campaignId => throw UnimplementedError();
-  int get totalRecipients => throw UnimplementedError();
-  int get pendingCount => throw UnimplementedError();
-  int get queuedCount => throw UnimplementedError();
-  int get processingCount => throw UnimplementedError();
-  int get sentCount => throw UnimplementedError();
-  int get deliveredCount => throw UnimplementedError();
-  int get failedCount => throw UnimplementedError();
-  int get bouncedCount => throw UnimplementedError();
-  int get openedCount => throw UnimplementedError();
-  int get clickedCount => throw UnimplementedError();
-  int get unsubscribedCount => throw UnimplementedError();
-  DateTime? get refreshedAt => throw UnimplementedError();
+  @JsonKey(name: 'campaign_id')
+  String get campaignId => throw _privateConstructorUsedError;
+  int get totalRecipients => throw _privateConstructorUsedError;
+  int get pendingCount => throw _privateConstructorUsedError;
+  int get queuedCount => throw _privateConstructorUsedError;
+  int get processingCount => throw _privateConstructorUsedError;
+  int get sentCount => throw _privateConstructorUsedError;
+  int get deliveredCount => throw _privateConstructorUsedError;
+  int get failedCount => throw _privateConstructorUsedError;
+  int get bouncedCount => throw _privateConstructorUsedError;
+  int get openedCount => throw _privateConstructorUsedError;
+  int get clickedCount => throw _privateConstructorUsedError;
+  int get unsubscribedCount => throw _privateConstructorUsedError;
+  @JsonKey(name: 'refreshed_at')
+  DateTime? get refreshedAt => throw _privateConstructorUsedError;
 
-  Map<String, dynamic> toJson() => throw UnimplementedError();
-  @JsonKey(ignore: true)
+  /// Serializes this CampaignAnalytics to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of CampaignAnalytics
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $CampaignAnalyticsCopyWith<CampaignAnalytics> get copyWith =>
-      throw UnimplementedError();
+      throw _privateConstructorUsedError;
 }
 
 /// @nodoc
@@ -37,21 +51,21 @@ abstract class $CampaignAnalyticsCopyWith<$Res> {
   factory $CampaignAnalyticsCopyWith(
           CampaignAnalytics value, $Res Function(CampaignAnalytics) then) =
       _$CampaignAnalyticsCopyWithImpl<$Res, CampaignAnalytics>;
-  $Res call({
-    String campaignId,
-    int totalRecipients,
-    int pendingCount,
-    int queuedCount,
-    int processingCount,
-    int sentCount,
-    int deliveredCount,
-    int failedCount,
-    int bouncedCount,
-    int openedCount,
-    int clickedCount,
-    int unsubscribedCount,
-    DateTime? refreshedAt,
-  });
+  @useResult
+  $Res call(
+      {@JsonKey(name: 'campaign_id') String campaignId,
+      int totalRecipients,
+      int pendingCount,
+      int queuedCount,
+      int processingCount,
+      int sentCount,
+      int deliveredCount,
+      int failedCount,
+      int bouncedCount,
+      int openedCount,
+      int clickedCount,
+      int unsubscribedCount,
+      @JsonKey(name: 'refreshed_at') DateTime? refreshedAt});
 }
 
 /// @nodoc
@@ -59,117 +73,218 @@ class _$CampaignAnalyticsCopyWithImpl<$Res, $Val extends CampaignAnalytics>
     implements $CampaignAnalyticsCopyWith<$Res> {
   _$CampaignAnalyticsCopyWithImpl(this._value, this._then);
 
+  // ignore: unused_field
   final $Val _value;
+  // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of CampaignAnalytics
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? campaignId = freezed,
-    Object? totalRecipients = freezed,
-    Object? pendingCount = freezed,
-    Object? queuedCount = freezed,
-    Object? processingCount = freezed,
-    Object? sentCount = freezed,
-    Object? deliveredCount = freezed,
-    Object? failedCount = freezed,
-    Object? bouncedCount = freezed,
-    Object? openedCount = freezed,
-    Object? clickedCount = freezed,
-    Object? unsubscribedCount = freezed,
+    Object? campaignId = null,
+    Object? totalRecipients = null,
+    Object? pendingCount = null,
+    Object? queuedCount = null,
+    Object? processingCount = null,
+    Object? sentCount = null,
+    Object? deliveredCount = null,
+    Object? failedCount = null,
+    Object? bouncedCount = null,
+    Object? openedCount = null,
+    Object? clickedCount = null,
+    Object? unsubscribedCount = null,
     Object? refreshedAt = freezed,
   }) {
     return _then(_value.copyWith(
-      campaignId:
-          campaignId == freezed ? _value.campaignId : campaignId as String,
-      totalRecipients: totalRecipients == freezed
+      campaignId: null == campaignId
+          ? _value.campaignId
+          : campaignId // ignore: cast_nullable_to_non_nullable
+              as String,
+      totalRecipients: null == totalRecipients
           ? _value.totalRecipients
-          : totalRecipients as int,
-      pendingCount:
-          pendingCount == freezed ? _value.pendingCount : pendingCount as int,
-      queuedCount:
-          queuedCount == freezed ? _value.queuedCount : queuedCount as int,
-      processingCount: processingCount == freezed
+          : totalRecipients // ignore: cast_nullable_to_non_nullable
+              as int,
+      pendingCount: null == pendingCount
+          ? _value.pendingCount
+          : pendingCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      queuedCount: null == queuedCount
+          ? _value.queuedCount
+          : queuedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      processingCount: null == processingCount
           ? _value.processingCount
-          : processingCount as int,
-      sentCount: sentCount == freezed ? _value.sentCount : sentCount as int,
-      deliveredCount: deliveredCount == freezed
+          : processingCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      sentCount: null == sentCount
+          ? _value.sentCount
+          : sentCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      deliveredCount: null == deliveredCount
           ? _value.deliveredCount
-          : deliveredCount as int,
-      failedCount:
-          failedCount == freezed ? _value.failedCount : failedCount as int,
-      bouncedCount: bouncedCount == freezed
+          : deliveredCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      failedCount: null == failedCount
+          ? _value.failedCount
+          : failedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      bouncedCount: null == bouncedCount
           ? _value.bouncedCount
-          : bouncedCount as int,
-      openedCount:
-          openedCount == freezed ? _value.openedCount : openedCount as int,
-      clickedCount: clickedCount == freezed
+          : bouncedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      openedCount: null == openedCount
+          ? _value.openedCount
+          : openedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      clickedCount: null == clickedCount
           ? _value.clickedCount
-          : clickedCount as int,
-      unsubscribedCount: unsubscribedCount == freezed
+          : clickedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      unsubscribedCount: null == unsubscribedCount
           ? _value.unsubscribedCount
-          : unsubscribedCount as int,
-      refreshedAt:
-          refreshedAt == freezed ? _value.refreshedAt : refreshedAt as DateTime?,
+          : unsubscribedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      refreshedAt: freezed == refreshedAt
+          ? _value.refreshedAt
+          : refreshedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ) as $Val);
   }
 }
 
 /// @nodoc
-abstract class _$$_CampaignAnalyticsCopyWith<$Res>
+abstract class _$$CampaignAnalyticsImplCopyWith<$Res>
     implements $CampaignAnalyticsCopyWith<$Res> {
-  factory _$$_CampaignAnalyticsCopyWith(
-          _$_CampaignAnalytics value, $Res Function(_$_CampaignAnalytics) then) =
-      __$$_CampaignAnalyticsCopyWithImpl<$Res>;
+  factory _$$CampaignAnalyticsImplCopyWith(_$CampaignAnalyticsImpl value,
+          $Res Function(_$CampaignAnalyticsImpl) then) =
+      __$$CampaignAnalyticsImplCopyWithImpl<$Res>;
   @override
-  $Res call({
-    String campaignId,
-    int totalRecipients,
-    int pendingCount,
-    int queuedCount,
-    int processingCount,
-    int sentCount,
-    int deliveredCount,
-    int failedCount,
-    int bouncedCount,
-    int openedCount,
-    int clickedCount,
-    int unsubscribedCount,
-    DateTime? refreshedAt,
-  });
+  @useResult
+  $Res call(
+      {@JsonKey(name: 'campaign_id') String campaignId,
+      int totalRecipients,
+      int pendingCount,
+      int queuedCount,
+      int processingCount,
+      int sentCount,
+      int deliveredCount,
+      int failedCount,
+      int bouncedCount,
+      int openedCount,
+      int clickedCount,
+      int unsubscribedCount,
+      @JsonKey(name: 'refreshed_at') DateTime? refreshedAt});
 }
 
 /// @nodoc
-class __$$_CampaignAnalyticsCopyWithImpl<$Res>
-    extends _$CampaignAnalyticsCopyWithImpl<$Res, _$_CampaignAnalytics>
-    implements _$$_CampaignAnalyticsCopyWith<$Res> {
-  __$$_CampaignAnalyticsCopyWithImpl(
-      _$_CampaignAnalytics _value, $Res Function(_$_CampaignAnalytics) _then)
+class __$$CampaignAnalyticsImplCopyWithImpl<$Res>
+    extends _$CampaignAnalyticsCopyWithImpl<$Res, _$CampaignAnalyticsImpl>
+    implements _$$CampaignAnalyticsImplCopyWith<$Res> {
+  __$$CampaignAnalyticsImplCopyWithImpl(_$CampaignAnalyticsImpl _value,
+      $Res Function(_$CampaignAnalyticsImpl) _then)
       : super(_value, _then);
+
+  /// Create a copy of CampaignAnalytics
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? campaignId = null,
+    Object? totalRecipients = null,
+    Object? pendingCount = null,
+    Object? queuedCount = null,
+    Object? processingCount = null,
+    Object? sentCount = null,
+    Object? deliveredCount = null,
+    Object? failedCount = null,
+    Object? bouncedCount = null,
+    Object? openedCount = null,
+    Object? clickedCount = null,
+    Object? unsubscribedCount = null,
+    Object? refreshedAt = freezed,
+  }) {
+    return _then(_$CampaignAnalyticsImpl(
+      campaignId: null == campaignId
+          ? _value.campaignId
+          : campaignId // ignore: cast_nullable_to_non_nullable
+              as String,
+      totalRecipients: null == totalRecipients
+          ? _value.totalRecipients
+          : totalRecipients // ignore: cast_nullable_to_non_nullable
+              as int,
+      pendingCount: null == pendingCount
+          ? _value.pendingCount
+          : pendingCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      queuedCount: null == queuedCount
+          ? _value.queuedCount
+          : queuedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      processingCount: null == processingCount
+          ? _value.processingCount
+          : processingCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      sentCount: null == sentCount
+          ? _value.sentCount
+          : sentCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      deliveredCount: null == deliveredCount
+          ? _value.deliveredCount
+          : deliveredCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      failedCount: null == failedCount
+          ? _value.failedCount
+          : failedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      bouncedCount: null == bouncedCount
+          ? _value.bouncedCount
+          : bouncedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      openedCount: null == openedCount
+          ? _value.openedCount
+          : openedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      clickedCount: null == clickedCount
+          ? _value.clickedCount
+          : clickedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      unsubscribedCount: null == unsubscribedCount
+          ? _value.unsubscribedCount
+          : unsubscribedCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      refreshedAt: freezed == refreshedAt
+          ? _value.refreshedAt
+          : refreshedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ));
+  }
 }
 
 /// @nodoc
 @JsonSerializable()
-class _$_CampaignAnalytics implements _CampaignAnalytics {
-  const _$_CampaignAnalytics({
-    required this.campaignId,
-    this.totalRecipients = 0,
-    this.pendingCount = 0,
-    this.queuedCount = 0,
-    this.processingCount = 0,
-    this.sentCount = 0,
-    this.deliveredCount = 0,
-    this.failedCount = 0,
-    this.bouncedCount = 0,
-    this.openedCount = 0,
-    this.clickedCount = 0,
-    this.unsubscribedCount = 0,
-    this.refreshedAt,
-  });
+class _$CampaignAnalyticsImpl implements _CampaignAnalytics {
+  const _$CampaignAnalyticsImpl(
+      {@JsonKey(name: 'campaign_id') required this.campaignId,
+      this.totalRecipients = 0,
+      this.pendingCount = 0,
+      this.queuedCount = 0,
+      this.processingCount = 0,
+      this.sentCount = 0,
+      this.deliveredCount = 0,
+      this.failedCount = 0,
+      this.bouncedCount = 0,
+      this.openedCount = 0,
+      this.clickedCount = 0,
+      this.unsubscribedCount = 0,
+      @JsonKey(name: 'refreshed_at') this.refreshedAt});
 
-  factory _$_CampaignAnalytics.fromJson(Map<String, dynamic> json) =>
-      _$CampaignAnalyticsFromJson(json);
+  factory _$CampaignAnalyticsImpl.fromJson(Map<String, dynamic> json) =>
+      _$$CampaignAnalyticsImplFromJson(json);
 
   @override
+  @JsonKey(name: 'campaign_id')
   final String campaignId;
   @override
   @JsonKey()
@@ -205,83 +320,104 @@ class _$_CampaignAnalytics implements _CampaignAnalytics {
   @JsonKey()
   final int unsubscribedCount;
   @override
+  @JsonKey(name: 'refreshed_at')
   final DateTime? refreshedAt;
 
   @override
   String toString() {
-    return 'CampaignAnalytics(campaignId: $campaignId, totalRecipients: $totalRecipients)';
+    return 'CampaignAnalytics(campaignId: $campaignId, totalRecipients: $totalRecipients, pendingCount: $pendingCount, queuedCount: $queuedCount, processingCount: $processingCount, sentCount: $sentCount, deliveredCount: $deliveredCount, failedCount: $failedCount, bouncedCount: $bouncedCount, openedCount: $openedCount, clickedCount: $clickedCount, unsubscribedCount: $unsubscribedCount, refreshedAt: $refreshedAt)';
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
-        (other is _$_CampaignAnalytics &&
-            other.campaignId == campaignId &&
-            other.totalRecipients == totalRecipients &&
-            other.pendingCount == pendingCount &&
-            other.queuedCount == queuedCount &&
-            other.processingCount == processingCount &&
-            other.sentCount == sentCount &&
-            other.deliveredCount == deliveredCount &&
-            other.failedCount == failedCount &&
-            other.bouncedCount == bouncedCount &&
-            other.openedCount == openedCount &&
-            other.clickedCount == clickedCount &&
-            other.unsubscribedCount == unsubscribedCount &&
-            other.refreshedAt == refreshedAt);
+        (other.runtimeType == runtimeType &&
+            other is _$CampaignAnalyticsImpl &&
+            (identical(other.campaignId, campaignId) ||
+                other.campaignId == campaignId) &&
+            (identical(other.totalRecipients, totalRecipients) ||
+                other.totalRecipients == totalRecipients) &&
+            (identical(other.pendingCount, pendingCount) ||
+                other.pendingCount == pendingCount) &&
+            (identical(other.queuedCount, queuedCount) ||
+                other.queuedCount == queuedCount) &&
+            (identical(other.processingCount, processingCount) ||
+                other.processingCount == processingCount) &&
+            (identical(other.sentCount, sentCount) ||
+                other.sentCount == sentCount) &&
+            (identical(other.deliveredCount, deliveredCount) ||
+                other.deliveredCount == deliveredCount) &&
+            (identical(other.failedCount, failedCount) ||
+                other.failedCount == failedCount) &&
+            (identical(other.bouncedCount, bouncedCount) ||
+                other.bouncedCount == bouncedCount) &&
+            (identical(other.openedCount, openedCount) ||
+                other.openedCount == openedCount) &&
+            (identical(other.clickedCount, clickedCount) ||
+                other.clickedCount == clickedCount) &&
+            (identical(other.unsubscribedCount, unsubscribedCount) ||
+                other.unsubscribedCount == unsubscribedCount) &&
+            (identical(other.refreshedAt, refreshedAt) ||
+                other.refreshedAt == refreshedAt));
   }
 
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
-        runtimeType,
-        campaignId,
-        totalRecipients,
-        pendingCount,
-        queuedCount,
-        processingCount,
-        sentCount,
-        deliveredCount,
-        failedCount,
-        bouncedCount,
-        openedCount,
-        clickedCount,
-        unsubscribedCount,
-        refreshedAt,
-      );
+      runtimeType,
+      campaignId,
+      totalRecipients,
+      pendingCount,
+      queuedCount,
+      processingCount,
+      sentCount,
+      deliveredCount,
+      failedCount,
+      bouncedCount,
+      openedCount,
+      clickedCount,
+      unsubscribedCount,
+      refreshedAt);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of CampaignAnalytics
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  _$$_CampaignAnalyticsCopyWith<_$_CampaignAnalytics> get copyWith =>
-      __$$_CampaignAnalyticsCopyWithImpl<_$_CampaignAnalytics>(this, _$identity);
+  @pragma('vm:prefer-inline')
+  _$$CampaignAnalyticsImplCopyWith<_$CampaignAnalyticsImpl> get copyWith =>
+      __$$CampaignAnalyticsImplCopyWithImpl<_$CampaignAnalyticsImpl>(
+          this, _$identity);
 
   @override
   Map<String, dynamic> toJson() {
-    return _$CampaignAnalyticsToJson(this);
+    return _$$CampaignAnalyticsImplToJson(
+      this,
+    );
   }
 }
 
-/// @nodoc
 abstract class _CampaignAnalytics implements CampaignAnalytics {
-  const factory _CampaignAnalytics({
-    required String campaignId,
-    int totalRecipients,
-    int pendingCount,
-    int queuedCount,
-    int processingCount,
-    int sentCount,
-    int deliveredCount,
-    int failedCount,
-    int bouncedCount,
-    int openedCount,
-    int clickedCount,
-    int unsubscribedCount,
-    DateTime? refreshedAt,
-  }) = _$_CampaignAnalytics;
+  const factory _CampaignAnalytics(
+          {@JsonKey(name: 'campaign_id') required final String campaignId,
+          final int totalRecipients,
+          final int pendingCount,
+          final int queuedCount,
+          final int processingCount,
+          final int sentCount,
+          final int deliveredCount,
+          final int failedCount,
+          final int bouncedCount,
+          final int openedCount,
+          final int clickedCount,
+          final int unsubscribedCount,
+          @JsonKey(name: 'refreshed_at') final DateTime? refreshedAt}) =
+      _$CampaignAnalyticsImpl;
 
   factory _CampaignAnalytics.fromJson(Map<String, dynamic> json) =
-      _$_CampaignAnalytics.fromJson;
+      _$CampaignAnalyticsImpl.fromJson;
 
   @override
+  @JsonKey(name: 'campaign_id')
   String get campaignId;
   @override
   int get totalRecipients;
@@ -306,9 +442,13 @@ abstract class _CampaignAnalytics implements CampaignAnalytics {
   @override
   int get unsubscribedCount;
   @override
+  @JsonKey(name: 'refreshed_at')
   DateTime? get refreshedAt;
+
+  /// Create a copy of CampaignAnalytics
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
-  _$$_CampaignAnalyticsCopyWith<_$_CampaignAnalytics> get copyWith =>
-      throw UnimplementedError();
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$CampaignAnalyticsImplCopyWith<_$CampaignAnalyticsImpl> get copyWith =>
+      throw _privateConstructorUsedError;
 }

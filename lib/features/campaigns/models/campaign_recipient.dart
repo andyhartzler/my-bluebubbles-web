@@ -31,8 +31,9 @@ class CampaignRecipient with _$CampaignRecipient {
     @JsonKey(name: 'recipient_id') String? recipientId,
     String? name,
     required String address,
-    @JsonKey(defaultValue: CampaignChannel.sms) CampaignChannel channel,
-    @JsonKey(defaultValue: CampaignRecipientStatus.pending)
+    @Default(CampaignChannel.sms)
+    CampaignChannel channel,
+    @Default(CampaignRecipientStatus.pending)
     CampaignRecipientStatus status,
     @JsonKey(name: 'error_message') String? errorMessage,
     @JsonKey(name: 'queued_at') DateTime? queuedAt,
