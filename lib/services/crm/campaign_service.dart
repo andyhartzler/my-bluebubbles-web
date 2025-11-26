@@ -3,6 +3,7 @@ import 'package:bluebubbles/models/crm/campaign.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
+import 'package:postgrest/postgrest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CampaignService {
@@ -55,9 +56,10 @@ class CampaignService {
     }
 
     final payload = campaign.toJson();
+    final campaignId = campaign.id;
 
     try {
-      if (campaign.id == null) {
+      if (campaignId == null) {
         final response =
             await _writeClient.from('campaigns').insert(payload).select().single();
         return Campaign.fromJson(response as Map<String, dynamic>);
@@ -66,7 +68,7 @@ class CampaignService {
       final response = await _writeClient
           .from('campaigns')
           .update(payload)
-          .eq('id', campaign.id)
+          .eq('id', campaignId)
           .select()
           .single();
       return Campaign.fromJson(response as Map<String, dynamic>);
@@ -86,7 +88,7 @@ class CampaignService {
           .from('campaigns')
           .update({
             'scheduled_at': scheduledAt.toIso8601String(),
-            'status': _statusToString(CampaignStatus.scheduled),
+            'status': CampaignStatus.scheduled.name,
           })
           .eq('id', campaignId)
           .select()
@@ -111,7 +113,7 @@ class CampaignService {
 
       await _writeClient
           .from('campaigns')
-          .update({'status': _statusToString(CampaignStatus.sending)})
+          .update({'status': CampaignStatus.sending.name})
           .eq('id', campaignId);
     } catch (e, s) {
       Logger.error('Failed to trigger send', error: e, trace: s);
@@ -177,7 +179,11 @@ class CampaignService {
 
       final data = await _readClient
           .from('members')
-          .select('id', const FetchOptions(count: CountOption.exact, head: true))
+          .select(
+            'id',
+            fetchOptions:
+                const FetchOptions(count: CountOption.exact, head: true),
+          )
           .match(_filterToSupabaseMatch(filter))
           .single();
 

@@ -5,7 +5,6 @@ import 'package:bluebubbles/services/services.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_dart/firebase_dart.dart';
 import 'package:firebase_dart/implementation/pure_dart.dart';
-import 'package:firebase_dart/src/firestore.dart' show FirebaseFirestore;
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart' hide Response;
 import 'package:bluebubbles/database/models.dart';
@@ -90,12 +89,6 @@ class FirebaseDatabaseService extends GetxService {
 
           final Event event = await ref.onValue.first;
           url = sanitizeServerAddress(address: event.snapshot.value);
-        } else {
-          final FirebaseFirestore db = FirebaseFirestore.instanceFor(app: app);
-          final doc = await db.collection("server").doc("config").get();
-          if (doc.data()?['serverUrl'] != null) {
-            url = sanitizeServerAddress(address: doc.data()!['serverUrl']);
-          }
         }
       } else {
         // First, try to auth with FCM with the current data
