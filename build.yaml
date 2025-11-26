@@ -1,0 +1,12 @@
+# Configure build_runner to avoid conflicting outputs when generating ObjectBox artifacts
+# Exclude objectbox.dart from the source_gen combining builder so objectbox_generator
+# is the sole producer of lib/objectbox.g.dart.
+targets:
+  $default:
+    builders:
+      source_gen|combining_builder:
+        generate_for:
+          include:
+            - lib/**.dart
+          exclude:
+            - lib/objectbox.dart
