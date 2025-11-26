@@ -4,12 +4,15 @@ import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/quick_link.dart';
 import 'package:bluebubbles/services/crm/quick_links_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:postgrest/postgrest.dart';
 
 class _FakeQuickLinksRepository extends QuickLinksRepository {
   _FakeQuickLinksRepository({
     List<Map<String, dynamic>> initialRows = const [],
     DateTime? now,
     this.fixedSignedUrl,
+    this.failInsertsForUnsupportedColumns = false,
+    this.failUpdatesForUnsupportedColumns = false,
   })  : _rows = initialRows,
         super(clock: () => now ?? DateTime.utc(2024, 1, 1, 12));
 
@@ -24,6 +27,22 @@ class _FakeQuickLinksRepository extends QuickLinksRepository {
   bool removeCalled = false;
   final List<String> signedUrlRequests = [];
   final String? fixedSignedUrl;
+  final bool failInsertsForUnsupportedColumns;
+  final bool failUpdatesForUnsupportedColumns;
+
+  static const _unsupportedColumns = {
+    'description',
+    'storage_bucket',
+    'storage_path',
+    'file_name',
+    'content_type',
+    'file_size',
+    'last_uploaded_at',
+  };
+
+  bool _hasUnsupportedColumns(Map<String, dynamic> payload) {
+    return payload.keys.any(_unsupportedColumns.contains);
+  }
 
   @override
   Future<List<Map<String, dynamic>>> fetchQuickLinkRows() async {
@@ -32,6 +51,12 @@ class _FakeQuickLinksRepository extends QuickLinksRepository {
 
   @override
   Future<Map<String, dynamic>> insertQuickLinkRow(Map<String, dynamic> payload) async {
+    if (failInsertsForUnsupportedColumns && _hasUnsupportedColumns(payload)) {
+      throw PostgrestException(
+        message: 'column does not exist',
+        code: '42703',
+      );
+    }
     lastInsertPayload = {...payload};
     final newRow = {
       'id': payload['id'] ?? 'id-${_rows.length + 1}',
@@ -43,6 +68,12 @@ class _FakeQuickLinksRepository extends QuickLinksRepository {
 
   @override
   Future<Map<String, dynamic>> updateQuickLinkRow(String id, Map<String, dynamic> payload) async {
+    if (failUpdatesForUnsupportedColumns && _hasUnsupportedColumns(payload)) {
+      throw PostgrestException(
+        message: 'column does not exist',
+        code: '42703',
+      );
+    }
     lastUpdateId = id;
     lastUpdatePayload = {...payload};
     _rows = _rows
@@ -173,6 +204,33 @@ void main() {
       expect(link.signedUrl, isNotEmpty);
     });
 
+    test('createQuickLink retries without storage metadata when schema is legacy',
+        () async {
+      final now = DateTime.utc(2024, 07, 04, 12, 0);
+      final repo = _FakeQuickLinksRepository(
+        now: now,
+        failInsertsForUnsupportedColumns: true,
+      )..debugOverrideClients(isInitialized: true);
+
+      final fileBytes = Uint8List.fromList([5, 4, 3]);
+      final file = PlatformFile(name: 'Plan.pdf', size: fileBytes.length, bytes: fileBytes);
+
+      final link = await repo.createQuickLink(
+        title: 'Field Plan',
+        category: 'Documents',
+        description: 'Door plan',
+        file: file,
+      );
+
+      expect(repo.lastInsertPayload, isNotNull);
+      expect(repo.lastInsertPayload!.containsKey('storage_path'), isFalse);
+      expect(repo.lastInsertPayload!.containsKey('description'), isFalse);
+      expect(repo.lastInsertPayload!['notes'], 'Door plan');
+      expect(repo.lastInsertPayload!['storage_url'], isNotEmpty);
+      expect(link.description, 'Door plan');
+      expect(link.storagePath, isNull);
+    });
+
     test('updateQuickLink replaces stored file and clears metadata when requested', () async {
       final existing = QuickLink(
         id: 'link-1',
@@ -234,6 +292,31 @@ void main() {
 
       expect(repo.lastUpdatePayload?['icon_url'], isNull);
       expect(updated.iconUrl, isNull);
+    });
+
+    test('updateQuickLink retries with legacy payload when metadata columns are missing',
+        () async {
+      final existing = QuickLink(
+        id: 'legacy-1',
+        title: 'Legacy File',
+        category: 'Docs',
+        storageBucket: QuickLinksRepository.storageBucket,
+        storagePath: 'old/path/file.pdf',
+        storageUrl: 'https://storage.example/legacy.pdf',
+        description: 'Existing description',
+      );
+
+      final repo = _FakeQuickLinksRepository(
+        initialRows: [existing.toJson()],
+        failUpdatesForUnsupportedColumns: true,
+      )..debugOverrideClients(isInitialized: true);
+
+      final updated = await repo.updateQuickLink(existing, description: 'Updated');
+
+      expect(repo.lastUpdatePayload!.containsKey('storage_path'), isFalse);
+      expect(repo.lastUpdatePayload!.containsKey('description'), isFalse);
+      expect(repo.lastUpdatePayload!['notes'], 'Updated');
+      expect(updated.description, 'Updated');
     });
 
     test('deleteQuickLink removes storage reference first', () async {
