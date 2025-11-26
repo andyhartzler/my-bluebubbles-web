@@ -61,7 +61,6 @@ dependencies:
       ref: beb79f70a2bb0e96e6bb9fdebac2ff452f138950
   json_annotation: ^4.9.0
   freezed_annotation: ^2.4.4
-      path: packages/firebase_dart
   flex_color_picker: ^3.4.1
   flex_color_scheme: ^7.3.1
   flutter_acrylic:
