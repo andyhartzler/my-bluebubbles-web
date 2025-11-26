@@ -765,11 +765,19 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/firebase_dart"
-      ref: beb79f70a2bb0e96e6bb9fdebac2ff452f138950
-      resolved-ref: beb79f70a2bb0e96e6bb9fdebac2ff452f138950
+      ref: "firebase_dart-v1.5.2"
+      resolved-ref: "494393f92c9961f4d5d9dc8745263c2a2551508b"
       url: "https://github.com/appsup-dart/firebase_dart.git"
     source: git
-    version: "1.0.11"
+    version: "1.5.2"
+  firebaseapis:
+    dependency: transitive
+    description:
+      name: firebaseapis
+      sha256: "7e9663f298a209dc7d4e8a10944d6c39d43e02e9cade08c915720768d02d712d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
   fixnum:
     dependency: transitive
     description:
@@ -1113,6 +1121,22 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  freezed:
+    dependency: "direct dev"
+    description:
+      name: freezed
+      sha256: "44c19278dd9d89292cf46e97dc0c1e52ce03275f40a97c5a348e802a924bf40e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.5.7"
+  freezed_annotation:
+    dependency: "direct main"
+    description:
+      name: freezed_annotation
+      sha256: c2e2d632dd9b8a2b7751117abcfc2b4888ecfe181bd9fca7170d9ef02e595fe2
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.4"
   frontend_server_client:
     dependency: "direct overridden"
     description:
@@ -1312,22 +1336,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.12.4+2"
-  googleapis:
-    dependency: transitive
-    description:
-      name: googleapis
-      sha256: dfea9984f0785ed445ba78e2aa8c55dadd86d6a60ea9e0ffbadad51edb5e7e36
-      url: "https://pub.dev"
-    source: hosted
-    version: "9.2.0"
-  googleapis_auth:
-    dependency: transitive
-    description:
-      name: googleapis_auth
-      sha256: befd71383a955535060acde8792e7efc11d2fccd03dd1d3ec434e85b68775938
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.6.0"
   gotrue:
     dependency: transitive
     description:
@@ -1568,13 +1576,21 @@ packages:
     source: hosted
     version: "0.7.1"
   json_annotation:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: json_annotation
       sha256: "1ce844379ca14835a50d2f019a3099f419082cfdd231cd86a142af94dd5c6bb1"
       url: "https://pub.dev"
     source: hosted
     version: "4.9.0"
+  json_serializable:
+    dependency: "direct dev"
+    description:
+      name: json_serializable
+      sha256: c2fcb3920cf2b6ae6845954186420fca40bc0a8abcc84903b7801f17d7050d7c
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.9.0"
   jwt_decode:
     dependency: transitive
     description:
@@ -2656,6 +2672,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.0"
+  source_helper:
+    dependency: transitive
+    description:
+      name: source_helper
+      sha256: "86d247119aedce8e63f4751bd9626fc9613255935558447569ad42f9f5b48b3c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.5"
   source_map_stack_trace:
     dependency: transitive
     description:
