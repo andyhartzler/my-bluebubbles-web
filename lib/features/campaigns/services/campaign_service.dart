@@ -85,7 +85,7 @@ class CampaignService {
     return CampaignAnalytics.fromJson(Map<String, dynamic>.from(response));
   }
 
-  Future<FunctionsResponse> processCampaignSegment({
+  Future<void> processCampaignSegment({
     required String campaignId,
     Map<String, dynamic>? segment,
   }) async {
@@ -94,14 +94,14 @@ class CampaignService {
       payload['segment'] = segment;
     }
 
-    return _functionClient.functions.invoke(
+    await _functionClient.functions.invoke(
       'process-campaign-segment',
       body: payload,
     );
   }
 
-  Future<FunctionsResponse> sendCampaign(String campaignId) {
-    return _functionClient.functions.invoke(
+  Future<void> sendCampaign(String campaignId) async {
+    await _functionClient.functions.invoke(
       'send-campaign',
       body: <String, dynamic>{'campaign_id': campaignId},
     );
