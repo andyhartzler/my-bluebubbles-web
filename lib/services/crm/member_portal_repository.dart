@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:postgrest/postgrest.dart'
-    show CountOption, PostgrestException, PostgrestResponse;
+    show CountOption, FetchOptions, PostgrestException, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mime_type/mime_type.dart';
 import 'package:universal_io/io.dart' as io;
@@ -56,28 +56,23 @@ class MemberPortalRepository {
       final responses = await Future.wait<PostgrestResponse<dynamic>>([
         _readClient
             .from('member_profile_changes')
-            .select('id')
-            .eq('status', 'pending')
-            .count(CountOption.exact),
+            .select('id', const FetchOptions(count: CountOption.exact))
+            .eq('status', 'pending'),
         _readClient
             .from('member_submitted_events')
-            .select('id')
-            .eq('approval_status', 'pending')
-            .count(CountOption.exact),
+            .select('id', const FetchOptions(count: CountOption.exact))
+            .eq('approval_status', 'pending'),
         _readClient
             .from('member_portal_meetings')
-            .select('id')
-            .eq('is_published', true)
-            .count(CountOption.exact),
+            .select('id', const FetchOptions(count: CountOption.exact))
+            .eq('is_published', true),
         _readClient
             .from('member_portal_meetings')
-            .select('id')
-            .count(CountOption.exact),
+            .select('id', const FetchOptions(count: CountOption.exact)),
         _readClient
             .from('member_portal_resources')
-            .select('id')
-            .eq('is_visible', true)
-            .count(CountOption.exact),
+            .select('id', const FetchOptions(count: CountOption.exact))
+            .eq('is_visible', true),
       ]);
 
       return MemberPortalDashboardStats(

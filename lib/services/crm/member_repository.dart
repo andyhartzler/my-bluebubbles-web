@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart'
-    show CountOption, PostgrestFilterBuilder, PostgrestResponse;
+    show CountOption, FetchOptions, PostgrestFilterBuilder, PostgrestResponse;
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
@@ -123,13 +123,40 @@ class MemberRepository {
       }
 
       if (fetchTotalCount) {
-        final response = await query.count(CountOption.exact);
-        final data = _coerceList(response.data);
+        // Need to rebuild query with count option since it must be passed to select()
+        final selectionWithCount = _resolveColumnSelection(columns);
+        var countQuery = _applyMemberFilters(
+          _readClient.from('members').select(selectionWithCount, const FetchOptions(count: CountOption.exact)),
+          county: county,
+          congressionalDistrict: congressionalDistrict,
+          committees: committees,
+          highSchool: highSchool,
+          college: college,
+          chapterName: chapterName,
+          chapterStatus: chapterStatus,
+          minAge: minAge,
+          maxAge: maxAge,
+          optedOut: optedOut,
+          registeredVoter: registeredVoter,
+          searchQuery: searchQuery,
+        );
+
+        countQuery = countQuery.order('name', ascending: true).order('id', ascending: true);
+        if (hasLimit && hasOffset) {
+          final start = offsetValue!;
+          final end = start + limitValue! - 1;
+          countQuery = countQuery.range(start, end);
+        } else if (hasLimit) {
+          countQuery = countQuery.limit(limitValue!);
+        }
+
+        final response = await countQuery;
+        final data = _coerceList(response);
         var members = _mapMembers(data);
         if (applyOffsetInMemory && offsetValue != null) {
           members = members.skip(offsetValue).toList();
         }
-        final totalCount = response.count ?? members.length;
+        final totalCount = (response is PostgrestResponse) ? (response.count ?? members.length) : members.length;
         return MemberFetchResult(members: members, totalCount: totalCount);
       }
 
@@ -1309,22 +1336,19 @@ class MemberRepository {
     try {
       final PostgrestResponse totalResponse = await _readClient
           .from('members')
-          .select('id')
-          .count(CountOption.exact);
+          .select('id', const FetchOptions(count: CountOption.exact));
       final total = totalResponse.count ?? 0;
 
       final PostgrestResponse optedOutResponse = await _readClient
           .from('members')
-          .select('id')
-          .eq('opt_out', true)
-          .count(CountOption.exact);
+          .select('id', const FetchOptions(count: CountOption.exact))
+          .eq('opt_out', true);
       final optedOut = optedOutResponse.count ?? 0;
 
       final PostgrestResponse withPhoneResponse = await _readClient
           .from('members')
-          .select('id')
-          .not('phone_e164', 'is', null)
-          .count(CountOption.exact);
+          .select('id', const FetchOptions(count: CountOption.exact))
+          .not('phone_e164', 'is', null);
       final withPhone = withPhoneResponse.count ?? 0;
 
       return {
