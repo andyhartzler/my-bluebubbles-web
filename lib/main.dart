@@ -34,6 +34,9 @@ import 'package:bluebubbles/screens/crm/donors_list_screen.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
 import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
+import 'package:bluebubbles/features/campaigns/screens/campaign_routes.dart';
+import 'package:bluebubbles/features/campaigns/services/campaign_service.dart';
+import 'package:bluebubbles/features/campaigns/services/unlayer_service.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_debounce.dart';
@@ -295,6 +298,12 @@ class Main extends StatelessWidget {
         ChangeNotifierProvider<EmailHistoryProvider>(
           create: (_) => EmailHistoryProvider(),
         ),
+        Provider<CampaignService>(
+          create: (_) => CampaignService(),
+        ),
+        Provider<UnlayerService>(
+          create: (_) => UnlayerService(),
+        ),
       ],
       child: AdaptiveTheme(
         light: lightTheme.copyWith(
@@ -323,6 +332,7 @@ class Main extends StatelessWidget {
           getPages: [
             GetPage(name: '/auth/callback', page: AuthCallbackScreen.new),
             GetPage(name: '/crm/donors', page: () => const DonorsListScreen()),
+            ...campaignPages,
           ],
           home: SupabaseAuthGate(child: Home()),
           shortcuts: {
