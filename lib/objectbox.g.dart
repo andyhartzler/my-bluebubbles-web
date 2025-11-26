@@ -402,7 +402,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
       id: const obx_int.IdUid(13, 4148278195232901830),
       name: 'Message',
-      lastPropertyId: const obx_int.IdUid(50, 2365667614914378517),
+      lastPropertyId: const obx_int.IdUid(53, 7687562220418813573),
       flags: 0,
       properties: <obx_int.ModelProperty>[
         obx_int.ModelProperty(
@@ -608,6 +608,21 @@ final _entities = <obx_int.ModelEntity>[
             id: const obx_int.IdUid(50, 2365667614914378517),
             name: 'isDelivered',
             type: 1,
+            flags: 0),
+        obx_int.ModelProperty(
+            id: const obx_int.IdUid(51, 5850597965296558151),
+            name: 'dateReadDb',
+            type: 10,
+            flags: 0),
+        obx_int.ModelProperty(
+            id: const obx_int.IdUid(52, 164759929812244803),
+            name: 'dateDeliveredDb',
+            type: 10,
+            flags: 0),
+        obx_int.ModelProperty(
+            id: const obx_int.IdUid(53, 7687562220418813573),
+            name: 'dateEditedDb',
+            type: 10,
             flags: 0)
       ],
       relations: <obx_int.ModelRelation>[],
@@ -1405,7 +1420,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           final dbMetadataOffset = object.dbMetadata == null
               ? null
               : fbb.writeString(object.dbMetadata!);
-          fbb.startTable(51);
+          fbb.startTable(54);
           fbb.addInt64(0, object.id ?? 0);
           fbb.addInt64(1, object.originalROWID);
           fbb.addOffset(2, guidOffset);
@@ -1446,6 +1461,9 @@ obx_int.ModelDefinition getObjectBoxModel() {
           fbb.addBool(47, object.didNotifyRecipient);
           fbb.addBool(48, object.isBookmarked);
           fbb.addBool(49, object.isDelivered);
+          fbb.addInt64(50, object.dateReadDb?.millisecondsSinceEpoch);
+          fbb.addInt64(51, object.dateDeliveredDb?.millisecondsSinceEpoch);
+          fbb.addInt64(52, object.dateEditedDb?.millisecondsSinceEpoch);
           fbb.finish(fbb.endTable());
           return object.id ?? 0;
         },
@@ -1464,6 +1482,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
               const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 70);
           final dateEditedValue =
               const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 88);
+          final dateReadDbValue =
+              const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 104);
+          final dateDeliveredDbValue =
+              const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 106);
+          final dateEditedDbValue =
+              const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 108);
           final idParam =
               const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 4);
           final originalROWIDParam =
@@ -1588,7 +1612,16 @@ obx_int.ModelDefinition getObjectBoxModel() {
             ..dbMetadata = const fb.StringReader(asciiOptimization: true)
                 .vTableGetNullable(buffer, rootOffset, 94)
             ..isDelivered =
-                const fb.BoolReader().vTableGet(buffer, rootOffset, 102, false);
+                const fb.BoolReader().vTableGet(buffer, rootOffset, 102, false)
+            ..dateReadDb = dateReadDbValue == null
+                ? null
+                : DateTime.fromMillisecondsSinceEpoch(dateReadDbValue)
+            ..dateDeliveredDb = dateDeliveredDbValue == null
+                ? null
+                : DateTime.fromMillisecondsSinceEpoch(dateDeliveredDbValue)
+            ..dateEditedDb = dateEditedDbValue == null
+                ? null
+                : DateTime.fromMillisecondsSinceEpoch(dateEditedDbValue);
           object.chat.targetId =
               const fb.Int64Reader().vTableGet(buffer, rootOffset, 80, 0);
           object.chat.attach(store);
@@ -2196,6 +2229,18 @@ class Message_ {
   /// See [Message.isDelivered].
   static final isDelivered =
       obx.QueryBooleanProperty<Message>(_entities[5].properties[39]);
+
+  /// See [Message.dateReadDb].
+  static final dateReadDb =
+      obx.QueryDateProperty<Message>(_entities[5].properties[40]);
+
+  /// See [Message.dateDeliveredDb].
+  static final dateDeliveredDb =
+      obx.QueryDateProperty<Message>(_entities[5].properties[41]);
+
+  /// See [Message.dateEditedDb].
+  static final dateEditedDb =
+      obx.QueryDateProperty<Message>(_entities[5].properties[42]);
 
   /// see [Message.dbAttachments]
   static final dbAttachments =
