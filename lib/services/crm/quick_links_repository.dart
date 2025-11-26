@@ -24,7 +24,6 @@ class QuickLinksRepository {
   static const Set<String> legacyColumns = {
     'title',
     'category',
-    'description',
     'notes',
     'url',
     'icon_url',
@@ -413,8 +412,10 @@ class QuickLinksRepository {
 
   Map<String, dynamic> _legacyPayload(Map<String, dynamic> payload) {
     final entries = Map<String, dynamic>.from(payload);
-    if (entries['notes'] == null && entries['description'] != null) {
-      entries['notes'] = entries['description'];
+    final description = entries.remove('description');
+
+    if (entries['notes'] == null && description != null) {
+      entries['notes'] = description;
     }
 
     return Map<String, dynamic>.fromEntries(

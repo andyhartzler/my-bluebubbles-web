@@ -31,6 +31,7 @@ class _FakeQuickLinksRepository extends QuickLinksRepository {
   final bool failUpdatesForUnsupportedColumns;
 
   static const _unsupportedColumns = {
+    'description',
     'storage_bucket',
     'storage_path',
     'file_name',
@@ -223,6 +224,8 @@ void main() {
 
       expect(repo.lastInsertPayload, isNotNull);
       expect(repo.lastInsertPayload!.containsKey('storage_path'), isFalse);
+      expect(repo.lastInsertPayload!.containsKey('description'), isFalse);
+      expect(repo.lastInsertPayload!['notes'], 'Door plan');
       expect(repo.lastInsertPayload!['storage_url'], isNotEmpty);
       expect(link.description, 'Door plan');
       expect(link.storagePath, isNull);
@@ -311,6 +314,7 @@ void main() {
       final updated = await repo.updateQuickLink(existing, description: 'Updated');
 
       expect(repo.lastUpdatePayload!.containsKey('storage_path'), isFalse);
+      expect(repo.lastUpdatePayload!.containsKey('description'), isFalse);
       expect(repo.lastUpdatePayload!['notes'], 'Updated');
       expect(updated.description, 'Updated');
     });
