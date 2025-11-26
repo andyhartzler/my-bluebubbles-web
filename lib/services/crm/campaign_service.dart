@@ -179,7 +179,11 @@ class CampaignService {
 
       final data = await _readClient
           .from('members')
-          .select('id', const FetchOptions(count: CountOption.exact, head: true))
+          .select(
+            'id',
+            fetchOptions:
+                const FetchOptions(count: CountOption.exact, head: true),
+          )
           .match(_filterToSupabaseMatch(filter))
           .single();
 
