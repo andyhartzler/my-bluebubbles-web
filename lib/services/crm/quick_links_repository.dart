@@ -93,8 +93,9 @@ class QuickLinksRepository {
     try {
       final PostgrestResponse response = await _readClient
           .from(quickLinksTable)
-          .select('id', options: const FetchOptions(count: CountOption.exact))
-          .eq('is_active', true);
+          .select('id')
+          .eq('is_active', true)
+          .count(CountOption.exact);
       return response.count ?? 0;
     } catch (_) {
       return 0;

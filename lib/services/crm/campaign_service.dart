@@ -179,8 +179,9 @@ class CampaignService {
 
       final response = await _readClient
           .from('members')
-          .select('id', options: const FetchOptions(count: CountOption.exact))
-          .match(_filterToSupabaseMatch(filter));
+          .select('id')
+          .match(_filterToSupabaseMatch(filter))
+          .count(CountOption.exact);
 
       final count = response.count;
       if (count != null) return count;
