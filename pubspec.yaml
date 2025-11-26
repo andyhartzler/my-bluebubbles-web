@@ -58,7 +58,8 @@ dependencies:
   firebase_dart:
     git:
       url: https://github.com/appsup-dart/firebase_dart.git
-      ref: beb79f70a2bb0e96e6bb9fdebac2ff452f138950
+      ref: firebase_dart-v1.5.2
+      path: packages/firebase_dart
   json_annotation: ^4.9.0
   freezed_annotation: ^2.4.4
   flex_color_picker: ^3.4.1
