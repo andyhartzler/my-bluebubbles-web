@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart'
-    show CountOption, FetchOptions, PostgrestFilterBuilder, PostgrestResponse;
+    show CountOption, PostgrestFilterBuilder, PostgrestResponse;
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
@@ -126,7 +126,7 @@ class MemberRepository {
         // Need to rebuild query with count option since it must be passed to select()
         final selectionWithCount = _resolveColumnSelection(columns);
         var countQuery = _applyMemberFilters(
-          _readClient.from('members').select(selectionWithCount, const FetchOptions(count: CountOption.exact)),
+          _readClient.from('members').select(selectionWithCount, count: CountOption.exact),
           county: county,
           congressionalDistrict: congressionalDistrict,
           committees: committees,
@@ -1336,18 +1336,18 @@ class MemberRepository {
     try {
       final PostgrestResponse totalResponse = await _readClient
           .from('members')
-          .select('id', const FetchOptions(count: CountOption.exact));
+          .select('id', count: CountOption.exact);
       final total = totalResponse.count ?? 0;
 
       final PostgrestResponse optedOutResponse = await _readClient
           .from('members')
-          .select('id', const FetchOptions(count: CountOption.exact))
+          .select('id', count: CountOption.exact)
           .eq('opt_out', true);
       final optedOut = optedOutResponse.count ?? 0;
 
       final PostgrestResponse withPhoneResponse = await _readClient
           .from('members')
-          .select('id', const FetchOptions(count: CountOption.exact))
+          .select('id', count: CountOption.exact)
           .not('phone_e164', 'is', null);
       final withPhone = withPhoneResponse.count ?? 0;
 

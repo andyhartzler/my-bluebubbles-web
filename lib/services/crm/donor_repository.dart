@@ -1,4 +1,4 @@
-import 'package:postgrest/postgrest.dart' show CountOption, FetchOptions, PostgrestFilterBuilder, PostgrestResponse;
+import 'package:postgrest/postgrest.dart' show CountOption, PostgrestFilterBuilder, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -150,7 +150,7 @@ class DonorRepository {
 
     if (fetchTotalCount) {
       var countQuery = _applyFilters(
-        _readClient.from('donors').select('*, donations(*)', const FetchOptions(count: CountOption.exact)),
+        _readClient.from('donors').select('*, donations(*)', count: CountOption.exact),
         searchQuery: searchQuery,
         recurring: recurring,
         linkedToMember: linkedToMember,
