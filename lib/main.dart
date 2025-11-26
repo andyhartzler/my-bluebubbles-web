@@ -35,6 +35,7 @@ import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_s
 import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
+import 'package:bluebubbles/features/campaigns/screens/campaigns_list_screen.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:provider/provider.dart';
@@ -478,6 +479,7 @@ enum _HomeSection {
   events,
   memberPortal,
   walletNotifications,
+  campaigns,
   conversations
 }
 
@@ -766,6 +768,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                         key: PageStorageKey('wallet-notification-view'),
                         embedded: true,
                       ),
+                      const CampaignsListScreen(
+                        key: PageStorageKey('campaigns-view'),
+                      ),
                       ConversationList(
                         key: const PageStorageKey('conversations-view'),
                         showArchivedChats: false,
@@ -811,6 +816,13 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         _HomeSection.walletNotifications,
         'Wallet Notifications',
         Icons.notifications_active_outlined,
+        enabled: crmReady,
+      ),
+      _buildNavButton(
+        context,
+        _HomeSection.campaigns,
+        'Campaigns',
+        Icons.campaign_outlined,
         enabled: crmReady,
       ),
       _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline),
@@ -1129,6 +1141,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   ),
                   buildItem(
                     order: 9,
+                    icon: Icons.campaign_outlined,
+                    label: 'Campaigns',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady ? () => _setSection(_HomeSection.campaigns) : null,
+                  ),
+                  buildItem(
+                    order: 10,
                     icon: Icons.chat_bubble_outline,
                     label: 'Conversations',
                     onActivate: () => _setSection(_HomeSection.conversations),
