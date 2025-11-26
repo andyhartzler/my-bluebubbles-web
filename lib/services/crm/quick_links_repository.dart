@@ -21,6 +21,17 @@ class QuickLinksRepository {
 
   static const String quickLinksTable = 'quick_links';
   static const String storageBucket = 'quick-access-files';
+  static const Set<String> legacyColumns = {
+    'title',
+    'category',
+    'description',
+    'notes',
+    'url',
+    'icon_url',
+    'is_active',
+    'sort_order',
+    'storage_url',
+  };
 
   final CRMSupabaseService _supabase;
   DateTime Function() _clock;
@@ -129,7 +140,7 @@ class QuickLinksRepository {
       uploadMetadata: upload,
     );
 
-    final row = await insertQuickLinkRow(payload);
+    final row = await _insertQuickLinkRowWithFallback(payload);
     final link = QuickLink.fromJson(row);
     return _hydrateSignedUrl(link, signedUrlTTL);
   }
@@ -193,7 +204,7 @@ class QuickLinksRepository {
       fallbackUrl: fallbackUrl,
     );
 
-    final row = await updateQuickLinkRow(link.id, updates);
+    final row = await _updateQuickLinkRowWithFallback(link.id, updates);
     final updated = QuickLink.fromJson(row);
     return _hydrateSignedUrl(updated, signedUrlTTL);
   }
@@ -398,6 +409,55 @@ class QuickLinksRepository {
         }
         return value == null || (value is String && value.isEmpty);
       });
+  }
+
+  Map<String, dynamic> _legacyPayload(Map<String, dynamic> payload) {
+    final entries = Map<String, dynamic>.from(payload);
+    if (entries['notes'] == null && entries['description'] != null) {
+      entries['notes'] = entries['description'];
+    }
+
+    return Map<String, dynamic>.fromEntries(
+      entries.entries.where((entry) => legacyColumns.contains(entry.key)),
+    );
+  }
+
+  bool _isMissingColumnError(Object error) {
+    if (error is! PostgrestException) return false;
+    final message = error.message.toLowerCase();
+    return error.code == '42703' ||
+        (message.contains('column') && message.contains('does not exist'));
+  }
+
+  Future<Map<String, dynamic>> _insertQuickLinkRowWithFallback(
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      return await insertQuickLinkRow(payload);
+    } catch (error) {
+      if (!_isMissingColumnError(error)) {
+        rethrow;
+      }
+
+      final legacy = _legacyPayload(payload);
+      return insertQuickLinkRow(legacy);
+    }
+  }
+
+  Future<Map<String, dynamic>> _updateQuickLinkRowWithFallback(
+    String id,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      return await updateQuickLinkRow(id, payload);
+    } catch (error) {
+      if (!_isMissingColumnError(error)) {
+        rethrow;
+      }
+
+      final legacy = _legacyPayload(payload);
+      return updateQuickLinkRow(id, legacy);
+    }
   }
 
   String? _normalizeExternalUrl(String? raw) {

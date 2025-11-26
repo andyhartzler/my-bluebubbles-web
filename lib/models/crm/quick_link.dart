@@ -41,7 +41,8 @@ class QuickLink {
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       category: json['category']?.toString() ?? '',
-      description: json['description']?.toString(),
+      description:
+          json['description']?.toString() ?? json['notes']?.toString(),
       externalUrl: (json['external_url'] ?? json['url'])?.toString(),
       iconUrl: json['icon_url']?.toString(),
       storageBucket: json['storage_bucket']?.toString(),
