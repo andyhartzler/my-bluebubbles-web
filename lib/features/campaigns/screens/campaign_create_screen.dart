@@ -1,7 +1,8 @@
+import 'package:bluebubbles/features/campaigns/email_builder/models/email_document.dart';
+import 'package:bluebubbles/features/campaigns/email_builder/screens/email_builder_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/campaign_editor_screen.dart';
 import 'package:bluebubbles/features/campaigns/widgets/campaign_brand.dart';
 import 'package:bluebubbles/features/campaigns/widgets/segment_builder.dart';
-import 'package:bluebubbles/features/campaigns/widgets/unlayer_editor.dart';
 import 'package:bluebubbles/models/crm/campaign.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/services/crm/campaign_service.dart';
@@ -24,20 +25,45 @@ class _CampaignCreateScreenState extends State<CampaignCreateScreen> {
   MessageFilter _filter = MessageFilter();
   int? _estimatedRecipients;
   bool _saving = false;
+  Map<String, dynamic>? _designJson;
 
   Future<void> _estimate() async {
     final count = await _campaignService.estimateRecipientCount(_filter);
     setState(() => _estimatedRecipients = count);
   }
 
+  Future<void> _openEmailBuilder() async {
+    final initialDocument =
+        _designJson != null ? EmailDocument.fromJson(_designJson!) : null;
+
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => EmailBuilderScreen(initialDocument: initialDocument),
+      ),
+    );
+
+    if (result == null) return;
+
+    setState(() {
+      _htmlController.text = result['html'] as String? ?? _htmlController.text;
+      _designJson =
+          result['designJson'] as Map<String, dynamic>? ?? _designJson;
+    });
+  }
+
   Future<void> _create() async {
     setState(() => _saving = true);
     try {
       final campaign = Campaign(
-        name: _nameController.text.trim().isEmpty ? 'Untitled campaign' : _nameController.text.trim(),
+        name: _nameController.text.trim().isEmpty
+            ? 'Untitled campaign'
+            : _nameController.text.trim(),
         subject: _subjectController.text.trim(),
-        previewText: _previewController.text.trim().isEmpty ? null : _previewController.text.trim(),
+        previewText: _previewController.text.trim().isEmpty
+            ? null
+            : _previewController.text.trim(),
         htmlContent: _htmlController.text.trim(),
+        designJson: _designJson,
         segment: _filter,
         expectedRecipients: _estimatedRecipients ?? 0,
       );
@@ -46,7 +72,8 @@ class _CampaignCreateScreenState extends State<CampaignCreateScreen> {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => CampaignEditorScreen(campaignId: saved.id, initialCampaign: saved),
+          builder: (_) => CampaignEditorScreen(
+              campaignId: saved.id, initialCampaign: saved),
         ),
       );
     } catch (e) {
@@ -85,12 +112,54 @@ class _CampaignCreateScreenState extends State<CampaignCreateScreen> {
               const SizedBox(height: 12),
               TextField(
                 controller: _previewController,
-                decoration: const InputDecoration(labelText: 'Preview text (optional)'),
+                decoration:
+                    const InputDecoration(labelText: 'Preview text (optional)'),
               ),
               const SizedBox(height: 16),
-              UnlayerEditor(
-                controller: _htmlController,
-                onChanged: (_) {},
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Email content',
+                                  style: theme.textTheme.titleMedium),
+                              const SizedBox(height: 4),
+                              Text(
+                                _designJson == null
+                                    ? 'Start designing your email with the native builder.'
+                                    : 'Native builder design ready',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _openEmailBuilder,
+                            icon: const Icon(Icons.design_services_outlined),
+                            label: const Text('Open email builder'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _htmlController,
+                        maxLines: 6,
+                        decoration: const InputDecoration(
+                          labelText: 'Generated HTML (editable)',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (_) {},
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               Card(
@@ -128,7 +197,8 @@ class _CampaignCreateScreenState extends State<CampaignCreateScreen> {
                   ),
                   const SizedBox(width: 12),
                   TextButton(
-                    onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+                    onPressed:
+                        _saving ? null : () => Navigator.of(context).pop(false),
                     child: const Text('Cancel'),
                   ),
                 ],
