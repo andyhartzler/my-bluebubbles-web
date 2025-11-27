@@ -14,57 +14,82 @@ class CanvasArea extends StatelessWidget {
     final provider = context.watch<EmailBuilderProvider>();
     final document = provider.document;
     final maxWidth = provider.previewDevice == 'mobile' ? 375.0 : 600.0;
+    final zoom = provider.zoomLevel;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(32),
-      child: Center(
-        child: Container(
-          width: maxWidth,
-          decoration: BoxDecoration(
-            color: _hexToColor(document.settings.backgroundColor),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              ...document.sections.asMap().entries.map((entry) {
-                final index = entry.key;
-                final section = entry.value;
-                return _SectionWidget(
-                  section: section,
-                  isSelected: provider.selectedSectionId == section.id,
-                  onTap: () => provider.selectSection(section.id),
-                  onDelete: () => provider.deleteSection(section.id),
-                  onDuplicate: () => provider.duplicateSection(section.id),
-                  onMoveUp: index > 0
-                      ? () => provider.moveSectionUp(section.id)
-                      : null,
-                  onMoveDown: index < document.sections.length - 1
-                      ? () => provider.moveSectionDown(section.id)
-                      : null,
-                );
-              }).toList(),
-              if (!provider.isPreviewMode)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: OutlinedButton.icon(
-                    onPressed: provider.addSection,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Section'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 48),
-                    ),
+    return Container(
+      color: Colors.grey[100],
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: Transform.scale(
+            scale: zoom,
+            child: Container(
+              width: maxWidth,
+              decoration: BoxDecoration(
+                color: _hexToColor(document.settings.backgroundColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
                   ),
-                ),
-            ],
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Empty state
+                  if (document.sections.isEmpty)
+                    _EmptyState(),
+
+                  // Sections
+                  ...document.sections.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final section = entry.value;
+                    return _SectionWidget(
+                      section: section,
+                      isSelected: provider.selectedSectionId == section.id,
+                      onTap: () => provider.selectSection(section.id),
+                      onDelete: () => provider.deleteSection(section.id),
+                      onDuplicate: () => provider.duplicateSection(section.id),
+                      onMoveUp: index > 0
+                          ? () => provider.moveSectionUp(section.id)
+                          : null,
+                      onMoveDown: index < document.sections.length - 1
+                          ? () => provider.moveSectionDown(section.id)
+                          : null,
+                    );
+                  }).toList(),
+
+                  // Add section button
+                  if (!provider.isPreviewMode)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showAddSectionDialog(context),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Section'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                          side: BorderSide(
+                            color: Theme.of(context).primaryColor.withOpacity(0.5),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  void _showAddSectionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _AddSectionDialog(),
     );
   }
 
@@ -399,6 +424,227 @@ class _ActionButton extends StatelessWidget {
           color: color ?? Colors.grey[700],
           padding: const EdgeInsets.all(4),
           constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(64),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.email_outlined,
+            size: 80,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Start building your email',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Drag content blocks from the left sidebar\nor click "Add Section" below',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: () {
+              _showAddSectionDialog(context);
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Add Your First Section'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddSectionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _AddSectionDialog(),
+    );
+  }
+}
+
+class _AddSectionDialog extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add New Section'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Choose a layout for your new section:'),
+            const SizedBox(height: 16),
+            _LayoutOption(
+              label: 'Single Column',
+              description: 'Full width content',
+              columns: const [1],
+              onTap: () {
+                Navigator.pop(context);
+                context.read<EmailBuilderProvider>().addSectionWithLayout([1]);
+              },
+            ),
+            _LayoutOption(
+              label: 'Two Columns (Equal)',
+              description: '50% / 50% split',
+              columns: const [1, 1],
+              onTap: () {
+                Navigator.pop(context);
+                context.read<EmailBuilderProvider>().addSectionWithLayout([1, 1]);
+              },
+            ),
+            _LayoutOption(
+              label: 'Two Columns (2:1)',
+              description: '66% / 33% split',
+              columns: const [2, 1],
+              onTap: () {
+                Navigator.pop(context);
+                context.read<EmailBuilderProvider>().addSectionWithLayout([2, 1]);
+              },
+            ),
+            _LayoutOption(
+              label: 'Two Columns (1:2)',
+              description: '33% / 66% split',
+              columns: const [1, 2],
+              onTap: () {
+                Navigator.pop(context);
+                context.read<EmailBuilderProvider>().addSectionWithLayout([1, 2]);
+              },
+            ),
+            _LayoutOption(
+              label: 'Three Columns',
+              description: '33% / 33% / 33% split',
+              columns: const [1, 1, 1],
+              onTap: () {
+                Navigator.pop(context);
+                context.read<EmailBuilderProvider>().addSectionWithLayout([1, 1, 1]);
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+      ],
+    );
+  }
+}
+
+class _LayoutOption extends StatefulWidget {
+  final String label;
+  final String description;
+  final List<int> columns;
+  final VoidCallback onTap;
+
+  const _LayoutOption({
+    required this.label,
+    required this.description,
+    required this.columns,
+    required this.onTap,
+  });
+
+  @override
+  State<_LayoutOption> createState() => _LayoutOptionState();
+}
+
+class _LayoutOptionState extends State<_LayoutOption> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Card(
+        elevation: _isHovered ? 4 : 1,
+        margin: const EdgeInsets.only(bottom: 12),
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Visual layout preview
+                Container(
+                  width: 80,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: widget.columns.map((flex) {
+                      return Expanded(
+                        flex: flex,
+                        child: Container(
+                          margin: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.label,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.description,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.grey[400],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
