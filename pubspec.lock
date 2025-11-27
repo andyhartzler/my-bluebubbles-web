@@ -855,7 +855,7 @@ packages:
     source: hosted
     version: "3.4.1"
   flutter_colorpicker:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: flutter_colorpicker
       sha256: "969de5f6f9e2a570ac660fb7b501551451ea2a1ab9e2097e89475f60e07816ea"
@@ -3111,7 +3111,7 @@ packages:
     source: hosted
     version: "3.1.2"
   uuid:
-    dependency: "direct overridden"
+    dependency: "direct main"
     description:
       name: uuid
       sha256: f33d6bb662f0e4f79dcd7ada2e6170f3b3a2530c28fc41f49a411ddedd576a77
@@ -3219,10 +3219,10 @@ packages:
     dependency: transitive
     description:
       name: vm_service
-      sha256: "5c5f338a667b4c644744b661f309fb8080bb94b18a7e91ef1dbd343bed00ed6d"
+      sha256: f652077d0bdf60abe4c1f6377448e8655008eef28f128bc023f7b5e8dfeb48fc
       url: "https://pub.dev"
     source: hosted
-    version: "14.2.5"
+    version: "14.2.4"
   volume_controller:
     dependency: transitive
     description:

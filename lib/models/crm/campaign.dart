@@ -51,6 +51,7 @@ class Campaign {
   final String subject;
   final String? previewText;
   final String? htmlContent;
+  final Map<String, dynamic>? designJson;
   final MessageFilter? segment;
   final CampaignStatus status;
   final DateTime? scheduledAt;
@@ -67,6 +68,7 @@ class Campaign {
     this.id,
     this.previewText,
     this.htmlContent,
+    this.designJson,
     this.segment,
     this.status = CampaignStatus.draft,
     this.scheduledAt,
@@ -85,6 +87,7 @@ class Campaign {
       subject: json['subject'] as String? ?? '',
       previewText: json['preview_text'] as String?,
       htmlContent: json['html_content'] as String?,
+      designJson: (json['design_json'] as Map?)?.cast<String, dynamic>(),
       segment: _segmentFromJson(json['segment'] as Map<String, dynamic>?),
       status: _statusFromString(json['status'] as String?),
       scheduledAt: _parseDate(json['scheduled_at'] as String?),
@@ -104,6 +107,7 @@ class Campaign {
       'subject': subject,
       'preview_text': previewText,
       'html_content': htmlContent,
+      'design_json': designJson,
       'segment': segment != null ? _segmentToJson(segment!) : null,
       'status': _statusToString(status),
       'scheduled_at': scheduledAt?.toIso8601String(),
@@ -120,6 +124,7 @@ class Campaign {
     String? subject,
     String? previewText,
     String? htmlContent,
+    Map<String, dynamic>? designJson,
     MessageFilter? segment,
     CampaignStatus? status,
     DateTime? scheduledAt,
@@ -136,6 +141,7 @@ class Campaign {
       subject: subject ?? this.subject,
       previewText: previewText ?? this.previewText,
       htmlContent: htmlContent ?? this.htmlContent,
+      designJson: designJson ?? this.designJson,
       segment: segment ?? this.segment,
       status: status ?? this.status,
       scheduledAt: scheduledAt ?? this.scheduledAt,
@@ -241,7 +247,8 @@ MessageFilter? _segmentFromJson(Map<String, dynamic>? json) {
   return MessageFilter(
     county: json['county'] as String?,
     congressionalDistrict: json['congressional_district'] as String?,
-    committees: (json['committees'] as List<dynamic>?)?.whereType<String>().toList(),
+    committees:
+        (json['committees'] as List<dynamic>?)?.whereType<String>().toList(),
     highSchool: json['high_school'] as String?,
     college: json['college'] as String?,
     chapterName: json['chapter_name'] as String?,
@@ -249,7 +256,8 @@ MessageFilter? _segmentFromJson(Map<String, dynamic>? json) {
     minAge: json['min_age'] as int?,
     maxAge: json['max_age'] as int?,
     excludeOptedOut: json['exclude_opted_out'] as bool? ?? true,
-    excludeRecentlyContacted: json['exclude_recently_contacted'] as bool? ?? false,
+    excludeRecentlyContacted:
+        json['exclude_recently_contacted'] as bool? ?? false,
     recentContactThreshold: json['recent_contact_threshold'] is int
         ? Duration(days: json['recent_contact_threshold'] as int)
         : const Duration(days: 7),

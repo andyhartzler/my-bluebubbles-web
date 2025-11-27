@@ -69,6 +69,7 @@ dependencies:
   flutter_audio_waveforms: ^1.2.1+8
   flutter_displaymode:
     path: packages/flutter_displaymode_stub
+  flutter_colorpicker: ^1.0.3
   flutter_dotenv: ^5.1.0
   # NEW CRM DEPENDENCIES
   supabase_flutter: ^2.6.0
@@ -195,6 +196,7 @@ dependencies:
   universal_html: ^2.2.4 # cross-platform dart:html implementation
   universal_io: ^2.2.2 # cross-platform dart:io implementation
   url_launcher: ^6.2.5
+  uuid: ^4.0.0
   vcf_dart: ^1.0.1
   version: ^3.0.2
   video_player: ^2.8.5

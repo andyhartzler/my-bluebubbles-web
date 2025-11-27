@@ -1,9 +1,10 @@
 import 'package:bluebubbles/features/campaigns/screens/campaign_analytics_screen.dart';
+import 'package:bluebubbles/features/campaigns/email_builder/models/email_document.dart';
+import 'package:bluebubbles/features/campaigns/email_builder/screens/email_builder_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/campaign_preview_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/campaign_recipients_screen.dart';
 import 'package:bluebubbles/features/campaigns/widgets/campaign_brand.dart';
 import 'package:bluebubbles/features/campaigns/widgets/segment_builder.dart';
-import 'package:bluebubbles/features/campaigns/widgets/unlayer_editor.dart';
 import 'package:bluebubbles/models/crm/campaign.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/services/crm/campaign_service.dart';
@@ -14,7 +15,8 @@ class CampaignEditorScreen extends StatefulWidget {
   final String? campaignId;
   final Campaign? initialCampaign;
 
-  const CampaignEditorScreen({super.key, this.campaignId, this.initialCampaign});
+  const CampaignEditorScreen(
+      {super.key, this.campaignId, this.initialCampaign});
 
   @override
   State<CampaignEditorScreen> createState() => _CampaignEditorScreenState();
@@ -34,6 +36,7 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
   bool _loading = true;
   bool _saving = false;
   int? _estimatedRecipients;
+  Map<String, dynamic>? _designJson;
 
   @override
   void initState() {
@@ -53,6 +56,7 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
     _subjectController.text = campaign.subject;
     _previewController.text = campaign.previewText ?? '';
     _htmlController.text = campaign.htmlContent ?? '';
+    _designJson = campaign.designJson;
     _segment = campaign.segment ?? MessageFilter();
     _scheduledAt = campaign.scheduledAt;
     _estimatedRecipients = campaign.expectedRecipients;
@@ -60,7 +64,8 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
 
   Future<void> _loadCampaign() async {
     setState(() => _loading = true);
-    final fetched = await _campaignService.fetchCampaignById(widget.campaignId ?? '');
+    final fetched =
+        await _campaignService.fetchCampaignById(widget.campaignId ?? '');
     if (!mounted) return;
     if (fetched != null) {
       _hydrateFromCampaign(fetched);
@@ -71,21 +76,30 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
   Future<void> _saveDraft() async {
     setState(() => _saving = true);
     try {
-      final campaign = (_campaign ?? Campaign(name: _nameController.text, subject: _subjectController.text)).copyWith(
-        name: _nameController.text.trim().isEmpty ? 'Untitled campaign' : _nameController.text.trim(),
+      final campaign = (_campaign ??
+              Campaign(
+                  name: _nameController.text, subject: _subjectController.text))
+          .copyWith(
+        name: _nameController.text.trim().isEmpty
+            ? 'Untitled campaign'
+            : _nameController.text.trim(),
         subject: _subjectController.text.trim(),
-        previewText: _previewController.text.trim().isEmpty ? null : _previewController.text.trim(),
+        previewText: _previewController.text.trim().isEmpty
+            ? null
+            : _previewController.text.trim(),
         htmlContent: _htmlController.text.trim(),
+        designJson: _designJson ?? _campaign?.designJson,
         segment: _segment,
         scheduledAt: _scheduledAt,
-        expectedRecipients: _estimatedRecipients ?? _campaign?.expectedRecipients ?? 0,
+        expectedRecipients:
+            _estimatedRecipients ?? _campaign?.expectedRecipients ?? 0,
       );
 
       final saved = await _campaignService.saveCampaign(campaign);
       if (!mounted) return;
       _hydrateFromCampaign(saved);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Campaign saved')), 
+        const SnackBar(content: Text('Campaign saved')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -110,11 +124,13 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
     );
     if (time == null) return;
 
-    final scheduledDate = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final scheduledDate =
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
     setState(() => _scheduledAt = scheduledDate);
 
     if (_campaign?.id != null) {
-      final updated = await _campaignService.scheduleCampaign(_campaign!.id!, scheduledDate);
+      final updated = await _campaignService.scheduleCampaign(
+          _campaign!.id!, scheduledDate);
       _hydrateFromCampaign(updated);
     }
   }
@@ -124,7 +140,8 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
     await _campaignService.sendCampaignNow(_campaign!.id!);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Send triggered. Track progress in analytics.')),
+      const SnackBar(
+          content: Text('Send triggered. Track progress in analytics.')),
     );
     await _loadCampaign();
   }
@@ -166,6 +183,28 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
     );
   }
 
+  Future<void> _openEmailBuilder() async {
+    final initialDocument =
+        _designJson != null ? EmailDocument.fromJson(_designJson!) : null;
+
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => EmailBuilderScreen(
+          campaignId: _campaign?.id,
+          initialDocument: initialDocument,
+        ),
+      ),
+    );
+
+    if (!mounted || result == null) return;
+
+    setState(() {
+      _htmlController.text = result['html'] as String? ?? _htmlController.text;
+      _designJson =
+          result['designJson'] as Map<String, dynamic>? ?? _designJson;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -198,14 +237,16 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
                   Expanded(
                     child: TextField(
                       controller: _nameController,
-                      decoration: const InputDecoration(labelText: 'Campaign name'),
+                      decoration:
+                          const InputDecoration(labelText: 'Campaign name'),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
                       controller: _subjectController,
-                      decoration: const InputDecoration(labelText: 'Subject line'),
+                      decoration:
+                          const InputDecoration(labelText: 'Subject line'),
                     ),
                   ),
                 ],
@@ -217,7 +258,8 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
               ),
               const SizedBox(height: 12),
               Chip(
-                avatar: const Icon(Icons.schedule, color: Colors.white, size: 18),
+                avatar:
+                    const Icon(Icons.schedule, color: Colors.white, size: 18),
                 label: Text(
                   _scheduledAt == null
                       ? 'Send immediately'
@@ -225,13 +267,57 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
                   style: const TextStyle(color: Colors.white),
                 ),
                 backgroundColor: CampaignBrand.momentumBlue,
-                deleteIcon: const Icon(Icons.calendar_today, color: Colors.white),
+                deleteIcon:
+                    const Icon(Icons.calendar_today, color: Colors.white),
                 onDeleted: _scheduleSend,
               ),
               const SizedBox(height: 16),
-              UnlayerEditor(
-                controller: _htmlController,
-                onChanged: (_) {},
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Email content',
+                                style: theme.textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _designJson == null
+                                    ? 'Build your campaign email with the native Flutter builder.'
+                                    : 'Native builder design ready',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _openEmailBuilder,
+                            icon: const Icon(Icons.design_services_outlined),
+                            label: const Text('Open email builder'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _htmlController,
+                        maxLines: 6,
+                        decoration: const InputDecoration(
+                          labelText: 'Generated HTML (editable)',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (_) {},
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               Card(
@@ -252,7 +338,8 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
                       if (_estimatedRecipients != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 8.0),
-                          child: Text('Estimated ${_estimatedRecipients!} recipients'),
+                          child: Text(
+                              'Estimated ${_estimatedRecipients!} recipients'),
                         ),
                       Wrap(
                         spacing: 8,
