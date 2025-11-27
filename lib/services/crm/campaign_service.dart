@@ -40,8 +40,11 @@ class CampaignService {
     if (!isReady) return null;
 
     try {
-      final data =
-          await _readClient.from('campaigns').select().eq('id', id).maybeSingle();
+      final data = await _readClient
+          .from('campaigns')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
       if (data == null) return null;
       return Campaign.fromJson(data as Map<String, dynamic>);
     } catch (e, s) {
@@ -60,8 +63,11 @@ class CampaignService {
 
     try {
       if (campaignId == null) {
-        final response =
-            await _writeClient.from('campaigns').insert(payload).select().single();
+        final response = await _writeClient
+            .from('campaigns')
+            .insert(payload)
+            .select()
+            .single();
         return Campaign.fromJson(response as Map<String, dynamic>);
       }
 
@@ -78,7 +84,35 @@ class CampaignService {
     }
   }
 
-  Future<Campaign> scheduleCampaign(String campaignId, DateTime scheduledAt) async {
+  Future<Campaign> saveCampaignDesign({
+    required String campaignId,
+    required String htmlContent,
+    required Map<String, dynamic> designJson,
+  }) async {
+    if (!isReady) {
+      throw Exception('CRM Supabase is not configured');
+    }
+
+    try {
+      final response = await _writeClient
+          .from('campaigns')
+          .update({
+            'html_content': htmlContent,
+            'design_json': designJson,
+          })
+          .eq('id', campaignId)
+          .select()
+          .single();
+
+      return Campaign.fromJson(response as Map<String, dynamic>);
+    } catch (e, s) {
+      Logger.error('Failed to save campaign design', error: e, trace: s);
+      rethrow;
+    }
+  }
+
+  Future<Campaign> scheduleCampaign(
+      String campaignId, DateTime scheduledAt) async {
     if (!isReady) {
       throw Exception('CRM Supabase is not configured');
     }
@@ -108,26 +142,27 @@ class CampaignService {
 
     try {
       if (_supabase.hasServiceRole) {
-        await _writeClient.rpc('send_campaign_now', params: {'campaign_id': campaignId});
+        await _writeClient
+            .rpc('send_campaign_now', params: {'campaign_id': campaignId});
       }
 
       await _writeClient
           .from('campaigns')
-          .update({'status': CampaignStatus.sending.name})
-          .eq('id', campaignId);
+          .update({'status': CampaignStatus.sending.name}).eq('id', campaignId);
     } catch (e, s) {
       Logger.error('Failed to trigger send', error: e, trace: s);
       rethrow;
     }
   }
 
-  Future<List<CampaignRecipient>> previewRecipients(MessageFilter filter) async {
+  Future<List<CampaignRecipient>> previewRecipients(
+      MessageFilter filter) async {
     if (!isReady) return [];
 
     try {
       if (_supabase.hasServiceRole) {
-        final response = await _readClient
-            .rpc('resolve_campaign_segment', params: _filterToParams(filter));
+        final response = await _readClient.rpc('resolve_campaign_segment',
+            params: _filterToParams(filter));
         return (response as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
             .map(CampaignRecipient.fromJson)
@@ -161,7 +196,8 @@ class CampaignService {
         return CampaignAnalytics.fromJson(data);
       }
     } catch (e, s) {
-      Logger.warn('Failed to load analytics for campaign $campaignId', error: e, trace: s);
+      Logger.warn('Failed to load analytics for campaign $campaignId',
+          error: e, trace: s);
     }
 
     return const CampaignAnalytics();
@@ -172,8 +208,8 @@ class CampaignService {
 
     try {
       if (_supabase.hasServiceRole) {
-        final response = await _readClient
-            .rpc('count_campaign_segment', params: _filterToParams(filter));
+        final response = await _readClient.rpc('count_campaign_segment',
+            params: _filterToParams(filter));
         if (response is int) return response;
       }
 
@@ -196,21 +232,26 @@ class CampaignService {
     final map = _filterToSupabaseMatch(filter);
     map['exclude_opted_out'] = filter.excludeOptedOut;
     map['exclude_recently_contacted'] = filter.excludeRecentlyContacted;
-    map['recent_contact_threshold_days'] = filter.recentContactThreshold?.inDays;
+    map['recent_contact_threshold_days'] =
+        filter.recentContactThreshold?.inDays;
     return map..removeWhere((_, value) => value == null);
   }
 
   Map<String, dynamic> _filterToSupabaseMatch(MessageFilter filter) {
     return {
-      if (filter.county != null && filter.county!.isNotEmpty) 'county': filter.county,
+      if (filter.county != null && filter.county!.isNotEmpty)
+        'county': filter.county,
       if (filter.congressionalDistrict != null &&
           filter.congressionalDistrict!.isNotEmpty)
         'congressional_district': filter.congressionalDistrict,
       if (filter.committees != null && filter.committees!.isNotEmpty)
         'committees': filter.committees,
-      if (filter.highSchool != null && filter.highSchool!.isNotEmpty) 'high_school': filter.highSchool,
-      if (filter.college != null && filter.college!.isNotEmpty) 'college': filter.college,
-      if (filter.chapterName != null && filter.chapterName!.isNotEmpty) 'chapter_name': filter.chapterName,
+      if (filter.highSchool != null && filter.highSchool!.isNotEmpty)
+        'high_school': filter.highSchool,
+      if (filter.college != null && filter.college!.isNotEmpty)
+        'college': filter.college,
+      if (filter.chapterName != null && filter.chapterName!.isNotEmpty)
+        'chapter_name': filter.chapterName,
       if (filter.chapterStatus != null && filter.chapterStatus!.isNotEmpty)
         'chapter_status': filter.chapterStatus,
       if (filter.minAge != null) 'min_age': filter.minAge,
