@@ -125,7 +125,7 @@ class MemberRepository {
       if (fetchTotalCount) {
         // Need to rebuild query with count option since it must be passed to select()
         final selectionWithCount = _resolveColumnSelection(columns);
-        var countQuery = _applyMemberFilters(
+        dynamic countQuery = _applyMemberFilters(
           _readClient.from('members').select(selectionWithCount),
           county: county,
           congressionalDistrict: congressionalDistrict,
@@ -139,9 +139,8 @@ class MemberRepository {
           optedOut: optedOut,
           registeredVoter: registeredVoter,
           searchQuery: searchQuery,
-        );
+        ).order('name', ascending: true).order('id', ascending: true);
 
-        countQuery = countQuery.order('name', ascending: true).order('id', ascending: true);
         if (hasLimit && hasOffset) {
           final start = offsetValue!;
           final end = start + limitValue! - 1;
