@@ -1,0 +1,676 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/campaign_wizard_provider.dart';
+import '../../theme/campaign_builder_theme.dart';
+import '../../email_builder/screens/email_builder_screen.dart';
+import '../../email_builder/models/email_document.dart';
+import 'package:flutter_html/flutter_html.dart';
+
+/// Step 2: Email Content
+/// Design email with visual builder
+/// Features: Prominent builder CTA, HTML preview, deliverability scoring
+class EmailContentStep extends StatelessWidget {
+  const EmailContentStep({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<CampaignWizardProvider>(
+      builder: (context, provider, _) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Text(
+              'Design Your Email',
+              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    color: CampaignBuilderTheme.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Create a beautiful, professional email using our drag-and-drop builder',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: CampaignBuilderTheme.textSecondary,
+                  ),
+            ),
+            const SizedBox(height: 32),
+
+            // Main content card
+            provider.hasEmailContent
+                ? _buildPreviewCard(context, provider)
+                : _buildEmptyStateCard(context, provider),
+
+            // Deliverability Score Card
+            if (provider.hasEmailContent) ...[
+              const SizedBox(height: 24),
+              _buildDeliverabilityCard(provider),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyStateCard(
+    BuildContext context,
+    CampaignWizardProvider provider,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: CampaignBuilderTheme.slate,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: CampaignBuilderTheme.moyDBlue.withOpacity(0.5),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: CampaignBuilderTheme.moyDBlue.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(48),
+        child: Column(
+          children: [
+            // Icon
+            Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    CampaignBuilderTheme.moyDBlue.withOpacity(0.2),
+                    CampaignBuilderTheme.brightBlue.withOpacity(0.1),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: const Icon(
+                Icons.email_outlined,
+                size: 70,
+                color: CampaignBuilderTheme.brightBlue,
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // Title
+            Text(
+              'Design Your Email Content',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: CampaignBuilderTheme.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 12),
+
+            // Description
+            Text(
+              'Use our professional drag-and-drop email builder to create\nstunning campaigns in minutes',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                color: CampaignBuilderTheme.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 40),
+
+            // Primary CTA - Open Visual Builder
+            ElevatedButton.icon(
+              onPressed: () => _openVisualBuilder(context, provider),
+              icon: const Icon(Icons.brush_outlined, size: 26),
+              label: const Text(
+                'Open Visual Builder',
+                style: TextStyle(fontSize: 18, letterSpacing: 0.3),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CampaignBuilderTheme.moyDBlue,
+                foregroundColor: CampaignBuilderTheme.textPrimary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 56,
+                  vertical: 24,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 4,
+                shadowColor: CampaignBuilderTheme.moyDBlue.withOpacity(0.5),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Secondary option - Templates
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: () => _showTemplateLibrary(context, provider),
+                  icon: const Icon(Icons.file_copy_outlined, size: 18),
+                  label: const Text('Choose from Templates'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: CampaignBuilderTheme.brightBlue,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Text('•', style: TextStyle(color: CampaignBuilderTheme.textTertiary)),
+                const SizedBox(width: 16),
+                TextButton.icon(
+                  onPressed: () => _importHTML(context, provider),
+                  icon: const Icon(Icons.code, size: 18),
+                  label: const Text('Import HTML'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: CampaignBuilderTheme.brightBlue,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewCard(
+    BuildContext context,
+    CampaignWizardProvider provider,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: CampaignBuilderTheme.slate,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: CampaignBuilderTheme.successGreen.withOpacity(0.5),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: CampaignBuilderTheme.successGreen.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: CampaignBuilderTheme.successGreen,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Email Content Ready',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: CampaignBuilderTheme.successGreen,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Your email design looks great!',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: CampaignBuilderTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1),
+
+          // Preview with side-by-side desktop/mobile
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Desktop Preview
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.desktop_windows,
+                            size: 16,
+                            color: CampaignBuilderTheme.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Desktop Preview',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: CampaignBuilderTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 400,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: CampaignBuilderTheme.slateLight),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SingleChildScrollView(
+                            child: Html(
+                              data: provider.htmlContent ?? '',
+                              style: {
+                                'body': Style(
+                                  margin: Margins.zero,
+                                  padding: HtmlPaddings.zero,
+                                ),
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(width: 24),
+
+                // Mobile Preview
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.phone_iphone,
+                          size: 16,
+                          color: CampaignBuilderTheme.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Mobile Preview',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: CampaignBuilderTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 200,
+                      height: 400,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: CampaignBuilderTheme.slateLight, width: 3),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: SingleChildScrollView(
+                          child: Html(
+                            data: provider.htmlContent ?? '',
+                            style: {
+                              'body': Style(
+                                margin: Margins.zero,
+                                padding: HtmlPaddings.all(4),
+                                fontSize: FontSize(10),
+                              ),
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1),
+
+          // Action buttons
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openVisualBuilder(context, provider),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit Design'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: CampaignBuilderTheme.moyDBlue),
+                      foregroundColor: CampaignBuilderTheme.moyDBlue,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showResetConfirmation(context, provider),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Start Over'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeliverabilityCard(CampaignWizardProvider provider) {
+    if (provider.deliverabilityScore == null) {
+      return const SizedBox();
+    }
+
+    final score = provider.deliverabilityScore!;
+    final color = _getScoreColor(score);
+    final rating = _getScoreRating(score);
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: CampaignBuilderTheme.slate,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.verified_user,
+                  color: color,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Deliverability Score',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: CampaignBuilderTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Your email is $rating',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: CampaignBuilderTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                children: [
+                  Text(
+                    score.toString(),
+                    style: TextStyle(
+                      fontSize: 40,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      height: 1,
+                    ),
+                  ),
+                  const Text(
+                    '/ 100',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: CampaignBuilderTheme.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          if (provider.deliverabilityIssues.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            const Divider(height: 1),
+            const SizedBox(height: 20),
+            const Text(
+              'Issues to Fix:',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: CampaignBuilderTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...provider.deliverabilityIssues.map((issue) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      size: 18,
+                      color: CampaignBuilderTheme.warningOrange,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        issue,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: CampaignBuilderTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+
+          // Spam score
+          if (provider.spamScore != null && provider.spamScore! > 20) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: CampaignBuilderTheme.warningOrange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: CampaignBuilderTheme.warningOrange),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.security,
+                    color: CampaignBuilderTheme.warningOrange,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Spam score: ${provider.spamScore}% - Consider revising content',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: CampaignBuilderTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Color _getScoreColor(int score) {
+    if (score >= 80) return CampaignBuilderTheme.successGreen;
+    if (score >= 60) return CampaignBuilderTheme.warningOrange;
+    return CampaignBuilderTheme.errorRed;
+  }
+
+  String _getScoreRating(int score) {
+    if (score >= 90) return 'excellent';
+    if (score >= 80) return 'very good';
+    if (score >= 70) return 'good';
+    if (score >= 60) return 'fair';
+    return 'needs improvement';
+  }
+
+  Future<void> _openVisualBuilder(
+    BuildContext context,
+    CampaignWizardProvider provider,
+  ) async {
+    EmailDocument? initialDocument;
+    if (provider.designJson != null) {
+      try {
+        initialDocument = EmailDocument.fromJson(provider.designJson!);
+      } catch (e) {
+        debugPrint('Error loading design: $e');
+      }
+    }
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EmailBuilderScreen(
+          initialDocument: initialDocument,
+        ),
+      ),
+    );
+
+    if (result != null && result is Map<String, dynamic>) {
+      provider.updateEmailContent(
+        htmlContent: result['html'] as String,
+        designJson: result['designJson'] as Map<String, dynamic>,
+      );
+    }
+  }
+
+  void _showTemplateLibrary(
+    BuildContext context,
+    CampaignWizardProvider provider,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => const AlertDialog(
+        title: Text('Template Library'),
+        content: SizedBox(
+          width: 600,
+          height: 400,
+          child: Center(
+            child: Text('Template library coming soon!'),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _importHTML(
+    BuildContext context,
+    CampaignWizardProvider provider,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Import HTML'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              maxLines: 10,
+              decoration: InputDecoration(
+                hintText: 'Paste your HTML code here...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // TODO: Implement HTML import
+              Navigator.pop(context);
+            },
+            child: const Text('Import'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showResetConfirmation(
+    BuildContext context,
+    CampaignWizardProvider provider,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Start Over?'),
+        content: const Text(
+          'Are you sure you want to discard your current design and start over?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              provider.clearEmailContent();
+              Navigator.pop(context);
+            },
+            style: CampaignBuilderTheme.dangerButtonStyle,
+            child: const Text('Start Over'),
+          ),
+        ],
+      ),
+    );
+  }
+}
