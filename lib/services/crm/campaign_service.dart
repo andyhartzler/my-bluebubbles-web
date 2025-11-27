@@ -180,7 +180,7 @@ class CampaignService {
       final response = await _readClient
           .from('members')
           .select('id')
-          .match(_filterToSupabaseMatch(filter))
+          .match(_filterToSupabaseMatch(filter).cast<String, Object>())
           .count(CountOption.exact);
 
       final count = response.count;
