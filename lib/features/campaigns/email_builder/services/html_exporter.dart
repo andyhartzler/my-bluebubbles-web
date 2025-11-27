@@ -7,39 +7,142 @@ class HtmlExporter {
 
     return '''
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <style>
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="format-detection" content="telephone=no,address=no,email=no,date=no">
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  <title>Missouri Young Democrats</title>
+  <style type="text/css">
+    /* Reset styles */
     body {
       margin: 0;
       padding: 0;
-      font-family: ${settings.fontFamily};
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+      font-family: ${settings.fontFamily}, Arial, sans-serif;
       font-size: ${settings.fontSize}px;
-      line-height: ${settings.lineHeight}px;
+      line-height: ${settings.lineHeight};
       color: ${settings.textColor};
       background-color: ${settings.backgroundColor};
     }
+
     table {
       border-collapse: collapse;
-      width: 100%;
+      border-spacing: 0;
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
     }
+
     img {
-      max-width: 100%;
+      border: 0;
       height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+      -ms-interpolation-mode: bicubic;
+      max-width: 100%;
       display: block;
     }
+
+    p {
+      margin: 0;
+    }
+
+    /* Prevent Gmail from changing text color */
+    a {
+      color: inherit;
+      text-decoration: underline;
+    }
+
+    /* iOS blue links */
+    a[x-apple-data-detectors] {
+      color: inherit !important;
+      text-decoration: none !important;
+      font-size: inherit !important;
+      font-family: inherit !important;
+      font-weight: inherit !important;
+      line-height: inherit !important;
+    }
+
+    /* Mobile styles */
+    @media only screen and (max-width: 600px) {
+      .mobile-full-width {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      .mobile-padding {
+        padding: 10px !important;
+      }
+
+      .mobile-hide {
+        display: none !important;
+        max-height: 0 !important;
+        overflow: hidden !important;
+        visibility: hidden !important;
+      }
+
+      .mobile-stack {
+        display: block !important;
+        width: 100% !important;
+      }
+
+      .mobile-text-center {
+        text-align: center !important;
+      }
+
+      .mobile-text-left {
+        text-align: left !important;
+      }
+
+      .mobile-font-size-16 {
+        font-size: 16px !important;
+      }
+    }
+
+    /* Outlook-specific fixes */
+    <!--[if mso]>
+    table {
+      border-collapse: collapse;
+    }
+    <![endif]-->
   </style>
 </head>
-<body>
-  <table width="100%" cellpadding="0" cellspacing="0">
+<body style="margin: 0; padding: 0; background-color: ${settings.backgroundColor};">
+  <!-- Preheader text (hidden from view) -->
+  <div style="display: none; max-height: 0px; overflow: hidden;">
+    Missouri Young Democrats - Stay informed and get involved!
+  </div>
+
+  <!-- Main email container -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: ${settings.backgroundColor};">
     <tr>
       <td align="center" style="padding: ${settings.padding}px;">
-        <table width="${settings.maxWidth}" cellpadding="0" cellspacing="0">
+        <!--[if mso]>
+        <table role="presentation" width="${settings.maxWidth}" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+        <td>
+        <![endif]-->
+        <table role="presentation" class="mobile-full-width" width="${settings.maxWidth}" cellpadding="0" cellspacing="0" border="0" style="max-width: ${settings.maxWidth}px; margin: 0 auto;">
           ${_exportSections(document.sections)}
         </table>
+        <!--[if mso]>
+        </td>
+        </tr>
+        </table>
+        <![endif]-->
       </td>
     </tr>
   </table>
@@ -102,6 +205,9 @@ class HtmlExporter {
   }
 
   String _exportTextComponent(String content, TextComponentStyle style) {
+    // Process merge tags
+    final processedContent = _processMergeTags(content);
+
     return '''
 <p style="
   font-size: ${style.fontSize}px;
@@ -114,9 +220,21 @@ class HtmlExporter {
   margin-top: ${style.paddingTop}px;
   margin-bottom: ${style.paddingBottom}px;
 ">
-  $content
+  $processedContent
 </p>
 ''';
+  }
+
+  /// Convert merge tags from {{tag}} format to email service format
+  /// Currently supports Mailchimp-style *|TAG|* format
+  String _processMergeTags(String content) {
+    // Replace {{tag_name}} with *|TAG_NAME|* (Mailchimp format)
+    final mergeTagPattern = RegExp(r'\{\{([a-zA-Z0-9_]+)\}\}');
+
+    return content.replaceAllMapped(mergeTagPattern, (match) {
+      final tagName = match.group(1)!.toUpperCase();
+      return '*|$tagName|*';
+    });
   }
 
   String _exportImageComponent(

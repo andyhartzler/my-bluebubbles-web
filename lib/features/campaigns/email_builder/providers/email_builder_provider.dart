@@ -12,12 +12,14 @@ class EmailBuilderProvider extends ChangeNotifier {
   String? _selectedSectionId;
   bool _isPreviewMode = false;
   String _previewDevice = 'desktop';
+  double _zoomLevel = 1.0;
 
   EmailDocument get document => _document;
   String? get selectedComponentId => _selectedComponentId;
   String? get selectedSectionId => _selectedSectionId;
   bool get isPreviewMode => _isPreviewMode;
   String get previewDevice => _previewDevice;
+  double get zoomLevel => _zoomLevel;
   bool get canUndo => _historyIndex > 0;
   bool get canRedo => _historyIndex < _history.length - 1;
 
@@ -344,6 +346,36 @@ class EmailBuilderProvider extends ChangeNotifier {
 
   void setPreviewDevice(String device) {
     _previewDevice = device;
+    notifyListeners();
+  }
+
+  void setZoomLevel(double zoom) {
+    _zoomLevel = zoom.clamp(0.5, 2.0);
+    notifyListeners();
+  }
+
+  void addSectionWithLayout(List<int> columnFlexValues, {int? index}) {
+    final columns = columnFlexValues.map((flex) {
+      return EmailColumn(
+        id: _uuid.v4(),
+        flex: flex,
+      );
+    }).toList();
+
+    final section = EmailSection(
+      id: _uuid.v4(),
+      columns: columns,
+    );
+
+    final sections = List<EmailSection>.from(_document.sections);
+    if (index != null) {
+      sections.insert(index, section);
+    } else {
+      sections.add(section);
+    }
+
+    _document = _document.copyWith(sections: sections);
+    _saveToHistory();
     notifyListeners();
   }
 
