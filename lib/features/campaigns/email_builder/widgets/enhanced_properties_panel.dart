@@ -5,6 +5,7 @@ import '../models/email_component.dart';
 import '../models/email_document.dart';
 import '../providers/email_builder_provider.dart';
 import 'color_picker_field.dart';
+import '../../widgets/image_asset_manager.dart';
 import 'merge_tag_picker_dialog.dart';
 
 class EnhancedPropertiesPanel extends StatelessWidget {
@@ -616,12 +617,55 @@ class _ImageContentTab extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 16),
 
+          // Upload Image Button (NEW!)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _showImagePicker(context, provider),
+              icon: const Icon(Icons.cloud_upload),
+              label: const Text('Upload from Library'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E3A8A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // OR divider
+          Row(
+            children: [
+              Expanded(child: Divider(color: Colors.grey[300])),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Expanded(child: Divider(color: Colors.grey[300])),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
           // Image URL
           TextField(
             controller: TextEditingController(text: component.url),
             decoration: const InputDecoration(
               labelText: 'Image URL',
               border: OutlineInputBorder(),
+              hintText: 'https://example.com/image.jpg',
+              helperText: 'Enter a direct URL to an image',
             ),
             onChanged: (value) {
               provider.updateComponent(
@@ -670,6 +714,26 @@ class _ImageContentTab extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  void _showImagePicker(BuildContext context, EmailBuilderProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: SizedBox(
+          width: 900,
+          child: ImageAssetManager(
+            onImageSelected: (imageUrl) {
+              provider.updateComponent(
+                sectionId,
+                columnId,
+                component.copyWith(url: imageUrl),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
