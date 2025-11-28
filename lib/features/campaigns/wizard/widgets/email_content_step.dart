@@ -4,6 +4,7 @@ import '../../providers/campaign_wizard_provider.dart';
 import '../../theme/campaign_builder_theme.dart';
 import '../../email_builder/screens/email_builder_screen.dart';
 import '../../email_builder/models/email_document.dart';
+import '../../widgets/ai_content_assistant.dart';
 import 'package:flutter_html/flutter_html.dart';
 
 /// Step 2: Email Content
@@ -151,9 +152,9 @@ class EmailContentStep extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 TextButton.icon(
-                  onPressed: () => _showTemplateLibrary(context, provider),
-                  icon: const Icon(Icons.file_copy_outlined, size: 18),
-                  label: const Text('Choose from Templates'),
+                  onPressed: () => _showAIAssistant(context, provider),
+                  icon: const Icon(Icons.auto_awesome, size: 18),
+                  label: const Text('AI Templates'),
                   style: TextButton.styleFrom(
                     foregroundColor: CampaignBuilderTheme.brightBlue,
                   ),
@@ -589,19 +590,25 @@ class EmailContentStep extends StatelessWidget {
     }
   }
 
-  void _showTemplateLibrary(
+  void _showAIAssistant(
     BuildContext context,
     CampaignWizardProvider provider,
   ) {
     showDialog(
       context: context,
-      builder: (context) => const AlertDialog(
-        title: Text('Template Library'),
-        content: SizedBox(
-          width: 600,
-          height: 400,
-          child: Center(
-            child: Text('Template library coming soon!'),
+      builder: (context) => Dialog(
+        child: SizedBox(
+          width: 900,
+          height: 700,
+          child: AIContentAssistant(
+            campaignName: provider.campaignName,
+            subject: provider.subject,
+            onContentGenerated: (htmlContent) {
+              provider.updateEmailContent(
+                htmlContent: htmlContent,
+                designJson: {}, // Template HTML doesn't need design JSON
+              );
+            },
           ),
         ),
       ),
