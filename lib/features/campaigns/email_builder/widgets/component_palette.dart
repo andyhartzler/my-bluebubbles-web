@@ -54,6 +54,28 @@ class ComponentPalette extends StatelessWidget {
         ],
       );
 
+  // New email-builder-js block templates
+  static EmailComponent _createAvatarTemplate() => EmailComponent.avatar(
+        id: const Uuid().v4(),
+        imageUrl: 'https://via.placeholder.com/80',
+        alt: 'Avatar',
+      );
+
+  static EmailComponent _createHeadingTemplate() => EmailComponent.heading(
+        id: const Uuid().v4(),
+        content: 'Your Heading Here',
+      );
+
+  static EmailComponent _createHtmlTemplate() => EmailComponent.html(
+        id: const Uuid().v4(),
+        htmlContent: '<p>Your custom HTML here</p>',
+      );
+
+  static EmailComponent _createContainerTemplate() => EmailComponent.container(
+        id: const Uuid().v4(),
+        children: [],
+      );
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -97,6 +119,11 @@ class ComponentPalette extends StatelessWidget {
                 title: 'Content',
                 components: [
                   _ComponentItem(
+                    icon: Icons.title,
+                    label: 'Heading',
+                    componentFactory: _createHeadingTemplate,
+                  ),
+                  _ComponentItem(
                     icon: Icons.text_fields,
                     label: 'Text',
                     componentFactory: _createTextTemplate,
@@ -105,6 +132,11 @@ class ComponentPalette extends StatelessWidget {
                     icon: Icons.image,
                     label: 'Image',
                     componentFactory: _createImageTemplate,
+                  ),
+                  _ComponentItem(
+                    icon: Icons.account_circle,
+                    label: 'Avatar',
+                    componentFactory: _createAvatarTemplate,
                   ),
                   _ComponentItem(
                     icon: Icons.smart_button,
@@ -120,6 +152,22 @@ class ComponentPalette extends StatelessWidget {
                     icon: Icons.share,
                     label: 'Social',
                     componentFactory: _createSocialTemplate,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _ComponentCategory(
+                title: 'Advanced',
+                components: [
+                  _ComponentItem(
+                    icon: Icons.code,
+                    label: 'HTML',
+                    componentFactory: _createHtmlTemplate,
+                  ),
+                  _ComponentItem(
+                    icon: Icons.inbox,
+                    label: 'Container',
+                    componentFactory: _createContainerTemplate,
                   ),
                 ],
               ),

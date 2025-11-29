@@ -217,6 +217,14 @@ class EmailBuilderProvider extends ChangeNotifier {
                 spacer: (id, height) => id == component.id ? component : c,
                 social: (id, links, style) =>
                     id == component.id ? component : c,
+                avatar: (id, imageUrl, alt, style) =>
+                    id == component.id ? component : c,
+                heading: (id, content, style) =>
+                    id == component.id ? component : c,
+                html: (id, htmlContent, style) =>
+                    id == component.id ? component : c,
+                container: (id, children, style) =>
+                    id == component.id ? component : c,
               );
             }).toList();
             return column.copyWith(components: components);
@@ -246,6 +254,10 @@ class EmailBuilderProvider extends ChangeNotifier {
                 divider: (id, _) => id != componentId,
                 spacer: (id, _) => id != componentId,
                 social: (id, _, __) => id != componentId,
+                avatar: (id, _, __, ___) => id != componentId,
+                heading: (id, _, __) => id != componentId,
+                html: (id, _, __) => id != componentId,
+                container: (id, _, __) => id != componentId,
               );
             }).toList();
             return column.copyWith(components: components);
@@ -286,6 +298,10 @@ class EmailBuilderProvider extends ChangeNotifier {
                   divider: (id, _) => id == componentId,
                   spacer: (id, _) => id == componentId,
                   social: (id, _, __) => id == componentId,
+                  avatar: (id, _, __, ___) => id == componentId,
+                  heading: (id, _, __) => id == componentId,
+                  html: (id, _, __) => id == componentId,
+                  container: (id, _, __) => id == componentId,
                 ));
             if (index != -1) {
               movedComponent = components.removeAt(index);
@@ -441,6 +457,27 @@ class EmailBuilderProvider extends ChangeNotifier {
           social: (_, links, style) => EmailComponent.social(
             id: _uuid.v4(),
             links: links,
+            style: style,
+          ),
+          avatar: (_, imageUrl, alt, style) => EmailComponent.avatar(
+            id: _uuid.v4(),
+            imageUrl: imageUrl,
+            alt: alt,
+            style: style,
+          ),
+          heading: (_, content, style) => EmailComponent.heading(
+            id: _uuid.v4(),
+            content: content,
+            style: style,
+          ),
+          html: (_, htmlContent, style) => EmailComponent.html(
+            id: _uuid.v4(),
+            htmlContent: htmlContent,
+            style: style,
+          ),
+          container: (_, children, style) => EmailComponent.container(
+            id: _uuid.v4(),
+            children: children,
             style: style,
           ),
         );

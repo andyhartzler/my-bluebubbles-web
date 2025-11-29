@@ -42,6 +42,32 @@ class EmailComponent with _$EmailComponent {
     @Default(SocialComponentStyle()) SocialComponentStyle style,
   }) = SocialComponent;
 
+  // New email-builder-js block types
+  const factory EmailComponent.avatar({
+    required String id,
+    required String imageUrl,
+    String? alt,
+    @Default(AvatarComponentStyle()) AvatarComponentStyle style,
+  }) = AvatarComponent;
+
+  const factory EmailComponent.heading({
+    required String id,
+    @Default('') String content,
+    @Default(HeadingComponentStyle()) HeadingComponentStyle style,
+  }) = HeadingComponent;
+
+  const factory EmailComponent.html({
+    required String id,
+    @Default('') String htmlContent,
+    @Default(HtmlComponentStyle()) HtmlComponentStyle style,
+  }) = HtmlComponent;
+
+  const factory EmailComponent.container({
+    required String id,
+    @Default([]) List<EmailComponent> children,
+    @Default(ContainerComponentStyle()) ContainerComponentStyle style,
+  }) = ContainerComponent;
+
   factory EmailComponent.fromJson(Map<String, dynamic> json) =>
       _$EmailComponentFromJson(json);
 }
@@ -58,6 +84,8 @@ class TextComponentStyle with _$TextComponentStyle {
     @Default(1.5) double lineHeight,
     @Default(0) double paddingTop,
     @Default(0) double paddingBottom,
+    @Default(0) double paddingLeft,
+    @Default(0) double paddingRight,
     String? fontFamily,
   }) = _TextComponentStyle;
 
@@ -74,6 +102,8 @@ class ImageComponentStyle with _$ImageComponentStyle {
     @Default(0) double borderRadius,
     @Default(0) double paddingTop,
     @Default(0) double paddingBottom,
+    @Default(0) double paddingLeft,
+    @Default(0) double paddingRight,
   }) = _ImageComponentStyle;
 
   factory ImageComponentStyle.fromJson(Map<String, dynamic> json) =>
@@ -137,4 +167,74 @@ class SocialComponentStyle with _$SocialComponentStyle {
 
   factory SocialComponentStyle.fromJson(Map<String, dynamic> json) =>
       _$SocialComponentStyleFromJson(json);
+}
+
+// New email-builder-js block styles
+@freezed
+class AvatarComponentStyle with _$AvatarComponentStyle {
+  const factory AvatarComponentStyle({
+    @Default(80) double size,
+    @Default('center') String alignment,
+    @Default(true) bool shape, // true = circle, false = square
+    @Default(0) double paddingTop,
+    @Default(0) double paddingBottom,
+    @Default(0) double paddingLeft,
+    @Default(0) double paddingRight,
+    String? borderColor,
+    @Default(0) double borderWidth,
+  }) = _AvatarComponentStyle;
+
+  factory AvatarComponentStyle.fromJson(Map<String, dynamic> json) =>
+      _$AvatarComponentStyleFromJson(json);
+}
+
+@freezed
+class HeadingComponentStyle with _$HeadingComponentStyle {
+  const factory HeadingComponentStyle({
+    @Default(32) double fontSize,
+    @Default('#000000') String color,
+    @Default('left') String alignment,
+    @Default(true) bool bold,
+    @Default(false) bool italic,
+    @Default(false) bool underline,
+    @Default(1.2) double lineHeight,
+    @Default(0) double paddingTop,
+    @Default(0) double paddingBottom,
+    @Default(0) double paddingLeft,
+    @Default(0) double paddingRight,
+    String? fontFamily,
+  }) = _HeadingComponentStyle;
+
+  factory HeadingComponentStyle.fromJson(Map<String, dynamic> json) =>
+      _$HeadingComponentStyleFromJson(json);
+}
+
+@freezed
+class HtmlComponentStyle with _$HtmlComponentStyle {
+  const factory HtmlComponentStyle({
+    @Default(0) double paddingTop,
+    @Default(0) double paddingBottom,
+    @Default(0) double paddingLeft,
+    @Default(0) double paddingRight,
+  }) = _HtmlComponentStyle;
+
+  factory HtmlComponentStyle.fromJson(Map<String, dynamic> json) =>
+      _$HtmlComponentStyleFromJson(json);
+}
+
+@freezed
+class ContainerComponentStyle with _$ContainerComponentStyle {
+  const factory ContainerComponentStyle({
+    @Default('#ffffff') String backgroundColor,
+    @Default(0) double paddingTop,
+    @Default(0) double paddingBottom,
+    @Default(0) double paddingLeft,
+    @Default(0) double paddingRight,
+    @Default(0) double borderRadius,
+    String? borderColor,
+    @Default(0) double borderWidth,
+  }) = _ContainerComponentStyle;
+
+  factory ContainerComponentStyle.fromJson(Map<String, dynamic> json) =>
+      _$ContainerComponentStyleFromJson(json);
 }
