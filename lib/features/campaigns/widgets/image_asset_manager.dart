@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:html' as html;
+import '../theme/campaign_builder_theme.dart';
 
 /// Image Asset Manager with Drag & Drop Upload
 /// Allows users to upload, manage, and select images for email campaigns
+/// Premium dark theme with stunning UI
 class ImageAssetManager extends StatefulWidget {
   final Function(String imageUrl) onImageSelected;
   final bool allowMultipleSelection;
@@ -78,78 +80,98 @@ class _ImageAssetManagerState extends State<ImageAssetManager> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 600,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Header
-          _buildHeader(),
+    return Theme(
+      data: CampaignBuilderTheme.darkTheme,
+      child: Container(
+        height: 600,
+        decoration: BoxDecoration(
+          color: CampaignBuilderTheme.slate,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: CampaignBuilderTheme.slateLight, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: CampaignBuilderTheme.moyDBlue.withOpacity(0.2),
+              blurRadius: 30,
+              spreadRadius: 2,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Header
+            _buildHeader(),
 
-          // Dropzone area for drag & drop upload
-          if (!_uploading) _buildDropzone(),
+            // Dropzone area for drag & drop upload
+            if (!_uploading) _buildDropzone(),
 
-          // Upload progress
-          if (_uploading) _buildUploadProgress(),
+            // Upload progress
+            if (_uploading) _buildUploadProgress(),
 
-          // Image grid
-          Expanded(
-            child: _buildImageGrid(),
-          ),
-        ],
+            // Image grid
+            Expanded(
+              child: _buildImageGrid(),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+        gradient: LinearGradient(
+          colors: [
+            CampaignBuilderTheme.moyDBlue.withOpacity(0.1),
+            CampaignBuilderTheme.brightBlue.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: const Border(bottom: BorderSide(color: CampaignBuilderTheme.slateLight)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E3A8A).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              gradient: const LinearGradient(
+                colors: [CampaignBuilderTheme.moyDBlue, CampaignBuilderTheme.brightBlue],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: CampaignBuilderTheme.moyDBlue.withOpacity(0.4),
+                  blurRadius: 12,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
             child: const Icon(
-              Icons.photo_library,
-              color: Color(0xFF1E3A8A),
-              size: 24,
+              Icons.photo_library_rounded,
+              color: Colors.white,
+              size: 28,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Image Library',
+                'Campaign Image Library',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: CampaignBuilderTheme.textPrimary,
                 ),
               ),
+              SizedBox(height: 4),
               Text(
-                'Upload and manage campaign images',
+                'Upload and manage images for your campaigns',
                 style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF64748B),
+                  fontSize: 14,
+                  color: CampaignBuilderTheme.textSecondary,
                 ),
               ),
             ],
@@ -159,18 +181,20 @@ class _ImageAssetManagerState extends State<ImageAssetManager> {
             onPressed: _uploading ? null : _uploadImage,
             icon: _uploading
                 ? const SizedBox(
-                    width: 16,
-                    height: 16,
+                    width: 18,
+                    height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
-                : const Icon(Icons.cloud_upload),
-            label: const Text('Upload'),
+                : const Icon(Icons.cloud_upload_rounded, size: 22),
+            label: const Text('Upload Image', style: TextStyle(fontWeight: FontWeight.w600)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E3A8A),
+              backgroundColor: CampaignBuilderTheme.moyDBlue,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+              elevation: 4,
+              shadowColor: CampaignBuilderTheme.moyDBlue.withOpacity(0.5),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
@@ -184,61 +208,72 @@ class _ImageAssetManagerState extends State<ImageAssetManager> {
       onEnter: (_) => setState(() => _dragOverZone = 'active'),
       onExit: (_) => setState(() => _dragOverZone = null),
       child: Container(
-        margin: const EdgeInsets.all(20),
-        height: 120,
+        margin: const EdgeInsets.all(24),
+        height: 140,
         decoration: BoxDecoration(
           border: Border.all(
             color: _dragOverZone == 'active'
-                ? const Color(0xFF10B981)
-                : const Color(0xFF1E3A8A),
+                ? CampaignBuilderTheme.successGreen
+                : CampaignBuilderTheme.brightBlue,
             width: 2,
             style: BorderStyle.solid,
           ),
-          borderRadius: BorderRadius.circular(12),
-          color: _dragOverZone == 'active'
-              ? const Color(0xFF10B981).withOpacity(0.1)
-              : const Color(0xFF1E3A8A).withOpacity(0.05),
+          borderRadius: BorderRadius.circular(16),
+          gradient: _dragOverZone == 'active'
+              ? LinearGradient(
+                  colors: [
+                    CampaignBuilderTheme.successGreen.withOpacity(0.15),
+                    CampaignBuilderTheme.successGreen.withOpacity(0.05),
+                  ],
+                )
+              : LinearGradient(
+                  colors: [
+                    CampaignBuilderTheme.brightBlue.withOpacity(0.1),
+                    CampaignBuilderTheme.brightBlue.withOpacity(0.05),
+                  ],
+                ),
         ),
         child: InkWell(
           onTap: _uploadImage,
+          borderRadius: BorderRadius.circular(16),
           child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   _dragOverZone == 'active'
-                      ? Icons.file_download
-                      : Icons.cloud_upload_outlined,
-                  size: 48,
+                      ? Icons.file_download_rounded
+                      : Icons.cloud_upload_rounded,
+                  size: 56,
                   color: _dragOverZone == 'active'
-                      ? const Color(0xFF10B981)
-                      : const Color(0xFF1E3A8A).withOpacity(0.5),
+                      ? CampaignBuilderTheme.successGreen
+                      : CampaignBuilderTheme.brightBlue,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
                   _dragOverZone == 'active'
                       ? 'Drop images here'
                       : 'Drag & drop images here',
                   style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    color: CampaignBuilderTheme.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
+                const SizedBox(height: 6),
+                const Text(
                   'or click to browse',
                   style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 12,
+                    color: CampaignBuilderTheme.textSecondary,
+                    fontSize: 13,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Text(
-                  'PNG, JPG, GIF up to 5MB',
+                  'PNG, JPG, GIF, WebP up to 5MB',
                   style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 11,
+                    color: CampaignBuilderTheme.textTertiary,
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -301,36 +336,54 @@ class _ImageAssetManagerState extends State<ImageAssetManager> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.image_not_supported_outlined,
-              size: 80,
-              color: Colors.grey[300],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No images yet',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[600],
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    CampaignBuilderTheme.brightBlue.withOpacity(0.2),
+                    CampaignBuilderTheme.brightBlue.withOpacity(0.05),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Upload your first image to get started',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
+              child: Icon(
+                Icons.add_photo_alternate_outlined,
+                size: 80,
+                color: CampaignBuilderTheme.brightBlue,
               ),
             ),
             const SizedBox(height: 24),
+            const Text(
+              'No images yet',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: CampaignBuilderTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Upload your first image to get started',
+              style: TextStyle(
+                fontSize: 15,
+                color: CampaignBuilderTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 32),
             ElevatedButton.icon(
               onPressed: _uploadImage,
-              icon: const Icon(Icons.add_photo_alternate),
-              label: const Text('Upload Image'),
+              icon: const Icon(Icons.cloud_upload_rounded, size: 22),
+              label: const Text('Upload Image', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1E3A8A),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                backgroundColor: CampaignBuilderTheme.moyDBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                elevation: 4,
+                shadowColor: CampaignBuilderTheme.moyDBlue.withOpacity(0.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
