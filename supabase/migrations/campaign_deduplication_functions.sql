@@ -1,30 +1,30 @@
--- Campaign Image Storage Bucket Setup
--- Creates storage bucket for campaign images with proper RLS policies
+-- Campaign Storage Bucket Setup
+-- Creates storage bucket for campaign assets (images, etc.) with proper RLS policies
 
--- Create campaign-images bucket if not exists
+-- Create campaigns bucket if not exists
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('campaign-images', 'campaign-images', true)
+VALUES ('campaigns', 'campaigns', true)
 ON CONFLICT (id) DO NOTHING;
 
--- RLS policies for campaign-images bucket
-CREATE POLICY IF NOT EXISTS "Anyone can view campaign images"
+-- RLS policies for campaigns bucket
+CREATE POLICY IF NOT EXISTS "Anyone can view campaign assets"
 ON storage.objects FOR SELECT
-USING (bucket_id = 'campaign-images');
+USING (bucket_id = 'campaigns');
 
-CREATE POLICY IF NOT EXISTS "Authenticated users can upload campaign images"
+CREATE POLICY IF NOT EXISTS "Authenticated users can upload campaign assets"
 ON storage.objects FOR INSERT
 TO authenticated
-WITH CHECK (bucket_id = 'campaign-images');
+WITH CHECK (bucket_id = 'campaigns');
 
-CREATE POLICY IF NOT EXISTS "Authenticated users can update campaign images"
+CREATE POLICY IF NOT EXISTS "Authenticated users can update campaign assets"
 ON storage.objects FOR UPDATE
 TO authenticated
-USING (bucket_id = 'campaign-images');
+USING (bucket_id = 'campaigns');
 
-CREATE POLICY IF NOT EXISTS "Authenticated users can delete campaign images"
+CREATE POLICY IF NOT EXISTS "Authenticated users can delete campaign assets"
 ON storage.objects FOR DELETE
 TO authenticated
-USING (bucket_id = 'campaign-images');
+USING (bucket_id = 'campaigns');
 
 -- ============================================================================
 -- RECIPIENT DEDUPLICATION FUNCTIONS

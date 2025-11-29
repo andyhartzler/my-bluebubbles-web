@@ -402,15 +402,24 @@ class _CampaignWizardScreenState extends State<CampaignWizardScreen>
 
   Widget _buildStepContent() {
     return Container(
-      color: CampaignBuilderTheme.darkNavy,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            CampaignBuilderTheme.darkNavy,
+            CampaignBuilderTheme.darkNavy.withBlue(25),
+          ],
+        ),
+      ),
       child: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
+              padding: const EdgeInsets.all(40),
               child: Center(
                 child: Container(
-                  constraints: const BoxConstraints(maxWidth: 900),
+                  constraints: const BoxConstraints(maxWidth: 1000),
                   child: FadeTransition(
                     opacity: _fadeAnimation,
                     child: _getStepWidget(_currentStep),

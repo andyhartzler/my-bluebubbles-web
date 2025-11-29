@@ -59,22 +59,15 @@ class EmailContentStep extends StatelessWidget {
   ) {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            CampaignBuilderTheme.moyDBlue.withOpacity(0.05),
-            CampaignBuilderTheme.brightBlue.withOpacity(0.03),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
+        color: CampaignBuilderTheme.slate,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: CampaignBuilderTheme.moyDBlue.withOpacity(0.2),
-          width: 2,
+          color: CampaignBuilderTheme.slateLight,
+          width: 1.5,
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 48),
+        padding: const EdgeInsets.symmetric(vertical: 100, horizontal: 60),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -86,8 +79,8 @@ class EmailContentStep extends StatelessWidget {
                 return Transform.scale(
                   scale: value,
                   child: Container(
-                    width: 120,
-                    height: 120,
+                    width: 100,
+                    height: 100,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
@@ -99,102 +92,68 @@ class EmailContentStep extends StatelessWidget {
                       boxShadow: [
                         BoxShadow(
                           color: CampaignBuilderTheme.moyDBlue.withOpacity(0.4),
-                          blurRadius: 30,
-                          spreadRadius: 5,
+                          blurRadius: 20,
+                          spreadRadius: 3,
                         ),
                       ],
                     ),
                     child: const Icon(
-                      Icons.palette_outlined,
-                      size: 60,
+                      Icons.email_outlined,
+                      size: 50,
                       color: Colors.white,
                     ),
                   ),
                 );
               },
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
 
             // Prompt text
             Text(
-              'Ready to create something amazing?',
+              'Design Your Email Content',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     color: CampaignBuilderTheme.textPrimary,
                     fontWeight: FontWeight.bold,
-                    fontSize: 28,
+                    fontSize: 26,
                   ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text(
-              'Design professional emails with our drag-and-drop visual builder',
+              'Use our powerful visual builder to create beautiful email designs',
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 17,
+                fontSize: 16,
                 color: CampaignBuilderTheme.textSecondary,
-                height: 1.6,
+                height: 1.5,
               ),
             ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 40),
 
             // Primary CTA - Open Visual Builder
             MouseRegion(
               cursor: SystemMouseCursors.click,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                child: ElevatedButton.icon(
-                  onPressed: () => _openVisualBuilder(context, provider),
-                  icon: const Icon(Icons.auto_awesome, size: 24),
-                  label: const Text(
-                    'Open Visual Builder',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              child: ElevatedButton.icon(
+                onPressed: () => _openVisualBuilder(context, provider),
+                icon: const Icon(Icons.auto_awesome, size: 22),
+                label: const Text(
+                  'Open the Visual Builder',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CampaignBuilderTheme.moyDBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 40,
+                    vertical: 18,
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: CampaignBuilderTheme.moyDBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 48,
-                      vertical: 20,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 8,
-                    shadowColor: CampaignBuilderTheme.moyDBlue.withOpacity(0.6),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  elevation: 6,
+                  shadowColor: CampaignBuilderTheme.moyDBlue.withOpacity(0.5),
                 ),
               ),
-            ),
-
-            const SizedBox(height: 28),
-
-            // Secondary options row
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () => _showAIAssistant(context, provider),
-                  icon: const Icon(Icons.psychology_outlined, size: 18),
-                  label: const Text('AI Assistant'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: CampaignBuilderTheme.brightBlue,
-                    side: BorderSide(color: CampaignBuilderTheme.brightBlue.withOpacity(0.3)),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  ),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _importHTML(context, provider),
-                  icon: const Icon(Icons.code_rounded, size: 18),
-                  label: const Text('Import HTML'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: CampaignBuilderTheme.textSecondary,
-                    side: BorderSide(color: CampaignBuilderTheme.slateLight.withOpacity(0.5)),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  ),
-                ),
-              ],
             ),
           ],
         ),

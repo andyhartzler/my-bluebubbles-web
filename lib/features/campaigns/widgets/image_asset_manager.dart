@@ -50,11 +50,11 @@ class _ImageAssetManagerState extends State<ImageAssetManager> {
     try {
       final supabase = Supabase.instance.client;
 
-      // List all files in campaign-images bucket
-      final files = await supabase.storage.from('campaign-images').list();
+      // List all files in campaigns bucket
+      final files = await supabase.storage.from('campaigns').list();
 
       final imageList = files.map((file) {
-        final url = supabase.storage.from('campaign-images').getPublicUrl(file.name);
+        final url = supabase.storage.from('campaigns').getPublicUrl(file.name);
         return {
           'name': file.name,
           'url': url,
@@ -454,8 +454,8 @@ class _ImageAssetManagerState extends State<ImageAssetManager> {
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
       final supabase = Supabase.instance.client;
 
-      // Upload to Supabase Storage
-      await supabase.storage.from('campaign-images').uploadBinary(
+      // Upload to Supabase Storage (campaigns bucket)
+      await supabase.storage.from('campaigns').uploadBinary(
             fileName,
             file.bytes!,
             fileOptions: FileOptions(
@@ -521,7 +521,7 @@ class _ImageAssetManagerState extends State<ImageAssetManager> {
 
     try {
       final supabase = Supabase.instance.client;
-      await supabase.storage.from('campaign-images').remove([fileName]);
+      await supabase.storage.from('campaigns').remove([fileName]);
 
       await _loadImages();
 
