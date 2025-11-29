@@ -479,49 +479,86 @@ class _ActionButton extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(64),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.email_outlined,
-            size: 80,
-            color: Colors.grey[600],
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Start building your email',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+    final provider = context.watch<EmailBuilderProvider>();
+    final theme = Theme.of(context);
+
+    return DragTarget<EmailComponent>(
+      onWillAcceptWithDetails: (details) =>
+          !provider.isPreviewMode && details.data != null,
+      onAcceptWithDetails: (details) {
+        final newSection = context.read<EmailBuilderProvider>().addSection();
+        final newColumnId = newSection.columns.first.id;
+
+        context.read<EmailBuilderProvider>().addComponent(
+              newSection.id,
+              newColumnId,
+              details.data,
+            );
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHighlighted = candidateData.isNotEmpty;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(64),
+          decoration: BoxDecoration(
+            color: isHighlighted
+                ? theme.primaryColor.withOpacity(0.05)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isHighlighted
+                  ? theme.primaryColor.withOpacity(0.8)
+                  : Colors.grey.withOpacity(0.2),
+              width: 2,
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Drag content blocks from the left sidebar\nor click "Add Section" below',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[700],
-            ),
-            textAlign: TextAlign.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.email_outlined,
+                size: 80,
+                color: isHighlighted
+                    ? theme.primaryColor
+                    : Colors.grey[600],
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Start building your email',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Drag content blocks from the left sidebar\nor click "Add Section" below',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[700],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {
+                  _showAddSectionDialog(context);
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Add Your First Section'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E3A8A),
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () {
-              _showAddSectionDialog(context);
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Add Your First Section'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E3A8A),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

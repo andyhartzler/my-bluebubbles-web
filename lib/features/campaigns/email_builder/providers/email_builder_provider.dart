@@ -37,7 +37,7 @@ class EmailBuilderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addSection({int? index}) {
+  EmailSection addSection({int? index}) {
     final section = EmailSection(
       id: _uuid.v4(),
       columns: [
@@ -58,6 +58,7 @@ class EmailBuilderProvider extends ChangeNotifier {
     _document = _document.copyWith(sections: sections);
     _saveToHistory();
     notifyListeners();
+    return section;
   }
 
   void duplicateSection(String sectionId) {
