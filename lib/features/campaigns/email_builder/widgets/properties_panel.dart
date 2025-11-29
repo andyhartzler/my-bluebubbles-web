@@ -66,6 +66,10 @@ class PropertiesPanel extends StatelessWidget {
             divider: (id, _) => id,
             spacer: (id, _) => id,
             social: (id, _, __) => id,
+            avatar: (id, _, __, ___) => id,
+            heading: (id, _, __) => id,
+            html: (id, _, __) => id,
+            container: (id, _, __) => id,
           );
           if (id == provider.selectedComponentId) {
             selectedComponent = component;
@@ -111,6 +115,50 @@ class PropertiesPanel extends StatelessWidget {
         sectionId: sectionId!,
         columnId: columnId!,
         component: selectedComponent as SocialComponent,
+      ),
+      avatar: (id, imageUrl, alt, style) => _buildPlaceholderProperties(
+        'Avatar Properties',
+        'Avatar component properties panel coming soon!',
+      ),
+      heading: (id, content, style) => _buildPlaceholderProperties(
+        'Heading Properties',
+        'Heading component properties panel coming soon!',
+      ),
+      html: (id, htmlContent, style) => _buildPlaceholderProperties(
+        'HTML Properties',
+        'HTML component properties panel coming soon!',
+      ),
+      container: (id, children, style) => _buildPlaceholderProperties(
+        'Container Properties',
+        'Container component properties panel coming soon!',
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderProperties(String title, String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.construction, size: 48, color: Colors.orange),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
       ),
     );
   }
