@@ -9,6 +9,51 @@ import '../providers/email_builder_provider.dart';
 class ComponentPalette extends StatelessWidget {
   const ComponentPalette({super.key});
 
+  // Create component templates as static methods to avoid regenerating UUIDs
+  static EmailComponent _createSpacerTemplate() => EmailComponent.spacer(
+        id: const Uuid().v4(),
+        height: 40,
+      );
+
+  static EmailComponent _createTextTemplate() => EmailComponent.text(
+        id: const Uuid().v4(),
+        content: 'Enter your text here...',
+      );
+
+  static EmailComponent _createImageTemplate() => EmailComponent.image(
+        id: const Uuid().v4(),
+        url: 'https://via.placeholder.com/600x300',
+        alt: 'Placeholder image',
+      );
+
+  static EmailComponent _createButtonTemplate() => EmailComponent.button(
+        id: const Uuid().v4(),
+        text: 'Click Here',
+        url: 'https://example.com',
+      );
+
+  static EmailComponent _createDividerTemplate() => EmailComponent.divider(
+        id: const Uuid().v4(),
+      );
+
+  static EmailComponent _createSocialTemplate() => EmailComponent.social(
+        id: const Uuid().v4(),
+        links: const [
+          SocialLink(
+            platform: 'facebook',
+            url: 'https://facebook.com',
+          ),
+          SocialLink(
+            platform: 'twitter',
+            url: 'https://twitter.com',
+          ),
+          SocialLink(
+            platform: 'instagram',
+            url: 'https://instagram.com',
+          ),
+        ],
+      );
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -43,10 +88,7 @@ class ComponentPalette extends StatelessWidget {
                   _ComponentItem(
                     icon: Icons.space_bar,
                     label: 'Spacer',
-                    component: EmailComponent.spacer(
-                      id: const Uuid().v4(),
-                      height: 40,
-                    ),
+                    componentFactory: _createSpacerTemplate,
                   ),
                 ],
               ),
@@ -57,56 +99,27 @@ class ComponentPalette extends StatelessWidget {
                   _ComponentItem(
                     icon: Icons.text_fields,
                     label: 'Text',
-                    component: EmailComponent.text(
-                      id: const Uuid().v4(),
-                      content: 'Enter your text here...',
-                    ),
+                    componentFactory: _createTextTemplate,
                   ),
                   _ComponentItem(
                     icon: Icons.image,
                     label: 'Image',
-                    component: EmailComponent.image(
-                      id: const Uuid().v4(),
-                      url: 'https://via.placeholder.com/600x300',
-                      alt: 'Placeholder image',
-                    ),
+                    componentFactory: _createImageTemplate,
                   ),
                   _ComponentItem(
                     icon: Icons.smart_button,
                     label: 'Button',
-                    component: EmailComponent.button(
-                      id: const Uuid().v4(),
-                      text: 'Click Here',
-                      url: 'https://example.com',
-                    ),
+                    componentFactory: _createButtonTemplate,
                   ),
                   _ComponentItem(
                     icon: Icons.horizontal_rule,
                     label: 'Divider',
-                    component: EmailComponent.divider(
-                      id: const Uuid().v4(),
-                    ),
+                    componentFactory: _createDividerTemplate,
                   ),
                   _ComponentItem(
                     icon: Icons.share,
                     label: 'Social',
-                    component: EmailComponent.social(
-                      id: const Uuid().v4(),
-                      links: const [
-                        SocialLink(
-                          platform: 'facebook',
-                          url: 'https://facebook.com',
-                        ),
-                        SocialLink(
-                          platform: 'twitter',
-                          url: 'https://twitter.com',
-                        ),
-                        SocialLink(
-                          platform: 'instagram',
-                          url: 'https://instagram.com',
-                        ),
-                      ],
-                    ),
+                    componentFactory: _createSocialTemplate,
                   ),
                 ],
               ),
@@ -163,20 +176,20 @@ class _ComponentCategory extends StatelessWidget {
 class _ComponentItem extends StatelessWidget {
   final IconData icon;
   final String label;
-  final EmailComponent? component;
+  final EmailComponent Function()? componentFactory;
   final VoidCallback? onTap;
 
   const _ComponentItem({
     required this.icon,
     required this.label,
-    this.component,
+    this.componentFactory,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    // If there's no component, only show the click handler (for Section and Columns)
-    if (component == null) {
+    // If there's no component factory, only show the click handler (for Section and Columns)
+    if (componentFactory == null) {
       return InkWell(
         onTap: onTap,
         child: _buildCard(context),
@@ -184,8 +197,10 @@ class _ComponentItem extends StatelessWidget {
     }
 
     // For actual components, make them draggable
-    return Draggable<EmailComponent>(
-      data: component,
+    // Use LongPressDraggable for better mobile support and clearer drag initiation
+    return LongPressDraggable<EmailComponent>(
+      // Generate a fresh component each time drag starts
+      data: componentFactory!(),
       feedback: Material(
         elevation: 8,
         borderRadius: BorderRadius.circular(8),
@@ -226,10 +241,7 @@ class _ComponentItem extends StatelessWidget {
         opacity: 0.4,
         child: _buildCard(context),
       ),
-      child: InkWell(
-        onTap: onTap,
-        child: _buildCard(context),
-      ),
+      child: _buildCard(context),
     );
   }
 
@@ -259,7 +271,11 @@ class _ColumnLayoutDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Select Column Layout'),
+      backgroundColor: const Color(0xFF1E293B), // slate color for dark theme
+      title: const Text(
+        'Select Column Layout',
+        style: TextStyle(color: Colors.white),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -336,7 +352,8 @@ class _LayoutOption extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[300]!),
+          color: const Color(0xFF0F172A), // darkNavy
+          border: Border.all(color: const Color(0xFF334155)), // slateLight
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -344,7 +361,10 @@ class _LayoutOption extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
               ),
             ),
             Row(
@@ -358,7 +378,7 @@ class _LayoutOption extends StatelessWidget {
                         margin: const EdgeInsets.symmetric(horizontal: 2),
                         decoration: BoxDecoration(
                           color:
-                              Theme.of(context).primaryColor.withOpacity(0.3),
+                              Theme.of(context).primaryColor.withOpacity(0.5),
                           border:
                               Border.all(color: Theme.of(context).primaryColor),
                         ),

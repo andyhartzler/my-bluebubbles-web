@@ -236,9 +236,14 @@ class _ColumnWidget extends StatelessWidget {
     final provider = context.watch<EmailBuilderProvider>();
 
     return DragTarget<EmailComponent>(
-      onWillAccept: (component) => component != null,
-      onAccept: (component) {
-        provider.addComponent(sectionId, column.id, component);
+      onWillAcceptWithDetails: (details) => details.data != null,
+      onAcceptWithDetails: (details) {
+        // Use context.read to ensure we get the current provider instance
+        context.read<EmailBuilderProvider>().addComponent(
+          sectionId,
+          column.id,
+          details.data,
+        );
       },
       builder: (context, candidateData, rejectedData) {
         final isHighlighted = candidateData.isNotEmpty;
@@ -511,14 +516,21 @@ class _AddSectionDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add New Section'),
+      backgroundColor: const Color(0xFF1E293B), // slate color for dark theme
+      title: const Text(
+        'Add New Section',
+        style: TextStyle(color: Colors.white),
+      ),
       content: SizedBox(
         width: 400,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Choose a layout for your new section:'),
+            const Text(
+              'Choose a layout for your new section:',
+              style: TextStyle(color: Color(0xFFCBD5E1)),
+            ),
             const SizedBox(height: 16),
             _LayoutOption(
               label: 'Single Column',
@@ -604,6 +616,7 @@ class _LayoutOptionState extends State<_LayoutOption> {
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: Card(
+        color: const Color(0xFF0F172A), // darkNavy for card background
         elevation: _isHovered ? 4 : 1,
         margin: const EdgeInsets.only(bottom: 12),
         child: InkWell(
@@ -618,7 +631,7 @@ class _LayoutOptionState extends State<_LayoutOption> {
                   width: 80,
                   height: 40,
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
+                    border: Border.all(color: const Color(0xFF334155)), // slateLight
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -628,7 +641,7 @@ class _LayoutOptionState extends State<_LayoutOption> {
                         child: Container(
                           margin: const EdgeInsets.all(2),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor.withOpacity(0.3),
+                            color: Theme.of(context).primaryColor.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -646,23 +659,24 @@ class _LayoutOptionState extends State<_LayoutOption> {
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
+                          color: Colors.white, // Ensure text is white
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         widget.description,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: Color(0xFF94A3B8), // textTertiary
                         ),
                       ),
                     ],
                   ),
                 ),
-                Icon(
+                const Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
-                  color: Colors.grey[400],
+                  color: Color(0xFF94A3B8), // textTertiary
                 ),
               ],
             ),
