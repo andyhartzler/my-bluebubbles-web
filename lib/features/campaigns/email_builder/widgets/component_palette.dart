@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -245,52 +246,70 @@ class _ComponentItem extends StatelessWidget {
     }
 
     // For actual components, make them draggable
-    // Use LongPressDraggable for better mobile support and clearer drag initiation
-    return LongPressDraggable<EmailComponent>(
-      // Generate a fresh component each time drag starts
-      data: componentFactory!(),
-      feedback: Material(
-        elevation: 8,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          width: 140,
-          height: 70,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+    final feedback = Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 140,
+        height: 70,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+          ),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E3A8A).withOpacity(0.5),
+              blurRadius: 12,
+              spreadRadius: 2,
             ),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF1E3A8A).withOpacity(0.5),
-                blurRadius: 12,
-                spreadRadius: 2,
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 32),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: Colors.white, size: 32),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+
+    final draggable = Draggable<EmailComponent>(
+      data: componentFactory!(),
+      feedback: feedback,
       childWhenDragging: Opacity(
         opacity: 0.4,
         child: _buildCard(context),
       ),
       child: _buildCard(context),
     );
+
+    final useLongPress = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+
+    if (useLongPress) {
+      return LongPressDraggable<EmailComponent>(
+        data: componentFactory!(),
+        feedback: feedback,
+        childWhenDragging: Opacity(
+          opacity: 0.4,
+          child: _buildCard(context),
+        ),
+        child: _buildCard(context),
+      );
+    }
+
+    return draggable;
   }
 
   Widget _buildCard(BuildContext context) {
