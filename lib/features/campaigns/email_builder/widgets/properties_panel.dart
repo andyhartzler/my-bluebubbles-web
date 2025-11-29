@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/email_component.dart';
 import '../providers/email_builder_provider.dart';
 import 'color_picker_field.dart';
+import '../../widgets/image_asset_manager.dart';
 
 class PropertiesPanel extends StatelessWidget {
   const PropertiesPanel({super.key});
@@ -441,6 +442,23 @@ class _ImageComponentProperties extends StatelessWidget {
       children: [
         Text('Image Component', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _showImagePicker(context, provider),
+            icon: const Icon(Icons.cloud_upload),
+            label: const Text('Upload or Select Image'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Use the library above or paste a direct link to your image.',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 12),
         TextFormField(
           initialValue: component.url,
           decoration: const InputDecoration(
@@ -583,6 +601,26 @@ class _ImageComponentProperties extends StatelessWidget {
           onChanged: onChanged,
         ),
       ],
+    );
+  }
+
+  void _showImagePicker(BuildContext context, EmailBuilderProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: SizedBox(
+          width: 900,
+          child: ImageAssetManager(
+            onImageSelected: (imageUrl) {
+              provider.updateComponent(
+                sectionId,
+                columnId,
+                component.copyWith(url: imageUrl),
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 }
