@@ -75,37 +75,34 @@ class ImageComponentRenderer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget image = ClipRRect(
-      borderRadius: BorderRadius.circular(style.borderRadius),
-      child: Image.network(
-        url,
-        width: style.width == '100%'
-            ? double.infinity
-            : double.tryParse(style.width.replaceAll('px', '')),
-        height: style.height != null
-            ? double.tryParse(style.height!.replaceAll('px', ''))
-            : null,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            width: double.infinity,
-            height: 200,
-            color: Colors.grey[200],
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.broken_image, size: 48, color: Colors.grey[400]),
-                const SizedBox(height: 8),
-                Text(
-                  'Image failed to load',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
+    Widget image;
+
+    if (url.trim().isEmpty) {
+      image = _buildPlaceholder(
+        message: 'Add an image from the Properties panel',
+        icon: Icons.image_outlined,
+      );
+    } else {
+      image = ClipRRect(
+        borderRadius: BorderRadius.circular(style.borderRadius),
+        child: Image.network(
+          url,
+          width: style.width == '100%'
+              ? double.infinity
+              : double.tryParse(style.width.replaceAll('px', '')),
+          height: style.height != null
+              ? double.tryParse(style.height!.replaceAll('px', ''))
+              : null,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildPlaceholder(
+              message: 'Image failed to load. Use Properties to replace it.',
+              icon: Icons.broken_image_outlined,
+            );
+          },
+        ),
+      );
+    }
 
     if (link != null && link!.isNotEmpty) {
       image = MouseRegion(
@@ -127,6 +124,34 @@ class ImageComponentRenderer extends StatelessWidget {
         right: style.paddingRight,
       ),
       child: _alignWidget(image, style.alignment),
+    );
+  }
+
+  Widget _buildPlaceholder({required String message, required IconData icon}) {
+    final placeholderHeight = style.height != null
+        ? double.tryParse(style.height!.replaceAll('px', ''))
+        : 200.0;
+
+    return Container(
+      width: double.infinity,
+      height: placeholderHeight,
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(style.borderRadius),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 48, color: Colors.grey[500]),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ],
+      ),
     );
   }
 
