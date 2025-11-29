@@ -201,6 +201,13 @@ class HtmlExporter {
       divider: (id, style) => _exportDividerComponent(style),
       spacer: (id, height) => _exportSpacerComponent(height),
       social: (id, links, style) => _exportSocialComponent(links, style),
+      avatar: (id, imageUrl, alt, style) =>
+          _exportAvatarComponent(imageUrl, alt, style),
+      heading: (id, content, style) => _exportHeadingComponent(content, style),
+      html: (id, htmlContent, style) =>
+          _exportHtmlComponent(htmlContent, style),
+      container: (id, children, style) =>
+          _exportContainerComponent(children, style),
     );
   }
 
@@ -219,6 +226,8 @@ class HtmlExporter {
   line-height: ${style.lineHeight};
   margin-top: ${style.paddingTop}px;
   margin-bottom: ${style.paddingBottom}px;
+  margin-left: ${style.paddingLeft}px;
+  margin-right: ${style.paddingRight}px;
 ">
   $processedContent
 </p>
@@ -255,7 +264,7 @@ class HtmlExporter {
     }
 
     return '''
-<div style="text-align: ${style.alignment}; margin-top: ${style.paddingTop}px; margin-bottom: ${style.paddingBottom}px;">
+<div style="text-align: ${style.alignment}; margin-top: ${style.paddingTop}px; margin-bottom: ${style.paddingBottom}px; margin-left: ${style.paddingLeft}px; margin-right: ${style.paddingRight}px;">
   $img
 </div>
 ''';
@@ -307,6 +316,75 @@ class HtmlExporter {
     return '''
 <div style="text-align: ${style.alignment}; margin-top: ${style.marginTop}px; margin-bottom: ${style.marginBottom}px;">
   $icons
+</div>
+''';
+  }
+
+  // New email-builder-js component exporters
+  String _exportAvatarComponent(
+      String imageUrl, String? alt, AvatarComponentStyle style) {
+    final borderRadius = style.shape ? '${style.size / 2}px' : '0';
+    final border = style.borderColor != null && style.borderWidth > 0
+        ? 'border: ${style.borderWidth}px solid ${style.borderColor};'
+        : '';
+
+    return '''
+<div style="text-align: ${style.alignment}; margin-top: ${style.paddingTop}px; margin-bottom: ${style.paddingBottom}px; margin-left: ${style.paddingLeft}px; margin-right: ${style.paddingRight}px;">
+  <img src="$imageUrl" alt="${alt ?? ''}" style="width: ${style.size}px; height: ${style.size}px; border-radius: $borderRadius; $border display: block;">
+</div>
+''';
+  }
+
+  String _exportHeadingComponent(
+      String content, HeadingComponentStyle style) {
+    // Process merge tags
+    final processedContent = _processMergeTags(content);
+
+    return '''
+<h1 style="
+  font-size: ${style.fontSize}px;
+  color: ${style.color};
+  text-align: ${style.alignment};
+  font-weight: ${style.bold ? 'bold' : 'normal'};
+  font-style: ${style.italic ? 'italic' : 'normal'};
+  text-decoration: ${style.underline ? 'underline' : 'none'};
+  line-height: ${style.lineHeight};
+  margin-top: ${style.paddingTop}px;
+  margin-bottom: ${style.paddingBottom}px;
+  margin-left: ${style.paddingLeft}px;
+  margin-right: ${style.paddingRight}px;
+">
+  $processedContent
+</h1>
+''';
+  }
+
+  String _exportHtmlComponent(
+      String htmlContent, HtmlComponentStyle style) {
+    return '''
+<div style="margin-top: ${style.paddingTop}px; margin-bottom: ${style.paddingBottom}px; margin-left: ${style.paddingLeft}px; margin-right: ${style.paddingRight}px;">
+  $htmlContent
+</div>
+''';
+  }
+
+  String _exportContainerComponent(
+      List<EmailComponent> children, ContainerComponentStyle style) {
+    final border = style.borderColor != null && style.borderWidth > 0
+        ? 'border: ${style.borderWidth}px solid ${style.borderColor};'
+        : '';
+
+    return '''
+<div style="
+  background-color: ${style.backgroundColor};
+  padding-top: ${style.paddingTop}px;
+  padding-bottom: ${style.paddingBottom}px;
+  padding-left: ${style.paddingLeft}px;
+  padding-right: ${style.paddingRight}px;
+  border-radius: ${style.borderRadius}px;
+  $border
+">
+  ${children.map(_exportComponent).join('\n')}
 </div>
 ''';
   }

@@ -342,6 +342,10 @@ class _ComponentWidgetState extends State<_ComponentWidget> {
       divider: (id, _) => id,
       spacer: (id, _) => id,
       social: (id, _, __) => id,
+      avatar: (id, _, __, ___) => id,
+      heading: (id, _, __) => id,
+      html: (id, _, __) => id,
+      container: (id, _, __) => id,
     );
     final isSelected = provider.selectedComponentId == componentId;
 
@@ -383,6 +387,23 @@ class _ComponentWidgetState extends State<_ComponentWidget> {
                 spacer: (id, height) => SpacerComponentRenderer(height: height),
                 social: (id, links, style) => SocialComponentRenderer(
                   links: links,
+                  style: style,
+                ),
+                avatar: (id, imageUrl, alt, style) => AvatarComponentRenderer(
+                  imageUrl: imageUrl,
+                  alt: alt,
+                  style: style,
+                ),
+                heading: (id, content, style) => HeadingComponentRenderer(
+                  content: content,
+                  style: style,
+                ),
+                html: (id, htmlContent, style) => HtmlComponentRenderer(
+                  htmlContent: htmlContent,
+                  style: style,
+                ),
+                container: (id, children, style) => ContainerComponentRenderer(
+                  children: children,
                   style: style,
                 ),
               ),

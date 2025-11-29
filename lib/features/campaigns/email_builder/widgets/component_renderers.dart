@@ -18,6 +18,8 @@ class TextComponentRenderer extends StatelessWidget {
       padding: EdgeInsets.only(
         top: style.paddingTop,
         bottom: style.paddingBottom,
+        left: style.paddingLeft,
+        right: style.paddingRight,
       ),
       child: Text(
         content,
@@ -121,6 +123,8 @@ class ImageComponentRenderer extends StatelessWidget {
       padding: EdgeInsets.only(
         top: style.paddingTop,
         bottom: style.paddingBottom,
+        left: style.paddingLeft,
+        right: style.paddingRight,
       ),
       child: _alignWidget(image, style.alignment),
     );
@@ -350,5 +354,249 @@ class SocialComponentRenderer extends StatelessWidget {
       default:
         return child;
     }
+  }
+}
+
+// New email-builder-js component renderers
+class AvatarComponentRenderer extends StatelessWidget {
+  final String imageUrl;
+  final String? alt;
+  final AvatarComponentStyle style;
+
+  const AvatarComponentRenderer({
+    super.key,
+    required this.imageUrl,
+    this.alt,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = Container(
+      width: style.size,
+      height: style.size,
+      decoration: BoxDecoration(
+        shape: style.shape ? BoxShape.circle : BoxShape.rectangle,
+        border: style.borderColor != null && style.borderWidth > 0
+            ? Border.all(
+                color: _hexToColor(style.borderColor!),
+                width: style.borderWidth,
+              )
+            : null,
+        image: DecorationImage(
+          image: NetworkImage(imageUrl),
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.only(
+        top: style.paddingTop,
+        bottom: style.paddingBottom,
+        left: style.paddingLeft,
+        right: style.paddingRight,
+      ),
+      child: _alignWidget(avatar, style.alignment),
+    );
+  }
+
+  Widget _alignWidget(Widget child, String alignment) {
+    switch (alignment) {
+      case 'left':
+        return Align(alignment: Alignment.centerLeft, child: child);
+      case 'center':
+        return Center(child: child);
+      case 'right':
+        return Align(alignment: Alignment.centerRight, child: child);
+      default:
+        return Center(child: child);
+    }
+  }
+
+  Color _hexToColor(String hex) {
+    hex = hex.replaceAll('#', '');
+    return Color(int.parse('FF$hex', radix: 16));
+  }
+}
+
+class HeadingComponentRenderer extends StatelessWidget {
+  final String content;
+  final HeadingComponentStyle style;
+
+  const HeadingComponentRenderer({
+    super.key,
+    required this.content,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        top: style.paddingTop,
+        bottom: style.paddingBottom,
+        left: style.paddingLeft,
+        right: style.paddingRight,
+      ),
+      child: Text(
+        content,
+        textAlign: _getTextAlign(style.alignment),
+        style: TextStyle(
+          fontSize: style.fontSize,
+          color: _hexToColor(style.color),
+          fontWeight: style.bold ? FontWeight.bold : FontWeight.normal,
+          fontStyle: style.italic ? FontStyle.italic : FontStyle.normal,
+          decoration:
+              style.underline ? TextDecoration.underline : TextDecoration.none,
+          height: style.lineHeight,
+          fontFamily: style.fontFamily,
+        ),
+      ),
+    );
+  }
+
+  TextAlign _getTextAlign(String alignment) {
+    switch (alignment) {
+      case 'left':
+        return TextAlign.left;
+      case 'center':
+        return TextAlign.center;
+      case 'right':
+        return TextAlign.right;
+      case 'justify':
+        return TextAlign.justify;
+      default:
+        return TextAlign.left;
+    }
+  }
+
+  Color _hexToColor(String hex) {
+    hex = hex.replaceAll('#', '');
+    return Color(int.parse('FF$hex', radix: 16));
+  }
+}
+
+class HtmlComponentRenderer extends StatelessWidget {
+  final String htmlContent;
+  final HtmlComponentStyle style;
+
+  const HtmlComponentRenderer({
+    super.key,
+    required this.htmlContent,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        top: style.paddingTop,
+        bottom: style.paddingBottom,
+        left: style.paddingLeft,
+        right: style.paddingRight,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.code, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 8),
+                Text(
+                  'HTML Content',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              htmlContent.isEmpty ? '<empty>' : htmlContent,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[800],
+                fontFamily: 'monospace',
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ContainerComponentRenderer extends StatelessWidget {
+  final List<EmailComponent> children;
+  final ContainerComponentStyle style;
+
+  const ContainerComponentRenderer({
+    super.key,
+    required this.children,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(
+        top: style.paddingTop,
+        bottom: style.paddingBottom,
+        left: style.paddingLeft,
+        right: style.paddingRight,
+      ),
+      decoration: BoxDecoration(
+        color: _hexToColor(style.backgroundColor),
+        borderRadius: BorderRadius.circular(style.borderRadius),
+        border: style.borderColor != null && style.borderWidth > 0
+            ? Border.all(
+                color: _hexToColor(style.borderColor!),
+                width: style.borderWidth,
+              )
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children.map((child) {
+          return child.when(
+            text: (id, content, style) =>
+                TextComponentRenderer(content: content, style: style),
+            image: (id, url, alt, link, style) =>
+                ImageComponentRenderer(url: url, alt: alt, link: link, style: style),
+            button: (id, text, url, style) =>
+                ButtonComponentRenderer(text: text, url: url, style: style),
+            divider: (id, style) => DividerComponentRenderer(style: style),
+            spacer: (id, height) => SpacerComponentRenderer(height: height),
+            social: (id, links, style) =>
+                SocialComponentRenderer(links: links, style: style),
+            avatar: (id, imageUrl, alt, style) =>
+                AvatarComponentRenderer(imageUrl: imageUrl, alt: alt, style: style),
+            heading: (id, content, style) =>
+                HeadingComponentRenderer(content: content, style: style),
+            html: (id, htmlContent, style) =>
+                HtmlComponentRenderer(htmlContent: htmlContent, style: style),
+            container: (id, children, style) =>
+                ContainerComponentRenderer(children: children, style: style),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Color _hexToColor(String hex) {
+    hex = hex.replaceAll('#', '');
+    return Color(int.parse('FF$hex', radix: 16));
   }
 }
