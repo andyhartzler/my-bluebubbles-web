@@ -747,9 +747,10 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
   }
 
   bool _showFilters(CampaignWizardProvider provider) {
-    return provider.selectedSegmentType != null &&
-        provider.selectedSegmentType != SegmentType.eventAttendees &&
-        provider.selectedSegmentType != SegmentType.everyone;
+    // Only show filters for subscribers, members, and donors
+    return provider.selectedSegmentType == SegmentType.allSubscribers ||
+        provider.selectedSegmentType == SegmentType.allMembers ||
+        provider.selectedSegmentType == SegmentType.allDonors;
   }
 
   List<_SegmentOption> _getSegmentOptions() {
