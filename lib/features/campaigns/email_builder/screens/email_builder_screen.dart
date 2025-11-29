@@ -10,6 +10,7 @@ import '../widgets/builder_toolbar.dart';
 import '../widgets/canvas_area.dart';
 import '../widgets/component_palette.dart';
 import '../widgets/properties_panel.dart';
+import '../../theme/campaign_builder_theme.dart';
 
 class EmailBuilderScreen extends StatefulWidget {
   final String? campaignId;
@@ -36,40 +37,68 @@ class _EmailBuilderScreenState extends State<EmailBuilderScreen> {
         builder: (context) {
           final provider = context.watch<EmailBuilderProvider>();
 
-          return Scaffold(
-            backgroundColor: Colors.grey[100],
-            appBar: AppBar(
-              title: const Text('Email Builder'),
-              actions: [
-                BuilderToolbar(
-                  onSave: () => _handleSave(context),
-                  onPreview: provider.togglePreviewMode,
-                  onUndo: provider.canUndo ? provider.undo : null,
-                  onRedo: provider.canRedo ? provider.redo : null,
+          return Theme(
+            data: CampaignBuilderTheme.darkTheme,
+            child: Scaffold(
+              backgroundColor: CampaignBuilderTheme.darkNavy,
+              appBar: AppBar(
+                backgroundColor: CampaignBuilderTheme.slate,
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [CampaignBuilderTheme.moyDBlue, CampaignBuilderTheme.brightBlue],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.palette_outlined, size: 20, color: Colors.white),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Visual Email Builder', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ],
                 ),
-              ],
-            ),
-            body: Row(
-              children: [
-                if (!provider.isPreviewMode)
-                  Container(
-                    width: 280,
-                    color: Colors.white,
-                    child: const ComponentPalette(),
+                actions: [
+                  BuilderToolbar(
+                    onSave: () => _handleSave(context),
+                    onPreview: provider.togglePreviewMode,
+                    onUndo: provider.canUndo ? provider.undo : null,
+                    onRedo: provider.canRedo ? provider.redo : null,
                   ),
-                Expanded(
-                  child: Container(
-                    color: Colors.grey[200],
-                    child: const Center(child: CanvasArea()),
+                ],
+              ),
+              body: Row(
+                children: [
+                  // Left Panel - Component Palette
+                  if (!provider.isPreviewMode)
+                    Container(
+                      width: 280,
+                      decoration: const BoxDecoration(
+                        color: CampaignBuilderTheme.slate,
+                        border: Border(right: BorderSide(color: CampaignBuilderTheme.slateLight)),
+                      ),
+                      child: const ComponentPalette(),
+                    ),
+                  // Center - Canvas Area
+                  Expanded(
+                    child: Container(
+                      color: CampaignBuilderTheme.darkNavy,
+                      child: const Center(child: CanvasArea()),
+                    ),
                   ),
-                ),
-                if (!provider.isPreviewMode)
-                  Container(
-                    width: 320,
-                    color: Colors.white,
-                    child: const PropertiesPanel(),
-                  ),
-              ],
+                  // Right Panel - Properties
+                  if (!provider.isPreviewMode)
+                    Container(
+                      width: 320,
+                      decoration: const BoxDecoration(
+                        color: CampaignBuilderTheme.slate,
+                        border: Border(left: BorderSide(color: CampaignBuilderTheme.slateLight)),
+                      ),
+                      child: const PropertiesPanel(),
+                    ),
+                ],
+              ),
             ),
           );
         },

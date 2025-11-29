@@ -147,7 +147,10 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to count all unique contacts across all tables (deduplicated)
-CREATE OR REPLACE FUNCTION count_all_unique_contacts()
+CREATE OR REPLACE FUNCTION count_all_unique_contacts(
+  p_congressional_districts TEXT[] DEFAULT NULL,
+  p_counties TEXT[] DEFAULT NULL
+)
 RETURNS INTEGER AS $$
 DECLARE
   v_count INTEGER;
@@ -161,6 +164,14 @@ BEGIN
     WHERE email IS NOT NULL
       AND email != ''
       AND subscription_status = 'subscribed'
+      AND (
+        p_congressional_districts IS NULL
+        OR congressional_district = ANY(p_congressional_districts)
+      )
+      AND (
+        p_counties IS NULL
+        OR county = ANY(p_counties)
+      )
 
     UNION
 
@@ -169,6 +180,15 @@ BEGIN
     FROM members
     WHERE email IS NOT NULL
       AND email != ''
+      AND opt_out = false
+      AND (
+        p_congressional_districts IS NULL
+        OR congressional_district = ANY(p_congressional_districts)
+      )
+      AND (
+        p_counties IS NULL
+        OR county = ANY(p_counties)
+      )
 
     UNION
 
@@ -177,6 +197,14 @@ BEGIN
     FROM donors
     WHERE email IS NOT NULL
       AND email != ''
+      AND (
+        p_congressional_districts IS NULL
+        OR congressional_district = ANY(p_congressional_districts)
+      )
+      AND (
+        p_counties IS NULL
+        OR county = ANY(p_counties)
+      )
 
     UNION
 
@@ -186,6 +214,15 @@ BEGIN
     JOIN members m ON ea.member_id = m.id
     WHERE m.email IS NOT NULL
       AND m.email != ''
+      AND m.opt_out = false
+      AND (
+        p_congressional_districts IS NULL
+        OR m.congressional_district = ANY(p_congressional_districts)
+      )
+      AND (
+        p_counties IS NULL
+        OR m.county = ANY(p_counties)
+      )
 
     UNION
 
@@ -214,7 +251,7 @@ BEGIN
   RETURN QUERY
   SELECT DISTINCT ON (LOWER(TRIM(s.email)))
     s.email,
-    COALESCE(s.first_name || ' ' || s.last_name, s.email) AS name,
+    COALESCE(s.name, s.email) AS name,
     s.congressional_district,
     s.county
   FROM subscribers s
@@ -243,11 +280,11 @@ BEGIN
   RETURN QUERY
   SELECT DISTINCT ON (LOWER(TRIM(m.email)))
     m.email,
-    COALESCE(m.first_name || ' ' || m.last_name, m.email) AS name,
+    COALESCE(m.name, m.email) AS name,
     m.congressional_district,
     m.county
   FROM members m
-  WHERE m.current_chapter_member = 'Yes'
+  WHERE m.opt_out = false
     AND m.email IS NOT NULL
     AND m.email != ''
     AND (
@@ -272,7 +309,7 @@ BEGIN
   RETURN QUERY
   SELECT DISTINCT ON (LOWER(TRIM(d.email)))
     d.email,
-    COALESCE(d.donor_name, d.email) AS name,
+    COALESCE(d.name, d.email) AS name,
     d.congressional_district,
     d.county
   FROM donors d
@@ -304,7 +341,7 @@ BEGIN
     -- From members who are attendees
     SELECT
       m.email AS email_col,
-      COALESCE(m.first_name || ' ' || m.last_name, m.email) AS name_col,
+      COALESCE(m.name, m.email) AS name_col,
       m.created_at
     FROM event_attendees ea
     JOIN members m ON ea.member_id = m.id
@@ -341,7 +378,7 @@ BEGIN
     -- From subscribers
     SELECT
       email AS email_col,
-      COALESCE(first_name || ' ' || last_name, email) AS name_col,
+      COALESCE(name, email) AS name_col,
       'subscriber' AS source_col,
       created_at
     FROM subscribers
@@ -354,19 +391,20 @@ BEGIN
     -- From members
     SELECT
       email AS email_col,
-      COALESCE(first_name || ' ' || last_name, email) AS name_col,
+      COALESCE(name, email) AS name_col,
       'member' AS source_col,
       created_at
     FROM members
     WHERE email IS NOT NULL
       AND email != ''
+      AND opt_out = false
 
     UNION ALL
 
     -- From donors
     SELECT
       email AS email_col,
-      COALESCE(donor_name, email) AS name_col,
+      COALESCE(name, email) AS name_col,
       'donor' AS source_col,
       created_at
     FROM donors
@@ -378,13 +416,14 @@ BEGIN
     -- From event attendees (member emails)
     SELECT
       m.email AS email_col,
-      COALESCE(m.first_name || ' ' || m.last_name, m.email) AS name_col,
+      COALESCE(m.name, m.email) AS name_col,
       'event_attendee' AS source_col,
       ea.created_at
     FROM event_attendees ea
     JOIN members m ON ea.member_id = m.id
     WHERE m.email IS NOT NULL
       AND m.email != ''
+      AND m.opt_out = false
 
     UNION ALL
 
