@@ -258,4 +258,85 @@ class CampaignService {
       if (filter.maxAge != null) 'max_age': filter.maxAge,
     };
   }
+
+  // ============================================================================
+  // DRAFT MANAGEMENT
+  // ============================================================================
+
+  /// Fetch all campaign drafts for the current user
+  Future<List<Map<String, dynamic>>> fetchDrafts() async {
+    if (!isReady) return [];
+
+    try {
+      final userId = _supabase.client.auth.currentUser?.id;
+      if (userId == null) return [];
+
+      final data = await _readClient
+          .from('campaign_drafts')
+          .select()
+          .eq('user_id', userId)
+          .order('updated_at', ascending: false);
+
+      return (data as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    } catch (e, s) {
+      Logger.error('Failed to fetch drafts', error: e, trace: s);
+      return [];
+    }
+  }
+
+  /// Delete a campaign draft
+  Future<void> deleteDraft(String draftId) async {
+    if (!isReady) throw Exception('CRM Supabase is not configured');
+
+    try {
+      await _writeClient.from('campaign_drafts').delete().eq('id', draftId);
+    } catch (e, s) {
+      Logger.error('Failed to delete draft', error: e, trace: s);
+      rethrow;
+    }
+  }
+
+  /// Promote a draft to a full campaign
+  Future<Campaign> promoteDraftToCampaign(String draftId) async {
+    if (!isReady) throw Exception('CRM Supabase is not configured');
+
+    try {
+      // Fetch the draft
+      final draftData = await _readClient
+          .from('campaign_drafts')
+          .select()
+          .eq('id', draftId)
+          .single();
+
+      // Create campaign from draft
+      final campaignPayload = {
+        'name': draftData['campaign_name'] ?? 'Untitled Campaign',
+        'subject_line': draftData['subject_line'],
+        'preview_text': draftData['preview_text'],
+        'from_email': draftData['from_email'],
+        'html_content': draftData['html_content'],
+        'design_json': draftData['design_json'],
+        'segment_type': draftData['segment_type'],
+        'segment_filters': draftData['segment_filters'],
+        'selected_events': draftData['selected_events'],
+        'status': 'draft',
+      };
+
+      final response = await _writeClient
+          .from('campaigns')
+          .insert(campaignPayload)
+          .select()
+          .single();
+
+      // Optionally delete the draft
+      await deleteDraft(draftId);
+
+      return Campaign.fromJson(response as Map<String, dynamic>);
+    } catch (e, s) {
+      Logger.error('Failed to promote draft to campaign', error: e, trace: s);
+      rethrow;
+    }
+  }
 }

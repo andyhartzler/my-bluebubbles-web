@@ -175,33 +175,55 @@ class _ComponentItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // If there's no component, only show the click handler (for Section and Columns)
+    if (component == null) {
+      return InkWell(
+        onTap: onTap,
+        child: _buildCard(context),
+      );
+    }
+
+    // For actual components, make them draggable
     return Draggable<EmailComponent>(
       data: component,
       feedback: Material(
-        elevation: 4,
+        elevation: 8,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          width: 120,
-          height: 60,
+          width: 140,
+          height: 70,
           decoration: BoxDecoration(
-            color: Theme.of(context).primaryColor,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+            ),
             borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1E3A8A).withOpacity(0.5),
+                blurRadius: 12,
+                spreadRadius: 2,
+              ),
+            ],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: Colors.white, size: 28),
-              const SizedBox(height: 4),
+              Icon(icon, color: Colors.white, size: 32),
+              const SizedBox(height: 6),
               Text(
                 label,
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
         ),
       ),
       childWhenDragging: Opacity(
-        opacity: 0.5,
+        opacity: 0.4,
         child: _buildCard(context),
       ),
       child: InkWell(

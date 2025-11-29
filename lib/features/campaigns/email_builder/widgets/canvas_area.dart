@@ -17,7 +17,16 @@ class CanvasArea extends StatelessWidget {
     final zoom = provider.zoomLevel;
 
     return Container(
-      color: Colors.grey[100],
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFF0F172A),
+            const Color(0xFF0F172A).withBlue(30),
+          ],
+        ),
+      ),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
         child: Center(
@@ -227,10 +236,9 @@ class _ColumnWidget extends StatelessWidget {
     final provider = context.watch<EmailBuilderProvider>();
 
     return DragTarget<EmailComponent>(
+      onWillAccept: (component) => component != null,
       onAccept: (component) {
-        if (component != null) {
-          provider.addComponent(sectionId, column.id, component);
-        }
+        provider.addComponent(sectionId, column.id, component);
       },
       builder: (context, candidateData, rejectedData) {
         final isHighlighted = candidateData.isNotEmpty;
@@ -254,13 +262,25 @@ class _ColumnWidget extends StatelessWidget {
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32),
-                    child: Text(
-                      'Drop components here',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.add_circle_outline,
+                          size: 32,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Drop components here',
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ),
                 )
@@ -441,7 +461,7 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.email_outlined,
             size: 80,
-            color: Colors.grey[400],
+            color: Colors.grey[600],
           ),
           const SizedBox(height: 24),
           Text(
@@ -449,7 +469,7 @@ class _EmptyState extends StatelessWidget {
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
+              color: Colors.grey[800],
             ),
           ),
           const SizedBox(height: 12),
@@ -457,7 +477,7 @@ class _EmptyState extends StatelessWidget {
             'Drag content blocks from the left sidebar\nor click "Add Section" below',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: Colors.grey[700],
             ),
             textAlign: TextAlign.center,
           ),
@@ -469,6 +489,8 @@ class _EmptyState extends StatelessWidget {
             icon: const Icon(Icons.add),
             label: const Text('Add Your First Section'),
             style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E3A8A),
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             ),
           ),
