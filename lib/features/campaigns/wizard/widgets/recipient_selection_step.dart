@@ -339,6 +339,8 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
             provider.selectedCounties,
             (county) => provider.toggleCounty(county),
             CampaignBuilderTheme.brightBlue,
+            showMissingDataWarning: true,
+            segmentType: provider.selectedSegmentType,
           ),
         ],
       ),
@@ -350,8 +352,10 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
     List<String> options,
     List<String> selected,
     Function(String) onToggle,
-    Color accentColor,
-  ) {
+    Color accentColor, {
+    bool showMissingDataWarning = false,
+    SegmentType? segmentType,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -386,6 +390,13 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
             ],
           ],
         ),
+
+        // Missing data warning for county filters
+        if (showMissingDataWarning && title == 'County') ...[
+          const SizedBox(height: 12),
+          _buildMissingCountyWarning(segmentType),
+        ],
+
         const SizedBox(height: 12),
         Wrap(
           spacing: 10,
@@ -806,6 +817,90 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
     } catch (e) {
       debugPrint('Error fetching events: $e');
       return [];
+    }
+  }
+
+  Widget _buildMissingCountyWarning(SegmentType? segmentType) {
+    if (segmentType == null) return const SizedBox.shrink();
+
+    return FutureBuilder<int>(
+      future: _fetchMissingCountyCount(segmentType),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data == 0) {
+          return const SizedBox.shrink();
+        }
+
+        final missingCount = snapshot.data!;
+
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF3CD),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.5)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFFF8F00),
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '$missingCount ${_getSegmentLabel(segmentType)} do not have county information and will not receive this campaign when filtering by county.',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B5100),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _getSegmentLabel(SegmentType type) {
+    switch (type) {
+      case SegmentType.allSubscribers:
+        return 'subscribers';
+      case SegmentType.allMembers:
+        return 'members';
+      case SegmentType.allDonors:
+        return 'donors';
+      default:
+        return 'contacts';
+    }
+  }
+
+  Future<int> _fetchMissingCountyCount(SegmentType segmentType) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      String functionName;
+      switch (segmentType) {
+        case SegmentType.allSubscribers:
+          functionName = 'count_subscribers_missing_county';
+          break;
+        case SegmentType.allMembers:
+          functionName = 'count_members_missing_county';
+          break;
+        case SegmentType.allDonors:
+          functionName = 'count_donors_missing_county';
+          break;
+        default:
+          return 0;
+      }
+
+      final response = await supabase.rpc(functionName);
+      return response as int? ?? 0;
+    } catch (e) {
+      debugPrint('Error fetching missing county count: $e');
+      return 0;
     }
   }
 }

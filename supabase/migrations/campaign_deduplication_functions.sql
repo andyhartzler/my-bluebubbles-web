@@ -441,6 +441,54 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- ============================================================================
+-- COUNT MISSING COUNTY DATA
+-- ============================================================================
+
+-- Count subscribers without county data
+CREATE OR REPLACE FUNCTION count_subscribers_missing_county()
+RETURNS INTEGER AS $$
+BEGIN
+  RETURN (
+    SELECT COUNT(DISTINCT LOWER(TRIM(email)))
+    FROM subscribers
+    WHERE email IS NOT NULL
+      AND email != ''
+      AND subscription_status = 'subscribed'
+      AND (county IS NULL OR TRIM(county) = '')
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Count members without county data
+CREATE OR REPLACE FUNCTION count_members_missing_county()
+RETURNS INTEGER AS $$
+BEGIN
+  RETURN (
+    SELECT COUNT(DISTINCT LOWER(TRIM(email)))
+    FROM members
+    WHERE email IS NOT NULL
+      AND email != ''
+      AND opt_out = false
+      AND (county IS NULL OR TRIM(county) = '')
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Count donors without county data
+CREATE OR REPLACE FUNCTION count_donors_missing_county()
+RETURNS INTEGER AS $$
+BEGIN
+  RETURN (
+    SELECT COUNT(DISTINCT LOWER(TRIM(email)))
+    FROM donors
+    WHERE email IS NOT NULL
+      AND email != ''
+      AND (county IS NULL OR TRIM(county) = '')
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Grant execute permissions to authenticated users
 GRANT EXECUTE ON FUNCTION count_subscribers_filtered TO authenticated;
 GRANT EXECUTE ON FUNCTION count_members_filtered TO authenticated;
@@ -452,6 +500,9 @@ GRANT EXECUTE ON FUNCTION get_members_filtered TO authenticated;
 GRANT EXECUTE ON FUNCTION get_donors_filtered TO authenticated;
 GRANT EXECUTE ON FUNCTION get_unique_event_attendees TO authenticated;
 GRANT EXECUTE ON FUNCTION get_all_unique_contacts TO authenticated;
+GRANT EXECUTE ON FUNCTION count_subscribers_missing_county TO authenticated;
+GRANT EXECUTE ON FUNCTION count_members_missing_county TO authenticated;
+GRANT EXECUTE ON FUNCTION count_donors_missing_county TO authenticated;
 
 -- ============================================================================
 -- COMMENTS FOR DOCUMENTATION
