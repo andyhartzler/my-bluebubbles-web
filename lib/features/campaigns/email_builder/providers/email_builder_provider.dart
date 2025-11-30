@@ -5,7 +5,7 @@ import '../models/email_component.dart';
 import '../models/email_document.dart';
 
 class EmailBuilderProvider extends ChangeNotifier {
-  EmailDocument _document = const EmailDocument();
+  EmailDocument _document = EmailDocument.empty();
   final List<EmailDocument> _history = [];
   int _historyIndex = -1;
   String? _selectedComponentId;
