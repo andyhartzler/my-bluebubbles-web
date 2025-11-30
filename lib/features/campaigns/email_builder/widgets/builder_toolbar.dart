@@ -10,6 +10,9 @@ class BuilderToolbar extends StatelessWidget {
   final VoidCallback? onSendTest;
   final VoidCallback? onUndo;
   final VoidCallback? onRedo;
+  final VoidCallback? onExportHtml;
+  final VoidCallback? onLoadTemplate;
+  final VoidCallback? onOpenSettings;
 
   const BuilderToolbar({
     super.key,
@@ -19,6 +22,9 @@ class BuilderToolbar extends StatelessWidget {
     this.onSendTest,
     this.onUndo,
     this.onRedo,
+    this.onExportHtml,
+    this.onLoadTemplate,
+    this.onOpenSettings,
   });
 
   @override

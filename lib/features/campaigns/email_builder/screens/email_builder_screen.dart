@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:bluebubbles/services/crm/campaign_service.dart';
 
@@ -23,20 +24,52 @@ class EmailBuilderScreen extends StatefulWidget {
   State<EmailBuilderScreen> createState() => _EmailBuilderScreenState();
 }
 
-class _EmailBuilderScreenState extends State<EmailBuilderScreen> {
+class _EmailBuilderScreenState extends State<EmailBuilderScreen>
+    with SingleTickerProviderStateMixin {
+  late final EmailBuilderProvider _provider;
+  late final TabController _deviceTabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _provider = EmailBuilderProvider(
+      initialDocument: widget.initialDocument ?? EmailDocument.empty(),
+    );
+    _deviceTabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: _provider.previewDevice == 'mobile' ? 0 : 1,
+    );
+
+    _deviceTabController.addListener(() {
+      if (_deviceTabController.indexIsChanging) return;
+      final device = _deviceTabController.index == 0 ? 'mobile' : 'desktop';
+      if (_provider.previewDevice != device) {
+        _provider.setPreviewDevice(device);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _deviceTabController.dispose();
+    _provider.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) {
-        final provider = EmailBuilderProvider();
-        if (widget.initialDocument != null) {
-          provider.loadDocument(widget.initialDocument!);
-        }
-        return provider;
-      },
+    return ChangeNotifierProvider.value(
+      value: _provider,
       child: Builder(
         builder: (context) {
           final provider = context.watch<EmailBuilderProvider>();
+
+          final desiredIndex = provider.previewDevice == 'mobile' ? 0 : 1;
+          if (_deviceTabController.index != desiredIndex &&
+              !_deviceTabController.indexIsChanging) {
+            _deviceTabController.animateTo(desiredIndex);
+          }
 
           return Theme(
             data: CampaignBuilderTheme.darkTheme,
@@ -67,38 +100,97 @@ class _EmailBuilderScreenState extends State<EmailBuilderScreen> {
                     onTemplates: () => _openTemplates(context),
                     onUndo: provider.canUndo ? provider.undo : null,
                     onRedo: provider.canRedo ? provider.redo : null,
+                    onExportHtml: () => _handleExport(context),
+                    onLoadTemplate: () => _openTemplateLoader(context),
+                    onOpenSettings: () => _openSettings(context),
                   ),
                 ],
               ),
-              body: Row(
+              body: Column(
                 children: [
-                  // Left Panel - Component Palette
-                  if (!provider.isPreviewMode)
-                    Container(
-                      width: 280,
-                      decoration: const BoxDecoration(
-                        color: CampaignBuilderTheme.slate,
-                        border: Border(right: BorderSide(color: CampaignBuilderTheme.slateLight)),
+                  Container(
+                    height: 48,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: const BoxDecoration(
+                      color: CampaignBuilderTheme.slate,
+                      border: Border(
+                        bottom: BorderSide(color: CampaignBuilderTheme.slateLight),
                       ),
-                      child: const ComponentPalette(),
                     ),
-                  // Center - Canvas Area
-                  Expanded(
-                    child: Container(
-                      color: CampaignBuilderTheme.darkNavy,
-                      child: const Center(child: CanvasArea()),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Preview',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TabBar(
+                            controller: _deviceTabController,
+                            labelColor: Colors.white,
+                            indicatorColor: CampaignBuilderTheme.brightBlue,
+                            unselectedLabelColor: Colors.white70,
+                            tabs: const [
+                              Tab(
+                                icon: Icon(Icons.phone_android, size: 16),
+                                text: 'Mobile',
+                              ),
+                              Tab(
+                                icon: Icon(Icons.desktop_windows, size: 16),
+                                text: 'Desktop',
+                              ),
+                            ],
+                            onTap: (index) {
+                              final device = index == 0 ? 'mobile' : 'desktop';
+                              provider.setPreviewDevice(device);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        IconButton(
+                          icon: Icon(
+                            provider.isPreviewMode ? Icons.design_services : Icons.remove_red_eye,
+                            color: Colors.white,
+                          ),
+                          tooltip: provider.isPreviewMode ? 'Back to editor' : 'Preview mode',
+                          onPressed: provider.togglePreviewMode,
+                        ),
+                      ],
                     ),
                   ),
-                  // Right Panel - Properties
-                  if (!provider.isPreviewMode)
-                    Container(
-                      width: 320,
-                      decoration: const BoxDecoration(
-                        color: CampaignBuilderTheme.slate,
-                        border: Border(left: BorderSide(color: CampaignBuilderTheme.slateLight)),
-                      ),
-                      child: const PropertiesPanel(),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        if (!provider.isPreviewMode)
+                          Container(
+                            width: 280,
+                            decoration: const BoxDecoration(
+                              color: CampaignBuilderTheme.slate,
+                              border: Border(right: BorderSide(color: CampaignBuilderTheme.slateLight)),
+                            ),
+                            child: const ComponentPalette(),
+                          ),
+                        Expanded(
+                          child: Container(
+                            color: CampaignBuilderTheme.darkNavy,
+                            child: const Center(child: CanvasArea()),
+                          ),
+                        ),
+                        if (!provider.isPreviewMode)
+                          Container(
+                            width: 320,
+                            decoration: const BoxDecoration(
+                              color: CampaignBuilderTheme.slate,
+                              border: Border(left: BorderSide(color: CampaignBuilderTheme.slateLight)),
+                            ),
+                            child: const PropertiesPanel(),
+                          ),
+                      ],
                     ),
+                  ),
                 ],
               ),
             ),

@@ -1,10 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/email_component.dart';
 import '../models/email_document.dart';
 import '../providers/email_builder_provider.dart';
 import 'component_renderers.dart';
+
+class _ComponentDragPayload {
+  final EmailComponent? newComponent;
+  final String? fromSectionId;
+  final String? fromColumnId;
+  final String? componentId;
+  final int? fromIndex;
+
+  const _ComponentDragPayload.newComponent(this.newComponent)
+      : fromSectionId = null,
+        fromColumnId = null,
+        componentId = null,
+        fromIndex = null;
+
+  const _ComponentDragPayload.existing({
+    required this.componentId,
+    required this.fromSectionId,
+    required this.fromColumnId,
+    required this.fromIndex,
+  }) : newComponent = null;
+
+  bool get isExisting =>
+      componentId != null && fromSectionId != null && fromColumnId != null;
+}
+
+String _componentId(EmailComponent component) {
+  return component.when(
+    text: (id, _, __) => id,
+    image: (id, _, __, ___, ____) => id,
+    button: (id, _, __, ___) => id,
+    divider: (id, _) => id,
+    spacer: (id, _) => id,
+    social: (id, _, __) => id,
+    avatar: (id, _, __, ___) => id,
+    heading: (id, _, __) => id,
+    html: (id, _, __) => id,
+    container: (id, _, __) => id,
+  );
+}
 
 class CanvasArea extends StatelessWidget {
   const CanvasArea({super.key});
@@ -16,77 +56,114 @@ class CanvasArea extends StatelessWidget {
     final maxWidth = provider.previewDevice == 'mobile' ? 375.0 : 600.0;
     final zoom = provider.zoomLevel;
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFF0F172A),
-            const Color(0xFF0F172A).withBlue(30),
-          ],
-        ),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Center(
-          child: Transform.scale(
-            scale: zoom,
-            child: Container(
-              width: maxWidth,
-              decoration: BoxDecoration(
-                color: _hexToColor(document.settings.backgroundColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
-                  ),
+    final focusNode = FocusNode();
+
+    return Shortcuts(
+      shortcuts: <LogicalKeySet, Intent>{
+        LogicalKeySet(LogicalKeyboardKey.delete): const _DeleteIntent(),
+        LogicalKeySet(LogicalKeyboardKey.backspace): const _DeleteIntent(),
+        LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyD):
+            const _DuplicateIntent(),
+        LogicalKeySet(LogicalKeyboardKey.meta, LogicalKeyboardKey.keyD):
+            const _DuplicateIntent(),
+      },
+      child: Actions(
+        actions: {
+          _DeleteIntent: CallbackAction<_DeleteIntent>(
+            onInvoke: (_) => _handleDelete(provider),
+          ),
+          _DuplicateIntent: CallbackAction<_DuplicateIntent>(
+            onInvoke: (_) => _handleDuplicate(provider),
+          ),
+        },
+        child: Focus(
+          autofocus: true,
+          focusNode: focusNode,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFF0F172A),
+                  const Color(0xFF0F172A).withBlue(30),
                 ],
               ),
-              child: Column(
-                children: [
-                  // Empty state
-                  if (document.sections.isEmpty)
-                    _EmptyState(),
-
-                  // Sections
-                  ...document.sections.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final section = entry.value;
-                    return _SectionWidget(
-                      section: section,
-                      isSelected: provider.selectedSectionId == section.id,
-                      onTap: () => provider.selectSection(section.id),
-                      onDelete: () => provider.deleteSection(section.id),
-                      onDuplicate: () => provider.duplicateSection(section.id),
-                      onMoveUp: index > 0
-                          ? () => provider.moveSectionUp(section.id)
-                          : null,
-                      onMoveDown: index < document.sections.length - 1
-                          ? () => provider.moveSectionDown(section.id)
-                          : null,
-                    );
-                  }).toList(),
-
-                  // Add section button
-                  if (!provider.isPreviewMode)
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showAddSectionDialog(context),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Section'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 48),
-                          side: BorderSide(
-                            color: Theme.of(context).primaryColor.withOpacity(0.5),
-                            width: 2,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Transform.scale(
+                  scale: zoom,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: provider.previewDevice == 'mobile'
+                          ? 400
+                          : document.settings.maxWidth.toDouble(),
+                    ),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: _hexToColor(document.settings.backgroundColor),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 30,
+                            offset: const Offset(0, 10),
                           ),
-                        ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Empty state
+                          if (document.sections.isEmpty)
+                            _EmptyState(),
+
+                          // Sections
+                          ...document.sections.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final section = entry.value;
+                            return _SectionWidget(
+                              section: section,
+                              isSelected:
+                                  provider.selectedSectionId == section.id,
+                              onTap: () => provider.selectSection(section.id),
+                              onDelete: () => provider.deleteSection(section.id),
+                              onDuplicate:
+                                  () => provider.duplicateSection(section.id),
+                              onMoveUp: index > 0
+                                  ? () => provider.moveSectionUp(section.id)
+                                  : null,
+                              onMoveDown: index < document.sections.length - 1
+                                  ? () => provider.moveSectionDown(section.id)
+                                  : null,
+                            );
+                          }).toList(),
+
+                          // Add section button
+                          if (!provider.isPreviewMode)
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: OutlinedButton.icon(
+                                onPressed: () => _showAddSectionDialog(context),
+                                icon: const Icon(Icons.add),
+                                label: const Text('Add Section'),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 48),
+                                  side: BorderSide(
+                                    color: Theme.of(context)
+                                        .primaryColor
+                                        .withOpacity(0.5),
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -102,10 +179,54 @@ class CanvasArea extends StatelessWidget {
     );
   }
 
+  void _handleDelete(EmailBuilderProvider provider) {
+    if (provider.selectedComponentId != null) {
+      final selection = provider.findComponentById(provider.selectedComponentId!);
+      if (selection != null) {
+        provider.deleteComponent(
+          selection.section.id,
+          selection.column.id,
+          provider.selectedComponentId!,
+        );
+      }
+      return;
+    }
+
+    if (provider.selectedSectionId != null) {
+      provider.deleteSection(provider.selectedSectionId!);
+    }
+  }
+
+  void _handleDuplicate(EmailBuilderProvider provider) {
+    if (provider.selectedComponentId != null) {
+      final selection = provider.findComponentById(provider.selectedComponentId!);
+      if (selection != null) {
+        provider.duplicateComponent(
+          selection.section.id,
+          selection.column.id,
+          provider.selectedComponentId!,
+        );
+      }
+      return;
+    }
+
+    if (provider.selectedSectionId != null) {
+      provider.duplicateSection(provider.selectedSectionId!);
+    }
+  }
+
   Color _hexToColor(String hex) {
     hex = hex.replaceAll('#', '');
     return Color(int.parse('FF$hex', radix: 16));
   }
+}
+
+class _DeleteIntent extends Intent {
+  const _DeleteIntent();
+}
+
+class _DuplicateIntent extends Intent {
+  const _DuplicateIntent();
 }
 
 class _SectionWidget extends StatefulWidget {
@@ -233,82 +354,155 @@ class _ColumnWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<EmailBuilderProvider>();
+    final children = <Widget>[];
 
-    return DragTarget<EmailComponent>(
-      onWillAcceptWithDetails: (details) => details.data != null,
-      onAcceptWithDetails: (details) {
-        // Use context.read to ensure we get the current provider instance
-        context.read<EmailBuilderProvider>().addComponent(
-          sectionId,
-          column.id,
-          details.data,
-        );
-      },
-      builder: (context, candidateData, rejectedData) {
-        final isHighlighted = candidateData.isNotEmpty;
+    if (column.components.isEmpty) {
+      children.add(_ComponentDropZone(
+        sectionId: sectionId,
+        columnId: column.id,
+        insertIndex: 0,
+        isEmpty: true,
+      ));
+    } else {
+      for (final entry in column.components.asMap().entries) {
+        children.add(_ComponentDropZone(
+          sectionId: sectionId,
+          columnId: column.id,
+          insertIndex: entry.key,
+        ));
+        children.add(_ComponentWidget(
+          sectionId: sectionId,
+          columnId: column.id,
+          component: entry.value,
+          index: entry.key,
+        ));
+      }
+      children.add(_ComponentDropZone(
+        sectionId: sectionId,
+        columnId: column.id,
+        insertIndex: column.components.length,
+      ));
+    }
 
-        return Container(
-          margin: const EdgeInsets.all(4),
-          padding: EdgeInsets.all(column.style.padding),
-          decoration: BoxDecoration(
-            color: isHighlighted
-                ? Theme.of(context).primaryColor.withOpacity(0.1)
-                : _hexToColor(column.style.backgroundColor),
-            border: Border.all(
-              color: isHighlighted
-                  ? Theme.of(context).primaryColor
-                  : Colors.transparent,
-              width: 2,
-            ),
-            borderRadius: BorderRadius.circular(column.style.borderRadius),
-          ),
-          child: column.components.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.add_circle_outline,
-                          size: 32,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Drop components here',
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : Column(
-                  children: column.components.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final component = entry.value;
-                    return _ComponentWidget(
-                      sectionId: sectionId,
-                      columnId: column.id,
-                      component: component,
-                      index: index,
-                    );
-                  }).toList(),
-                ),
-        );
-      },
+    return Container(
+      margin: const EdgeInsets.all(4),
+      padding: EdgeInsets.all(column.style.padding),
+      decoration: BoxDecoration(
+        color: _hexToColor(column.style.backgroundColor),
+        borderRadius: BorderRadius.circular(column.style.borderRadius),
+        border: column.style.borderWidth > 0 && column.style.borderColor != null
+            ? Border.all(
+                color: _hexToColor(column.style.borderColor!),
+                width: column.style.borderWidth,
+              )
+            : null,
+      ),
+      child: Column(children: children),
     );
   }
 
   Color _hexToColor(String hex) {
     hex = hex.replaceAll('#', '');
     return Color(int.parse('FF$hex', radix: 16));
+  }
+}
+
+class _ComponentDropZone extends StatelessWidget {
+  final String sectionId;
+  final String columnId;
+  final int insertIndex;
+  final bool isEmpty;
+
+  const _ComponentDropZone({
+    required this.sectionId,
+    required this.columnId,
+    required this.insertIndex,
+    this.isEmpty = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<EmailBuilderProvider>();
+
+    return DragTarget<Object>(
+      onWillAcceptWithDetails: (details) =>
+          !provider.isPreviewMode &&
+          (details.data is EmailComponent ||
+              details.data is _ComponentDragPayload),
+      onAcceptWithDetails: (details) {
+        final payload = details.data is _ComponentDragPayload
+            ? details.data as _ComponentDragPayload
+            : _ComponentDragPayload.newComponent(details.data as EmailComponent);
+
+        if (payload.newComponent != null) {
+          final newComponent = payload.newComponent!;
+          context.read<EmailBuilderProvider>().insertComponent(
+                sectionId,
+                columnId,
+                newComponent,
+                insertIndex,
+              );
+          provider.selectComponent(_componentId(newComponent));
+          return;
+        }
+
+        if (payload.isExisting &&
+            payload.componentId != null &&
+            payload.fromSectionId != null &&
+            payload.fromColumnId != null) {
+          context.read<EmailBuilderProvider>().moveComponent(
+                payload.fromSectionId!,
+                payload.fromColumnId!,
+                sectionId,
+                columnId,
+                payload.componentId!,
+                insertIndex,
+              );
+          provider.selectComponent(payload.componentId!);
+        }
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHighlighted = candidateData.isNotEmpty;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          margin: EdgeInsets.symmetric(vertical: isEmpty ? 8 : 4),
+          padding: EdgeInsets.symmetric(vertical: isEmpty ? 18 : 6),
+          decoration: BoxDecoration(
+            color: isHighlighted
+                ? Theme.of(context).primaryColor.withOpacity(0.08)
+                : Colors.transparent,
+            border: Border.all(
+              color: isHighlighted
+                  ? Theme.of(context).primaryColor
+                  : Colors.transparent,
+              width: isEmpty ? 2 : 1.5,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: isEmpty
+              ? Column(
+                  children: [
+                    Icon(Icons.add_circle_outline,
+                        color: isHighlighted
+                            ? Theme.of(context).primaryColor
+                            : Colors.grey[600]),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Drop components here',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isHighlighted
+                            ? Theme.of(context).primaryColor
+                            : Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                )
+              : const SizedBox.shrink(),
+        );
+      },
+    );
   }
 }
 
@@ -335,35 +529,37 @@ class _ComponentWidgetState extends State<_ComponentWidget> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<EmailBuilderProvider>();
-    final componentId = widget.component.when(
-      text: (id, _, __) => id,
-      image: (id, _, __, ___, ____) => id,
-      button: (id, _, __, ___) => id,
-      divider: (id, _) => id,
-      spacer: (id, _) => id,
-      social: (id, _, __) => id,
-      avatar: (id, _, __, ___) => id,
-      heading: (id, _, __) => id,
-      html: (id, _, __) => id,
-      container: (id, _, __) => id,
-    );
+    final componentId = _componentId(widget.component);
     final isSelected = provider.selectedComponentId == componentId;
+    final canDrag = !provider.isPreviewMode;
 
-    return MouseRegion(
+    final card = MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
         onTap: () => provider.selectComponent(componentId),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
           margin: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             border: Border.all(
               color: isSelected
                   ? Theme.of(context).primaryColor
-                  : Colors.transparent,
+                  : _isHovered
+                      ? Theme.of(context).primaryColor.withOpacity(0.35)
+                      : Colors.transparent,
               width: 2,
             ),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: _isHovered
+                ? [
+                    BoxShadow(
+                      color: Theme.of(context).primaryColor.withOpacity(0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
           child: Stack(
             children: [
@@ -424,6 +620,16 @@ class _ComponentWidgetState extends State<_ComponentWidget> {
                         tooltip: 'Delete',
                         color: Colors.red,
                       ),
+                      const SizedBox(width: 4),
+                      _ActionButton(
+                        icon: Icons.control_point_duplicate,
+                        onPressed: () => provider.duplicateComponent(
+                          widget.sectionId,
+                          widget.columnId,
+                          componentId,
+                        ),
+                        tooltip: 'Duplicate',
+                      ),
                     ],
                   ),
                 ),
@@ -431,6 +637,34 @@ class _ComponentWidgetState extends State<_ComponentWidget> {
           ),
         ),
       ),
+    );
+
+    if (!canDrag) {
+      return card;
+    }
+
+    final payload = _ComponentDragPayload.existing(
+      componentId: componentId,
+      fromSectionId: widget.sectionId,
+      fromColumnId: widget.columnId,
+      fromIndex: widget.index,
+    );
+
+    return LongPressDraggable<_ComponentDragPayload>(
+      data: payload,
+      feedback: Material(
+        elevation: 6,
+        borderRadius: BorderRadius.circular(8),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280),
+          child: Opacity(opacity: 0.9, child: card),
+        ),
+      ),
+      childWhenDragging: Opacity(
+        opacity: 0.5,
+        child: card,
+      ),
+      child: card,
     );
   }
 }
@@ -482,18 +716,43 @@ class _EmptyState extends StatelessWidget {
     final provider = context.watch<EmailBuilderProvider>();
     final theme = Theme.of(context);
 
-    return DragTarget<EmailComponent>(
+    return DragTarget<Object>(
       onWillAcceptWithDetails: (details) =>
-          !provider.isPreviewMode && details.data != null,
+          !provider.isPreviewMode &&
+          (details.data is EmailComponent ||
+              details.data is _ComponentDragPayload),
       onAcceptWithDetails: (details) {
+        final payload = details.data is _ComponentDragPayload
+            ? details.data as _ComponentDragPayload
+            : _ComponentDragPayload.newComponent(details.data as EmailComponent);
         final newSection = context.read<EmailBuilderProvider>().addSection();
         final newColumnId = newSection.columns.first.id;
 
-        context.read<EmailBuilderProvider>().addComponent(
-              newSection.id,
-              newColumnId,
-              details.data,
-            );
+        if (payload.newComponent != null) {
+          context.read<EmailBuilderProvider>().insertComponent(
+                newSection.id,
+                newColumnId,
+                payload.newComponent!,
+                0,
+              );
+          provider.selectComponent(_componentId(payload.newComponent!));
+          return;
+        }
+
+        if (payload.isExisting &&
+            payload.componentId != null &&
+            payload.fromSectionId != null &&
+            payload.fromColumnId != null) {
+          context.read<EmailBuilderProvider>().moveComponent(
+                payload.fromSectionId!,
+                payload.fromColumnId!,
+                newSection.id,
+                newColumnId,
+                payload.componentId!,
+                0,
+              );
+          provider.selectComponent(payload.componentId!);
+        }
       },
       builder: (context, candidateData, rejectedData) {
         final isHighlighted = candidateData.isNotEmpty;
