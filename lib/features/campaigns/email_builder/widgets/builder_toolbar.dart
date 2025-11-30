@@ -9,6 +9,9 @@ class BuilderToolbar extends StatelessWidget {
   final VoidCallback? onSendTest;
   final VoidCallback? onUndo;
   final VoidCallback? onRedo;
+  final VoidCallback? onExportHtml;
+  final VoidCallback? onLoadTemplate;
+  final VoidCallback? onOpenSettings;
 
   const BuilderToolbar({
     super.key,
@@ -17,6 +20,9 @@ class BuilderToolbar extends StatelessWidget {
     this.onSendTest,
     this.onUndo,
     this.onRedo,
+    this.onExportHtml,
+    this.onLoadTemplate,
+    this.onOpenSettings,
   });
 
   @override
@@ -127,6 +133,33 @@ class BuilderToolbar extends StatelessWidget {
             icon: const Icon(Icons.visibility),
             label: Text(provider.isPreviewMode ? 'Edit' : 'Preview'),
           ),
+
+          const SizedBox(width: 12),
+
+          if (onLoadTemplate != null)
+            OutlinedButton.icon(
+              onPressed: onLoadTemplate,
+              icon: const Icon(Icons.folder_open_outlined),
+              label: const Text('Templates'),
+            ),
+
+          const SizedBox(width: 12),
+
+          if (onOpenSettings != null)
+            OutlinedButton.icon(
+              onPressed: onOpenSettings,
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text('Settings'),
+            ),
+
+          const SizedBox(width: 12),
+
+          if (onExportHtml != null)
+            OutlinedButton.icon(
+              onPressed: onExportHtml,
+              icon: const Icon(Icons.output_outlined),
+              label: const Text('Export HTML'),
+            ),
 
           const SizedBox(width: 12),
 

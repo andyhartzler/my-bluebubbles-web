@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'package:flutter/material.dart';
 
 import 'email_component.dart';
 
@@ -14,6 +15,15 @@ class EmailDocument with _$EmailDocument {
     @Default({}) Map<String, dynamic> theme,
     DateTime? lastModified,
   }) = _EmailDocument;
+
+  factory EmailDocument.empty() {
+    return EmailDocument(
+      sections: const [],
+      settings: const EmailSettings(),
+      theme: const {},
+      lastModified: DateTime.now(),
+    );
+  }
 
   factory EmailDocument.fromJson(Map<String, dynamic> json) =>
       _$EmailDocumentFromJson(json);
