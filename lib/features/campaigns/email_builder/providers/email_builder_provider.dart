@@ -17,7 +17,6 @@ class EmailBuilderProvider extends ChangeNotifier {
   String _previewDevice = 'desktop';
   double _zoomLevel = 1.0;
 
-  final _uuid = const Uuid();
 
   EmailDocument get document => _document;
   String? get selectedComponentId => _selectedComponentId;
@@ -321,6 +320,14 @@ class EmailBuilderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateComponent(
+    String sectionId,
+    String columnId,
+    EmailComponent component,
+  ) {
+    updateBlock(sectionId, columnId, component);
+  }
+
   void deleteBlock(String sectionId, String columnId, String componentId) {
     final sections = _document.sections.map((section) {
       if (section.id == sectionId) {
@@ -346,6 +353,10 @@ class EmailBuilderProvider extends ChangeNotifier {
     }
     _saveToHistory();
     notifyListeners();
+  }
+
+  void deleteComponent(String sectionId, String columnId, String componentId) {
+    deleteBlock(sectionId, columnId, componentId);
   }
 
   void moveBlock(
@@ -392,6 +403,24 @@ class EmailBuilderProvider extends ChangeNotifier {
     _document = _document.copyWith(sections: finalSections);
     _saveToHistory();
     notifyListeners();
+  }
+
+  void moveComponent(
+    String fromSectionId,
+    String fromColumnId,
+    String toSectionId,
+    String toColumnId,
+    String componentId,
+    int toIndex,
+  ) {
+    moveBlock(
+      fromSectionId,
+      fromColumnId,
+      toSectionId,
+      toColumnId,
+      componentId,
+      toIndex,
+    );
   }
 
   void duplicateComponent(
@@ -560,6 +589,87 @@ class EmailBuilderProvider extends ChangeNotifier {
     }
   }
 
+  @override
+  void dispose() {
+    _history.clear();
+    super.dispose();
+  }
+
+  String _componentId(EmailComponent component) {
+    return component.when(
+      text: (id, _, __) => id,
+      image: (id, _, __, ___, ____) => id,
+      button: (id, _, __, ___) => id,
+      divider: (id, _) => id,
+      spacer: (id, _) => id,
+      social: (id, _, __) => id,
+      avatar: (id, _, __, ___) => id,
+      heading: (id, _, __) => id,
+      html: (id, _, __) => id,
+      container: (id, _, __) => id,
+    );
+  }
+
+  List<EmailComponent> _replaceComponent(
+    List<EmailComponent> components,
+    EmailComponent replacement,
+  ) {
+    final replacementId = _componentId(replacement);
+
+    return components.map((component) {
+      final id = _componentId(component);
+      if (id == replacementId) {
+        return replacement;
+      }
+
+      if (component is ContainerComponent) {
+        final updatedChildren = _replaceComponent(
+          component.children,
+          replacement,
+        );
+
+        if (!identical(updatedChildren, component.children)) {
+          return component.copyWith(children: updatedChildren);
+        }
+      }
+
+      return component;
+    }).toList();
+  }
+
+  _RemovalResult _removeComponent(
+    List<EmailComponent> components,
+    String componentId,
+  ) {
+    final updated = <EmailComponent>[];
+    EmailComponent? removed;
+
+    for (final component in components) {
+      final id = _componentId(component);
+      if (id == componentId) {
+        removed = component;
+        continue;
+      }
+
+      if (component is ContainerComponent) {
+        final nestedResult = _removeComponent(component.children, componentId);
+        if (nestedResult.removed != null) {
+          removed = nestedResult.removed;
+          updated.add(component.copyWith(children: nestedResult.components));
+          continue;
+        }
+      }
+
+      updated.add(component);
+    }
+
+    return _RemovalResult(components: updated, removed: removed);
+  }
+
+  EmailComponent _duplicateComponent(EmailComponent component) {
+    return _duplicateComponentWithNewIds(component);
+  }
+
   EmailSection _duplicateSectionWithNewIds(EmailSection section) {
     final newColumns = section.columns.map((column) {
       final newComponents = column.components.map((component) {
@@ -681,4 +791,11 @@ class EmailBuilderProvider extends ChangeNotifier {
       ),
     );
   }
+}
+
+class _RemovalResult {
+  final List<EmailComponent> components;
+  final EmailComponent? removed;
+
+  const _RemovalResult({required this.components, this.removed});
 }

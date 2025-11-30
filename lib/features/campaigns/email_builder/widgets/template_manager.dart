@@ -241,7 +241,7 @@ class _TemplateManagerState extends State<TemplateManager>
       name: _nameController.text.trim(),
       description: _descriptionController.text.trim(),
       document: widget.currentDocument,
-      accentColor: CampaignBuilderTheme.moyDBlue,
+      accentColor: '#1E3A8A',
     );
 
     setState(() => _saving = false);

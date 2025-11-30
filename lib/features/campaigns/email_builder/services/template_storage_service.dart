@@ -11,10 +11,12 @@ class TemplateStorageService {
     try {
       final response = await _client
           .from('email_templates')
-          .select<List<Map<String, dynamic>>>()
+          .select()
           .order('updated_at', ascending: false);
 
-      return response.map((row) => EmailTemplate.fromMap(row)).toList();
+      return (response as List<dynamic>)
+          .map((row) => EmailTemplate.fromMap(row as Map<String, dynamic>))
+          .toList();
     } catch (_) {
       // Return empty list if storage is not configured yet.
       return [];
