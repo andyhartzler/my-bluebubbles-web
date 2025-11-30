@@ -556,7 +556,7 @@ class EmailContentStep extends StatelessWidget {
       }
     }
 
-    final result = await Navigator.push(
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (context) => EmailBuilderScreen(
@@ -565,12 +565,24 @@ class EmailContentStep extends StatelessWidget {
       ),
     );
 
-    if (result != null && result is Map<String, dynamic>) {
+    if (result == null) return;
+
+    final html = result['html'];
+    final designJson = result['designJson'];
+
+    if (html is String && designJson is Map<String, dynamic>) {
       provider.updateEmailContent(
-        htmlContent: result['html'] as String,
-        designJson: result['designJson'] as Map<String, dynamic>,
+        htmlContent: html,
+        designJson: designJson,
       );
+      return;
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Email builder must return both HTML and design JSON'),
+      ),
+    );
   }
 
   void _showAIAssistant(
