@@ -4,12 +4,13 @@ import 'package:provider/provider.dart';
 import 'package:bluebubbles/services/crm/campaign_service.dart';
 
 import '../models/email_document.dart';
+import '../models/email_document_extensions.dart';
 import '../providers/email_builder_provider.dart';
-import '../services/html_exporter.dart';
 import '../widgets/builder_toolbar.dart';
 import '../widgets/canvas_area.dart';
 import '../widgets/component_palette.dart';
 import '../widgets/properties_panel.dart';
+import '../widgets/template_manager.dart';
 import '../../theme/campaign_builder_theme.dart';
 
 class EmailBuilderScreen extends StatefulWidget {
@@ -63,6 +64,7 @@ class _EmailBuilderScreenState extends State<EmailBuilderScreen> {
                   BuilderToolbar(
                     onSave: () => _handleSave(context),
                     onPreview: provider.togglePreviewMode,
+                    onTemplates: () => _openTemplates(context),
                     onUndo: provider.canUndo ? provider.undo : null,
                     onRedo: provider.canRedo ? provider.redo : null,
                   ),
@@ -108,8 +110,7 @@ class _EmailBuilderScreenState extends State<EmailBuilderScreen> {
 
   Future<void> _handleSave(BuildContext context) async {
     final provider = context.read<EmailBuilderProvider>();
-    final htmlExporter = HtmlExporter();
-    final html = htmlExporter.export(provider.document);
+    final html = provider.document.toHtml();
     final designJson = provider.document.toJson();
 
     try {
@@ -134,6 +135,20 @@ class _EmailBuilderScreenState extends State<EmailBuilderScreen> {
           SnackBar(content: Text('Failed to save design: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _openTemplates(BuildContext context) async {
+    final provider = context.read<EmailBuilderProvider>();
+    final selected = await showDialog<EmailDocument>(
+      context: context,
+      builder: (context) => Dialog(
+        child: TemplateManager(currentDocument: provider.document),
+      ),
+    );
+
+    if (selected != null) {
+      provider.loadDocument(selected);
     }
   }
 }

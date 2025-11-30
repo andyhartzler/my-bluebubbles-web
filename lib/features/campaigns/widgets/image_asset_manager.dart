@@ -471,6 +471,18 @@ class _ImageAssetManagerState extends State<ImageAssetManager> {
       // Reload images
       await _loadImages();
 
+      final uploadedImage = _images.firstWhere(
+        (img) => img['name'] == fileName,
+        orElse: () => {},
+      );
+
+      if (uploadedImage.isNotEmpty) {
+        widget.onImageSelected(uploadedImage['url'] as String);
+        if (!widget.allowMultipleSelection && mounted) {
+          Navigator.pop(context);
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
