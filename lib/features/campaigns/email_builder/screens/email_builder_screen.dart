@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -242,5 +243,132 @@ class _EmailBuilderScreenState extends State<EmailBuilderScreen>
     if (selected != null) {
       provider.loadDocument(selected);
     }
+  }
+
+  Future<void> _handleExport(BuildContext context) async {
+    final provider = context.read<EmailBuilderProvider>();
+    final html = provider.document.toHtml();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Export HTML'),
+          content: SizedBox(
+            width: 600,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Copy and paste this HTML into your email service.'),
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 320),
+                  child: SingleChildScrollView(
+                    child: SelectableText(html),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: html));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('HTML copied to clipboard')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy HTML'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openTemplateLoader(BuildContext context) async {
+    await _openTemplates(context);
+  }
+
+  Future<void> _openSettings(BuildContext context) async {
+    final provider = context.read<EmailBuilderProvider>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        double zoom = provider.zoomLevel;
+        String device = provider.previewDevice;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Builder Settings'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const Text('Device:'),
+                      const SizedBox(width: 12),
+                      ChoiceChip(
+                        label: const Text('Mobile'),
+                        selected: device == 'mobile',
+                        onSelected: (_) {
+                          setState(() => device = 'mobile');
+                          provider.setPreviewDevice('mobile');
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Desktop'),
+                        selected: device == 'desktop',
+                        onSelected: (_) {
+                          setState(() => device = 'desktop');
+                          provider.setPreviewDevice('desktop');
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Zoom'),
+                      Slider(
+                        value: zoom,
+                        min: 0.5,
+                        max: 2.0,
+                        divisions: 15,
+                        label: '${(zoom * 100).round()}%',
+                        onChanged: (value) {
+                          setState(() => zoom = value);
+                          provider.setZoomLevel(value);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }
