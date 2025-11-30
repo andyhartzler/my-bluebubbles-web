@@ -1,11 +1,14 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import 'email_component.dart';
 
 part 'email_document.freezed.dart';
 part 'email_document.g.dart';
+
+const _uuid = Uuid();
 
 @freezed
 class EmailDocument with _$EmailDocument {
@@ -69,82 +72,8 @@ class SectionStyle with _$SectionStyle {
     @Default('cover') String backgroundSize,
   }) = _SectionStyle;
 
-    return '''
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>${metadata.subject}</title>
-  ${styles.globalStyles()}
-</head>
-<body style="margin: 0; padding: 0; font-family: ${styles.fontFamily}; background-color: ${styles.backgroundColor}; color: ${styles.textColor};">
-  <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: ${styles.backgroundColor};">
-    <tr>
-      <td align="center" style="padding: 16px;">
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="${styles.contentWidth}" class="container" role="presentation" style="max-width: ${styles.contentWidth}; width: 100%;">
-          ${contentBody.toHtml(styles)}
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-''';
-  }
-
-  static EmailBlock _defaultBody() {
-    return EmailBlock.container(
-      id: 'root-container',
-      style: const ContainerBlockStyle(
-        backgroundColor: '#ffffff',
-        padding: Spacing.all(24),
-      ),
-      children: [
-        EmailBlock.text(
-          content: 'Welcome to the email builder! Start editing this text.',
-          style: const TextBlockStyle(
-            fontSize: 18,
-            color: '#273351',
-            alignment: 'left',
-            lineHeight: 1.6,
-            padding: Spacing.symmetric(vertical: 8),
-            bold: true,
-          ),
-        ),
-        EmailBlock.divider(
-          style: const DividerBlockStyle(
-            padding: Spacing.symmetric(vertical: 12),
-            thickness: 1,
-            color: '#e5e7eb',
-          ),
-        ),
-        EmailBlock.text(
-          content:
-              'Use the palette to add images, buttons, dividers, and more. Each block is fully responsive.',
-          style: const TextBlockStyle(
-            fontSize: 14,
-            color: '#374151',
-            alignment: 'left',
-            lineHeight: 1.6,
-            padding: Spacing.symmetric(vertical: 8),
-          ),
-        ),
-        EmailBlock.button(
-          text: 'Learn More',
-          href: 'https://moyoungdemocrats.org',
-          style: const ButtonBlockStyle(
-            alignment: 'left',
-            backgroundColor: '#32A6DE',
-            borderColor: '#32A6DE',
-            textColor: '#ffffff',
-            buttonPadding: Spacing.symmetric(vertical: 12, horizontal: 24),
-            padding: Spacing.symmetric(vertical: 12),
-          ),
-        ),
-      ],
-    );
-  }
+  factory SectionStyle.fromJson(Map<String, dynamic> json) =>
+      _$SectionStyleFromJson(json);
 }
 
 class EmailBlock {
@@ -547,175 +476,6 @@ class EmailStyles {
   }
 }
 
-class EmailSettings {
-  final int maxWidth;
-  final String backgroundColor;
-  final String textColor;
-  final String fontFamily;
-  final int fontSize;
-  final int lineHeight;
-  final int padding;
-
-  const EmailSettings({
-    this.maxWidth = 600,
-    this.backgroundColor = '#ffffff',
-    this.textColor = '#000000',
-    this.fontFamily = 'Arial, sans-serif',
-    this.fontSize = 16,
-    this.lineHeight = 24,
-    this.padding = 20,
-  });
-
-  factory EmailSettings.fromJson(Map<String, dynamic> json) {
-    return EmailSettings(
-      maxWidth: json['maxWidth'] as int? ?? 600,
-      backgroundColor: json['backgroundColor'] as String? ?? '#ffffff',
-      textColor: json['textColor'] as String? ?? '#000000',
-      fontFamily: json['fontFamily'] as String? ?? 'Arial, sans-serif',
-      fontSize: json['fontSize'] as int? ?? 16,
-      lineHeight: json['lineHeight'] as int? ?? 24,
-      padding: json['padding'] as int? ?? 20,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'maxWidth': maxWidth,
-      'backgroundColor': backgroundColor,
-      'textColor': textColor,
-      'fontFamily': fontFamily,
-      'fontSize': fontSize,
-      'lineHeight': lineHeight,
-      'padding': padding,
-    };
-  }
-
-  EmailSettings copyWith({
-    int? maxWidth,
-    String? backgroundColor,
-    String? textColor,
-    String? fontFamily,
-    int? fontSize,
-    int? lineHeight,
-    int? padding,
-  }) {
-    return EmailSettings(
-      maxWidth: maxWidth ?? this.maxWidth,
-      backgroundColor: backgroundColor ?? this.backgroundColor,
-      textColor: textColor ?? this.textColor,
-      fontFamily: fontFamily ?? this.fontFamily,
-      fontSize: fontSize ?? this.fontSize,
-      lineHeight: lineHeight ?? this.lineHeight,
-      padding: padding ?? this.padding,
-    );
-  }
-}
-
-class EmailSection {
-  final String id;
-  final List<EmailColumn> columns;
-  final SectionStyle style;
-
-  const EmailSection({
-    required this.id,
-    this.columns = const [],
-    this.style = const SectionStyle(),
-  });
-
-  factory EmailSection.fromJson(Map<String, dynamic> json) {
-    return EmailSection(
-      id: json['id'] as String,
-      columns: (json['columns'] as List<dynamic>? ?? [])
-          .map((column) => EmailColumn.fromJson(column as Map<String, dynamic>))
-          .toList(),
-      style: SectionStyle.fromJson(json['style'] as Map<String, dynamic>? ?? const {}),
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'columns': columns.map((column) => column.toJson()).toList(),
-      'style': style.toJson(),
-    };
-  }
-
-  EmailSection copyWith({
-    String? id,
-    List<EmailColumn>? columns,
-    SectionStyle? style,
-  }) {
-    return EmailSection(
-      id: id ?? this.id,
-      columns: columns ?? this.columns,
-      style: style ?? this.style,
-    );
-  }
-}
-
-class SectionStyle {
-  final String backgroundColor;
-  final double paddingTop;
-  final double paddingBottom;
-  final double paddingLeft;
-  final double paddingRight;
-  final String? backgroundImage;
-  final String backgroundSize;
-
-  const SectionStyle({
-    this.backgroundColor = '#ffffff',
-    this.paddingTop = 20,
-    this.paddingBottom = 20,
-    this.paddingLeft = 20,
-    this.paddingRight = 20,
-    this.backgroundImage,
-    this.backgroundSize = 'cover',
-  });
-
-  factory SectionStyle.fromJson(Map<String, dynamic> json) {
-    return SectionStyle(
-      backgroundColor: json['backgroundColor'] as String? ?? '#ffffff',
-      paddingTop: (json['paddingTop'] as num?)?.toDouble() ?? 20,
-      paddingBottom: (json['paddingBottom'] as num?)?.toDouble() ?? 20,
-      paddingLeft: (json['paddingLeft'] as num?)?.toDouble() ?? 20,
-      paddingRight: (json['paddingRight'] as num?)?.toDouble() ?? 20,
-      backgroundImage: json['backgroundImage'] as String?,
-      backgroundSize: json['backgroundSize'] as String? ?? 'cover',
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'backgroundColor': backgroundColor,
-      'paddingTop': paddingTop,
-      'paddingBottom': paddingBottom,
-      'paddingLeft': paddingLeft,
-      'paddingRight': paddingRight,
-      'backgroundImage': backgroundImage,
-      'backgroundSize': backgroundSize,
-    };
-  }
-
-  SectionStyle copyWith({
-    String? backgroundColor,
-    double? paddingTop,
-    double? paddingBottom,
-    double? paddingLeft,
-    double? paddingRight,
-    String? backgroundImage,
-    String? backgroundSize,
-  }) {
-    return SectionStyle(
-      backgroundColor: backgroundColor ?? this.backgroundColor,
-      paddingTop: paddingTop ?? this.paddingTop,
-      paddingBottom: paddingBottom ?? this.paddingBottom,
-      paddingLeft: paddingLeft ?? this.paddingLeft,
-      paddingRight: paddingRight ?? this.paddingRight,
-      backgroundImage: backgroundImage ?? this.backgroundImage,
-      backgroundSize: backgroundSize ?? this.backgroundSize,
-    );
-  }
-}
 
 class EmailColumn {
   final String id;
