@@ -6,6 +6,7 @@ import '../providers/email_builder_provider.dart';
 class BuilderToolbar extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onPreview;
+  final VoidCallback onTemplates;
   final VoidCallback? onSendTest;
   final VoidCallback? onUndo;
   final VoidCallback? onRedo;
@@ -17,6 +18,7 @@ class BuilderToolbar extends StatelessWidget {
     super.key,
     required this.onSave,
     required this.onPreview,
+    required this.onTemplates,
     this.onSendTest,
     this.onUndo,
     this.onRedo,
@@ -136,30 +138,12 @@ class BuilderToolbar extends StatelessWidget {
 
           const SizedBox(width: 12),
 
-          if (onLoadTemplate != null)
-            OutlinedButton.icon(
-              onPressed: onLoadTemplate,
-              icon: const Icon(Icons.folder_open_outlined),
-              label: const Text('Templates'),
-            ),
-
-          const SizedBox(width: 12),
-
-          if (onOpenSettings != null)
-            OutlinedButton.icon(
-              onPressed: onOpenSettings,
-              icon: const Icon(Icons.settings_outlined),
-              label: const Text('Settings'),
-            ),
-
-          const SizedBox(width: 12),
-
-          if (onExportHtml != null)
-            OutlinedButton.icon(
-              onPressed: onExportHtml,
-              icon: const Icon(Icons.output_outlined),
-              label: const Text('Export HTML'),
-            ),
+          // Templates
+          OutlinedButton.icon(
+            onPressed: onTemplates,
+            icon: const Icon(Icons.layers_outlined),
+            label: const Text('Templates'),
+          ),
 
           const SizedBox(width: 12),
 
