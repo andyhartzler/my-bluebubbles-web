@@ -1,100 +1,73 @@
-import 'package:uuid/uuid.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'package:flutter/material.dart';
 
 import 'email_component.dart';
 
-const _uuid = Uuid();
+part 'email_document.freezed.dart';
+part 'email_document.g.dart';
 
-class EmailDocument {
-  final String id;
-  final EmailMetadata metadata;
-  final EmailBlock body;
-  final EmailStyles styles;
-  final EmailSettings settings;
-  final Map<String, dynamic> theme;
-  final List<EmailSection> sections;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+@freezed
+class EmailDocument with _$EmailDocument {
+  const factory EmailDocument({
+    @Default([]) List<EmailSection> sections,
+    @Default(EmailSettings()) EmailSettings settings,
+    @Default({}) Map<String, dynamic> theme,
+    DateTime? lastModified,
+  }) = _EmailDocument;
 
-  EmailDocument({
-    String? id,
-    EmailMetadata? metadata,
-    EmailBlock? body,
-    EmailStyles? styles,
-    EmailSettings? settings,
-    Map<String, dynamic>? theme,
-    List<EmailSection>? sections,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  })  : id = id ?? _uuid.v4(),
-        metadata = metadata ?? EmailMetadata.empty(),
-        body = body ?? _defaultBody(),
-        styles = styles ?? EmailStyles.defaultStyles(),
-        settings = settings ?? const EmailSettings(),
-        theme = theme ?? const {},
-        sections = sections ?? const [],
-        createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
-
-  factory EmailDocument.empty() => EmailDocument();
-
-  factory EmailDocument.fromJson(Map<String, dynamic> json) {
+  factory EmailDocument.empty() {
     return EmailDocument(
-      id: (json['id'] as String?)?.isNotEmpty == true ? json['id'] as String : _uuid.v4(),
-      metadata: EmailMetadata.fromJson(json['metadata'] as Map<String, dynamic>? ?? const {}),
-      body: json['body'] != null
-          ? EmailBlock.fromJson(json['body'] as Map<String, dynamic>)
-          : _defaultBody(),
-      styles: EmailStyles.fromJson(json['styles'] as Map<String, dynamic>? ?? const {}),
-      settings: EmailSettings.fromJson(json['settings'] as Map<String, dynamic>? ?? const {}),
-      theme: Map<String, dynamic>.from(json['theme'] as Map? ?? {}),
-      sections: (json['sections'] as List<dynamic>? ?? [])
-          .map((section) => EmailSection.fromJson(section as Map<String, dynamic>))
-          .toList(),
-      createdAt: _parseDate(json['createdAt']) ?? DateTime.now(),
-      updatedAt: _parseDate(json['updatedAt']) ?? DateTime.now(),
+      sections: const [],
+      settings: const EmailSettings(),
+      theme: const {},
+      lastModified: DateTime.now(),
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'metadata': metadata.toJson(),
-      'body': body.toJson(),
-      'styles': styles.toJson(),
-      'settings': settings.toJson(),
-      'theme': theme,
-      'sections': sections.map((section) => section.toJson()).toList(),
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-    };
-  }
+  factory EmailDocument.fromJson(Map<String, dynamic> json) =>
+      _$EmailDocumentFromJson(json);
+}
 
-  EmailDocument copyWith({
-    String? id,
-    EmailMetadata? metadata,
-    EmailBlock? body,
-    EmailStyles? styles,
-    EmailSettings? settings,
-    Map<String, dynamic>? theme,
-    List<EmailSection>? sections,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return EmailDocument(
-      id: id ?? this.id,
-      metadata: metadata ?? this.metadata,
-      body: body ?? this.body,
-      styles: styles ?? this.styles,
-      settings: settings ?? this.settings,
-      theme: theme ?? this.theme,
-      sections: sections ?? this.sections,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
-    );
-  }
+@freezed
+class EmailSettings with _$EmailSettings {
+  const factory EmailSettings({
+    @Default(600) int maxWidth,
+    @Default('#ffffff') String backgroundColor,
+    @Default('#000000') String textColor,
+    @Default('Arial, sans-serif') String fontFamily,
+    @Default(16) int fontSize,
+    @Default(24) int lineHeight,
+    @Default(20) int padding,
+  }) = _EmailSettings;
 
-  String toHtml() {
-    final contentBody = body;
+  factory EmailSettings.fromJson(Map<String, dynamic> json) =>
+      _$EmailSettingsFromJson(json);
+}
+
+@freezed
+class EmailSection with _$EmailSection {
+  const factory EmailSection({
+    required String id,
+    @Default([]) List<EmailColumn> columns,
+    @Default(SectionStyle()) SectionStyle style,
+  }) = _EmailSection;
+
+  factory EmailSection.fromJson(Map<String, dynamic> json) =>
+      _$EmailSectionFromJson(json);
+}
+
+@freezed
+class SectionStyle with _$SectionStyle {
+  const factory SectionStyle({
+    @Default('#ffffff') String backgroundColor,
+    @Default(20) double paddingTop,
+    @Default(20) double paddingBottom,
+    @Default(20) double paddingLeft,
+    @Default(20) double paddingRight,
+    String? backgroundImage,
+    @Default('cover') String backgroundSize,
+  }) = _SectionStyle;
 
     return '''
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">

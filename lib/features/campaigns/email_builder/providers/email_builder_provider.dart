@@ -5,7 +5,7 @@ import '../models/email_component.dart';
 import '../models/email_document.dart';
 
 class EmailBuilderProvider extends ChangeNotifier {
-  EmailDocument _document = EmailDocument.empty();
+  EmailDocument _document;
   final List<EmailDocument> _history = [];
   int _historyIndex = -1;
   String? _selectedComponentId;
@@ -49,7 +49,8 @@ class EmailBuilderProvider extends ChangeNotifier {
       );
   bool get canExport => canSave;
 
-  EmailBuilderProvider() {
+  EmailBuilderProvider({EmailDocument? initialDocument})
+      : _document = initialDocument ?? EmailDocument.empty() {
     _saveToHistory();
   }
 
