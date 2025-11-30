@@ -14,6 +14,7 @@ import '../widgets/component_palette.dart';
 import '../widgets/properties_panel.dart';
 import '../widgets/template_manager.dart';
 import '../../theme/campaign_builder_theme.dart';
+import '../widgets/send_test_dialog.dart';
 
 class EmailBuilderScreen extends StatefulWidget {
   final String? campaignId;
@@ -104,6 +105,9 @@ class _EmailBuilderScreenState extends State<EmailBuilderScreen>
                     onExportHtml: () => _handleExport(context),
                     onLoadTemplate: () => _openTemplateLoader(context),
                     onOpenSettings: () => _openSettings(context),
+                    onSendTest: widget.campaignId != null
+                        ? () => _openSendTest(context)
+                        : null,
                   ),
                 ],
               ),
@@ -367,6 +371,23 @@ class _EmailBuilderScreenState extends State<EmailBuilderScreen>
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  Future<void> _openSendTest(BuildContext context) async {
+    if (widget.campaignId == null) return;
+
+    final provider = context.read<EmailBuilderProvider>();
+    final html = provider.document.toHtml();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return SendTestDialog(
+          campaignId: widget.campaignId!,
+          htmlContent: html,
         );
       },
     );
