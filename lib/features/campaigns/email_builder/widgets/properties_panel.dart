@@ -7,6 +7,48 @@ import 'color_picker_field.dart';
 import '../../widgets/image_asset_manager.dart';
 import '../../widgets/ai_content_assistant.dart';
 
+Future<void> _openAIContentAssistant(
+  BuildContext context,
+  EmailBuilderProvider provider, {
+  required String sectionId,
+  required String columnId,
+  required EmailComponent component,
+  String successMessage = 'Content inserted from AI assistant',
+}) async {
+  final generatedContent = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) {
+      return Dialog(
+        child: SizedBox(
+          width: 520,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: AIContentAssistant(
+              onContentGenerated: (content) {
+                Navigator.of(dialogContext).pop(content);
+              },
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
+  if (generatedContent == null || generatedContent.isEmpty) return;
+
+  provider.updateComponent(
+    sectionId,
+    columnId,
+    component.copyWith(content: generatedContent),
+  );
+
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(successMessage)),
+    );
+  }
+}
+
 class PropertiesPanel extends StatelessWidget {
   const PropertiesPanel({super.key});
 
@@ -335,44 +377,6 @@ class PropertiesPanel extends StatelessWidget {
     );
   }
 
-  Future<void> _openAIContentAssistant(
-    BuildContext context,
-    EmailBuilderProvider provider,
-  ) async {
-    final generatedContent = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        return Dialog(
-          child: SizedBox(
-            width: 520,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: AIContentAssistant(
-                onContentGenerated: (content) {
-                  Navigator.of(dialogContext).pop(content);
-                },
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    if (generatedContent == null || generatedContent.isEmpty) return;
-
-    provider.updateComponent(
-      sectionId,
-      columnId,
-      component.copyWith(content: generatedContent),
-    );
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Content inserted from AI assistant')),
-      );
-    }
-  }
-
   Widget _buildSlider({
     required String label,
     required double value,
@@ -431,11 +435,17 @@ class _TextComponentProperties extends StatelessWidget {
           },
         ),
         const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () => _openAIContentAssistant(context, provider),
-          icon: const Icon(Icons.auto_awesome),
-          label: const Text('AI Content Assistant'),
-        ),
+          OutlinedButton.icon(
+            onPressed: () => _openAIContentAssistant(
+              context,
+              provider,
+              sectionId: sectionId,
+              columnId: columnId,
+              component: component,
+            ),
+            icon: const Icon(Icons.auto_awesome),
+            label: const Text('AI Content Assistant'),
+          ),
         const SizedBox(height: 16),
         _buildSlider(
           label: 'Font Size',
@@ -528,44 +538,6 @@ class _TextComponentProperties extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  Future<void> _openAIContentAssistant(
-    BuildContext context,
-    EmailBuilderProvider provider,
-  ) async {
-    final generatedContent = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        return Dialog(
-          child: SizedBox(
-            width: 520,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: AIContentAssistant(
-                onContentGenerated: (content) {
-                  Navigator.of(dialogContext).pop(content);
-                },
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    if (generatedContent == null || generatedContent.isEmpty) return;
-
-    provider.updateComponent(
-      sectionId,
-      columnId,
-      component.copyWith(content: generatedContent),
-    );
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Heading updated with AI suggestion')),
-      );
-    }
   }
 
   Widget _buildSlider({
@@ -1514,13 +1486,20 @@ class _HeadingComponentProperties extends StatelessWidget {
             columnId,
             component.copyWith(content: value),
           ),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () => _openAIContentAssistant(context, provider),
-          icon: const Icon(Icons.auto_awesome),
-          label: const Text('AI Content Assistant'),
-        ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => _openAIContentAssistant(
+              context,
+              provider,
+              sectionId: sectionId,
+              columnId: columnId,
+              component: component,
+              successMessage: 'Heading updated with AI suggestion',
+            ),
+            icon: const Icon(Icons.auto_awesome),
+            label: const Text('AI Content Assistant'),
+          ),
         const SizedBox(height: 12),
         _buildSlider(
           label: 'Font Size',
