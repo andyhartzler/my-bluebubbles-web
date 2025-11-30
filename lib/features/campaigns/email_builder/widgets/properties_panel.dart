@@ -117,21 +117,25 @@ class PropertiesPanel extends StatelessWidget {
         columnId: columnId!,
         component: selectedComponent as SocialComponent,
       ),
-      avatar: (id, imageUrl, alt, style) => _buildPlaceholderProperties(
-        'Avatar Properties',
-        'Avatar component properties panel coming soon!',
+      avatar: (id, imageUrl, alt, style) => _AvatarComponentProperties(
+        sectionId: sectionId!,
+        columnId: columnId!,
+        component: selectedComponent as AvatarComponent,
       ),
-      heading: (id, content, style) => _buildPlaceholderProperties(
-        'Heading Properties',
-        'Heading component properties panel coming soon!',
+      heading: (id, content, style) => _HeadingComponentProperties(
+        sectionId: sectionId!,
+        columnId: columnId!,
+        component: selectedComponent as HeadingComponent,
       ),
-      html: (id, htmlContent, style) => _buildPlaceholderProperties(
-        'HTML Properties',
-        'HTML component properties panel coming soon!',
+      html: (id, htmlContent, style) => _HtmlComponentProperties(
+        sectionId: sectionId!,
+        columnId: columnId!,
+        component: selectedComponent as HtmlComponent,
       ),
-      container: (id, children, style) => _buildPlaceholderProperties(
-        'Container Properties',
-        'Container component properties panel coming soon!',
+      container: (id, children, style) => _ContainerComponentProperties(
+        sectionId: sectionId!,
+        columnId: columnId!,
+        component: selectedComponent as ContainerComponent,
       ),
     );
   }
@@ -230,6 +234,87 @@ class PropertiesPanel extends StatelessWidget {
             );
           },
         ),
+        const SizedBox(height: 24),
+        Text('Columns', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        ...section.columns.asMap().entries.map((entry) {
+          final column = entry.value;
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Column ${entry.key + 1}',
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  _buildSlider(
+                    label: 'Flex',
+                    value: column.flex.toDouble(),
+                    min: 1,
+                    max: 3,
+                    onChanged: (value) => provider.updateColumnFlex(
+                      section.id,
+                      column.id,
+                      value.toInt(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ColorPickerField(
+                    label: 'Background',
+                    value: column.style.backgroundColor,
+                    onChanged: (color) => provider.updateColumnStyle(
+                      section.id,
+                      column.id,
+                      column.style.copyWith(backgroundColor: color),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSlider(
+                    label: 'Padding',
+                    value: column.style.padding,
+                    max: 40,
+                    onChanged: (value) => provider.updateColumnStyle(
+                      section.id,
+                      column.id,
+                      column.style.copyWith(padding: value),
+                    ),
+                  ),
+                  _buildSlider(
+                    label: 'Border Radius',
+                    value: column.style.borderRadius,
+                    max: 32,
+                    onChanged: (value) => provider.updateColumnStyle(
+                      section.id,
+                      column.id,
+                      column.style.copyWith(borderRadius: value),
+                    ),
+                  ),
+                  _buildSlider(
+                    label: 'Border Width',
+                    value: column.style.borderWidth,
+                    max: 8,
+                    onChanged: (value) => provider.updateColumnStyle(
+                      section.id,
+                      column.id,
+                      column.style.copyWith(borderWidth: value),
+                    ),
+                  ),
+                  ColorPickerField(
+                    label: 'Border Color',
+                    value: column.style.borderColor ?? '#d1d5db',
+                    onChanged: (color) => provider.updateColumnStyle(
+                      section.id,
+                      column.id,
+                      column.style.copyWith(borderColor: color),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ],
     );
   }
@@ -1157,6 +1242,535 @@ class _SocialComponentProperties extends StatelessWidget {
           max: max,
           onChanged: onChanged,
         ),
+      ],
+    );
+  }
+}
+
+class _AvatarComponentProperties extends StatelessWidget {
+  final String sectionId;
+  final String columnId;
+  final AvatarComponent component;
+
+  const _AvatarComponentProperties({
+    required this.sectionId,
+    required this.columnId,
+    required this.component,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<EmailBuilderProvider>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Avatar', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        TextFormField(
+          initialValue: component.imageUrl,
+          decoration: const InputDecoration(
+            labelText: 'Image URL',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(imageUrl: value),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          initialValue: component.alt,
+          decoration: const InputDecoration(
+            labelText: 'Alt text',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(alt: value),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSlider(
+          label: 'Size',
+          value: component.style.size,
+          min: 40,
+          max: 200,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(size: value)),
+          ),
+        ),
+        SwitchListTile(
+          value: component.style.shape,
+          title: const Text('Circle avatar'),
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(shape: value)),
+          ),
+        ),
+        DropdownButtonFormField<String>(
+          value: component.style.alignment,
+          decoration: const InputDecoration(labelText: 'Alignment'),
+          items: const [
+            DropdownMenuItem(value: 'left', child: Text('Left')),
+            DropdownMenuItem(value: 'center', child: Text('Center')),
+            DropdownMenuItem(value: 'right', child: Text('Right')),
+          ],
+          onChanged: (value) {
+            if (value != null) {
+              provider.updateComponent(
+                sectionId,
+                columnId,
+                component.copyWith(style: component.style.copyWith(alignment: value)),
+              );
+            }
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildSlider(
+          label: 'Border Width',
+          value: component.style.borderWidth,
+          max: 12,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(
+              style: component.style.copyWith(borderWidth: value),
+            ),
+          ),
+        ),
+        ColorPickerField(
+          label: 'Border Color',
+          value: component.style.borderColor ?? '#d1d5db',
+          onChanged: (color) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(borderColor: color)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSlider(
+          label: 'Padding Top',
+          value: component.style.paddingTop,
+          max: 40,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(
+              style: component.style.copyWith(paddingTop: value),
+            ),
+          ),
+        ),
+        _buildSlider(
+          label: 'Padding Bottom',
+          value: component.style.paddingBottom,
+          max: 40,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(
+              style: component.style.copyWith(paddingBottom: value),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSlider({
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+    double min = 0,
+    double max = 100,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label: ${value.toInt()}'),
+        Slider(value: value, min: min, max: max, onChanged: onChanged),
+      ],
+    );
+  }
+}
+
+class _HeadingComponentProperties extends StatelessWidget {
+  final String sectionId;
+  final String columnId;
+  final HeadingComponent component;
+
+  const _HeadingComponentProperties({
+    required this.sectionId,
+    required this.columnId,
+    required this.component,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<EmailBuilderProvider>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Heading', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        TextFormField(
+          initialValue: component.content,
+          decoration: const InputDecoration(
+            labelText: 'Content',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(content: value),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSlider(
+          label: 'Font Size',
+          value: component.style.fontSize,
+          min: 18,
+          max: 64,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(fontSize: value)),
+          ),
+        ),
+        _buildSlider(
+          label: 'Line Height',
+          value: component.style.lineHeight,
+          min: 1,
+          max: 2.5,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(lineHeight: value)),
+          ),
+        ),
+        ColorPickerField(
+          label: 'Text Color',
+          value: component.style.color,
+          onChanged: (color) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(color: color)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: component.style.alignment,
+          decoration: const InputDecoration(labelText: 'Alignment'),
+          items: const [
+            DropdownMenuItem(value: 'left', child: Text('Left')),
+            DropdownMenuItem(value: 'center', child: Text('Center')),
+            DropdownMenuItem(value: 'right', child: Text('Right')),
+            DropdownMenuItem(value: 'justify', child: Text('Justify')),
+          ],
+          onChanged: (value) {
+            if (value != null) {
+              provider.updateComponent(
+                sectionId,
+                columnId,
+                component.copyWith(style: component.style.copyWith(alignment: value)),
+              );
+            }
+          },
+        ),
+        CheckboxListTile(
+          value: component.style.bold,
+          title: const Text('Bold'),
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(bold: value ?? false)),
+          ),
+        ),
+        CheckboxListTile(
+          value: component.style.italic,
+          title: const Text('Italic'),
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(italic: value ?? false)),
+          ),
+        ),
+        CheckboxListTile(
+          value: component.style.underline,
+          title: const Text('Underline'),
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(underline: value ?? false)),
+          ),
+        ),
+        _buildSlider(
+          label: 'Padding Top',
+          value: component.style.paddingTop,
+          max: 40,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(paddingTop: value)),
+          ),
+        ),
+        _buildSlider(
+          label: 'Padding Bottom',
+          value: component.style.paddingBottom,
+          max: 40,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(
+              style: component.style.copyWith(paddingBottom: value),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSlider({
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+    double min = 0,
+    double max = 100,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label: ${value.toStringAsFixed(2)}'),
+        Slider(value: value, min: min, max: max, onChanged: onChanged),
+      ],
+    );
+  }
+}
+
+class _HtmlComponentProperties extends StatelessWidget {
+  final String sectionId;
+  final String columnId;
+  final HtmlComponent component;
+
+  const _HtmlComponentProperties({
+    required this.sectionId,
+    required this.columnId,
+    required this.component,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<EmailBuilderProvider>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('HTML', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        TextFormField(
+          initialValue: component.htmlContent,
+          maxLines: 6,
+          decoration: const InputDecoration(
+            labelText: 'HTML Content',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(htmlContent: value),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSlider(
+          label: 'Padding Top',
+          value: component.style.paddingTop,
+          max: 40,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(paddingTop: value)),
+          ),
+        ),
+        _buildSlider(
+          label: 'Padding Bottom',
+          value: component.style.paddingBottom,
+          max: 40,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(
+              style: component.style.copyWith(paddingBottom: value),
+            ),
+          ),
+        ),
+        _buildSlider(
+          label: 'Padding Left',
+          value: component.style.paddingLeft,
+          max: 40,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(paddingLeft: value)),
+          ),
+        ),
+        _buildSlider(
+          label: 'Padding Right',
+          value: component.style.paddingRight,
+          max: 40,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(
+              style: component.style.copyWith(paddingRight: value),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSlider({
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+    double min = 0,
+    double max = 100,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label: ${value.toInt()}px'),
+        Slider(value: value, min: min, max: max, onChanged: onChanged),
+      ],
+    );
+  }
+}
+
+class _ContainerComponentProperties extends StatelessWidget {
+  final String sectionId;
+  final String columnId;
+  final ContainerComponent component;
+
+  const _ContainerComponentProperties({
+    required this.sectionId,
+    required this.columnId,
+    required this.component,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<EmailBuilderProvider>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Container', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        ColorPickerField(
+          label: 'Background',
+          value: component.style.backgroundColor,
+          onChanged: (color) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(backgroundColor: color)),
+          ),
+        ),
+        _buildSlider(
+          label: 'Padding Top',
+          value: component.style.paddingTop,
+          max: 48,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(paddingTop: value)),
+          ),
+        ),
+        _buildSlider(
+          label: 'Padding Bottom',
+          value: component.style.paddingBottom,
+          max: 48,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(
+              style: component.style.copyWith(paddingBottom: value),
+            ),
+          ),
+        ),
+        _buildSlider(
+          label: 'Padding Left',
+          value: component.style.paddingLeft,
+          max: 48,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(paddingLeft: value)),
+          ),
+        ),
+        _buildSlider(
+          label: 'Padding Right',
+          value: component.style.paddingRight,
+          max: 48,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(
+              style: component.style.copyWith(paddingRight: value),
+            ),
+          ),
+        ),
+        _buildSlider(
+          label: 'Border Radius',
+          value: component.style.borderRadius,
+          max: 36,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(borderRadius: value)),
+          ),
+        ),
+        _buildSlider(
+          label: 'Border Width',
+          value: component.style.borderWidth,
+          max: 12,
+          onChanged: (value) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(borderWidth: value)),
+          ),
+        ),
+        ColorPickerField(
+          label: 'Border Color',
+          value: component.style.borderColor ?? '#d1d5db',
+          onChanged: (color) => provider.updateComponent(
+            sectionId,
+            columnId,
+            component.copyWith(style: component.style.copyWith(borderColor: color)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSlider({
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+    double min = 0,
+    double max = 100,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label: ${value.toInt()}px'),
+        Slider(value: value, min: min, max: max, onChanged: onChanged),
       ],
     );
   }
