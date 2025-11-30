@@ -36,10 +36,17 @@ Future<void> _openAIContentAssistant(
 
   if (generatedContent == null || generatedContent.isEmpty) return;
 
+  final updatedComponent = component.maybeMap(
+    text: (value) => value.copyWith(content: generatedContent),
+    heading: (value) => value.copyWith(content: generatedContent),
+    html: (value) => value.copyWith(htmlContent: generatedContent),
+    orElse: () => component,
+  );
+
   provider.updateComponent(
     sectionId,
     columnId,
-    component.copyWith(content: generatedContent),
+    updatedComponent,
   );
 
   if (context.mounted) {
