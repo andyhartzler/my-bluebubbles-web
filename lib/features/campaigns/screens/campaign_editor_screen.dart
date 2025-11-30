@@ -198,11 +198,22 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
 
     if (!mounted || result == null) return;
 
-    setState(() {
-      _htmlController.text = result['html'] as String? ?? _htmlController.text;
-      _designJson =
-          result['designJson'] as Map<String, dynamic>? ?? _designJson;
-    });
+    final html = result['html'];
+    final designJson = result['designJson'];
+
+    if (html is String && designJson is Map<String, dynamic>) {
+      setState(() {
+        _htmlController.text = html;
+        _designJson = designJson;
+      });
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Email builder must return both HTML and design JSON'),
+      ),
+    );
   }
 
   @override
