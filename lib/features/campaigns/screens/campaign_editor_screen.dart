@@ -1,6 +1,4 @@
 import 'package:bluebubbles/features/campaigns/screens/campaign_analytics_screen.dart';
-import 'package:bluebubbles/features/campaigns/email_builder/models/email_document.dart';
-import 'package:bluebubbles/features/campaigns/email_builder/screens/email_builder_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/campaign_preview_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/campaign_recipients_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/campaign_iframe_editor_screen.dart';
@@ -185,39 +183,6 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
   }
 
   Future<void> _openEmailBuilder() async {
-    final initialDocument =
-        _designJson != null ? EmailDocument.fromJson(_designJson!) : null;
-
-    final result = await Navigator.of(context).push<Map<String, dynamic>>(
-      MaterialPageRoute(
-        builder: (_) => EmailBuilderScreen(
-          campaignId: _campaign?.id,
-          initialDocument: initialDocument,
-        ),
-      ),
-    );
-
-    if (!mounted || result == null) return;
-
-    final html = result['html'];
-    final designJson = result['designJson'];
-
-    if (html is String && designJson is Map<String, dynamic>) {
-      setState(() {
-        _htmlController.text = html;
-        _designJson = designJson;
-      });
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Email builder must return both HTML and design JSON'),
-      ),
-    );
-  }
-
-  Future<void> _openIframeBuilder() async {
     if (_campaign?.id == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -338,31 +303,21 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
                                 const SizedBox(height: 4),
                                 Text(
                                   _designJson == null
-                                      ? 'Build your campaign email with a visual builder.'
+                                      ? 'Build your campaign email with the mail.moyd.app builder.'
                                       : 'Email design ready',
                                   style: theme.textTheme.bodySmall,
                                 ),
                               ],
                             ),
                           ),
-                          Row(
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed: _openEmailBuilder,
-                                icon: const Icon(Icons.design_services_outlined),
-                                label: const Text('Native Builder'),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                onPressed: _openIframeBuilder,
-                                icon: const Icon(Icons.web),
-                                label: const Text('Web Builder'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ],
+                          ElevatedButton.icon(
+                            onPressed: _openEmailBuilder,
+                            icon: const Icon(Icons.email_outlined),
+                            label: const Text('Open Email Builder'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                            ),
                           ),
                         ],
                       ),

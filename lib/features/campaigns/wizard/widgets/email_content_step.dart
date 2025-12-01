@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/campaign_wizard_provider.dart';
 import '../../theme/campaign_builder_theme.dart';
-import '../../email_builder/screens/email_builder_screen.dart';
-import '../../email_builder/models/email_document.dart';
+import '../../screens/campaign_iframe_editor_screen.dart';
 import '../../widgets/ai_content_assistant.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:bluebubbles/models/crm/campaign.dart';
+import 'package:bluebubbles/services/crm/campaign_service.dart';
 
 /// Step 2: Email Content
 /// Design email with visual builder
@@ -547,42 +548,93 @@ class EmailContentStep extends StatelessWidget {
     BuildContext context,
     CampaignWizardProvider provider,
   ) async {
-    EmailDocument? initialDocument;
-    if (provider.designJson != null) {
-      try {
-        initialDocument = EmailDocument.fromJson(provider.designJson!);
-      } catch (e) {
-        debugPrint('Error loading design: $e');
-      }
-    }
-
-    final result = await Navigator.push<Map<String, dynamic>>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EmailBuilderScreen(
-          initialDocument: initialDocument,
+    // Validate campaign details
+    if (provider.campaignName.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a campaign name first'),
+          backgroundColor: Colors.orange,
         ),
-      ),
-    );
-
-    if (result == null) return;
-
-    final html = result['html'];
-    final designJson = result['designJson'];
-
-    if (html is String && designJson is Map<String, dynamic>) {
-      provider.updateEmailContent(
-        htmlContent: html,
-        designJson: designJson,
       );
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Email builder must return both HTML and design JSON'),
+    if (provider.subject.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a subject line first'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show loading indicator
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
       ),
     );
+
+    try {
+      // Create/save campaign to get a campaign ID
+      final campaignService = CampaignService();
+      final campaign = Campaign(
+        name: provider.campaignName,
+        subject: provider.subject,
+        previewText: provider.previewText.isEmpty ? null : provider.previewText,
+        htmlContent: provider.htmlContent,
+        designJson: provider.designJson,
+        segment: provider.buildMessageFilter(),
+      );
+
+      final savedCampaign = await campaignService.saveCampaign(campaign);
+
+      // Dismiss loading indicator
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Open iframe builder with the saved campaign ID
+      if (!context.mounted) return;
+      final result = await Navigator.push<Map<String, dynamic>>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CampaignIframeEditorScreen(
+            campaignId: savedCampaign.id!,
+            initialCampaign: savedCampaign,
+          ),
+        ),
+      );
+
+      if (result == null) return;
+
+      final html = result['html'];
+      final designJson = result['designJson'];
+
+      if (html is String && designJson is Map<String, dynamic>) {
+        provider.updateEmailContent(
+          htmlContent: html,
+          designJson: designJson,
+        );
+        return;
+      }
+    } catch (e) {
+      // Dismiss loading indicator if still showing
+      if (context.mounted) {
+        Navigator.of(context).pop();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening email builder: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showAIAssistant(

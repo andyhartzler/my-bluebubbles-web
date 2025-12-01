@@ -1,6 +1,5 @@
-import 'package:bluebubbles/features/campaigns/email_builder/models/email_document.dart';
-import 'package:bluebubbles/features/campaigns/email_builder/screens/email_builder_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/campaign_editor_screen.dart';
+import 'package:bluebubbles/features/campaigns/screens/campaign_iframe_editor_screen.dart';
 import 'package:bluebubbles/features/campaigns/widgets/campaign_brand.dart';
 import 'package:bluebubbles/features/campaigns/widgets/segment_builder.dart';
 import 'package:bluebubbles/models/crm/campaign.dart';
@@ -33,33 +32,86 @@ class _CampaignCreateScreenState extends State<CampaignCreateScreen> {
   }
 
   Future<void> _openEmailBuilder() async {
-    final initialDocument =
-        _designJson != null ? EmailDocument.fromJson(_designJson!) : null;
-
-    final result = await Navigator.of(context).push<Map<String, dynamic>>(
-      MaterialPageRoute(
-        builder: (_) => EmailBuilderScreen(initialDocument: initialDocument),
-      ),
-    );
-
-    if (!mounted || result == null) return;
-
-    final html = result['html'];
-    final designJson = result['designJson'];
-
-    if (html is String && designJson is Map<String, dynamic>) {
-      setState(() {
-        _htmlController.text = html;
-        _designJson = designJson;
-      });
+    // Validate campaign details
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a campaign name first'),
+          backgroundColor: Colors.orange,
+        ),
+      );
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Email builder must return both HTML and design JSON'),
-      ),
-    );
+    if (_subjectController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a subject line first'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show loading indicator
+    setState(() => _saving = true);
+
+    try {
+      // Auto-save campaign to get a campaign ID
+      final campaign = Campaign(
+        name: _nameController.text.trim().isEmpty
+            ? 'Untitled campaign'
+            : _nameController.text.trim(),
+        subject: _subjectController.text.trim(),
+        previewText: _previewController.text.trim().isEmpty
+            ? null
+            : _previewController.text.trim(),
+        htmlContent: _htmlController.text.trim(),
+        designJson: _designJson,
+        segment: _filter,
+        expectedRecipients: _estimatedRecipients ?? 0,
+      );
+
+      final saved = await _campaignService.saveCampaign(campaign);
+
+      if (!mounted) return;
+
+      // Open iframe builder with the saved campaign ID
+      final result = await Navigator.of(context).push<Map<String, dynamic>>(
+        MaterialPageRoute(
+          builder: (_) => CampaignIframeEditorScreen(
+            campaignId: saved.id!,
+            initialCampaign: saved,
+          ),
+        ),
+      );
+
+      if (!mounted || result == null) return;
+
+      final html = result['html'];
+      final designJson = result['designJson'];
+
+      if (html is String && designJson is Map<String, dynamic>) {
+        setState(() {
+          _htmlController.text = html;
+          _designJson = designJson;
+        });
+        return;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening email builder: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 
   Future<void> _create() async {
@@ -145,16 +197,20 @@ class _CampaignCreateScreenState extends State<CampaignCreateScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 _designJson == null
-                                    ? 'Start designing your email with the native builder.'
-                                    : 'Native builder design ready',
+                                    ? 'Start designing your email with the mail.moyd.app builder.'
+                                    : 'Email design ready',
                                 style: theme.textTheme.bodySmall,
                               ),
                             ],
                           ),
                           ElevatedButton.icon(
                             onPressed: _openEmailBuilder,
-                            icon: const Icon(Icons.design_services_outlined),
-                            label: const Text('Open email builder'),
+                            icon: const Icon(Icons.email_outlined),
+                            label: const Text('Open Email Builder'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                            ),
                           ),
                         ],
                       ),
