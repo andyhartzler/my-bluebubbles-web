@@ -5,8 +5,7 @@ import '../../theme/campaign_builder_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Step 3: Premium Recipient Selection
-/// Stunning UI for intelligent audience targeting with deduplication
-/// Features: Beautiful cards, real-time counts, smart filters
+/// Two-stage selection: First choose audience type, then refine with dropdowns
 class RecipientSelectionStep extends StatefulWidget {
   const RecipientSelectionStep({super.key});
 
@@ -89,7 +88,7 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Choose who receives this campaign with smart deduplication',
+                          'Choose your primary audience, then refine your selection',
                           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                 color: CampaignBuilderTheme.textSecondary,
                               ),
@@ -105,7 +104,7 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
 
             // Segment type selector with stunning cards
             Text(
-              'Choose Audience Type',
+              'Step 1: Choose Audience Type',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: CampaignBuilderTheme.textPrimary,
                     fontWeight: FontWeight.bold,
@@ -117,15 +116,17 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
 
             const SizedBox(height: 32),
 
-            // Filters section
-            if (_showFilters(provider)) ...[
-              _buildFiltersSection(provider),
-              const SizedBox(height: 32),
-            ],
-
-            // Event selector
-            if (provider.selectedSegmentType == SegmentType.eventAttendees) ...[
-              _buildEventSelector(provider),
+            // Stage 2: Filter options based on selected type
+            if (provider.selectedSegmentType != null) ...[
+              Text(
+                'Step 2: Refine Your Selection',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: CampaignBuilderTheme.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 20),
+              _buildFilterOptions(provider),
               const SizedBox(height: 32),
             ],
 
@@ -258,7 +259,20 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
     );
   }
 
-  Widget _buildFiltersSection(CampaignWizardProvider provider) {
+  Widget _buildFilterOptions(CampaignWizardProvider provider) {
+    switch (provider.selectedSegmentType!) {
+      case SegmentType.subscribers:
+        return _buildSubscriberFilters(provider);
+      case SegmentType.donors:
+        return _buildDonorFilters(provider);
+      case SegmentType.members:
+        return _buildMemberFilters(provider);
+      case SegmentType.eventAttendees:
+        return _buildEventSelector(provider);
+    }
+  }
+
+  Widget _buildSubscriberFilters(CampaignWizardProvider provider) {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
@@ -269,199 +283,462 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: CampaignBuilderTheme.brightBlue.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.tune_rounded,
-                  color: CampaignBuilderTheme.brightBlue,
-                  size: 22,
-                ),
+          const Text(
+            'How do you want to filter subscribers?',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: CampaignBuilderTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Filter mode dropdown
+          DropdownButtonFormField<SubscriberFilterMode>(
+            value: provider.subscriberFilterMode,
+            decoration: InputDecoration(
+              labelText: 'Filter Type',
+              filled: true,
+              fillColor: CampaignBuilderTheme.darkNavy,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: CampaignBuilderTheme.slateLight),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Refine Your Audience',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: CampaignBuilderTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Optional filters to narrow your reach',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: CampaignBuilderTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+            dropdownColor: CampaignBuilderTheme.darkNavy,
+            items: const [
+              DropdownMenuItem(
+                value: SubscriberFilterMode.all,
+                child: Text('All Subscribers'),
               ),
-              if (provider.selectedCongressionalDistricts.isNotEmpty ||
-                  provider.selectedCounties.isNotEmpty)
-                TextButton.icon(
-                  onPressed: provider.clearAllFilters,
-                  icon: const Icon(Icons.clear_all_rounded, size: 18),
-                  label: const Text('Clear'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: CampaignBuilderTheme.errorRed,
-                  ),
-                ),
+              DropdownMenuItem(
+                value: SubscriberFilterMode.byCongressionalDistrict,
+                child: Text('By Congressional District'),
+              ),
             ],
-          ),
-          const SizedBox(height: 24),
-
-          // Congressional Districts
-          _buildFilterCategory(
-            'Congressional District',
-            ['MO-1', 'MO-2', 'MO-3', 'MO-4', 'MO-5', 'MO-6', 'MO-7', 'MO-8'],
-            provider.selectedCongressionalDistricts,
-            (district) => provider.toggleCongressionalDistrict(district),
-            CampaignBuilderTheme.moyDBlue,
+            onChanged: (value) {
+              if (value != null) {
+                provider.setSubscriberFilterMode(value);
+              }
+            },
           ),
 
-          const SizedBox(height: 24),
+          // Show CD dropdown if filter mode is byCongressionalDistrict
+          if (provider.subscriberFilterMode == SubscriberFilterMode.byCongressionalDistrict) ...[
+            const SizedBox(height: 16),
+            FutureBuilder<List<String>>(
+              future: provider.fetchCongressionalDistricts(SegmentType.subscribers),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          // Counties
-          _buildFilterCategory(
-            'County',
-            ['Jackson', 'Clay', 'Platte', 'St. Louis', 'St. Louis City', 'Greene', 'Boone', 'Jasper', 'Cole', 'Jefferson'],
-            provider.selectedCounties,
-            (county) => provider.toggleCounty(county),
-            CampaignBuilderTheme.brightBlue,
-            showMissingDataWarning: true,
-            segmentType: provider.selectedSegmentType,
-          ),
+                final districts = snapshot.data ?? [];
+
+                return DropdownButtonFormField<String>(
+                  value: provider.selectedCongressionalDistrict,
+                  decoration: InputDecoration(
+                    labelText: 'Congressional District',
+                    filled: true,
+                    fillColor: CampaignBuilderTheme.darkNavy,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: CampaignBuilderTheme.slateLight),
+                    ),
+                  ),
+                  dropdownColor: CampaignBuilderTheme.darkNavy,
+                  items: districts.map((district) {
+                    return DropdownMenuItem(
+                      value: district,
+                      child: Text(district),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    provider.setSubscriberCongressionalDistrict(value);
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text(
+                'Include subscribers where CD is not set',
+                style: TextStyle(color: CampaignBuilderTheme.textPrimary),
+              ),
+              value: provider.includeNullCD,
+              onChanged: (value) {
+                if (value != null) {
+                  provider.toggleIncludeNullCD(value);
+                }
+              },
+              activeColor: CampaignBuilderTheme.brightBlue,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildFilterCategory(
-    String title,
-    List<String> options,
-    List<String> selected,
-    Function(String) onToggle,
-    Color accentColor, {
-    bool showMissingDataWarning = false,
-    SegmentType? segmentType,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: CampaignBuilderTheme.textPrimary,
+  Widget _buildDonorFilters(CampaignWizardProvider provider) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: CampaignBuilderTheme.slate.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: CampaignBuilderTheme.slateLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'How do you want to filter donors?',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: CampaignBuilderTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Filter mode dropdown
+          DropdownButtonFormField<DonorFilterMode>(
+            value: provider.donorFilterMode,
+            decoration: InputDecoration(
+              labelText: 'Filter Type',
+              filled: true,
+              fillColor: CampaignBuilderTheme.darkNavy,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: CampaignBuilderTheme.slateLight),
               ),
             ),
-            if (selected.isNotEmpty) ...[
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: accentColor.withOpacity(0.4)),
-                ),
-                child: Text(
-                  '${selected.length} selected',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: accentColor,
-                  ),
-                ),
+            dropdownColor: CampaignBuilderTheme.darkNavy,
+            items: const [
+              DropdownMenuItem(
+                value: DonorFilterMode.all,
+                child: Text('All Donors'),
+              ),
+              DropdownMenuItem(
+                value: DonorFilterMode.byCounty,
+                child: Text('By County'),
+              ),
+              DropdownMenuItem(
+                value: DonorFilterMode.byCongressionalDistrict,
+                child: Text('By Congressional District'),
               ),
             ],
-          ],
-        ),
+            onChanged: (value) {
+              if (value != null) {
+                provider.setDonorFilterMode(value);
+              }
+            },
+          ),
 
-        // Missing data warning for county filters
-        if (showMissingDataWarning && title == 'County') ...[
-          const SizedBox(height: 12),
-          _buildMissingCountyWarning(segmentType),
-        ],
+          // Show county dropdown
+          if (provider.donorFilterMode == DonorFilterMode.byCounty) ...[
+            const SizedBox(height: 16),
+            FutureBuilder<List<String>>(
+              future: provider.fetchCounties(SegmentType.donors),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: options.map((option) {
-            final isSelected = selected.contains(option);
-            return MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                child: GestureDetector(
-                  onTap: () => onToggle(option),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      gradient: isSelected
-                          ? LinearGradient(
-                              colors: [accentColor, accentColor.withOpacity(0.8)],
-                            )
-                          : null,
-                      color: isSelected ? null : CampaignBuilderTheme.darkNavy,
+                final counties = snapshot.data ?? [];
+
+                return DropdownButtonFormField<String>(
+                  value: provider.selectedCounty,
+                  decoration: InputDecoration(
+                    labelText: 'County',
+                    filled: true,
+                    fillColor: CampaignBuilderTheme.darkNavy,
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected ? accentColor : CampaignBuilderTheme.slateLight,
-                        width: isSelected ? 2 : 1,
-                      ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: accentColor.withOpacity(0.3),
-                                blurRadius: 10,
-                                spreadRadius: 1,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isSelected)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 8),
-                            child: Icon(
-                              Icons.check_circle_rounded,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        Text(
-                          option,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                            color: isSelected ? Colors.white : CampaignBuilderTheme.textSecondary,
-                          ),
-                        ),
-                      ],
+                      borderSide: BorderSide(color: CampaignBuilderTheme.slateLight),
                     ),
                   ),
-                ),
+                  dropdownColor: CampaignBuilderTheme.darkNavy,
+                  items: counties.map((county) {
+                    return DropdownMenuItem(
+                      value: county,
+                      child: Text(county),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    provider.setDonorCounty(value);
+                  },
+                );
+              },
+            ),
+          ],
+
+          // Show CD dropdown
+          if (provider.donorFilterMode == DonorFilterMode.byCongressionalDistrict) ...[
+            const SizedBox(height: 16),
+            FutureBuilder<List<String>>(
+              future: provider.fetchCongressionalDistricts(SegmentType.donors),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final districts = snapshot.data ?? [];
+
+                return DropdownButtonFormField<String>(
+                  value: provider.selectedCongressionalDistrict,
+                  decoration: InputDecoration(
+                    labelText: 'Congressional District',
+                    filled: true,
+                    fillColor: CampaignBuilderTheme.darkNavy,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: CampaignBuilderTheme.slateLight),
+                    ),
+                  ),
+                  dropdownColor: CampaignBuilderTheme.darkNavy,
+                  items: districts.map((district) {
+                    return DropdownMenuItem(
+                      value: district,
+                      child: Text(district),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    provider.setDonorCongressionalDistrict(value);
+                  },
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMemberFilters(CampaignWizardProvider provider) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: CampaignBuilderTheme.slate.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: CampaignBuilderTheme.slateLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'How do you want to filter members?',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: CampaignBuilderTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Filter mode dropdown
+          DropdownButtonFormField<MemberFilterMode>(
+            value: provider.memberFilterMode,
+            decoration: InputDecoration(
+              labelText: 'Filter Type',
+              filled: true,
+              fillColor: CampaignBuilderTheme.darkNavy,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: CampaignBuilderTheme.slateLight),
               ),
-            );
-          }).toList(),
-        ),
-      ],
+            ),
+            dropdownColor: CampaignBuilderTheme.darkNavy,
+            items: const [
+              DropdownMenuItem(
+                value: MemberFilterMode.all,
+                child: Text('All Members'),
+              ),
+              DropdownMenuItem(
+                value: MemberFilterMode.byCongressionalDistrict,
+                child: Text('By Congressional District'),
+              ),
+              DropdownMenuItem(
+                value: MemberFilterMode.byCounty,
+                child: Text('By County'),
+              ),
+              DropdownMenuItem(
+                value: MemberFilterMode.byChapter,
+                child: Text('By Chapter'),
+              ),
+              DropdownMenuItem(
+                value: MemberFilterMode.bySchool,
+                child: Text('By School'),
+              ),
+              DropdownMenuItem(
+                value: MemberFilterMode.collegeStudents,
+                child: Text('All College Students'),
+              ),
+              DropdownMenuItem(
+                value: MemberFilterMode.highSchoolStudents,
+                child: Text('All High School Students'),
+              ),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                provider.setMemberFilterMode(value);
+              }
+            },
+          ),
+
+          // Show CD dropdown
+          if (provider.memberFilterMode == MemberFilterMode.byCongressionalDistrict) ...[
+            const SizedBox(height: 16),
+            FutureBuilder<List<String>>(
+              future: provider.fetchCongressionalDistricts(SegmentType.members),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final districts = snapshot.data ?? [];
+
+                return DropdownButtonFormField<String>(
+                  value: provider.selectedCongressionalDistrict,
+                  decoration: InputDecoration(
+                    labelText: 'Congressional District',
+                    filled: true,
+                    fillColor: CampaignBuilderTheme.darkNavy,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: CampaignBuilderTheme.slateLight),
+                    ),
+                  ),
+                  dropdownColor: CampaignBuilderTheme.darkNavy,
+                  items: districts.map((district) {
+                    return DropdownMenuItem(
+                      value: district,
+                      child: Text(district),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    provider.setMemberCongressionalDistrict(value);
+                  },
+                );
+              },
+            ),
+          ],
+
+          // Show county dropdown
+          if (provider.memberFilterMode == MemberFilterMode.byCounty) ...[
+            const SizedBox(height: 16),
+            FutureBuilder<List<String>>(
+              future: provider.fetchCounties(SegmentType.members),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final counties = snapshot.data ?? [];
+
+                return DropdownButtonFormField<String>(
+                  value: provider.selectedCounty,
+                  decoration: InputDecoration(
+                    labelText: 'County',
+                    filled: true,
+                    fillColor: CampaignBuilderTheme.darkNavy,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: CampaignBuilderTheme.slateLight),
+                    ),
+                  ),
+                  dropdownColor: CampaignBuilderTheme.darkNavy,
+                  items: counties.map((county) {
+                    return DropdownMenuItem(
+                      value: county,
+                      child: Text(county),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    provider.setMemberCounty(value);
+                  },
+                );
+              },
+            ),
+          ],
+
+          // Show chapter dropdown
+          if (provider.memberFilterMode == MemberFilterMode.byChapter) ...[
+            const SizedBox(height: 16),
+            FutureBuilder<List<String>>(
+              future: provider.fetchChapters(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final chapters = snapshot.data ?? [];
+
+                return DropdownButtonFormField<String>(
+                  value: provider.selectedChapter,
+                  decoration: InputDecoration(
+                    labelText: 'Chapter',
+                    filled: true,
+                    fillColor: CampaignBuilderTheme.darkNavy,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: CampaignBuilderTheme.slateLight),
+                    ),
+                  ),
+                  dropdownColor: CampaignBuilderTheme.darkNavy,
+                  items: chapters.map((chapter) {
+                    return DropdownMenuItem(
+                      value: chapter,
+                      child: Text(chapter),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    provider.setMemberChapter(value);
+                  },
+                );
+              },
+            ),
+          ],
+
+          // Show school dropdown
+          if (provider.memberFilterMode == MemberFilterMode.bySchool) ...[
+            const SizedBox(height: 16),
+            FutureBuilder<List<String>>(
+              future: provider.fetchSchools(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final schools = snapshot.data ?? [];
+
+                return DropdownButtonFormField<String>(
+                  value: provider.selectedSchool,
+                  decoration: InputDecoration(
+                    labelText: 'School',
+                    filled: true,
+                    fillColor: CampaignBuilderTheme.darkNavy,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: CampaignBuilderTheme.slateLight),
+                    ),
+                  ),
+                  dropdownColor: CampaignBuilderTheme.darkNavy,
+                  items: schools.map((school) {
+                    return DropdownMenuItem(
+                      value: school,
+                      child: Text(school),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    provider.setMemberSchool(value);
+                  },
+                );
+              },
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -595,7 +872,7 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${event['start_date']} • ${event['attendee_count'] ?? 0} attendees',
+                                      '${event['event_date']} • ${event['attendee_count'] ?? 0} attendees',
                                       style: const TextStyle(
                                         fontSize: 13,
                                         color: CampaignBuilderTheme.textSecondary,
@@ -757,49 +1034,35 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
     );
   }
 
-  bool _showFilters(CampaignWizardProvider provider) {
-    // Only show filters for subscribers, members, and donors
-    return provider.selectedSegmentType == SegmentType.allSubscribers ||
-        provider.selectedSegmentType == SegmentType.allMembers ||
-        provider.selectedSegmentType == SegmentType.allDonors;
-  }
-
   List<_SegmentOption> _getSegmentOptions() {
     return [
       _SegmentOption(
-        type: SegmentType.allSubscribers,
-        title: 'All Subscribers',
-        subtitle: 'Everyone on your email list',
+        type: SegmentType.subscribers,
+        title: 'Subscribers',
+        subtitle: 'Email list subscribers',
         icon: Icons.mail_outline_rounded,
         color: CampaignBuilderTheme.brightBlue,
       ),
       _SegmentOption(
-        type: SegmentType.allMembers,
-        title: 'All Members',
-        subtitle: 'Current chapter members',
-        icon: Icons.card_membership_rounded,
-        color: const Color(0xFF8B5CF6),
-      ),
-      _SegmentOption(
-        type: SegmentType.allDonors,
-        title: 'All Donors',
-        subtitle: 'People who have donated',
-        icon: Icons.volunteer_activism_rounded,
-        color: CampaignBuilderTheme.successGreen,
-      ),
-      _SegmentOption(
         type: SegmentType.eventAttendees,
         title: 'Event Attendees',
-        subtitle: 'Specific event participants',
+        subtitle: 'Event participants',
         icon: Icons.event_available_rounded,
         color: CampaignBuilderTheme.warningOrange,
       ),
       _SegmentOption(
-        type: SegmentType.everyone,
-        title: 'Everyone',
-        subtitle: 'All contacts (deduplicated)',
-        icon: Icons.group_add_rounded,
-        color: CampaignBuilderTheme.moyDBlue,
+        type: SegmentType.donors,
+        title: 'Donors',
+        subtitle: 'Campaign donors',
+        icon: Icons.volunteer_activism_rounded,
+        color: CampaignBuilderTheme.successGreen,
+      ),
+      _SegmentOption(
+        type: SegmentType.members,
+        title: 'Members',
+        subtitle: 'Organization members',
+        icon: Icons.card_membership_rounded,
+        color: const Color(0xFF8B5CF6),
       ),
     ];
   }
@@ -809,98 +1072,14 @@ class _RecipientSelectionStepState extends State<RecipientSelectionStep> with Si
       final supabase = Supabase.instance.client;
       final response = await supabase
           .from('events')
-          .select('id, title, start_date, attendee_count')
-          .order('start_date', ascending: false)
+          .select('id, title, event_date, attendee_count')
+          .order('event_date', ascending: false)
           .limit(10);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error fetching events: $e');
       return [];
-    }
-  }
-
-  Widget _buildMissingCountyWarning(SegmentType? segmentType) {
-    if (segmentType == null) return const SizedBox.shrink();
-
-    return FutureBuilder<int>(
-      future: _fetchMissingCountyCount(segmentType),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data == 0) {
-          return const SizedBox.shrink();
-        }
-
-        final missingCount = snapshot.data!;
-
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF3CD),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.5)),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.warning_amber_rounded,
-                color: Color(0xFFFF8F00),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '$missingCount ${_getSegmentLabel(segmentType)} do not have county information and will not receive this campaign when filtering by county.',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B5100),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  String _getSegmentLabel(SegmentType type) {
-    switch (type) {
-      case SegmentType.allSubscribers:
-        return 'subscribers';
-      case SegmentType.allMembers:
-        return 'members';
-      case SegmentType.allDonors:
-        return 'donors';
-      default:
-        return 'contacts';
-    }
-  }
-
-  Future<int> _fetchMissingCountyCount(SegmentType segmentType) async {
-    try {
-      final supabase = Supabase.instance.client;
-
-      String functionName;
-      switch (segmentType) {
-        case SegmentType.allSubscribers:
-          functionName = 'count_subscribers_missing_county';
-          break;
-        case SegmentType.allMembers:
-          functionName = 'count_members_missing_county';
-          break;
-        case SegmentType.allDonors:
-          functionName = 'count_donors_missing_county';
-          break;
-        default:
-          return 0;
-      }
-
-      final response = await supabase.rpc(functionName);
-      return response as int? ?? 0;
-    } catch (e) {
-      debugPrint('Error fetching missing county count: $e');
-      return 0;
     }
   }
 }

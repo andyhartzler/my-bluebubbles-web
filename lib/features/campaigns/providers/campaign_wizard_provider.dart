@@ -2,13 +2,36 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Segment types for recipient selection
+/// Primary audience types for recipient selection
 enum SegmentType {
-  allSubscribers,
-  allMembers,
-  allDonors,
+  subscribers,
   eventAttendees,
-  everyone,
+  donors,
+  members,
+}
+
+/// Filter modes for subscribers
+enum SubscriberFilterMode {
+  all,
+  byCongressionalDistrict,
+}
+
+/// Filter modes for donors
+enum DonorFilterMode {
+  all,
+  byCounty,
+  byCongressionalDistrict,
+}
+
+/// Filter modes for members
+enum MemberFilterMode {
+  all,
+  byCongressionalDistrict,
+  byCounty,
+  byChapter,
+  bySchool,
+  collegeStudents,
+  highSchoolStudents,
 }
 
 /// Premium Campaign Wizard Provider
@@ -35,9 +58,22 @@ class CampaignWizardProvider extends ChangeNotifier {
 
   // === STEP 3: Recipient Selection ===
   SegmentType? _selectedSegmentType;
-  List<String> _selectedCongressionalDistricts = [];
-  List<String> _selectedCounties = [];
+
+  // Filter modes for each segment type
+  SubscriberFilterMode _subscriberFilterMode = SubscriberFilterMode.all;
+  DonorFilterMode _donorFilterMode = DonorFilterMode.all;
+  MemberFilterMode _memberFilterMode = MemberFilterMode.all;
+
+  // Filter values (single selections from dropdowns)
+  String? _selectedCongressionalDistrict;
+  String? _selectedCounty;
+  String? _selectedChapter;
+  String? _selectedSchool;
   List<String> _selectedEventIds = [];
+
+  // Include null CD option for subscribers
+  bool _includeNullCD = false;
+
   int _estimatedRecipients = 0;
   bool _loadingEstimate = false;
 
@@ -77,9 +113,15 @@ class CampaignWizardProvider extends ChangeNotifier {
 
   // Step 3
   SegmentType? get selectedSegmentType => _selectedSegmentType;
-  List<String> get selectedCongressionalDistricts => _selectedCongressionalDistricts;
-  List<String> get selectedCounties => _selectedCounties;
+  SubscriberFilterMode get subscriberFilterMode => _subscriberFilterMode;
+  DonorFilterMode get donorFilterMode => _donorFilterMode;
+  MemberFilterMode get memberFilterMode => _memberFilterMode;
+  String? get selectedCongressionalDistrict => _selectedCongressionalDistrict;
+  String? get selectedCounty => _selectedCounty;
+  String? get selectedChapter => _selectedChapter;
+  String? get selectedSchool => _selectedSchool;
   List<String> get selectedEventIds => _selectedEventIds;
+  bool get includeNullCD => _includeNullCD;
   int get estimatedRecipients => _estimatedRecipients;
   bool get loadingEstimate => _loadingEstimate;
   bool get hasRecipients => _estimatedRecipients > 0;
@@ -229,9 +271,18 @@ class CampaignWizardProvider extends ChangeNotifier {
 
   Future<void> selectSegmentType(SegmentType type) async {
     _selectedSegmentType = type;
-    _selectedCongressionalDistricts.clear();
-    _selectedCounties.clear();
+
+    // Reset all filter modes and values
+    _subscriberFilterMode = SubscriberFilterMode.all;
+    _donorFilterMode = DonorFilterMode.all;
+    _memberFilterMode = MemberFilterMode.all;
+    _selectedCongressionalDistrict = null;
+    _selectedCounty = null;
+    _selectedChapter = null;
+    _selectedSchool = null;
     _selectedEventIds.clear();
+    _includeNullCD = false;
+
     _hasUnsavedChanges = true;
     notifyListeners();
 
@@ -239,32 +290,95 @@ class CampaignWizardProvider extends ChangeNotifier {
     await estimateRecipients();
   }
 
-  void toggleCongressionalDistrict(String district) {
-    if (_selectedCongressionalDistricts.contains(district)) {
-      _selectedCongressionalDistricts.remove(district);
-    } else {
-      _selectedCongressionalDistricts.add(district);
-    }
+  // Subscriber filter methods
+  Future<void> setSubscriberFilterMode(SubscriberFilterMode mode) async {
+    _subscriberFilterMode = mode;
+    _selectedCongressionalDistrict = null;
+    _includeNullCD = false;
     _hasUnsavedChanges = true;
     notifyListeners();
-
-    // Re-estimate with new filters
-    estimateRecipients();
+    await estimateRecipients();
   }
 
-  void toggleCounty(String county) {
-    if (_selectedCounties.contains(county)) {
-      _selectedCounties.remove(county);
-    } else {
-      _selectedCounties.add(county);
-    }
+  Future<void> setSubscriberCongressionalDistrict(String? district) async {
+    _selectedCongressionalDistrict = district;
     _hasUnsavedChanges = true;
     notifyListeners();
-
-    // Re-estimate with new filters
-    estimateRecipients();
+    await estimateRecipients();
   }
 
+  Future<void> toggleIncludeNullCD(bool value) async {
+    _includeNullCD = value;
+    _hasUnsavedChanges = true;
+    notifyListeners();
+    await estimateRecipients();
+  }
+
+  // Donor filter methods
+  Future<void> setDonorFilterMode(DonorFilterMode mode) async {
+    _donorFilterMode = mode;
+    _selectedCongressionalDistrict = null;
+    _selectedCounty = null;
+    _hasUnsavedChanges = true;
+    notifyListeners();
+    await estimateRecipients();
+  }
+
+  Future<void> setDonorCongressionalDistrict(String? district) async {
+    _selectedCongressionalDistrict = district;
+    _hasUnsavedChanges = true;
+    notifyListeners();
+    await estimateRecipients();
+  }
+
+  Future<void> setDonorCounty(String? county) async {
+    _selectedCounty = county;
+    _hasUnsavedChanges = true;
+    notifyListeners();
+    await estimateRecipients();
+  }
+
+  // Member filter methods
+  Future<void> setMemberFilterMode(MemberFilterMode mode) async {
+    _memberFilterMode = mode;
+    _selectedCongressionalDistrict = null;
+    _selectedCounty = null;
+    _selectedChapter = null;
+    _selectedSchool = null;
+    _hasUnsavedChanges = true;
+    notifyListeners();
+    await estimateRecipients();
+  }
+
+  Future<void> setMemberCongressionalDistrict(String? district) async {
+    _selectedCongressionalDistrict = district;
+    _hasUnsavedChanges = true;
+    notifyListeners();
+    await estimateRecipients();
+  }
+
+  Future<void> setMemberCounty(String? county) async {
+    _selectedCounty = county;
+    _hasUnsavedChanges = true;
+    notifyListeners();
+    await estimateRecipients();
+  }
+
+  Future<void> setMemberChapter(String? chapter) async {
+    _selectedChapter = chapter;
+    _hasUnsavedChanges = true;
+    notifyListeners();
+    await estimateRecipients();
+  }
+
+  Future<void> setMemberSchool(String? school) async {
+    _selectedSchool = school;
+    _hasUnsavedChanges = true;
+    notifyListeners();
+    await estimateRecipients();
+  }
+
+  // Event attendee methods
   void toggleEvent(String eventId) {
     if (_selectedEventIds.contains(eventId)) {
       _selectedEventIds.remove(eventId);
@@ -279,8 +393,14 @@ class CampaignWizardProvider extends ChangeNotifier {
   }
 
   void clearAllFilters() {
-    _selectedCongressionalDistricts.clear();
-    _selectedCounties.clear();
+    _subscriberFilterMode = SubscriberFilterMode.all;
+    _donorFilterMode = DonorFilterMode.all;
+    _memberFilterMode = MemberFilterMode.all;
+    _selectedCongressionalDistrict = null;
+    _selectedCounty = null;
+    _selectedChapter = null;
+    _selectedSchool = null;
+    _includeNullCD = false;
     _hasUnsavedChanges = true;
     notifyListeners();
 
@@ -301,31 +421,17 @@ class CampaignWizardProvider extends ChangeNotifier {
     try {
       int count = 0;
 
-      final districts = _selectedCongressionalDistricts.isEmpty
-          ? null
-          : _selectedCongressionalDistricts;
-      final counties = _selectedCounties.isEmpty ? null : _selectedCounties;
-
       switch (_selectedSegmentType!) {
-        case SegmentType.allSubscribers:
-          count = await _supabase.rpc('count_subscribers_filtered', params: {
-            'p_congressional_districts': districts,
-            'p_counties': counties,
-          });
+        case SegmentType.subscribers:
+          count = await _estimateSubscribers();
           break;
 
-        case SegmentType.allMembers:
-          count = await _supabase.rpc('count_members_filtered', params: {
-            'p_congressional_districts': districts,
-            'p_counties': counties,
-          });
+        case SegmentType.donors:
+          count = await _estimateDonors();
           break;
 
-        case SegmentType.allDonors:
-          count = await _supabase.rpc('count_donors_filtered', params: {
-            'p_congressional_districts': districts,
-            'p_counties': counties,
-          });
+        case SegmentType.members:
+          count = await _estimateMembers();
           break;
 
         case SegmentType.eventAttendees:
@@ -335,13 +441,6 @@ class CampaignWizardProvider extends ChangeNotifier {
             count = await _supabase.rpc('count_unique_event_attendees',
                 params: {'event_ids': _selectedEventIds});
           }
-          break;
-
-        case SegmentType.everyone:
-          count = await _supabase.rpc('count_all_unique_contacts', params: {
-            'p_congressional_districts': districts,
-            'p_counties': counties,
-          });
           break;
       }
 
@@ -353,6 +452,77 @@ class CampaignWizardProvider extends ChangeNotifier {
       _estimatedRecipients = 0;
       _loadingEstimate = false;
       notifyListeners();
+    }
+  }
+
+  Future<int> _estimateSubscribers() async {
+    switch (_subscriberFilterMode) {
+      case SubscriberFilterMode.all:
+        return await _supabase.rpc('count_subscribers_all');
+
+      case SubscriberFilterMode.byCongressionalDistrict:
+        if (_selectedCongressionalDistrict == null) return 0;
+        return await _supabase.rpc('count_subscribers_by_cd', params: {
+          'p_congressional_district': _selectedCongressionalDistrict,
+          'p_include_null': _includeNullCD,
+        });
+    }
+  }
+
+  Future<int> _estimateDonors() async {
+    switch (_donorFilterMode) {
+      case DonorFilterMode.all:
+        return await _supabase.rpc('count_donors_all');
+
+      case DonorFilterMode.byCounty:
+        if (_selectedCounty == null) return 0;
+        return await _supabase.rpc('count_donors_by_county', params: {
+          'p_county': _selectedCounty,
+        });
+
+      case DonorFilterMode.byCongressionalDistrict:
+        if (_selectedCongressionalDistrict == null) return 0;
+        return await _supabase.rpc('count_donors_by_cd', params: {
+          'p_congressional_district': _selectedCongressionalDistrict,
+        });
+    }
+  }
+
+  Future<int> _estimateMembers() async {
+    switch (_memberFilterMode) {
+      case MemberFilterMode.all:
+        return await _supabase.rpc('count_members_all');
+
+      case MemberFilterMode.byCongressionalDistrict:
+        if (_selectedCongressionalDistrict == null) return 0;
+        return await _supabase.rpc('count_members_by_cd', params: {
+          'p_congressional_district': _selectedCongressionalDistrict,
+        });
+
+      case MemberFilterMode.byCounty:
+        if (_selectedCounty == null) return 0;
+        return await _supabase.rpc('count_members_by_county', params: {
+          'p_county': _selectedCounty,
+        });
+
+      case MemberFilterMode.byChapter:
+        if (_selectedChapter == null) return 0;
+        return await _supabase.rpc('count_members_by_chapter', params: {
+          'p_chapter': _selectedChapter,
+        });
+
+      case MemberFilterMode.bySchool:
+        if (_selectedSchool == null) return 0;
+        // Determine if it's high school or college based on available data
+        return await _supabase.rpc('count_members_by_school', params: {
+          'p_school': _selectedSchool,
+        });
+
+      case MemberFilterMode.collegeStudents:
+        return await _supabase.rpc('count_members_with_college');
+
+      case MemberFilterMode.highSchoolStudents:
+        return await _supabase.rpc('count_members_with_high_school');
     }
   }
 
@@ -521,8 +691,14 @@ class CampaignWizardProvider extends ChangeNotifier {
         'design_json': _designJson,
         'segment_type': _selectedSegmentType?.name,
         'segment_filters': {
-          'congressional_districts': _selectedCongressionalDistricts,
-          'counties': _selectedCounties,
+          'subscriber_filter_mode': _subscriberFilterMode.name,
+          'donor_filter_mode': _donorFilterMode.name,
+          'member_filter_mode': _memberFilterMode.name,
+          'congressional_district': _selectedCongressionalDistrict,
+          'county': _selectedCounty,
+          'chapter': _selectedChapter,
+          'school': _selectedSchool,
+          'include_null_cd': _includeNullCD,
         },
         'selected_events': _selectedEventIds.isEmpty ? null : _selectedEventIds,
         'updated_at': DateTime.now().toIso8601String(),
@@ -585,9 +761,29 @@ class CampaignWizardProvider extends ChangeNotifier {
 
       final filters = response['segment_filters'] as Map<String, dynamic>?;
       if (filters != null) {
-        _selectedCongressionalDistricts =
-            List<String>.from(filters['congressional_districts'] ?? []);
-        _selectedCounties = List<String>.from(filters['counties'] ?? []);
+        final subscriberFilterStr = filters['subscriber_filter_mode'] as String?;
+        if (subscriberFilterStr != null) {
+          _subscriberFilterMode = SubscriberFilterMode.values
+              .firstWhere((e) => e.name == subscriberFilterStr);
+        }
+
+        final donorFilterStr = filters['donor_filter_mode'] as String?;
+        if (donorFilterStr != null) {
+          _donorFilterMode =
+              DonorFilterMode.values.firstWhere((e) => e.name == donorFilterStr);
+        }
+
+        final memberFilterStr = filters['member_filter_mode'] as String?;
+        if (memberFilterStr != null) {
+          _memberFilterMode = MemberFilterMode.values
+              .firstWhere((e) => e.name == memberFilterStr);
+        }
+
+        _selectedCongressionalDistrict = filters['congressional_district'];
+        _selectedCounty = filters['county'];
+        _selectedChapter = filters['chapter'];
+        _selectedSchool = filters['school'];
+        _includeNullCD = filters['include_null_cd'] ?? false;
       }
 
       final events = response['selected_events'];
@@ -641,9 +837,15 @@ class CampaignWizardProvider extends ChangeNotifier {
     _htmlContent = null;
     _designJson = null;
     _selectedSegmentType = null;
-    _selectedCongressionalDistricts.clear();
-    _selectedCounties.clear();
+    _subscriberFilterMode = SubscriberFilterMode.all;
+    _donorFilterMode = DonorFilterMode.all;
+    _memberFilterMode = MemberFilterMode.all;
+    _selectedCongressionalDistrict = null;
+    _selectedCounty = null;
+    _selectedChapter = null;
+    _selectedSchool = null;
     _selectedEventIds.clear();
+    _includeNullCD = false;
     _estimatedRecipients = 0;
     _scheduledFor = null;
     _sendImmediately = true;
@@ -657,6 +859,137 @@ class CampaignWizardProvider extends ChangeNotifier {
     _lastSavedAt = null;
 
     notifyListeners();
+  }
+
+  // === DROPDOWN OPTIONS FETCHING ===
+
+  /// Fetch distinct congressional districts
+  Future<List<String>> fetchCongressionalDistricts(SegmentType type) async {
+    try {
+      String table;
+      switch (type) {
+        case SegmentType.subscribers:
+          table = 'subscribers';
+          break;
+        case SegmentType.donors:
+          table = 'donors';
+          break;
+        case SegmentType.members:
+          table = 'members';
+          break;
+        default:
+          return [];
+      }
+
+      final response = await _supabase
+          .from(table)
+          .select('congressional_district')
+          .not('congressional_district', 'is', null)
+          .order('congressional_district');
+
+      final districts = <String>{};
+      for (final row in response) {
+        final district = row['congressional_district'] as String?;
+        if (district != null && district.isNotEmpty) {
+          districts.add(district);
+        }
+      }
+
+      return districts.toList()..sort();
+    } catch (e) {
+      debugPrint('Error fetching congressional districts: $e');
+      return [];
+    }
+  }
+
+  /// Fetch distinct counties
+  Future<List<String>> fetchCounties(SegmentType type) async {
+    try {
+      String table;
+      switch (type) {
+        case SegmentType.subscribers:
+          table = 'subscribers';
+          break;
+        case SegmentType.donors:
+          table = 'donors';
+          break;
+        case SegmentType.members:
+          table = 'members';
+          break;
+        default:
+          return [];
+      }
+
+      final response = await _supabase
+          .from(table)
+          .select('county')
+          .not('county', 'is', null)
+          .order('county');
+
+      final counties = <String>{};
+      for (final row in response) {
+        final county = row['county'] as String?;
+        if (county != null && county.isNotEmpty) {
+          counties.add(county);
+        }
+      }
+
+      return counties.toList()..sort();
+    } catch (e) {
+      debugPrint('Error fetching counties: $e');
+      return [];
+    }
+  }
+
+  /// Fetch distinct chapters
+  Future<List<String>> fetchChapters() async {
+    try {
+      final response = await _supabase
+          .from('members')
+          .select('chapter_name')
+          .not('chapter_name', 'is', null)
+          .order('chapter_name');
+
+      final chapters = <String>{};
+      for (final row in response) {
+        final chapter = row['chapter_name'] as String?;
+        if (chapter != null && chapter.isNotEmpty) {
+          chapters.add(chapter);
+        }
+      }
+
+      return chapters.toList()..sort();
+    } catch (e) {
+      debugPrint('Error fetching chapters: $e');
+      return [];
+    }
+  }
+
+  /// Fetch distinct schools (both high school and college)
+  Future<List<String>> fetchSchools() async {
+    try {
+      final response = await _supabase
+          .from('members')
+          .select('high_school, college');
+
+      final schools = <String>{};
+      for (final row in response) {
+        final highSchool = row['high_school'] as String?;
+        final college = row['college'] as String?;
+
+        if (highSchool != null && highSchool.isNotEmpty) {
+          schools.add(highSchool);
+        }
+        if (college != null && college.isNotEmpty) {
+          schools.add(college);
+        }
+      }
+
+      return schools.toList()..sort();
+    } catch (e) {
+      debugPrint('Error fetching schools: $e');
+      return [];
+    }
   }
 
   @override
