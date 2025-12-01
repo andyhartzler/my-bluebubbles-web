@@ -76,6 +76,7 @@ dependencies:
   supabase: ^2.6.0
   fl_chart: ^0.66.0
   flutter_image_compress: ^2.2.0
+  webview_flutter: ^4.4.0
   flutter_improved_scrolling: ^0.0.3
   flutter_isolate:
     path: packages/flutter_isolate

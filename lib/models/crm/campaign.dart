@@ -55,12 +55,23 @@ class Campaign {
   final MessageFilter? segment;
   final CampaignStatus status;
   final DateTime? scheduledAt;
+  final DateTime? sentAt;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? createdBy;
+  final String fromName;
+  final String fromEmail;
+  final String? replyTo;
   final int expectedRecipients;
   final int sentCount;
   final int openedCount;
   final int clickedCount;
+  final int totalDelivered;
+  final int totalBounced;
+  final int totalComplained;
+  final int totalUnsubscribed;
+  final bool abTestEnabled;
+  final Map<String, dynamic>? abTestConfig;
 
   const Campaign({
     required this.name,
@@ -72,12 +83,23 @@ class Campaign {
     this.segment,
     this.status = CampaignStatus.draft,
     this.scheduledAt,
+    this.sentAt,
     this.createdAt,
     this.updatedAt,
+    this.createdBy,
+    this.fromName = 'Missouri Young Democrats',
+    this.fromEmail = 'info@moyoungdemocrats.org',
+    this.replyTo,
     this.expectedRecipients = 0,
     this.sentCount = 0,
     this.openedCount = 0,
     this.clickedCount = 0,
+    this.totalDelivered = 0,
+    this.totalBounced = 0,
+    this.totalComplained = 0,
+    this.totalUnsubscribed = 0,
+    this.abTestEnabled = false,
+    this.abTestConfig,
   });
 
   factory Campaign.fromJson(Map<String, dynamic> json) {
@@ -91,12 +113,23 @@ class Campaign {
       segment: _segmentFromJson(json['segment'] as Map<String, dynamic>?),
       status: _statusFromString(json['status'] as String?),
       scheduledAt: _parseDate(json['scheduled_at'] as String?),
+      sentAt: _parseDate(json['sent_at'] as String?),
       createdAt: _parseDate(json['created_at'] as String?),
       updatedAt: _parseDate(json['updated_at'] as String?),
+      createdBy: json['created_by'] as String?,
+      fromName: json['from_name'] as String? ?? 'Missouri Young Democrats',
+      fromEmail: json['from_email'] as String? ?? 'info@moyoungdemocrats.org',
+      replyTo: json['reply_to'] as String?,
       expectedRecipients: json['expected_recipients'] as int? ?? 0,
       sentCount: json['sent_count'] as int? ?? 0,
       openedCount: json['opened_count'] as int? ?? 0,
       clickedCount: json['clicked_count'] as int? ?? 0,
+      totalDelivered: json['total_delivered'] as int? ?? 0,
+      totalBounced: json['total_bounced'] as int? ?? 0,
+      totalComplained: json['total_complained'] as int? ?? 0,
+      totalUnsubscribed: json['total_unsubscribed'] as int? ?? 0,
+      abTestEnabled: json['ab_test_enabled'] as bool? ?? false,
+      abTestConfig: (json['ab_test_config'] as Map?)?.cast<String, dynamic>(),
     );
   }
 
@@ -111,10 +144,23 @@ class Campaign {
       'segment': segment != null ? _segmentToJson(segment!) : null,
       'status': _statusToString(status),
       'scheduled_at': scheduledAt?.toIso8601String(),
+      'sent_at': sentAt?.toIso8601String(),
+      'created_at': createdAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
+      'created_by': createdBy,
+      'from_name': fromName,
+      'from_email': fromEmail,
+      'reply_to': replyTo,
       'expected_recipients': expectedRecipients,
       'sent_count': sentCount,
       'opened_count': openedCount,
       'clicked_count': clickedCount,
+      'total_delivered': totalDelivered,
+      'total_bounced': totalBounced,
+      'total_complained': totalComplained,
+      'total_unsubscribed': totalUnsubscribed,
+      'ab_test_enabled': abTestEnabled,
+      'ab_test_config': abTestConfig,
     }..removeWhere((_, value) => value == null);
   }
 
@@ -128,12 +174,23 @@ class Campaign {
     MessageFilter? segment,
     CampaignStatus? status,
     DateTime? scheduledAt,
+    DateTime? sentAt,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? createdBy,
+    String? fromName,
+    String? fromEmail,
+    String? replyTo,
     int? expectedRecipients,
     int? sentCount,
     int? openedCount,
     int? clickedCount,
+    int? totalDelivered,
+    int? totalBounced,
+    int? totalComplained,
+    int? totalUnsubscribed,
+    bool? abTestEnabled,
+    Map<String, dynamic>? abTestConfig,
   }) {
     return Campaign(
       id: id ?? this.id,
@@ -145,12 +202,23 @@ class Campaign {
       segment: segment ?? this.segment,
       status: status ?? this.status,
       scheduledAt: scheduledAt ?? this.scheduledAt,
+      sentAt: sentAt ?? this.sentAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      createdBy: createdBy ?? this.createdBy,
+      fromName: fromName ?? this.fromName,
+      fromEmail: fromEmail ?? this.fromEmail,
+      replyTo: replyTo ?? this.replyTo,
       expectedRecipients: expectedRecipients ?? this.expectedRecipients,
       sentCount: sentCount ?? this.sentCount,
       openedCount: openedCount ?? this.openedCount,
       clickedCount: clickedCount ?? this.clickedCount,
+      totalDelivered: totalDelivered ?? this.totalDelivered,
+      totalBounced: totalBounced ?? this.totalBounced,
+      totalComplained: totalComplained ?? this.totalComplained,
+      totalUnsubscribed: totalUnsubscribed ?? this.totalUnsubscribed,
+      abTestEnabled: abTestEnabled ?? this.abTestEnabled,
+      abTestConfig: abTestConfig ?? this.abTestConfig,
     );
   }
 
