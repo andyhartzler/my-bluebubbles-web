@@ -69,7 +69,7 @@ class _CampaignCreateScreenState extends State<CampaignCreateScreen> {
         htmlContent: _htmlController.text.trim(),
         designJson: _designJson,
         segment: _filter,
-        expectedRecipients: _estimatedRecipients ?? 0,
+        totalRecipients: _estimatedRecipients ?? 0,
       );
 
       final saved = await _campaignService.saveCampaign(campaign);
@@ -128,7 +128,7 @@ class _CampaignCreateScreenState extends State<CampaignCreateScreen> {
         htmlContent: _htmlController.text.trim(),
         designJson: _designJson,
         segment: _filter,
-        expectedRecipients: _estimatedRecipients ?? 0,
+        totalRecipients: _estimatedRecipients ?? 0,
       );
 
       final saved = await _campaignService.saveCampaign(campaign);

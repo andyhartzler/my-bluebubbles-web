@@ -62,10 +62,10 @@ class Campaign {
   final String fromName;
   final String fromEmail;
   final String? replyTo;
-  final int expectedRecipients;
-  final int sentCount;
-  final int openedCount;
-  final int clickedCount;
+  final int totalRecipients;
+  final int totalSent;
+  final int totalOpened;
+  final int totalClicked;
   final int totalDelivered;
   final int totalBounced;
   final int totalComplained;
@@ -90,10 +90,10 @@ class Campaign {
     this.fromName = 'Missouri Young Democrats',
     this.fromEmail = 'info@moyoungdemocrats.org',
     this.replyTo,
-    this.expectedRecipients = 0,
-    this.sentCount = 0,
-    this.openedCount = 0,
-    this.clickedCount = 0,
+    this.totalRecipients = 0,
+    this.totalSent = 0,
+    this.totalOpened = 0,
+    this.totalClicked = 0,
     this.totalDelivered = 0,
     this.totalBounced = 0,
     this.totalComplained = 0,
@@ -120,10 +120,10 @@ class Campaign {
       fromName: json['from_name'] as String? ?? 'Missouri Young Democrats',
       fromEmail: json['from_email'] as String? ?? 'info@moyoungdemocrats.org',
       replyTo: json['reply_to'] as String?,
-      expectedRecipients: json['expected_recipients'] as int? ?? 0,
-      sentCount: json['sent_count'] as int? ?? 0,
-      openedCount: json['opened_count'] as int? ?? 0,
-      clickedCount: json['clicked_count'] as int? ?? 0,
+      totalRecipients: json['total_recipients'] as int? ?? 0,
+      totalSent: json['total_sent'] as int? ?? 0,
+      totalOpened: json['total_opened'] as int? ?? 0,
+      totalClicked: json['total_clicked'] as int? ?? 0,
       totalDelivered: json['total_delivered'] as int? ?? 0,
       totalBounced: json['total_bounced'] as int? ?? 0,
       totalComplained: json['total_complained'] as int? ?? 0,
@@ -151,10 +151,10 @@ class Campaign {
       'from_name': fromName,
       'from_email': fromEmail,
       'reply_to': replyTo,
-      'expected_recipients': expectedRecipients,
-      'sent_count': sentCount,
-      'opened_count': openedCount,
-      'clicked_count': clickedCount,
+      'total_recipients': totalRecipients,
+      'total_sent': totalSent,
+      'total_opened': totalOpened,
+      'total_clicked': totalClicked,
       'total_delivered': totalDelivered,
       'total_bounced': totalBounced,
       'total_complained': totalComplained,
@@ -181,10 +181,10 @@ class Campaign {
     String? fromName,
     String? fromEmail,
     String? replyTo,
-    int? expectedRecipients,
-    int? sentCount,
-    int? openedCount,
-    int? clickedCount,
+    int? totalRecipients,
+    int? totalSent,
+    int? totalOpened,
+    int? totalClicked,
     int? totalDelivered,
     int? totalBounced,
     int? totalComplained,
@@ -209,10 +209,10 @@ class Campaign {
       fromName: fromName ?? this.fromName,
       fromEmail: fromEmail ?? this.fromEmail,
       replyTo: replyTo ?? this.replyTo,
-      expectedRecipients: expectedRecipients ?? this.expectedRecipients,
-      sentCount: sentCount ?? this.sentCount,
-      openedCount: openedCount ?? this.openedCount,
-      clickedCount: clickedCount ?? this.clickedCount,
+      totalRecipients: totalRecipients ?? this.totalRecipients,
+      totalSent: totalSent ?? this.totalSent,
+      totalOpened: totalOpened ?? this.totalOpened,
+      totalClicked: totalClicked ?? this.totalClicked,
       totalDelivered: totalDelivered ?? this.totalDelivered,
       totalBounced: totalBounced ?? this.totalBounced,
       totalComplained: totalComplained ?? this.totalComplained,
