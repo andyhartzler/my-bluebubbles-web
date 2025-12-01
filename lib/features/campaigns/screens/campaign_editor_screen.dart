@@ -58,7 +58,7 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
     _designJson = campaign.designJson;
     _segment = campaign.segment ?? MessageFilter();
     _scheduledAt = campaign.scheduledAt;
-    _estimatedRecipients = campaign.expectedRecipients;
+    _estimatedRecipients = campaign.totalRecipients;
   }
 
   Future<void> _loadCampaign() async {
@@ -90,8 +90,8 @@ class _CampaignEditorScreenState extends State<CampaignEditorScreen> {
         designJson: _designJson ?? _campaign?.designJson,
         segment: _segment,
         scheduledAt: _scheduledAt,
-        expectedRecipients:
-            _estimatedRecipients ?? _campaign?.expectedRecipients ?? 0,
+        totalRecipients:
+            _estimatedRecipients ?? _campaign?.totalRecipients ?? 0,
       );
 
       final saved = await _campaignService.saveCampaign(campaign);
