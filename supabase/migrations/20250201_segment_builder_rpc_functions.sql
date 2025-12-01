@@ -234,6 +234,9 @@ $$;
 -- EVENT ATTENDEE COUNT FUNCTION
 -- ============================================================================
 
+-- Drop the old function if it exists (with different parameter name)
+DROP FUNCTION IF EXISTS count_unique_event_attendees(uuid[]);
+
 -- Count unique event attendees across multiple events
 CREATE OR REPLACE FUNCTION count_unique_event_attendees(
   event_ids UUID[]
