@@ -795,74 +795,66 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       return _buildMobileTopBar(context, theme, crmReady);
     }
 
-    final navButtons = [
-      _buildNavButton(context, _HomeSection.dashboard, 'Dashboard', Icons.dashboard_outlined),
-      _buildNavButton(context, _HomeSection.members, 'Members', Icons.groups_outlined, enabled: crmReady),
-      _buildNavButton(context, _HomeSection.donors, 'Donors', Icons.volunteer_activism_outlined, enabled: crmReady),
-      _buildNavButton(context, _HomeSection.subscribers, 'Subscribers', Icons.mark_email_unread_outlined,
-          enabled: crmReady),
-      _buildNavButton(context, _HomeSection.chapters, 'Chapters', Icons.account_tree_outlined, enabled: crmReady),
-      _buildNavButton(context, _HomeSection.meetings, 'Meetings', Icons.video_camera_front_outlined, enabled: crmReady),
-      _buildNavButton(context, _HomeSection.events, 'Events', Icons.event_available_outlined, enabled: crmReady),
-      _buildNavButton(
-        context,
-        _HomeSection.memberPortal,
-        'Member Portal',
-        Icons.admin_panel_settings_outlined,
-        enabled: crmReady,
-      ),
-      _buildNavButton(
-        context,
-        _HomeSection.campaigns,
-        'Campaigns',
-        Icons.campaign_outlined,
-        enabled: crmReady,
-      ),
-      _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline),
-    ];
-
-    // Outreach dropdown button for desktop
-    final outreachDropdownButton = PopupMenuButton<VoidCallback>(
-      onSelected: (callback) => callback(),
-      offset: const Offset(0, 48),
-      itemBuilder: (context) => [
-        PopupMenuItem<VoidCallback>(
-          value: () => _openNewMessage(context),
-          child: const ListTile(
-            leading: Icon(Icons.add_comment),
-            title: Text('New Message'),
-            contentPadding: EdgeInsets.zero,
+    // Outreach dropdown button - positioned after Dashboard
+    Widget buildOutreachButton({bool hideIcon = false}) {
+      return PopupMenuButton<VoidCallback>(
+        onSelected: (callback) => callback(),
+        offset: const Offset(0, 48),
+        itemBuilder: (context) => [
+          PopupMenuItem<VoidCallback>(
+            value: () => _openNewMessage(context),
+            child: const ListTile(
+              leading: Icon(Icons.add_comment),
+              title: Text('New Message'),
+              contentPadding: EdgeInsets.zero,
+            ),
           ),
-        ),
-        PopupMenuItem<VoidCallback>(
-          value: () => _openNewEmail(context),
-          child: const ListTile(
-            leading: Icon(Icons.email_outlined),
-            title: Text('New Email'),
-            contentPadding: EdgeInsets.zero,
+          PopupMenuItem<VoidCallback>(
+            value: () => _openNewEmail(context),
+            child: const ListTile(
+              leading: Icon(Icons.email_outlined),
+              title: Text('New Email'),
+              contentPadding: EdgeInsets.zero,
+            ),
           ),
-        ),
-        PopupMenuItem<VoidCallback>(
-          value: crmReady ? () => _setSection(_HomeSection.walletNotifications) : null,
-          enabled: crmReady,
-          child: ListTile(
-            leading: const Icon(Icons.notifications_active_outlined),
-            title: const Text('Wallet Notifications'),
-            subtitle: crmReady ? null : const Text('Available when CRM is connected', style: TextStyle(fontSize: 11)),
-            contentPadding: EdgeInsets.zero,
+          PopupMenuItem<VoidCallback>(
+            value: crmReady ? () => _setSection(_HomeSection.walletNotifications) : null,
+            enabled: crmReady,
+            child: ListTile(
+              leading: const Icon(Icons.notifications_active_outlined),
+              title: const Text('Wallet Notifications'),
+              subtitle: crmReady ? null : const Text('Available when CRM is connected', style: TextStyle(fontSize: 11)),
+              contentPadding: EdgeInsets.zero,
+            ),
           ),
-        ),
-      ],
-      child: ElevatedButton.icon(
-        onPressed: null, // Handled by PopupMenuButton
-        icon: const Icon(Icons.campaign),
-        label: const Text('Outreach'),
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        ),
-      ),
-    );
+        ],
+        child: hideIcon
+            ? ElevatedButton(
+                onPressed: null,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Text('Outreach'),
+                    SizedBox(width: 4),
+                    Icon(Icons.arrow_drop_down, size: 18),
+                  ],
+                ),
+              )
+            : ElevatedButton.icon(
+                onPressed: null,
+                icon: const Icon(Icons.arrow_drop_down),
+                label: const Text('Outreach'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                ),
+              ),
+      );
+    }
 
     final searchButton = Tooltip(
       message: crmReady ? 'Search CRM' : 'Search available when CRM is connected',
@@ -895,9 +887,21 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       child: LayoutBuilder(
         builder: (context, constraints) {
           final bool mobile = constraints.maxWidth < 600;
+          // Hide icons when space is constrained
+          final bool hideIcons = constraints.maxWidth < 1400;
+
           final navChildren = [
-            ...navButtons,
-            outreachDropdownButton,
+            _buildNavButton(context, _HomeSection.dashboard, 'Dashboard', Icons.dashboard_outlined, hideIcon: hideIcons),
+            buildOutreachButton(hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.members, 'Members', Icons.groups_outlined, enabled: crmReady, hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.donors, 'Donors', Icons.volunteer_activism_outlined, enabled: crmReady, hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.subscribers, 'Subscribers', Icons.mark_email_unread_outlined, enabled: crmReady, hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.chapters, 'Chapters', Icons.account_tree_outlined, enabled: crmReady, hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.meetings, 'Meetings', Icons.video_camera_front_outlined, enabled: crmReady, hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.events, 'Events', Icons.event_available_outlined, enabled: crmReady, hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.memberPortal, 'Member Portal', Icons.admin_panel_settings_outlined, enabled: crmReady, hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.campaigns, 'Campaigns', Icons.campaign_outlined, enabled: crmReady, hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline, hideIcon: hideIcons),
             searchButton,
             settingsButton,
           ];
@@ -1239,12 +1243,50 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     String label,
     IconData icon, {
     bool enabled = true,
+    bool hideIcon = false,
   }) {
     final theme = Theme.of(context);
     final bool isSelected = _currentSection == section;
     final screenWidth = MediaQuery.of(context).size.width;
     final bool mobile = screenWidth < 600;
 
+    final buttonStyle = ButtonStyle(
+      backgroundColor: MaterialStateProperty.resolveWith((states) {
+        if (states.contains(MaterialState.disabled)) {
+          return theme.colorScheme.surfaceVariant.withOpacity(0.3);
+        }
+        return isSelected
+            ? theme.colorScheme.primary
+            : theme.colorScheme.surfaceVariant.withOpacity(0.7);
+      }),
+      foregroundColor: MaterialStateProperty.resolveWith((states) {
+        if (states.contains(MaterialState.disabled)) {
+          return theme.disabledColor;
+        }
+        return isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
+      }),
+      padding: MaterialStateProperty.all(
+        EdgeInsets.symmetric(
+          horizontal: mobile ? 8 : 10,
+          vertical: mobile ? 6 : 10,
+        ),
+      ),
+      shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
+    );
+
+    if (hideIcon) {
+      // Text-only button when space is constrained
+      return TextButton(
+        onPressed: enabled ? () => _setSection(section) : null,
+        style: buttonStyle,
+        child: Text(
+          label,
+          style: mobile ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium,
+        ),
+      );
+    }
+
+    // Button with icon when space is available
     return TextButton.icon(
       onPressed: enabled ? () => _setSection(section) : null,
       icon: Icon(icon, size: mobile ? 16 : 17),
@@ -1252,29 +1294,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         label,
         style: mobile ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium,
       ),
-      style: ButtonStyle(
-        backgroundColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.disabled)) {
-            return theme.colorScheme.surfaceVariant.withOpacity(0.3);
-          }
-          return isSelected
-              ? theme.colorScheme.primary
-              : theme.colorScheme.surfaceVariant.withOpacity(0.7);
-        }),
-        foregroundColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.disabled)) {
-            return theme.disabledColor;
-          }
-          return isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
-        }),
-        padding: MaterialStateProperty.all(
-          EdgeInsets.symmetric(
-            horizontal: mobile ? 8 : 12,
-            vertical: mobile ? 6 : 10,
-          ),
-        ),
-        shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
-      ),
+      style: buttonStyle,
     );
   }
 
