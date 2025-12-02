@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:webview_flutter/webview_flutter.dart';
+// Conditional imports for web vs mobile/desktop
+import 'listmonk_web_view_stub.dart'
+    if (dart.library.html) 'listmonk_web_view_web.dart'
+    if (dart.library.io) 'listmonk_web_view_mobile.dart';
 
 /// Simple WebView screen that embeds Listmonk's full UI
 /// Listmonk handles everything: campaigns, subscribers, templates, analytics
 /// This screen integrates seamlessly into the app's existing layout
+/// Platform-aware: uses iframe on web, WebView on mobile/desktop
 class ListmonkWebViewScreen extends StatefulWidget {
   const ListmonkWebViewScreen({super.key});
 
@@ -22,7 +28,22 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeWebView();
+    _initializeView();
+  }
+
+  void _initializeView() {
+    if (kIsWeb) {
+      // Web uses iframe - initialized in build method
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      });
+    } else {
+      _initializeWebView();
+    }
   }
 
   void _initializeWebView() {
@@ -56,22 +77,36 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
               }
             },
             onNavigationRequest: (NavigationRequest request) {
-              // Allow all navigation within Listmonk
               return NavigationDecision.navigate;
             },
           ),
         )
         ..loadRequest(Uri.parse(listmonkUrl));
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to initialize WebView: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to initialize WebView: $e';
+        });
+      }
     }
   }
 
   void _reload() {
-    if (_controller != null) {
+    if (kIsWeb) {
+      setState(() {
+        _errorMessage = null;
+        _isLoading = true;
+      });
+      // Trigger rebuild which will recreate iframe
+      Future.delayed(Duration.zero, () {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      });
+    } else if (_controller != null) {
       setState(() {
         _errorMessage = null;
         _isLoading = true;
@@ -144,7 +179,7 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
           ),
         ),
 
-        // WebView content
+        // WebView/iframe content
         Expanded(
           child: _buildContent(context, theme),
         ),
@@ -159,8 +194,11 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
 
     return Stack(
       children: [
-        // WebView
-        if (_controller != null)
+        // Platform-specific view
+        if (kIsWeb)
+          // Simple iframe for web using HtmlElementView
+          Iframe(src: listmonkUrl)
+        else if (_controller != null)
           WebViewWidget(controller: _controller!),
 
         // Loading indicator
