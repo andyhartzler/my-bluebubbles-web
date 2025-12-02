@@ -797,6 +797,19 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
 
     // Outreach dropdown button - positioned after Dashboard
     Widget buildOutreachButton({bool hideIcon = false}) {
+      final buttonStyle = ButtonStyle(
+        backgroundColor: MaterialStateProperty.all(
+          theme.colorScheme.surfaceVariant.withOpacity(0.7),
+        ),
+        foregroundColor: MaterialStateProperty.all(theme.colorScheme.onSurface),
+        padding: MaterialStateProperty.all(
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        ),
+        shape: MaterialStateProperty.all(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        ),
+      );
+
       return PopupMenuButton<VoidCallback>(
         onSelected: (callback) => callback(),
         offset: const Offset(0, 48),
@@ -829,12 +842,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           ),
         ],
         child: hideIcon
-            ? ElevatedButton(
+            ? TextButton(
                 onPressed: null,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                ),
+                style: buttonStyle,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: const [
@@ -844,14 +854,11 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   ],
                 ),
               )
-            : ElevatedButton.icon(
+            : TextButton.icon(
                 onPressed: null,
-                icon: const Icon(Icons.arrow_drop_down),
+                icon: const Icon(Icons.arrow_drop_down, size: 17),
                 label: const Text('Outreach'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                ),
+                style: buttonStyle,
               ),
       );
     }
@@ -890,6 +897,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           // Hide icons when space is constrained
           final bool hideIcons = constraints.maxWidth < 1400;
 
+          // Navigation buttons that scroll
           final navChildren = [
             _buildNavButton(context, _HomeSection.dashboard, 'Dashboard', Icons.dashboard_outlined, hideIcon: hideIcons),
             buildOutreachButton(hideIcon: hideIcons),
@@ -902,19 +910,19 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             _buildNavButton(context, _HomeSection.memberPortal, 'Member Portal', Icons.admin_panel_settings_outlined, enabled: crmReady, hideIcon: hideIcons),
             _buildNavButton(context, _HomeSection.campaigns, 'Campaigns', Icons.campaign_outlined, enabled: crmReady, hideIcon: hideIcons),
             _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline, hideIcon: hideIcons),
-            searchButton,
-            settingsButton,
           ];
 
-          // Always use Row layout - no wrapping to second line
+          // Always use Row layout - logo left (fixed), nav middle (scrollable), search/settings right (fixed)
           return Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Logo - always visible on left
               Flexible(
                 flex: 0,
                 child: _buildBranding(theme, mobile: mobile),
               ),
               const SizedBox(width: 24),
+              // Scrollable navigation buttons
               Expanded(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -929,6 +937,10 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
+              // Search and Settings - always visible on right
+              searchButton,
+              settingsButton,
             ],
           );
         },
