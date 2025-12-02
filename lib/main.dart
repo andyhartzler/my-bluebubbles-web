@@ -813,13 +813,6 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       ),
       _buildNavButton(
         context,
-        _HomeSection.walletNotifications,
-        'Wallet Notifications',
-        Icons.notifications_active_outlined,
-        enabled: crmReady,
-      ),
-      _buildNavButton(
-        context,
         _HomeSection.campaigns,
         'Campaigns',
         Icons.campaign_outlined,
@@ -828,23 +821,46 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline),
     ];
 
-    final newMessageButton = ElevatedButton.icon(
-      onPressed: () => _openNewMessage(context),
-      icon: const Icon(Icons.add_comment),
-      label: const Text('New Message'),
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-      ),
-    );
-
-    final newEmailButton = ElevatedButton.icon(
-      onPressed: () => _openNewEmail(context),
-      icon: const Icon(Icons.email_outlined),
-      label: const Text('New Email'),
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+    // Outreach dropdown button for desktop
+    final outreachDropdownButton = PopupMenuButton<VoidCallback>(
+      onSelected: (callback) => callback(),
+      offset: const Offset(0, 48),
+      itemBuilder: (context) => [
+        PopupMenuItem<VoidCallback>(
+          value: () => _openNewMessage(context),
+          child: const ListTile(
+            leading: Icon(Icons.add_comment),
+            title: Text('New Message'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        PopupMenuItem<VoidCallback>(
+          value: () => _openNewEmail(context),
+          child: const ListTile(
+            leading: Icon(Icons.email_outlined),
+            title: Text('New Email'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        PopupMenuItem<VoidCallback>(
+          value: crmReady ? () => _setSection(_HomeSection.walletNotifications) : null,
+          enabled: crmReady,
+          child: ListTile(
+            leading: const Icon(Icons.notifications_active_outlined),
+            title: const Text('Wallet Notifications'),
+            subtitle: crmReady ? null : const Text('Available when CRM is connected', style: TextStyle(fontSize: 11)),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+      child: ElevatedButton.icon(
+        onPressed: null, // Handled by PopupMenuButton
+        icon: const Icon(Icons.campaign),
+        label: const Text('Outreach'),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        ),
       ),
     );
 
@@ -882,8 +898,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           final bool mobile = constraints.maxWidth < 600;
           final navChildren = [
             ...navButtons,
-            newMessageButton,
-            newEmailButton,
+            outreachDropdownButton,
             searchButton,
             settingsButton,
           ];
@@ -999,10 +1014,11 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
 
   Future<void> _showMobileMenu(BuildContext context, bool crmReady) async {
     final BuildContext parentContext = context;
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      useRootNavigator: true,
-      builder: (sheetContext) {
+      barrierDismissible: true,
+      useSafeArea: true,
+      builder: (dialogContext) {
         Widget buildItem({
           required double order,
           required IconData icon,
@@ -1012,7 +1028,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           VoidCallback? onActivate,
         }) {
           void handleActivate() {
-            Navigator.of(sheetContext).pop();
+            Navigator.of(dialogContext).pop();
             if (onActivate != null) {
               Future.microtask(onActivate);
             }
@@ -1053,22 +1069,25 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         }
 
         final disabledMessage = crmReady ? null : 'Available when CRM is connected';
+        final theme = Theme.of(parentContext);
 
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+        return Scaffold(
+          backgroundColor: theme.colorScheme.surface,
+          appBar: AppBar(
+            title: const Text('Menu'),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              tooltip: 'Close menu',
+            ),
+            elevation: 0,
+          ),
+          body: SafeArea(
             child: FocusTraversalGroup(
               policy: OrderedTraversalPolicy(),
               child: ListView(
-                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Text(
-                      'Menu',
-                      style: Theme.of(parentContext).textTheme.titleMedium,
-                    ),
-                  ),
                   buildItem(
                     order: 0,
                     icon: Icons.dashboard_outlined,
