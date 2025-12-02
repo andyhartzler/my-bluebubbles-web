@@ -417,7 +417,9 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+            },
             child: const Text('Got it'),
           ),
         ],
