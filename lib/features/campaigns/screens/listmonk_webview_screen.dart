@@ -22,8 +22,10 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
   bool _isLoading = true;
   String? _errorMessage;
 
-  // Listmonk instance URL
-  static const String listmonkUrl = 'https://mail.moyd.app';
+  // Listmonk admin URL with auto-login
+  static const String listmonkUrl = 'https://mail.moyd.app/admin';
+  static const String listmonkUsername = 'admin';
+  static const String listmonkPassword = 'fucktrump67';
 
   @override
   void initState() {
@@ -33,17 +35,26 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
 
   void _initializeView() {
     if (kIsWeb) {
-      // Web uses iframe - initialized in build method
+      // Web uses iframe - auto-login happens via iframe src
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
+          // Attempt auto-login via JavaScript after iframe loads
+          _attemptWebAutoLogin();
         }
       });
     } else {
       _initializeWebView();
     }
+  }
+
+  void _attemptWebAutoLogin() {
+    // For web platform, we'll inject JavaScript to auto-fill login
+    // This needs to be done after iframe loads
+    // Note: Due to cross-origin restrictions, this might not work
+    // But we'll try to navigate directly to /admin which might have session
   }
 
   void _initializeWebView() {
@@ -66,6 +77,8 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
                 setState(() {
                   _isLoading = false;
                 });
+                // Attempt to auto-login after page loads
+                _attemptAutoLogin(url);
               }
             },
             onWebResourceError: (WebResourceError error) {
@@ -89,6 +102,59 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
           _errorMessage = 'Failed to initialize WebView: $e';
         });
       }
+    }
+  }
+
+  void _attemptAutoLogin(String currentUrl) {
+    if (_controller == null) return;
+
+    // Check if we're on the login page
+    if (currentUrl.contains('/admin') || currentUrl.contains('login')) {
+      // Inject JavaScript to auto-fill and submit login form
+      final jsCode = '''
+        (function() {
+          try {
+            // Wait a bit for the page to fully load
+            setTimeout(function() {
+              // Find username and password fields
+              var usernameField = document.querySelector('input[name="username"]') ||
+                                  document.querySelector('input[type="text"]') ||
+                                  document.querySelector('input[placeholder*="username" i]');
+              var passwordField = document.querySelector('input[name="password"]') ||
+                                  document.querySelector('input[type="password"]');
+              var submitButton = document.querySelector('button[type="submit"]') ||
+                                 document.querySelector('input[type="submit"]') ||
+                                 document.querySelector('button');
+
+              if (usernameField && passwordField) {
+                usernameField.value = '$listmonkUsername';
+                passwordField.value = '$listmonkPassword';
+
+                // Trigger input events to ensure form validation
+                usernameField.dispatchEvent(new Event('input', { bubbles: true }));
+                passwordField.dispatchEvent(new Event('input', { bubbles: true }));
+
+                // Submit the form after a short delay
+                setTimeout(function() {
+                  if (submitButton) {
+                    submitButton.click();
+                  } else {
+                    // Try to find and submit the form
+                    var form = document.querySelector('form');
+                    if (form) {
+                      form.submit();
+                    }
+                  }
+                }, 100);
+              }
+            }, 500);
+          } catch(e) {
+            console.log('Auto-login error:', e);
+          }
+        })();
+      ''';
+
+      _controller!.runJavaScript(jsCode);
     }
   }
 
@@ -123,57 +189,43 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
 
     return Column(
       children: [
-        // Header bar with actions
+        // Minimal header bar with just action buttons
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
+            color: theme.colorScheme.surface.withOpacity(0.95),
             border: Border(
               bottom: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.2),
+                color: theme.colorScheme.outline.withOpacity(0.1),
                 width: 1,
               ),
             ),
           ),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Icon(
-                Icons.email,
-                color: theme.colorScheme.primary,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Email Campaigns',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    Text(
-                      'Powered by Listmonk',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               IconButton(
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh, size: 20),
                 onPressed: _reload,
                 tooltip: 'Reload Listmonk',
                 color: theme.colorScheme.primary,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  minHeight: 36,
+                ),
               ),
+              const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.help_outline),
+                icon: const Icon(Icons.help_outline, size: 20),
                 onPressed: () => _showHelp(context),
                 tooltip: 'Help',
                 color: theme.colorScheme.primary,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  minHeight: 36,
+                ),
               ),
             ],
           ),
@@ -287,7 +339,8 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) => AlertDialog(
         title: Row(
           children: [
             Icon(Icons.info_outline, color: theme.colorScheme.primary),
@@ -364,7 +417,7 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Got it'),
           ),
         ],
