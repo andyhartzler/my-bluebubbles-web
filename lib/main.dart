@@ -894,9 +894,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final bool compact = constraints.maxWidth < 1150;
+          final bool compact = constraints.maxWidth < 1600;
           final bool mobile = constraints.maxWidth < 600;
-          final bool medium = constraints.maxWidth >= 600 && constraints.maxWidth < 1150;
+          final bool medium = constraints.maxWidth >= 600 && constraints.maxWidth < 1600;
           final navChildren = [
             ...navButtons,
             outreachDropdownButton,
@@ -1248,7 +1248,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     final bool isSelected = _currentSection == section;
     final screenWidth = MediaQuery.of(context).size.width;
     final bool mobile = screenWidth < 600;
-    final bool medium = screenWidth >= 600 && screenWidth < 1150;
+    final bool medium = screenWidth >= 600 && screenWidth < 1600;
 
     return TextButton.icon(
       onPressed: enabled ? () => _setSection(section) : null,
