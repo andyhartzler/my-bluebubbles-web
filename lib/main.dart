@@ -894,9 +894,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final bool compact = constraints.maxWidth < 1600;
           final bool mobile = constraints.maxWidth < 600;
-          final bool medium = constraints.maxWidth >= 600 && constraints.maxWidth < 1600;
           final navChildren = [
             ...navButtons,
             outreachDropdownButton,
@@ -904,31 +902,29 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             settingsButton,
           ];
 
-          final navigation = Wrap(
-            spacing: mobile ? 6 : 12,
-            runSpacing: mobile ? 6 : 12,
-            alignment: compact ? WrapAlignment.start : WrapAlignment.end,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: navChildren,
-          );
-
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildBranding(theme, mobile: mobile, medium: medium),
-                SizedBox(height: mobile ? 6 : 12),
-                navigation,
-              ],
-            );
-          }
-
+          // Always use Row layout - no wrapping to second line
           return Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _buildBranding(theme),
-              const Spacer(),
-              navigation,
+              Flexible(
+                flex: 0,
+                child: _buildBranding(theme, mobile: mobile),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      for (int i = 0; i < navChildren.length; i++) ...[
+                        if (i > 0) SizedBox(width: mobile ? 6 : 8),
+                        navChildren[i],
+                      ],
+                    ],
+                  ),
+                ),
+              ),
             ],
           );
         },
@@ -1209,10 +1205,10 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     );
   }
 
-  Widget _buildBranding(ThemeData theme, {bool mobile = false, bool medium = false}) {
-    // Responsive logo sizing: mobile (150px) -> medium (180px) -> desktop (220px)
-    final double logoWidth = mobile ? 150 : (medium ? 180 : 220);
-    final double logoHeight = mobile ? 40 : (medium ? 50 : 60);
+  Widget _buildBranding(ThemeData theme, {bool mobile = false}) {
+    // Responsive logo sizing based on screen width
+    final double logoWidth = mobile ? 140 : 180;
+    final double logoHeight = mobile ? 35 : 45;
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
@@ -1248,12 +1244,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     final bool isSelected = _currentSection == section;
     final screenWidth = MediaQuery.of(context).size.width;
     final bool mobile = screenWidth < 600;
-    final bool medium = screenWidth >= 600 && screenWidth < 1600;
 
     return TextButton.icon(
       onPressed: enabled ? () => _setSection(section) : null,
-      icon: Icon(icon, size: mobile ? 16 : 18),
-      label: Text(label, style: mobile ? theme.textTheme.bodySmall : null),
+      icon: Icon(icon, size: mobile ? 16 : 17),
+      label: Text(
+        label,
+        style: mobile ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium,
+      ),
       style: ButtonStyle(
         backgroundColor: MaterialStateProperty.resolveWith((states) {
           if (states.contains(MaterialState.disabled)) {
@@ -1271,8 +1269,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         }),
         padding: MaterialStateProperty.all(
           EdgeInsets.symmetric(
-            horizontal: mobile ? 10 : (medium ? 14 : 18),
-            vertical: mobile ? 8 : (medium ? 10 : 12),
+            horizontal: mobile ? 8 : 12,
+            vertical: mobile ? 6 : 10,
           ),
         ),
         shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
