@@ -894,8 +894,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final bool compact = constraints.maxWidth < 900;
+          final bool compact = constraints.maxWidth < 1150;
           final bool mobile = constraints.maxWidth < 600;
+          final bool medium = constraints.maxWidth >= 600 && constraints.maxWidth < 1150;
           final navChildren = [
             ...navButtons,
             outreachDropdownButton,
@@ -915,7 +916,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildBranding(theme, mobile: mobile),
+                _buildBranding(theme, mobile: mobile, medium: medium),
                 SizedBox(height: mobile ? 6 : 12),
                 navigation,
               ],
@@ -1208,7 +1209,11 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     );
   }
 
-  Widget _buildBranding(ThemeData theme, {bool mobile = false}) {
+  Widget _buildBranding(ThemeData theme, {bool mobile = false, bool medium = false}) {
+    // Responsive logo sizing: mobile (150px) -> medium (180px) -> desktop (220px)
+    final double logoWidth = mobile ? 150 : (medium ? 180 : 220);
+    final double logoHeight = mobile ? 40 : (medium ? 50 : 60);
+
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () => _setSection(_HomeSection.dashboard),
@@ -1217,8 +1222,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            height: mobile ? 40 : 60,
-            width: mobile ? 150 : 220,
+            height: logoHeight,
+            width: logoWidth,
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: mobile ? 0 : 4),
               child: Image.asset(
@@ -1241,7 +1246,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   }) {
     final theme = Theme.of(context);
     final bool isSelected = _currentSection == section;
-    final bool mobile = MediaQuery.of(context).size.width < 600;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final bool mobile = screenWidth < 600;
+    final bool medium = screenWidth >= 600 && screenWidth < 1150;
 
     return TextButton.icon(
       onPressed: enabled ? () => _setSection(section) : null,
@@ -1264,8 +1271,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         }),
         padding: MaterialStateProperty.all(
           EdgeInsets.symmetric(
-            horizontal: mobile ? 10 : 18,
-            vertical: mobile ? 8 : 12,
+            horizontal: mobile ? 10 : (medium ? 14 : 18),
+            vertical: mobile ? 8 : (medium ? 10 : 12),
           ),
         ),
         shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),

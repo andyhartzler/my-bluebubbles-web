@@ -187,56 +187,8 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Column(
-      children: [
-        // Minimal header bar with just action buttons
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withOpacity(0.95),
-            border: Border(
-              bottom: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 20),
-                onPressed: _reload,
-                tooltip: 'Reload Listmonk',
-                color: theme.colorScheme.primary,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  minHeight: 36,
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.help_outline, size: 20),
-                onPressed: () => _showHelp(context),
-                tooltip: 'Help',
-                color: theme.colorScheme.primary,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  minHeight: 36,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // WebView/iframe content
-        Expanded(
-          child: _buildContent(context, theme),
-        ),
-      ],
-    );
+    // Full-screen Listmonk iframe - no header bar for maximum space
+    return _buildContent(context, theme);
   }
 
   Widget _buildContent(BuildContext context, ThemeData theme) {
