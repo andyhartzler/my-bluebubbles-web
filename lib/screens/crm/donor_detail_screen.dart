@@ -358,6 +358,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     final mapsUri = Uri.https('maps.apple.com', '/', {'q': mapAddress});
 
     return Card(
+      clipBehavior: Clip.hardEdge,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: LayoutBuilder(
@@ -388,19 +389,31 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
               ),
             );
 
-            final mapView = Container(
-              clipBehavior: Clip.hardEdge,
-              decoration: BoxDecoration(
+            final mapView = RepaintBoundary(
+              child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-              ),
-              child: SizedBox(
-                height: mapHeight,
-                width: double.infinity,
-                child: EventMapWidget(
-                  location: mapAddress,
-                  locationAddress: addressText.replaceAll('\n', ', '),
-                  eventTitle: donor.name ?? 'Donor address',
-                  height: mapHeight,
+                clipBehavior: Clip.hardEdge,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: mapHeight,
+                    maxWidth: constraints.maxWidth - 32, // Account for padding
+                    minHeight: mapHeight,
+                    minWidth: double.infinity,
+                  ),
+                  child: OverflowBox(
+                    maxHeight: mapHeight,
+                    maxWidth: constraints.maxWidth - 32,
+                    child: SizedBox(
+                      height: mapHeight,
+                      width: double.infinity,
+                      child: EventMapWidget(
+                        location: mapAddress,
+                        locationAddress: addressText.replaceAll('\n', ', '),
+                        eventTitle: donor.name ?? 'Donor address',
+                        height: mapHeight,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             );
