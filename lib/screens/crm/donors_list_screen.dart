@@ -422,9 +422,13 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         children: [
           Icon(icon, size: 14, color: Colors.white),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
           ),
         ],
       ),
@@ -1226,13 +1230,42 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
               return Row(children: children);
             }
 
+            // Mobile: 2x2 grid layout
             return Column(
-              children: cards
-                  .map((card) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: card,
-                      ))
-                  .toList(),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 6, bottom: 12),
+                        child: cards[0],
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 6, bottom: 12),
+                        child: cards[1],
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: cards[2],
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: cards[3],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             );
           }),
           const SizedBox(height: 24),
