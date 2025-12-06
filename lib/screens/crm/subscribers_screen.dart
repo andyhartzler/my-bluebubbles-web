@@ -410,7 +410,7 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
     final List<Widget> sourceTiles = _stats.bySource.entries
         .map<Widget>(
           (entry) => _StatsTile(
-            label: 'Source: ${entry.key}',
+            label: 'Source: ${_capitalizeFirst(entry.key)}',
             value: entry.value,
             icon: Icons.tag_outlined,
             color: Colors.indigo,
@@ -690,9 +690,14 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
 }
 
 String _statusLabelFor(Subscriber subscriber) {
-  if (subscriber.subscribed == true) return 'subscribed';
-  if (subscriber.subscribed == false) return 'unsubscribed';
-  return (subscriber.subscriptionStatus ?? 'unknown').toLowerCase();
+  if (subscriber.subscribed == true) return 'Subscribed';
+  if (subscriber.subscribed == false) return 'Unsubscribed';
+  return _capitalizeFirst(subscriber.subscriptionStatus ?? 'Unknown');
+}
+
+String _capitalizeFirst(String text) {
+  if (text.isEmpty) return text;
+  return text[0].toUpperCase() + text.substring(1).toLowerCase();
 }
 
 class _SubscriberCard extends StatelessWidget {
@@ -800,7 +805,7 @@ class _SubscriberCard extends StatelessWidget {
                         if (subscriber.source != null)
                           _InfoPill(
                             icon: Icons.source_outlined,
-                            label: subscriber.source!,
+                            label: _capitalizeFirst(subscriber.source!),
                           ),
                         if (subscriber.eventAttendanceCount > 0)
                           _InfoPill(
@@ -895,7 +900,7 @@ class _SubscriberCard extends StatelessWidget {
       pills.add(
         _InfoPill(
           icon: Icons.source_outlined,
-          label: subscriber.source!,
+          label: _capitalizeFirst(subscriber.source!),
         ),
       );
     }
@@ -1068,7 +1073,7 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                     if (_subscriber.source != null)
                       _detailItem(
                         'Source',
-                        _subscriber.source!,
+                        _capitalizeFirst(_subscriber.source!),
                         icon: Icons.source_outlined,
                       ),
                     if (_subscriber.optinDate != null)
@@ -1388,7 +1393,7 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
       items.add(
         _detailItem(
           'Source',
-          subscriber.source!,
+          _capitalizeFirst(subscriber.source!),
           icon: Icons.source_outlined,
         ),
       );

@@ -372,19 +372,24 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.max,
           children: [
             if (icon != null)
               CircleAvatar(
                 backgroundColor: Colors.white.withOpacity(0.2),
                 child: Icon(icon, color: Colors.white),
-              ),
-            if (icon != null) const SizedBox(height: 12),
+              )
+            else
+              const SizedBox(height: 40), // Placeholder to maintain consistent height
+            const SizedBox(height: 12),
             Text(
               title,
               style: Theme.of(context)
                   .textTheme
                   .titleSmall
                   ?.copyWith(color: Colors.white.withOpacity(0.9)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 8),
             Text(
@@ -393,17 +398,21 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
+            const SizedBox(height: 8),
+            Expanded(
+              child: Text(
+                subtitle ?? '',
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
                     ?.copyWith(color: Colors.white.withOpacity(0.8)),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
+            ),
           ],
         ),
       ),
