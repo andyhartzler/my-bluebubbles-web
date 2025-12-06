@@ -423,6 +423,20 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
       children: [
         LayoutBuilder(
           builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 900;
+            if (isMobile) {
+              // Mobile: Stack tiles vertically with horizontal layout
+              return Column(
+                children: [
+                  for (var i = 0; i < tiles.length; i++)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: i == tiles.length - 1 ? 0 : 8),
+                      child: tiles[i],
+                    ),
+                ],
+              );
+            }
+            // Desktop: Horizontal row layout
             return Row(
               children: [
                 for (var i = 0; i < tiles.length; i++)

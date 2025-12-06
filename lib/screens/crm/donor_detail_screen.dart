@@ -388,21 +388,21 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
               ),
             );
 
-            final mapView = Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    height: mapHeight,
-                    child: EventMapWidget(
-                      location: mapAddress,
-                      locationAddress: addressText.replaceAll('\n', ', '),
-                      eventTitle: donor.name ?? 'Donor address',
-                      height: mapHeight,
-                    ),
-                  ),
+            final mapView = Container(
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SizedBox(
+                height: mapHeight,
+                width: double.infinity,
+                child: EventMapWidget(
+                  location: mapAddress,
+                  locationAddress: addressText.replaceAll('\n', ', '),
+                  eventTitle: donor.name ?? 'Donor address',
+                  height: mapHeight,
                 ),
-              ],
+              ),
             );
 
             if (isWide) {
@@ -502,18 +502,55 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
           children: [
             Text('Summary', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 24,
-              runSpacing: 12,
-              children: [
-                _buildStat('Total Donated', _formatCurrency(totalGiven)),
-                _buildStat('Donations', donationCount.toString()),
-                _buildStat('Average Gift', averageGift != null ? _formatCurrency(averageGift) : '—'),
-                _buildStat('Last Donation',
-                    lastDonationDate != null ? DateFormat.yMMMd().format(lastDonationDate) : '—'),
-                _buildStat('Events', eventsCount.toString()),
-                _buildStat('Recurring', isRecurring ? 'Yes' : 'No'),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 600;
+                if (isNarrow) {
+                  // Mobile: Stack stats horizontally in pairs
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: _buildStat('Total Donated', _formatCurrency(totalGiven))),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildStat('Donations', donationCount.toString())),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: _buildStat('Average Gift', averageGift != null ? _formatCurrency(averageGift) : '—')),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildStat('Last Donation', lastDonationDate != null ? DateFormat.yMMMd().format(lastDonationDate) : '—')),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: _buildStat('Events', eventsCount.toString())),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildStat('Recurring', isRecurring ? 'Yes' : 'No')),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+                // Desktop: Use wrap layout
+                return Wrap(
+                  spacing: 24,
+                  runSpacing: 12,
+                  children: [
+                    _buildStat('Total Donated', _formatCurrency(totalGiven)),
+                    _buildStat('Donations', donationCount.toString()),
+                    _buildStat('Average Gift', averageGift != null ? _formatCurrency(averageGift) : '—'),
+                    _buildStat('Last Donation',
+                        lastDonationDate != null ? DateFormat.yMMMd().format(lastDonationDate) : '—'),
+                    _buildStat('Events', eventsCount.toString()),
+                    _buildStat('Recurring', isRecurring ? 'Yes' : 'No'),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -674,16 +711,23 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   }
 
   Widget _buildStat(String label, String value) {
-    return SizedBox(
-      width: 180,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Colors.grey, fontSize: 12),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
+      ],
     );
   }
 
