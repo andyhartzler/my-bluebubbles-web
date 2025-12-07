@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../../services/credential_storage_service.dart';
+// Conditional imports for web vs mobile/desktop
+import 'listmonk_web_view_stub.dart'
+    if (dart.library.html) 'listmonk_web_view_web.dart'
+    if (dart.library.io) 'listmonk_web_view_mobile.dart';
 
+/// Simple WebView screen that embeds Listmonk's full UI
+/// Platform-aware: uses iframe on web, WebView on mobile/desktop with auto-login
 class ListmonkWebViewScreen extends StatefulWidget {
   const ListmonkWebViewScreen({Key? key}) : super(key: key);
 
@@ -10,19 +17,37 @@ class ListmonkWebViewScreen extends StatefulWidget {
 }
 
 class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
   bool _isLoading = true;
   String? _username;
   String? _password;
 
+  static const String listmonkUrl = 'https://mail.moyd.app/admin';
+
   @override
   void initState() {
     super.initState();
-    _initializeWebView();
+    _initializeView();
+  }
+
+  void _initializeView() {
+    if (kIsWeb) {
+      // Web uses iframe - auto-login happens via API call
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      });
+    } else {
+      // Mobile/Desktop uses WebView with JavaScript auto-login
+      _initializeWebView();
+    }
   }
 
   Future<void> _initializeWebView() async {
-    // Load credentials
+    // Load credentials from secure storage
     _username = await CredentialStorageService.getListmonkUsername();
     _password = await CredentialStorageService.getListmonkPassword();
 
@@ -32,13 +57,19 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
-            setState(() => _isLoading = true);
+            if (mounted) {
+              setState(() => _isLoading = true);
+            }
           },
           onPageFinished: (String url) {
-            setState(() => _isLoading = false);
+            if (mounted) {
+              setState(() => _isLoading = false);
+            }
 
-            // Auto-login whenever we hit the login page
-            if (url.contains('/admin/login') || url.endsWith('/admin') || url.endsWith('/admin/')) {
+            // Auto-login when we hit the login page
+            // Match both /admin/login and /admin/login?next=...
+            if (url.contains('/admin/login') ||
+                (url.contains('/admin') && !url.contains('/admin/campaigns') && !url.contains('/admin/subscribers'))) {
               _performAutoLogin();
             }
           },
@@ -47,14 +78,16 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
           },
         ),
       )
-      ..loadRequest(Uri.parse('https://mail.moyd.app/admin'));
+      ..loadRequest(Uri.parse(listmonkUrl));
 
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _performAutoLogin() {
-    if (_username == null || _password == null) {
-      debugPrint('Credentials not loaded');
+    if (_controller == null || _username == null || _password == null) {
+      debugPrint('❌ Cannot auto-login: controller or credentials missing');
       return;
     }
 
@@ -128,15 +161,35 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
           setTimeout(attemptLogin, 500);
           setTimeout(attemptLogin, 1000);
           setTimeout(attemptLogin, 2000);
+          setTimeout(attemptLogin, 3000);
         }
       })();
     ''';
 
-    _controller.runJavaScript(jsCode);
+    _controller!.runJavaScript(jsCode);
   }
 
-  Future<void> _refreshPage() async {
-    await _controller.reload();
+  Future<void> _reload() async {
+    if (kIsWeb) {
+      setState(() {
+        _isLoading = true;
+      });
+      // Trigger rebuild which will recreate iframe
+      Future.delayed(Duration.zero, () {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      });
+    } else if (_controller != null) {
+      setState(() {
+        _isLoading = true;
+      });
+      await _controller!.reload();
+    } else {
+      _initializeWebView();
+    }
   }
 
   @override
@@ -147,17 +200,28 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _refreshPage,
+            onPressed: _reload,
             tooltip: 'Refresh',
           ),
         ],
       ),
       body: Stack(
         children: [
-          WebViewWidget(controller: _controller),
+          // Platform-specific view
+          if (kIsWeb)
+            // Web: Use iframe with API-based auth
+            const Iframe(src: listmonkUrl)
+          else if (_controller != null)
+            // Mobile/Desktop: Use WebView with JS auto-login
+            WebViewWidget(controller: _controller!),
+
+          // Loading indicator
           if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(),
+            Container(
+              color: Colors.grey[300],
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
             ),
         ],
       ),
