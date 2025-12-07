@@ -8,6 +8,7 @@ import 'package:bluebubbles/app/components/custom/custom_error_box.dart';
 import 'package:bluebubbles/helpers/backend/startup_tasks.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/services/network/http_overrides.dart';
+import 'package:bluebubbles/services/credential_storage_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/window_effects.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
@@ -96,6 +97,10 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
         try {
           await CRMSupabaseService().initialize();
           Logger.info('CRM system initialized');
+
+          // Initialize Listmonk credentials
+          await CredentialStorageService.initializeListmonkCredentials();
+          Logger.info('Listmonk credentials initialized');
         } catch (e, s) {
           Logger.warn('CRM system failed to initialize: $e', trace: s);
         }
