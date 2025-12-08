@@ -293,6 +293,10 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         return Icons.draw;
       case FormFieldTypes.typeahead:
         return Icons.keyboard;
+      case FormFieldTypes.filePicker:
+        return Icons.attach_file;
+      case FormFieldTypes.imagePicker:
+        return Icons.add_photo_alternate;
 
       // Cupertino specific
       case FormFieldTypes.cupertinoSegmentedControl:

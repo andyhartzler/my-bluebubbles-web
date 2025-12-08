@@ -76,6 +76,29 @@ class FormFieldConfig with _$FormFieldConfig {
     String? chipShape, // 'rectangle', 'rounded', 'stadium'
     @Default(false) bool allowMultipleSelection, // For filter chips
 
+    // File picker
+    List<String>? allowedExtensions, // e.g., ['pdf', 'doc', 'docx']
+    @Default(false) bool allowMultipleFiles,
+    int? maxFileSizeMB,
+    String? fileTypeFilter, // 'any', 'image', 'video', 'audio', 'custom'
+
+    // Image picker
+    int? maxImages,
+    double? imageQuality, // 0.0 to 1.0
+    int? maxImageWidth,
+    int? maxImageHeight,
+    @Default(false) bool allowCamera,
+    @Default(false) bool allowGallery,
+
+    // Conditional logic
+    String? conditionalFieldId, // ID of field to watch
+    String? conditionalOperator, // 'equals', 'notEquals', 'contains', 'greaterThan', 'lessThan'
+    dynamic conditionalValue, // Value to compare against
+    @Default(true) bool showWhenConditionMet, // Show field when condition is true or false
+
+    // Form page (for multi-page forms)
+    int? pageNumber, // Which page this field belongs to (0-indexed)
+
     // General settings
     @Default(true) bool enabled,
     dynamic defaultValue,

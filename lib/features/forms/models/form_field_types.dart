@@ -34,6 +34,8 @@ class FormFieldTypes {
   static const String colorPicker = 'color_picker';
   static const String signaturePad = 'signature_pad';
   static const String typeahead = 'typeahead';
+  static const String filePicker = 'file_picker';
+  static const String imagePicker = 'image_picker';
 
   // Cupertino (iOS) fields
   static const String cupertinoTextField = 'cupertino_text_field';
@@ -79,6 +81,8 @@ class FormFieldTypes {
           FieldTypeInfo(colorPicker, 'Color Picker', 'Select a color'),
           FieldTypeInfo(signaturePad, 'Signature Pad', 'Draw signature'),
           FieldTypeInfo(typeahead, 'Typeahead', 'Auto-complete text input'),
+          FieldTypeInfo(filePicker, 'File Picker', 'Upload files (PDF, documents, etc.)'),
+          FieldTypeInfo(imagePicker, 'Image Picker', 'Select or capture images/photos'),
         ],
         'iOS (Cupertino)': [
           FieldTypeInfo(cupertinoTextField, 'Text Field (iOS)', 'iOS-styled text input'),
