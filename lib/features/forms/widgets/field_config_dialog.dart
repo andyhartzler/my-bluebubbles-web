@@ -80,9 +80,10 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
       _divisions = field.divisions;
       _firstDate = field.firstDate;
       _lastDate = field.lastDate;
-      _options = field.options ?? [];
-      _selectedValidators = field.validatorTypes ?? [];
-      _validatorConfigs = field.validation ?? {};
+      // Create mutable copies of lists (Freezed returns immutable lists)
+      _options = List.from(field.options ?? []);
+      _selectedValidators = List.from(field.validatorTypes ?? []);
+      _validatorConfigs = Map.from(field.validation ?? {});
     }
   }
 
