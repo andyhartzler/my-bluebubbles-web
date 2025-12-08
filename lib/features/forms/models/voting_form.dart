@@ -31,6 +31,30 @@ class VotingForm with _$VotingForm {
     @JsonKey(name: 'eligible_members') Map<String, dynamic>? eligibleMembers,
     @JsonKey(name: 'results_public') @Default(false) bool resultsPublic,
     @JsonKey(name: 'results_data') Map<String, dynamic>? resultsData,
+
+    // Page management
+    @JsonKey(name: 'page_count') @Default(1) int pageCount,
+
+    // Custom URL slug
+    String? slug,
+
+    // Submission tracking
+    @JsonKey(name: 'submission_count') @Default(0) int submissionCount,
+
+    // Scheduling
+    @JsonKey(name: 'opens_at') DateTime? opensAt,
+    @JsonKey(name: 'closes_at') DateTime? closesAt,
+
+    // Submission limits
+    @JsonKey(name: 'max_submissions') int? maxSubmissions,
+
+    // Access control
+    @JsonKey(name: 'require_login') @Default(false) bool requireLogin,
+    @JsonKey(name: 'one_submission_per_user') @Default(true) bool oneSubmissionPerUser,
+
+    // Email settings
+    @JsonKey(name: 'confirmation_email_template') String? confirmationEmailTemplate,
+    @JsonKey(name: 'notification_emails') List<String>? notificationEmails,
   }) = _VotingForm;
 
   factory VotingForm.fromJson(Map<String, dynamic> json) =>
