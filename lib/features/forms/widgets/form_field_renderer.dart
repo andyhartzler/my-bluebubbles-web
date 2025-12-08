@@ -216,7 +216,7 @@ class FormFieldRenderer extends StatelessWidget {
             break;
           case 'match':
             if (validatorConfig is String) {
-              validators.add(FormBuilderValidators.match(validatorConfig));
+              validators.add(FormBuilderValidators.match(RegExp(validatorConfig)));
             }
             break;
           // Add more validators as needed
@@ -299,12 +299,7 @@ class FormFieldRenderer extends StatelessWidget {
     return FormBuilderSearchableDropdown<String>(
       name: config.id,
       decoration: _buildDecoration(),
-      items: (config.options ?? [])
-          .map((option) => DropdownMenuItem(
-                value: option.value,
-                child: Text(option.label),
-              ))
-          .toList(),
+      items: (config.options ?? []).map((option) => option.value).toList(),
       enabled: config.enabled,
       validator: config.required ? FormBuilderValidators.required() : null,
     );
@@ -459,6 +454,8 @@ class FormFieldRenderer extends StatelessWidget {
   }
 
   Widget _buildRating() {
+    // Rating field not available in form_builder_extra_fields 11.0.0
+    // Fall back to a slider
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -470,13 +467,18 @@ class FormFieldRenderer extends StatelessWidget {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
           ),
-        FormBuilderRating(
+        FormBuilderSlider(
           name: config.id,
           decoration: const InputDecoration(border: InputBorder.none),
-          maxRating: (config.maxValue ?? 5).toInt(),
-          initialRating: config.initialValue ?? 0,
+          min: 0,
+          max: config.maxValue ?? 5,
+          initialValue: config.initialValue ?? 0,
+          divisions: (config.maxValue ?? 5).toInt(),
           enabled: config.enabled,
-          validator: config.required ? FormBuilderValidators.required() : null,
+          valueWidget: (value) => Text(
+            '${value.toInt()} / ${(config.maxValue ?? 5).toInt()}',
+            style: const TextStyle(fontSize: 14),
+          ),
         ),
         if (config.help != null)
           Padding(
@@ -491,11 +493,27 @@ class FormFieldRenderer extends StatelessWidget {
   }
 
   Widget _buildColorPicker() {
-    return FormBuilderColorPicker(
+    // ColorPicker not available in form_builder_extra_fields 11.0.0
+    // Fall back to text field for hex color input
+    return FormBuilderTextField(
       name: config.id,
-      decoration: _buildDecoration(),
+      decoration: _buildDecoration().copyWith(
+        helperText: 'Enter hex color (e.g., #FF5733)',
+      ),
+      initialValue: config.initialColor,
       enabled: config.enabled,
-      validator: config.required ? FormBuilderValidators.required() : null,
+      validator: FormBuilderValidators.compose([
+        if (config.required) FormBuilderValidators.required(),
+        (value) {
+          if (value != null && value.isNotEmpty) {
+            // Basic hex color validation
+            if (!RegExp(r'^#?[0-9A-Fa-f]{6}$').hasMatch(value)) {
+              return 'Invalid color format';
+            }
+          }
+          return null;
+        },
+      ]),
     );
   }
 
@@ -561,27 +579,71 @@ class FormFieldRenderer extends StatelessWidget {
   }
 
   Widget _buildCupertinoCheckbox() {
-    return FormBuilderCupertinoCheckbox(
-      name: config.id,
-      title: Text(config.label),
-      subtitle: config.help != null ? Text(config.help!) : null,
-      enabled: config.enabled,
-      validator: config.required
-          ? (value) {
-              if (value != true) return 'This field is required';
-              return null;
-            }
-          : null,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          FormBuilderCupertinoCheckbox(
+            name: config.id,
+            initialValue: config.defaultValue as bool? ?? false,
+            enabled: config.enabled,
+            validator: config.required
+                ? (value) {
+                    if (value != true) return 'This field is required';
+                    return null;
+                  }
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  config.label,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                if (config.help != null)
+                  Text(
+                    config.help!,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildCupertinoSwitch() {
-    return FormBuilderCupertinoSwitch(
-      name: config.id,
-      title: Text(config.label),
-      subtitle: config.help != null ? Text(config.help!) : null,
-      enabled: config.enabled,
-      initialValue: config.defaultValue as bool? ?? false,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  config.label,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                if (config.help != null)
+                  Text(
+                    config.help!,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+              ],
+            ),
+          ),
+          FormBuilderCupertinoSwitch(
+            name: config.id,
+            initialValue: config.defaultValue as bool? ?? false,
+            enabled: config.enabled,
+          ),
+        ],
+      ),
     );
   }
 
@@ -599,7 +661,6 @@ class FormFieldRenderer extends StatelessWidget {
           ),
         FormBuilderCupertinoSlider(
           name: config.id,
-          decoration: const InputDecoration(border: InputBorder.none),
           min: config.minValue ?? 0,
           max: config.maxValue ?? 100,
           initialValue: config.initialValue ?? (config.minValue ?? 0),
@@ -632,7 +693,6 @@ class FormFieldRenderer extends StatelessWidget {
           ),
         FormBuilderCupertinoSegmentedControl<String>(
           name: config.id,
-          decoration: const InputDecoration(border: InputBorder.none),
           options: (config.options ?? [])
               .map((option) => FormBuilderFieldOption(
                     value: option.value,
@@ -668,7 +728,6 @@ class FormFieldRenderer extends StatelessWidget {
           ),
         FormBuilderCupertinoSlidingSegmentedControl<String>(
           name: config.id,
-          decoration: const InputDecoration(border: InputBorder.none),
           options: (config.options ?? [])
               .asMap()
               .map((index, option) => MapEntry(
@@ -697,7 +756,6 @@ class FormFieldRenderer extends StatelessWidget {
       maxFiles: config.allowMultipleFiles ? null : 1,
       previewImages: true,
       allowedExtensions: config.allowedExtensions,
-      type: _getFileType(),
       allowCompression: true,
       validator: config.required ? FormBuilderValidators.required() : null,
       onChanged: (files) {
@@ -711,21 +769,6 @@ class FormFieldRenderer extends StatelessWidget {
         }
       },
     );
-  }
-
-  FileType _getFileType() {
-    switch (config.fileTypeFilter) {
-      case 'image':
-        return FileType.image;
-      case 'video':
-        return FileType.video;
-      case 'audio':
-        return FileType.audio;
-      case 'custom':
-        return FileType.custom;
-      default:
-        return FileType.any;
-    }
   }
 
   Widget _buildImagePicker() {
