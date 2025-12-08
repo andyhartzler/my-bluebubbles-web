@@ -28,23 +28,33 @@ class _FormsMainScreenState extends State<FormsMainScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Forms Management'),
+        title: Text(
+          isMobile ? 'Forms' : 'Forms Management',
+          style: TextStyle(fontSize: isMobile ? 18 : 20),
+        ),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
+          labelPadding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 16),
+          tabs: [
             Tab(
-              icon: Icon(Icons.work_outline),
-              text: 'Jobs',
+              icon: const Icon(Icons.work_outline),
+              text: isMobile ? null : 'Jobs',
+              iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
             ),
             Tab(
-              icon: Icon(Icons.description_outlined),
-              text: 'Forms',
+              icon: const Icon(Icons.description_outlined),
+              text: isMobile ? null : 'Forms',
+              iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
             ),
             Tab(
-              icon: Icon(Icons.how_to_vote_outlined),
-              text: 'Votes',
+              icon: const Icon(Icons.how_to_vote_outlined),
+              text: isMobile ? null : 'Votes',
+              iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
             ),
           ],
         ),
