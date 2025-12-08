@@ -23,11 +23,22 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   final _uuid = const Uuid();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _slugController = TextEditingController();
+  final _maxSubmissionsController = TextEditingController();
+  final _confirmationEmailController = TextEditingController();
+  final _notificationEmailsController = TextEditingController();
 
   List<FormFieldConfig> _fields = [];
   String _formType = 'survey';
   bool _isLoading = false;
   bool _isSaving = false;
+
+  // Settings
+  DateTime? _opensAt;
+  DateTime? _closesAt;
+  bool _requireLogin = false;
+  bool _oneSubmissionPerUser = false;
+  bool _showSettings = false;
 
   @override
   void initState() {
@@ -41,6 +52,10 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _slugController.dispose();
+    _maxSubmissionsController.dispose();
+    _confirmationEmailController.dispose();
+    _notificationEmailsController.dispose();
     super.dispose();
   }
 
@@ -56,6 +71,17 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         _formType = form.formType;
         // Create a mutable copy of the fields list (Freezed returns immutable lists)
         _fields = List.from(form.schema.fields);
+
+        // Load settings
+        _slugController.text = form.slug ?? '';
+        _maxSubmissionsController.text = form.maxSubmissions?.toString() ?? '';
+        _confirmationEmailController.text = form.confirmationEmailTemplate ?? '';
+        _notificationEmailsController.text = form.notificationEmails?.join(', ') ?? '';
+        _opensAt = form.opensAt;
+        _closesAt = form.closesAt;
+        _requireLogin = form.requireLogin;
+        _oneSubmissionPerUser = form.oneSubmissionPerUser;
+
         _isLoading = false;
       });
     } catch (e) {
@@ -124,6 +150,164 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               onChanged: (value) {
                 setState(() => _formType = value!);
               },
+            ),
+            const SizedBox(height: 16),
+
+            // Settings Section
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.settings),
+                    title: const Text('Form Settings'),
+                    subtitle: Text(_showSettings ? 'Tap to collapse' : 'Configure scheduling, access control, and more'),
+                    trailing: Icon(_showSettings ? Icons.expand_less : Icons.expand_more),
+                    onTap: () => setState(() => _showSettings = !_showSettings),
+                  ),
+                  if (_showSettings) ...[
+                    const Divider(height: 1),
+                    Padding(
+                      padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Custom URL Slug
+                          TextField(
+                            controller: _slugController,
+                            decoration: const InputDecoration(
+                              labelText: 'Custom URL Slug (optional)',
+                              hintText: 'my-form-name',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.link),
+                              helperText: 'Leave blank to auto-generate',
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Scheduling Section
+                          Text(
+                            'Scheduling',
+                            style: TextStyle(
+                              fontSize: isMobile ? 14 : 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (isMobile)
+                            Column(
+                              children: [
+                                _buildDatePickerTile(
+                                  'Opens At',
+                                  _opensAt,
+                                  (date) => setState(() => _opensAt = date),
+                                  Icons.schedule,
+                                ),
+                                const SizedBox(height: 8),
+                                _buildDatePickerTile(
+                                  'Closes At',
+                                  _closesAt,
+                                  (date) => setState(() => _closesAt = date),
+                                  Icons.event_busy,
+                                ),
+                              ],
+                            )
+                          else
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildDatePickerTile(
+                                    'Opens At',
+                                    _opensAt,
+                                    (date) => setState(() => _opensAt = date),
+                                    Icons.schedule,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildDatePickerTile(
+                                    'Closes At',
+                                    _closesAt,
+                                    (date) => setState(() => _closesAt = date),
+                                    Icons.event_busy,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          const SizedBox(height: 16),
+
+                          // Access Control Section
+                          Text(
+                            'Access Control',
+                            style: TextStyle(
+                              fontSize: isMobile ? 14 : 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            title: const Text('Require Login'),
+                            subtitle: const Text('Users must be logged in to submit'),
+                            value: _requireLogin,
+                            onChanged: (value) => setState(() => _requireLogin = value),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          SwitchListTile(
+                            title: const Text('One Submission Per User'),
+                            subtitle: const Text('Each user can only submit once'),
+                            value: _oneSubmissionPerUser,
+                            onChanged: (value) => setState(() => _oneSubmissionPerUser = value),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _maxSubmissionsController,
+                            decoration: const InputDecoration(
+                              labelText: 'Max Submissions (optional)',
+                              hintText: 'e.g., 100',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.format_list_numbered),
+                              helperText: 'Leave blank for unlimited',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Email Settings Section
+                          Text(
+                            'Email Settings',
+                            style: TextStyle(
+                              fontSize: isMobile ? 14 : 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _notificationEmailsController,
+                            decoration: const InputDecoration(
+                              labelText: 'Notification Emails (optional)',
+                              hintText: 'admin@example.com, team@example.com',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.notifications),
+                              helperText: 'Comma-separated emails to notify on submission',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _confirmationEmailController,
+                            decoration: const InputDecoration(
+                              labelText: 'Confirmation Email Template (optional)',
+                              hintText: 'Thank you for submitting...',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.email),
+                            ),
+                            maxLines: 3,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -478,6 +662,93 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
     });
   }
 
+  Widget _buildDatePickerTile(
+    String label,
+    DateTime? value,
+    Function(DateTime?) onChanged,
+    IconData icon,
+  ) {
+    final formattedDate = value != null
+        ? '${value.month}/${value.day}/${value.year} ${value.hour}:${value.minute.toString().padLeft(2, '0')}'
+        : 'Not set';
+
+    return InkWell(
+      onTap: () async {
+        final date = await showDatePicker(
+          context: context,
+          initialDate: value ?? DateTime.now(),
+          firstDate: DateTime.now().subtract(const Duration(days: 365)),
+          lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+        );
+        if (date != null && mounted) {
+          final time = await showTimePicker(
+            context: context,
+            initialTime: TimeOfDay.fromDateTime(value ?? DateTime.now()),
+          );
+          if (time != null) {
+            onChanged(DateTime(
+              date.year,
+              date.month,
+              date.day,
+              time.hour,
+              time.minute,
+            ));
+          } else {
+            onChanged(date);
+          }
+        }
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.grey[600]),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  Text(
+                    formattedDate,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+            if (value != null)
+              IconButton(
+                icon: const Icon(Icons.clear, size: 18),
+                onPressed: () => onChanged(null),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<String>? _parseNotificationEmails() {
+    final text = _notificationEmailsController.text.trim();
+    if (text.isEmpty) return null;
+    return text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
+  int? _parseMaxSubmissions() {
+    final text = _maxSubmissionsController.text.trim();
+    if (text.isEmpty) return null;
+    return int.tryParse(text);
+  }
+
   Future<void> _saveForm({bool publish = false}) async {
     if (_titleController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -495,6 +766,13 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         confirmation: {},
       );
 
+      final slug = _slugController.text.trim().isEmpty ? null : _slugController.text.trim();
+      final maxSubmissions = _parseMaxSubmissions();
+      final notificationEmails = _parseNotificationEmails();
+      final confirmationEmail = _confirmationEmailController.text.trim().isEmpty
+          ? null
+          : _confirmationEmailController.text.trim();
+
       if (widget.formId == null) {
         // Create new
         await _formsService.createForm(
@@ -505,6 +783,14 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           formType: _formType,
           schema: schema,
           status: publish ? 'active' : 'draft',
+          opensAt: _opensAt,
+          closesAt: _closesAt,
+          requireLogin: _requireLogin,
+          oneSubmissionPerUser: _oneSubmissionPerUser,
+          maxSubmissions: maxSubmissions,
+          slug: slug,
+          confirmationEmailTemplate: confirmationEmail,
+          notificationEmails: notificationEmails,
         );
       } else {
         // Update existing
@@ -516,6 +802,14 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               : _descriptionController.text,
           schema: schema,
           status: publish ? 'active' : null,
+          opensAt: _opensAt,
+          closesAt: _closesAt,
+          requireLogin: _requireLogin,
+          oneSubmissionPerUser: _oneSubmissionPerUser,
+          maxSubmissions: maxSubmissions,
+          slug: slug,
+          confirmationEmailTemplate: confirmationEmail,
+          notificationEmails: notificationEmails,
         );
       }
 

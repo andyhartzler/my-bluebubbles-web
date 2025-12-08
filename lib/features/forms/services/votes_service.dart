@@ -36,11 +36,25 @@ class VotesService {
     required String title,
     String? description,
     required List<VotingOption> options,
+    // Voting-specific fields
     DateTime? votingStartsAt,
     DateTime? votingEndsAt,
     Map<String, dynamic>? eligibleMembers,
     bool resultsPublic = false,
     String status = 'draft',
+    // Scheduling (opens_at/closes_at can mirror voting dates or be separate)
+    DateTime? opensAt,
+    DateTime? closesAt,
+    // Access control
+    bool requireLogin = false,
+    bool oneSubmissionPerUser = true, // Default true for votes (one vote per person)
+    // Submission limits
+    int? maxSubmissions,
+    // Custom URL
+    String? slug,
+    // Email settings
+    String? confirmationEmailTemplate,
+    List<String>? notificationEmails,
   }) async {
     // Build schema with voting options
     final schema = {
@@ -61,6 +75,17 @@ class VotesService {
           'results_public': resultsPublic,
           'status': status,
           'created_by': _supabase.auth.currentUser?.id,
+          // Scheduling - use voting dates if opens_at/closes_at not provided
+          if (opensAt != null) 'opens_at': opensAt.toIso8601String()
+          else if (votingStartsAt != null) 'opens_at': votingStartsAt.toIso8601String(),
+          if (closesAt != null) 'closes_at': closesAt.toIso8601String()
+          else if (votingEndsAt != null) 'closes_at': votingEndsAt.toIso8601String(),
+          'require_login': requireLogin,
+          'one_submission_per_user': oneSubmissionPerUser,
+          if (maxSubmissions != null) 'max_submissions': maxSubmissions,
+          if (slug != null) 'slug': slug,
+          if (confirmationEmailTemplate != null) 'confirmation_email_template': confirmationEmailTemplate,
+          if (notificationEmails != null) 'notification_emails': notificationEmails,
         })
         .select()
         .single();
@@ -73,9 +98,34 @@ class VotesService {
     String? title,
     String? description,
     List<VotingOption>? options,
+    // Voting-specific fields
     DateTime? votingStartsAt,
+    bool clearVotingStartsAt = false,
     DateTime? votingEndsAt,
+    bool clearVotingEndsAt = false,
+    Map<String, dynamic>? eligibleMembers,
+    bool clearEligibleMembers = false,
+    bool? resultsPublic,
     String? status,
+    // Scheduling
+    DateTime? opensAt,
+    bool clearOpensAt = false,
+    DateTime? closesAt,
+    bool clearClosesAt = false,
+    // Access control
+    bool? requireLogin,
+    bool? oneSubmissionPerUser,
+    // Submission limits
+    int? maxSubmissions,
+    bool clearMaxSubmissions = false,
+    // Custom URL
+    String? slug,
+    bool clearSlug = false,
+    // Email settings
+    String? confirmationEmailTemplate,
+    bool clearConfirmationEmailTemplate = false,
+    List<String>? notificationEmails,
+    bool clearNotificationEmails = false,
   }) async {
     final updates = <String, dynamic>{};
 
@@ -86,13 +136,67 @@ class VotesService {
         'fields': options.map((o) => o.toJson()).toList(),
       };
     }
+    if (status != null) updates['status'] = status;
+
+    // Voting-specific fields
     if (votingStartsAt != null) {
       updates['voting_starts_at'] = votingStartsAt.toIso8601String();
+    } else if (clearVotingStartsAt) {
+      updates['voting_starts_at'] = null;
     }
     if (votingEndsAt != null) {
       updates['voting_ends_at'] = votingEndsAt.toIso8601String();
+    } else if (clearVotingEndsAt) {
+      updates['voting_ends_at'] = null;
     }
-    if (status != null) updates['status'] = status;
+    if (eligibleMembers != null) {
+      updates['eligible_members'] = eligibleMembers;
+    } else if (clearEligibleMembers) {
+      updates['eligible_members'] = null;
+    }
+    if (resultsPublic != null) updates['results_public'] = resultsPublic;
+
+    // Scheduling
+    if (opensAt != null) {
+      updates['opens_at'] = opensAt.toIso8601String();
+    } else if (clearOpensAt) {
+      updates['opens_at'] = null;
+    }
+    if (closesAt != null) {
+      updates['closes_at'] = closesAt.toIso8601String();
+    } else if (clearClosesAt) {
+      updates['closes_at'] = null;
+    }
+
+    // Access control
+    if (requireLogin != null) updates['require_login'] = requireLogin;
+    if (oneSubmissionPerUser != null) updates['one_submission_per_user'] = oneSubmissionPerUser;
+
+    // Submission limits
+    if (maxSubmissions != null) {
+      updates['max_submissions'] = maxSubmissions;
+    } else if (clearMaxSubmissions) {
+      updates['max_submissions'] = null;
+    }
+
+    // Custom URL
+    if (slug != null) {
+      updates['slug'] = slug;
+    } else if (clearSlug) {
+      updates['slug'] = null;
+    }
+
+    // Email settings
+    if (confirmationEmailTemplate != null) {
+      updates['confirmation_email_template'] = confirmationEmailTemplate;
+    } else if (clearConfirmationEmailTemplate) {
+      updates['confirmation_email_template'] = null;
+    }
+    if (notificationEmails != null) {
+      updates['notification_emails'] = notificationEmails;
+    } else if (clearNotificationEmails) {
+      updates['notification_emails'] = null;
+    }
 
     await _supabase
         .from('form_schemas')
