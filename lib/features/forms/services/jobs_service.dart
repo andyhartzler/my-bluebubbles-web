@@ -5,16 +5,20 @@ class JobsService {
   final _supabase = Supabase.instance.client;
 
   Stream<List<Job>> watchJobs(String statusFilter) {
-    var query = _supabase.from('jobs').select();
-
-    if (statusFilter != 'all') {
-      query = query.eq('status', statusFilter);
+    if (statusFilter == 'all') {
+      return _supabase
+          .from('jobs')
+          .stream(primaryKey: ['id'])
+          .order('created_at', ascending: false)
+          .map((data) => data.map((json) => Job.fromJson(json)).toList());
+    } else {
+      return _supabase
+          .from('jobs')
+          .stream(primaryKey: ['id'])
+          .eq('status', statusFilter)
+          .order('created_at', ascending: false)
+          .map((data) => data.map((json) => Job.fromJson(json)).toList());
     }
-
-    return query
-        .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false)
-        .map((data) => data.map((json) => Job.fromJson(json)).toList());
   }
 
   Stream<int> watchPendingCount() {
