@@ -94,7 +94,7 @@ dependencies:
   # Flutter Form Builder ecosystem
   flutter_form_builder: ^9.4.1
   form_builder_validators: ^11.0.0
-  form_builder_extra_fields: ^10.0.1
+  form_builder_extra_fields: ^11.0.0
   form_builder_cupertino_fields: ^0.4.0
   form_builder_file_picker: ^4.2.0
   form_builder_image_picker: ^4.1.0
