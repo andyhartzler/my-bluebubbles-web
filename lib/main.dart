@@ -37,6 +37,7 @@ import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/listmonk_webview_screen.dart';
+import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:provider/provider.dart';
@@ -485,6 +486,7 @@ enum _HomeSection {
   memberPortal,
   walletNotifications,
   campaigns,
+  forms,
   conversations
 }
 
@@ -776,6 +778,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                       const ListmonkWebViewScreen(
                         key: PageStorageKey('campaigns-view'),
                       ),
+                      const FormsMainScreen(
+                        key: PageStorageKey('forms-view'),
+                      ),
                       ConversationList(
                         key: const PageStorageKey('conversations-view'),
                         showArchivedChats: false,
@@ -914,6 +919,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             _buildNavButton(context, _HomeSection.events, 'Events', Icons.event_available_outlined, enabled: crmReady, hideIcon: hideIcons),
             _buildNavButton(context, _HomeSection.memberPortal, 'Member Portal', Icons.admin_panel_settings_outlined, enabled: crmReady, hideIcon: hideIcons),
             _buildNavButton(context, _HomeSection.campaigns, 'Campaigns', Icons.campaign_outlined, enabled: crmReady, hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.forms, 'Forms', Icons.dynamic_form_outlined, enabled: crmReady, hideIcon: hideIcons),
             _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline, hideIcon: hideIcons),
           ];
 
