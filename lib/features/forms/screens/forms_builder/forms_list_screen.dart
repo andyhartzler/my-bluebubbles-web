@@ -3,6 +3,7 @@ import '../../models/form_schema.dart';
 import '../../services/forms_service.dart';
 import '../../widgets/form_card.dart';
 import 'form_builder_screen.dart';
+import '../form_submission_screen.dart';
 
 class FormsListScreen extends StatefulWidget {
   const FormsListScreen({Key? key}) : super(key: key);
@@ -101,6 +102,7 @@ class _FormsListScreenState extends State<FormsListScreen>
                       return FormCard(
                         form: form,
                         onTap: () => _editForm(form),
+                        onView: form.status == 'active' ? () => _viewForm(form) : null,
                       );
                     },
                   ),
@@ -145,6 +147,15 @@ class _FormsListScreenState extends State<FormsListScreen>
       context,
       MaterialPageRoute(
         builder: (_) => FormBuilderScreen(formId: form.id),
+      ),
+    );
+  }
+
+  void _viewForm(FormSchema form) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FormSubmissionScreen(formId: form.id),
       ),
     );
   }

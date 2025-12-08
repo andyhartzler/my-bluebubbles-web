@@ -4,11 +4,13 @@ import '../models/form_schema.dart';
 class FormCard extends StatelessWidget {
   final FormSchema form;
   final VoidCallback onTap;
+  final VoidCallback? onView;
 
   const FormCard({
     Key? key,
     required this.form,
     required this.onTap,
+    this.onView,
   }) : super(key: key);
 
   @override
@@ -46,16 +48,34 @@ class FormCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
+              Row(
                 children: [
-                  Chip(
-                    label: Text(form.formType),
-                    visualDensity: VisualDensity.compact,
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      children: [
+                        Chip(
+                          label: Text(form.formType),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        Chip(
+                          label: Text('${form.schema.fields.length} fields'),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
                   ),
-                  Chip(
-                    label: Text('${form.schema.fields.length} fields'),
-                    visualDensity: VisualDensity.compact,
+                  if (form.status == 'active' && onView != null) ...[
+                    IconButton(
+                      icon: const Icon(Icons.visibility),
+                      onPressed: onView,
+                      tooltip: 'View Form',
+                    ),
+                  ],
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: onTap,
+                    tooltip: 'Edit Form',
                   ),
                 ],
               ),

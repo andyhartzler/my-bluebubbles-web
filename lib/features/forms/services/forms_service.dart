@@ -107,4 +107,26 @@ class FormsService {
         .map((json) => FormSubmission.fromJson(json))
         .toList();
   }
+
+  Future<String> createSubmission({
+    required String formId,
+    required String memberId,
+    required Map<String, dynamic> submissionData,
+    String? submitterEmail,
+    String? submitterName,
+  }) async {
+    final response = await _supabase
+        .from('form_submissions')
+        .insert({
+          'form_id': formId,
+          'member_id': memberId,
+          'submission': submissionData,
+          'submitter_email': submitterEmail,
+          'submitter_name': submitterName,
+        })
+        .select()
+        .single();
+
+    return response['id'] as String;
+  }
 }
