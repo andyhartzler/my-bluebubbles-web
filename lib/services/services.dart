@@ -37,5 +37,4 @@ export 'ui/attachments_service.dart';
 export 'ui/contact_service.dart';
 export 'ui/unifiedpush.dart';
 export 'email/email_service.dart' show EmailReplyDraft;
-export 'listmonk_auth_service.dart';
 export 'credential_storage_service.dart';
