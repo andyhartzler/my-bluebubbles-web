@@ -18,8 +18,8 @@ forms/
 │   ├── form_schema.dart
 │   ├── form_submission.dart
 │   ├── job.dart
+│   ├── job_application.dart
 │   └── voting_form.dart
-├── providers/           # State management (if needed)
 ├── services/            # Supabase service layer
 │   ├── forms_service.dart
 │   ├── jobs_service.dart
@@ -56,95 +56,90 @@ This will generate the following files for each model:
 - `*.freezed.dart` - Freezed generated code for immutable models
 - `*.g.dart` - JSON serialization/deserialization code
 
-### 2. Database Tables Required
+**Note:** The code WILL NOT compile until you run this command.
 
-Ensure the following Supabase tables exist:
+### 2. Database Schema
+
+The database schema already exists in Supabase with the following tables:
 
 #### jobs
-- id (uuid, primary key)
-- created_at (timestamptz)
-- updated_at (timestamptz)
-- title (text)
-- organization (text)
-- description (text)
-- requirements (text, nullable)
-- qualifications (text, nullable)
-- location (text, nullable)
-- job_type (text)
-- location_type (text, nullable)
-- is_paid (boolean)
-- contact_email (text)
-- submitter_name (text)
-- submitter_email (text)
-- submitter_organization (text, nullable)
-- status (text, default 'pending')
-- approved_at (timestamptz, nullable)
-- approved_by (uuid, nullable)
-- rejection_reason (text, nullable)
-- featured (boolean, default false)
+- Stores job postings with approval workflow
+- Fields include compensation (salary_range, hourly_rate), contact info, application tracking
+- Statuses: pending, approved, rejected, expired, archived
+- Auto-generates slugs for SEO-friendly URLs
+- Triggers: auto_expire_jobs(), generate_job_slug()
+
+#### job_applications
+- Stores applications for jobs
+- Links to jobs and optionally to members
+- Auto-updates application_count on jobs table
 
 #### form_schemas
-- id (uuid, primary key)
-- created_at (timestamptz)
-- updated_at (timestamptz)
-- created_by (uuid, nullable)
-- title (text)
-- description (text, nullable)
-- form_type (text)
-- schema (jsonb)
-- status (text, default 'draft')
+- Stores all form definitions including regular forms AND voting forms
+- form_type: 'survey', 'registration', 'feedback', 'vote'
+- schema field contains JSONB with form structure
+- settings field for form configuration
+- Voting-specific fields: voting_starts_at, voting_ends_at, eligible_members, results_public, results_data
 
 #### form_submissions
-- id (uuid, primary key)
-- created_at (timestamptz)
-- form_id (uuid, foreign key)
-- member_id (uuid, nullable)
-- data (jsonb)
-- submitter_email (text, nullable)
-- submitter_name (text, nullable)
+- Stores form submission responses
+- data field contains JSONB with user responses
+- Links to form_schemas and optionally to members
 
-#### voting_forms
-- id (uuid, primary key)
-- created_at (timestamptz)
-- updated_at (timestamptz)
-- created_by (uuid, nullable)
-- title (text)
-- description (text, nullable)
-- voting_type (text)
-- options (jsonb)
-- start_date (timestamptz, nullable)
-- end_date (timestamptz, nullable)
-- status (text, default 'draft')
-- allow_multiple (boolean, default false)
-- max_choices (integer, nullable)
-- require_member (boolean, default true)
+#### votes
+- Stores individual vote submissions
+- vote_data contains JSONB with vote choices
+- Unique constraint: one vote per member per voting form
+- Triggers automatically update results_data on form_schemas
 
-#### vote_submissions
-- id (uuid, primary key)
-- created_at (timestamptz)
-- voting_form_id (uuid, foreign key)
-- member_id (uuid, nullable)
-- option_ids (jsonb)
+#### voting_forms (VIEW)
+- Read-only view of form_schemas WHERE form_type='vote'
+- Provides convenient access to voting forms
 
-### 3. Row Level Security (RLS)
+## Database Functions
 
-Ensure appropriate RLS policies are set up for authenticated users to access these tables.
+The schema includes helper functions:
+
+- `can_member_vote(member_id, voting_form_id)` - Check if member is eligible to vote
+- `get_form_submission_count(form_id)` - Count submissions for a form
+- `get_vote_results(voting_form_id)` - Get aggregated vote results
+- `auto_expire_jobs()` - Mark expired jobs
+- `close_expired_votes()` - Close voting after end date
+
+## Architecture Notes
+
+### Voting System
+
+Voting forms are stored in the `form_schemas` table with `form_type='vote'`. This unified approach:
+- Reuses the forms infrastructure
+- Stores voting options in the schema.fields JSONB
+- Uses voting-specific fields (voting_starts_at, voting_ends_at, etc.)
+- Individual votes go in the `votes` table
+- Results are auto-aggregated in results_data field
+
+### Data Flow
+
+1. **Jobs**: User submits → Status='pending' → Admin approves/rejects → Status='approved'/'rejected'
+2. **Forms**: Admin creates → Status='draft' → Publishes → Status='active'
+3. **Votes**: Admin creates vote form (form_type='vote') → Members cast votes in `votes` table → Results aggregated automatically
 
 ## Usage
 
 The Forms Management feature is accessible from the main navigation bar. Click on "Forms" to access:
 - **Jobs Tab** - View and manage job postings, approve/reject submissions
-- **Forms Tab** - Create and manage custom forms with drag-and-drop builder
+- **Forms Tab** - Create and manage custom forms
 - **Votes Tab** - Create and manage voting forms for member engagement
 
 ## Features Implemented
 
 ### Jobs Management
 - ✅ List all jobs with status filtering (All, Pending, Approved, Rejected)
-- ✅ View job details
+- ✅ View job details including compensation, requirements, contact info
 - ✅ Approve/reject jobs with feedback
 - ✅ Real-time pending count badge
 - ✅ Status indicators
+- ✅ Slug auto-generation for SEO
+- ✅ Application tracking (count, view count)
 
 ### Forms Builder
 - ✅ Create custom forms with multiple field types
@@ -152,30 +147,58 @@ The Forms Management feature is accessible from the main navigation bar. Click o
 - ✅ Form type selection (Survey, Registration, Feedback)
 - ✅ Save as draft or publish
 - ✅ Edit existing forms
+- ✅ View form submissions
 
 ### Voting
-- ✅ Create voting forms with multiple options
-- ✅ Single choice, multiple choice, and ranked voting
-- ✅ Set start/end dates
-- ✅ View voting results
+- ✅ Create voting forms stored in form_schemas
+- ✅ Set start/end dates for voting periods
+- ✅ View voting results from results_data
 - ✅ Draft and publish functionality
+- ✅ Member eligibility checking via can_member_vote()
+- ✅ Automatic results aggregation via database triggers
+
+## Model Changes from Original Design
+
+The models have been updated to match the actual Supabase schema:
+
+### Job Model
+- Added: salary_range, hourly_rate, contact_name, contact_phone, application_url, application_instructions
+- Added: submitter_phone, expires_at, slug, tags[], application_count, view_count
+- job_type values: 'full-time', 'part-time', 'internship', 'volunteer', 'contract'
+
+### FormSchema Model
+- Added: settings (JSONB)
+- Added voting fields: voting_starts_at, voting_ends_at, eligible_members, results_public, results_data
+
+### VotingForm Model
+- Now maps to form_schemas table with form_type='vote'
+- Uses schema field for storing options
+- Uses voting-specific fields from form_schemas
+
+### New Models
+- JobApplication - for job application submissions
 
 ## Next Steps
 
-1. Run `flutter pub run build_runner build --delete-conflicting-outputs`
-2. Create the required database tables in Supabase
-3. Set up RLS policies
-4. Test the implementation
-5. Add additional features as needed (email notifications, advanced form fields, etc.)
+1. ✅ Run `flutter pub run build_runner build --delete-conflicting-outputs`
+2. Test the implementation
+3. Update UI screens to use actual schema fields
+4. Add file upload support for resumes (job applications)
+5. Implement email notifications (marked as TODO in services)
+6. Add more advanced form field types as needed
 
 ## Notes
 
-- The forms builder is a simplified version. For advanced form building, consider adding:
-  - Field reordering (drag and drop)
-  - Conditional logic
-  - File uploads
-  - Advanced validation rules
-  - Custom styling options
+- All database operations use Row Level Security (RLS) policies
+- The schema includes comprehensive triggers and functions
+- Voting results are automatically calculated by database triggers
+- Form schemas support JSONB for flexible field definitions
+- The system supports both anonymous and authenticated submissions depending on RLS policies
 
-- Email notifications for job approvals/rejections are marked as TODO in the services
-- Consider adding more advanced voting features like ranked choice voting algorithms
+## Email Notifications (TODO)
+
+The following email notifications are marked as TODO in the services:
+- Job approval confirmation (jobs_service.dart:49)
+- Job rejection notification (jobs_service.dart:58)
+
+These should be implemented using Supabase Edge Functions or a third-party service.
