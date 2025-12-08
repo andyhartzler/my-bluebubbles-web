@@ -1,14 +1,22 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:webview_flutter/webview_flutter.dart';
-import '../../../services/credential_storage_service.dart';
+
+// Platform-specific imports for WebView configuration
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+
+import '../../../services/listmonk_auth_service.dart';
+
 // Conditional imports for web vs mobile/desktop
 import 'listmonk_web_view_stub.dart'
     if (dart.library.html) 'listmonk_web_view_web.dart'
     if (dart.library.io) 'listmonk_web_view_mobile.dart';
 
-/// Simple WebView screen that embeds Listmonk's full UI
-/// Platform-aware: uses iframe on web, WebView on mobile/desktop with auto-login
+/// WebView screen that embeds Listmonk's full UI with auto-authentication
+/// Platform-aware: uses iframe on web, WebView on mobile/desktop with multi-layer auto-login
 class ListmonkWebViewScreen extends StatefulWidget {
   const ListmonkWebViewScreen({Key? key}) : super(key: key);
 
@@ -18,178 +26,266 @@ class ListmonkWebViewScreen extends StatefulWidget {
 
 class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
   WebViewController? _controller;
+  bool _isInitializing = true;
   bool _isLoading = true;
-  String? _username;
-  String? _password;
-
-  static const String listmonkUrl = 'https://mail.moyd.app/admin';
+  String? _error;
+  String? _sessionCookie;
+  int _loginAttempts = 0;
+  static const int _maxLoginAttempts = 3;
 
   @override
   void initState() {
     super.initState();
-    _initializeView();
+    _initialize();
   }
 
-  void _initializeView() {
-    if (kIsWeb) {
-      // Web uses iframe - auto-login happens via API call
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+  Future<void> _initialize() async {
+    setState(() {
+      _isInitializing = true;
+      _error = null;
+      _loginAttempts = 0;
+    });
+
+    try {
+      // Initialize auth service
+      await ListmonkAuthService.init();
+
+      if (kIsWeb) {
+        // Web uses iframe - auto-login handled in the iframe widget
+        debugPrint('Listmonk: Using web iframe implementation');
+        setState(() {
+          _isInitializing = false;
+          _isLoading = false;
+        });
+      } else {
+        // Mobile/Desktop: Try to pre-authenticate first
+        debugPrint('Listmonk: Starting mobile/desktop initialization...');
+
+        // Step 1: Attempt pre-authentication to get session cookie
+        _sessionCookie = await ListmonkAuthService.authenticate();
+        if (_sessionCookie != null) {
+          debugPrint('Listmonk: Pre-auth successful, got session cookie');
+        } else {
+          debugPrint('Listmonk: Pre-auth failed, will use JS auto-login');
         }
+
+        // Step 2: Set up WebView
+        await _setupWebView();
+
+        setState(() {
+          _isInitializing = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Listmonk: Initialization failed: $e');
+      setState(() {
+        _error = 'Failed to initialize: $e';
+        _isInitializing = false;
+        _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _setupWebView() async {
+    // Platform-specific configuration
+    late final PlatformWebViewControllerCreationParams params;
+
+    if (WebViewPlatform.instance is WebKitWebViewPlatform) {
+      // iOS/macOS configuration
+      params = WebKitWebViewControllerCreationParams(
+        allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+      );
     } else {
-      // Mobile/Desktop uses WebView with JavaScript auto-login
-      _initializeWebView();
+      params = const PlatformWebViewControllerCreationParams();
+    }
+
+    final controller = WebViewController.fromPlatformCreationParams(params);
+
+    // Basic configuration
+    await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+    await controller.setBackgroundColor(Colors.white);
+
+    // Enable debugging on Android
+    if (controller.platform is AndroidWebViewController) {
+      await AndroidWebViewController.enableDebugging(true);
+    }
+
+    // Set up navigation handling
+    await controller.setNavigationDelegate(
+      NavigationDelegate(
+        onProgress: (int progress) {
+          if (mounted && progress == 100) {
+            setState(() => _isLoading = false);
+          }
+        },
+        onPageStarted: (String url) {
+          debugPrint('Listmonk: Page started: $url');
+          if (mounted) {
+            setState(() => _isLoading = true);
+          }
+        },
+        onPageFinished: (String url) {
+          debugPrint('Listmonk: Page finished: $url');
+          if (mounted) {
+            setState(() => _isLoading = false);
+          }
+
+          // Check if we're on login page and need to auto-fill
+          if (_isLoginPage(url)) {
+            debugPrint('Listmonk: Login page detected, attempting auto-fill...');
+            _attemptAutoLogin();
+          }
+        },
+        onWebResourceError: (WebResourceError error) {
+          debugPrint('Listmonk: WebView error: ${error.description}');
+          if (error.isForMainFrame == true && mounted) {
+            setState(() {
+              _error = 'Page load error: ${error.description}';
+              _isLoading = false;
+            });
+          }
+        },
+        onHttpError: (HttpResponseError error) {
+          debugPrint('Listmonk: HTTP error: ${error.response?.statusCode}');
+        },
+      ),
+    );
+
+    // Set up JavaScript channel for communication
+    await controller.addJavaScriptChannel(
+      'FlutterBridge',
+      onMessageReceived: (JavaScriptMessage message) {
+        debugPrint('Listmonk: JS Message: ${message.message}');
+        _handleJsMessage(message.message);
+      },
+    );
+
+    // Inject cookie if we have one
+    if (_sessionCookie != null) {
+      await _injectCookie(controller);
+    }
+
+    // Load the admin page
+    final headers = <String, String>{};
+    if (_sessionCookie != null) {
+      headers['Cookie'] = _sessionCookie!;
+    }
+
+    await controller.loadRequest(
+      Uri.parse('${ListmonkAuthService.listmonkUrl}/admin'),
+      headers: headers,
+    );
+
+    _controller = controller;
+  }
+
+  bool _isLoginPage(String url) {
+    final lowerUrl = url.toLowerCase();
+    // Match login page but not actual admin content pages
+    return lowerUrl.contains('/admin/login') ||
+        (lowerUrl.endsWith('/admin') || lowerUrl.endsWith('/admin/')) &&
+            !lowerUrl.contains('/admin/campaigns') &&
+            !lowerUrl.contains('/admin/subscribers') &&
+            !lowerUrl.contains('/admin/lists') &&
+            !lowerUrl.contains('/admin/templates') &&
+            !lowerUrl.contains('/admin/settings');
+  }
+
+  Future<void> _injectCookie(WebViewController controller) async {
+    if (_sessionCookie == null) return;
+
+    debugPrint('Listmonk: Injecting session cookie...');
+
+    try {
+      final cookieManager = WebViewCookieManager();
+
+      // Parse cookie
+      final parts = _sessionCookie!.split('=');
+      if (parts.length >= 2) {
+        final name = parts[0];
+        final value = parts.sublist(1).join('=');
+
+        await cookieManager.setCookie(
+          WebViewCookie(
+            name: name,
+            value: value,
+            domain: 'mail.moyd.app',
+            path: '/',
+          ),
+        );
+        debugPrint('Listmonk: Cookie injected successfully');
+      }
+    } catch (e) {
+      debugPrint('Listmonk: Cookie injection failed: $e');
     }
   }
 
-  Future<void> _initializeWebView() async {
-    // Load credentials from secure storage
-    _username = await CredentialStorageService.getListmonkUsername();
-    _password = await CredentialStorageService.getListmonkPassword();
+  Future<void> _attemptAutoLogin() async {
+    if (_controller == null) return;
 
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.white)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (String url) {
-            if (mounted) {
-              setState(() => _isLoading = true);
-            }
-          },
-          onPageFinished: (String url) {
-            if (mounted) {
-              setState(() => _isLoading = false);
-            }
-
-            // Auto-login when we hit the login page
-            // Match both /admin/login and /admin/login?next=...
-            if (url.contains('/admin/login') ||
-                (url.contains('/admin') && !url.contains('/admin/campaigns') && !url.contains('/admin/subscribers'))) {
-              _performAutoLogin();
-            }
-          },
-          onWebResourceError: (WebResourceError error) {
-            debugPrint('WebView error: ${error.description}');
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(listmonkUrl));
-
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  void _performAutoLogin() {
-    if (_controller == null || _username == null || _password == null) {
-      debugPrint('❌ Cannot auto-login: controller or credentials missing');
+    _loginAttempts++;
+    if (_loginAttempts > _maxLoginAttempts) {
+      debugPrint('Listmonk: Max login attempts reached');
       return;
     }
 
-    final jsCode = '''
-      (function() {
-        console.log('🔐 Starting auto-login...');
+    debugPrint('Listmonk: Auto-login attempt $_loginAttempts of $_maxLoginAttempts');
 
-        function attemptLogin() {
-          // Find username/email field with multiple selectors
-          const usernameField =
-            document.querySelector('input[name="username"]') ||
-            document.querySelector('input[name="email"]') ||
-            document.querySelector('input[id="username"]') ||
-            document.querySelector('input[id="email"]') ||
-            document.querySelector('input[type="text"]') ||
-            document.querySelector('input[type="email"]') ||
-            document.querySelector('input[placeholder*="username" i]') ||
-            document.querySelector('input[placeholder*="email" i]');
-
-          // Find password field
-          const passwordField =
-            document.querySelector('input[name="password"]') ||
-            document.querySelector('input[id="password"]') ||
-            document.querySelector('input[type="password"]');
-
-          // Find submit button
-          const loginButton =
-            document.querySelector('button[type="submit"]') ||
-            document.querySelector('form button') ||
-            document.querySelector('.btn-primary') ||
-            document.querySelector('input[type="submit"]') ||
-            document.querySelector('button');
-
-          if (usernameField && passwordField && loginButton) {
-            console.log('✅ Found all form elements');
-
-            // Fill in the credentials
-            usernameField.value = '$_username';
-            passwordField.value = '$_password';
-
-            // Trigger events that forms might be listening for
-            const inputEvent = new Event('input', { bubbles: true });
-            const changeEvent = new Event('change', { bubbles: true });
-
-            usernameField.dispatchEvent(inputEvent);
-            usernameField.dispatchEvent(changeEvent);
-            passwordField.dispatchEvent(inputEvent);
-            passwordField.dispatchEvent(changeEvent);
-
-            console.log('📝 Credentials filled');
-
-            // Submit after a short delay
-            setTimeout(function() {
-              loginButton.click();
-              console.log('🚀 Login submitted');
-            }, 300);
-
-            return true;
-          } else {
-            console.log('❌ Form elements not found yet');
-            console.log('Username field:', !!usernameField);
-            console.log('Password field:', !!passwordField);
-            console.log('Login button:', !!loginButton);
-            return false;
-          }
-        }
-
-        // Try immediately
-        if (!attemptLogin()) {
-          // If not found, try again after delays
-          setTimeout(attemptLogin, 500);
-          setTimeout(attemptLogin, 1000);
-          setTimeout(attemptLogin, 2000);
-          setTimeout(attemptLogin, 3000);
-        }
-      })();
-    ''';
-
+    // Get the comprehensive auto-login JavaScript from the service
+    final jsCode = await ListmonkAuthService.generateAutoLoginJs();
     _controller!.runJavaScript(jsCode);
   }
 
-  Future<void> _reload() async {
+  void _handleJsMessage(String message) {
+    try {
+      final data = jsonDecode(message);
+      final type = data['type'];
+
+      switch (type) {
+        case 'log':
+          debugPrint('Listmonk JS: ${data['message']}');
+          break;
+        case 'login_attempted':
+          debugPrint('Listmonk: Login attempt completed');
+          break;
+        case 'login_failed':
+          debugPrint('Listmonk: Login failed: ${data['reason']}');
+          break;
+        case 'already_logged_in':
+          debugPrint('Listmonk: Already logged in');
+          break;
+      }
+    } catch (e) {
+      debugPrint('Listmonk JS (raw): $message');
+    }
+  }
+
+  Future<void> _refresh() async {
     if (kIsWeb) {
+      // Trigger rebuild for web iframe
       setState(() {
         _isLoading = true;
       });
-      // Trigger rebuild which will recreate iframe
-      Future.delayed(Duration.zero, () {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      });
+      await Future.delayed(Duration.zero);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } else if (_controller != null) {
       setState(() {
         _isLoading = true;
+        _loginAttempts = 0;
       });
       await _controller!.reload();
     } else {
-      _initializeWebView();
+      await _initialize();
     }
+  }
+
+  Future<void> _retry() async {
+    await _initialize();
   }
 
   @override
@@ -197,34 +293,110 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Email Campaigns'),
+        backgroundColor: const Color(0xFF273351),
+        foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _reload,
-            tooltip: 'Refresh',
-          ),
+          if (!_isInitializing)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _refresh,
+              tooltip: 'Refresh',
+            ),
         ],
       ),
-      body: Stack(
-        children: [
-          // Platform-specific view
-          if (kIsWeb)
-            // Web: Use iframe with API-based auth
-            const Iframe(src: listmonkUrl)
-          else if (_controller != null)
-            // Mobile/Desktop: Use WebView with JS auto-login
-            WebViewWidget(controller: _controller!),
+      body: _buildBody(),
+    );
+  }
 
-          // Loading indicator
+  Widget _buildBody() {
+    // Error state (only for mobile/desktop)
+    if (_error != null && !kIsWeb) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to Load',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _retry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF273351),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Initializing state (only for mobile/desktop)
+    if (_isInitializing && !kIsWeb) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Color(0xFF273351)),
+            SizedBox(height: 16),
+            Text(
+              'Connecting to Email Campaigns...',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Platform-specific view
+    if (kIsWeb) {
+      // Web: Use iframe with API-based auth
+      return Stack(
+        children: [
+          const Iframe(src: '${ListmonkAuthService.listmonkUrl}/admin'),
           if (_isLoading)
             Container(
               color: Colors.grey[300],
               child: const Center(
-                child: CircularProgressIndicator(),
+                child: CircularProgressIndicator(color: Color(0xFF273351)),
               ),
             ),
         ],
-      ),
+      );
+    } else if (_controller != null) {
+      // Mobile/Desktop: Use WebView with JS auto-login
+      return Stack(
+        children: [
+          WebViewWidget(controller: _controller!),
+          if (_isLoading)
+            Container(
+              color: Colors.white.withOpacity(0.8),
+              child: const Center(
+                child: CircularProgressIndicator(color: Color(0xFF273351)),
+              ),
+            ),
+        ],
+      );
+    }
+
+    // Fallback loading state
+    return const Center(
+      child: CircularProgressIndicator(color: Color(0xFF273351)),
     );
   }
 }

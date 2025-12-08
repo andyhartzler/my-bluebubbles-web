@@ -5,6 +5,8 @@ import 'dart:ui' as ui;
 import 'dart:convert';
 import 'dart:async';
 
+import '../../../services/credential_storage_service.dart';
+
 /// Web-specific iframe widget for Listmonk with auto-authentication
 /// Only attempts login when the page is actually rendered/visible
 class Iframe extends StatefulWidget {
@@ -17,9 +19,13 @@ class Iframe extends StatefulWidget {
 }
 
 class _IframeState extends State<Iframe> {
-  final String _iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
+  final String _iframeId =
+      'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
   bool _hasAttemptedAuth = false;
   bool _isAuthenticating = false;
+  String? _authError;
+  int _authAttempts = 0;
+  static const int _maxAuthAttempts = 3;
 
   @override
   void initState() {
@@ -44,13 +50,13 @@ class _IframeState extends State<Iframe> {
             ..setAttribute('credentialless', 'false')
             ..setAttribute('allow', 'same-origin');
 
-          print('📺 Iframe registered with src: ${widget.src}');
+          print('Listmonk: Iframe registered with src: ${widget.src}');
 
           return iframe;
         },
       );
     } catch (e) {
-      print('❌ Error registering iframe: $e');
+      print('Listmonk: Error registering iframe: $e');
     }
   }
 
@@ -62,12 +68,19 @@ class _IframeState extends State<Iframe> {
     setState(() {
       _isAuthenticating = true;
       _hasAttemptedAuth = true;
+      _authError = null;
     });
+
+    // Get credentials from secure storage
+    final username =
+        await CredentialStorageService.getListmonkUsername() ?? 'admin';
+    final password =
+        await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
 
     final loginUrl = 'https://mail.moyd.app/api/admin/login';
 
     try {
-      print('🔐 Attempting Listmonk API authentication...');
+      print('Listmonk: Attempting API authentication...');
 
       // Create a completer to handle the async response
       final completer = Completer<void>();
@@ -80,42 +93,43 @@ class _IframeState extends State<Iframe> {
       request.withCredentials = true; // Important: allows cookies to be set
 
       request.onLoad.listen((_) {
-        print('📡 API Response Status: ${request.status}');
+        print('Listmonk: API Response Status: ${request.status}');
 
         if (request.status == 200) {
-          print('✅ Listmonk API authentication successful');
+          print('Listmonk: API authentication successful');
           completer.complete();
         } else {
           final errorMsg = 'Auth failed with status ${request.status}';
-          print('❌ $errorMsg');
+          print('Listmonk: $errorMsg');
           completer.completeError(errorMsg);
         }
       });
 
       request.onError.listen((error) {
         final errorMsg = 'Network error during authentication: $error';
-        print('❌ $errorMsg');
+        print('Listmonk: $errorMsg');
         completer.completeError(errorMsg);
       });
 
       // Send the login credentials
       final credentials = jsonEncode({
-        'username': 'admin',
-        'password': 'fucktrump67',
+        'username': username,
+        'password': password,
       });
 
-      print('📤 Sending credentials to $loginUrl');
+      print('Listmonk: Sending credentials to $loginUrl');
       request.send(credentials);
 
       // Wait for the request to complete (with timeout)
       await completer.future.timeout(
         const Duration(seconds: 10),
         onTimeout: () {
-          throw TimeoutException('Authentication request timed out after 10 seconds');
+          throw TimeoutException(
+              'Authentication request timed out after 10 seconds');
         },
       );
 
-      print('✅ Authentication complete, cookies should be set');
+      print('Listmonk: Authentication complete, cookies should be set');
 
       // Wait a bit for cookies to be set, then reload iframe
       await Future.delayed(const Duration(milliseconds: 500));
@@ -125,8 +139,25 @@ class _IframeState extends State<Iframe> {
         setState(() {});
       }
     } catch (e) {
-      print('❌ Failed to authenticate with Listmonk: $e');
-      print('💡 User can still login manually in the iframe');
+      print('Listmonk: Failed to authenticate: $e');
+      print('Listmonk: User can still login manually in the iframe');
+
+      _authAttempts++;
+
+      // Retry if we haven't exceeded max attempts
+      if (_authAttempts < _maxAuthAttempts) {
+        print('Listmonk: Retrying authentication (attempt ${_authAttempts + 1}/$_maxAuthAttempts)');
+        _hasAttemptedAuth = false;
+        await Future.delayed(const Duration(seconds: 1));
+        await _authenticateWithListmonk();
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _authError = e.toString();
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -143,25 +174,85 @@ class _IframeState extends State<Iframe> {
     if (!_hasAttemptedAuth) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_hasAttemptedAuth) {
-          print('🎯 Campaigns page is now visible, attempting auto-login...');
+          print('Listmonk: Campaigns page is now visible, attempting auto-login...');
           _authenticateWithListmonk();
         }
       });
     }
 
     if (_isAuthenticating) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
+            const CircularProgressIndicator(color: Color(0xFF273351)),
+            const SizedBox(height: 16),
             Text(
-              'Logging in to Listmonk...',
-              style: TextStyle(fontSize: 16),
+              'Logging in to Email Campaigns...',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
             ),
+            if (_authAttempts > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Attempt ${_authAttempts + 1}/$_maxAuthAttempts',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[400],
+                  ),
+                ),
+              ),
           ],
         ),
+      );
+    }
+
+    // Show error message if auth failed after all retries
+    if (_authError != null && _authAttempts >= _maxAuthAttempts) {
+      return Stack(
+        children: [
+          HtmlElementView(viewType: _iframeId),
+          // Show a dismissible banner at the top
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Material(
+              color: Colors.orange[100],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Auto-login failed. Please log in manually.',
+                        style: TextStyle(
+                          color: Colors.orange[900],
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () {
+                        setState(() {
+                          _authError = null;
+                        });
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
