@@ -6,7 +6,7 @@ class FormsService {
   final _supabase = Supabase.instance.client;
 
   Stream<List<FormSchema>> watchForms(String typeFilter) {
-    var query = _supabase.from('form_schemas');
+    var query = _supabase.from('form_schemas').select();
 
     if (typeFilter != 'all') {
       query = query.eq('form_type', typeFilter);
