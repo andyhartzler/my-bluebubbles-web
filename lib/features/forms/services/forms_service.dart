@@ -11,7 +11,7 @@ class FormsService {
         .stream(primaryKey: ['id']);
 
     if (typeFilter != 'all') {
-      query = query.eq('form_type', typeFilter) as RealtimePostgresStreamBuilder;
+      query = query.eq('form_type', typeFilter);
     }
 
     return query

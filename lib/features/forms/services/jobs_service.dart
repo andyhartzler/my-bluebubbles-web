@@ -10,7 +10,7 @@ class JobsService {
         .stream(primaryKey: ['id']);
 
     if (statusFilter != 'all') {
-      query = query.eq('status', statusFilter) as RealtimePostgresStreamBuilder;
+      query = query.eq('status', statusFilter);
     }
 
     return query

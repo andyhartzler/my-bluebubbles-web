@@ -12,7 +12,7 @@ class VotesService {
         .eq('form_type', 'vote');
 
     if (statusFilter != 'all') {
-      query = query.eq('status', statusFilter) as RealtimePostgresStreamBuilder;
+      query = query.eq('status', statusFilter);
     }
 
     return query
