@@ -5,7 +5,7 @@ class JobsService {
   final _supabase = Supabase.instance.client;
 
   Stream<List<Job>> watchJobs(String statusFilter) {
-    var query = _supabase.from('jobs');
+    var query = _supabase.from('jobs').select();
 
     if (statusFilter != 'all') {
       query = query.eq('status', statusFilter);
