@@ -6,16 +6,20 @@ class FormsService {
   final _supabase = Supabase.instance.client;
 
   Stream<List<FormSchema>> watchForms(String typeFilter) {
-    var query = _supabase.from('form_schemas').select();
-
-    if (typeFilter != 'all') {
-      query = query.eq('form_type', typeFilter);
+    if (typeFilter == 'all') {
+      return _supabase
+          .from('form_schemas')
+          .stream(primaryKey: ['id'])
+          .order('created_at', ascending: false)
+          .map((data) => data.map((json) => FormSchema.fromJson(json)).toList());
+    } else {
+      return _supabase
+          .from('form_schemas')
+          .stream(primaryKey: ['id'])
+          .eq('form_type', typeFilter)
+          .order('created_at', ascending: false)
+          .map((data) => data.map((json) => FormSchema.fromJson(json)).toList());
     }
-
-    return query
-        .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false)
-        .map((data) => data.map((json) => FormSchema.fromJson(json)).toList());
   }
 
   Future<FormSchema> getForm(String id) async {
