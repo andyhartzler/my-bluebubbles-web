@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/form_schema.dart';
 import '../../models/form_field_config.dart';
+import '../../models/form_field_types.dart';
 import '../../services/forms_service.dart';
+import '../../widgets/field_config_dialog.dart';
 
 class FormBuilderScreen extends StatefulWidget {
   final String? formId; // null for new form
@@ -192,7 +194,17 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       child: ListTile(
         leading: Icon(_getFieldIcon(field.type)),
         title: Text(field.label),
-        subtitle: Text(field.type),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_getFieldTypeLabel(field.type)),
+            if (field.validatorTypes != null && field.validatorTypes!.isNotEmpty)
+              Text(
+                '${field.validatorTypes!.length} validator(s)',
+                style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+              ),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -200,7 +212,12 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               const Chip(
                 label: Text('Required', style: TextStyle(fontSize: 11)),
                 visualDensity: VisualDensity.compact,
+                backgroundColor: Colors.orange,
               ),
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () => _editField(field),
+            ),
             IconButton(
               icon: const Icon(Icons.delete),
               onPressed: () => _deleteField(field.id),
@@ -213,32 +230,112 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
 
   IconData _getFieldIcon(String type) {
     switch (type) {
-      case 'text':
+      // Text fields
+      case FormFieldTypes.text:
+      case FormFieldTypes.cupertinoTextField:
         return Icons.text_fields;
-      case 'email':
+      case FormFieldTypes.email:
         return Icons.email;
-      case 'phone':
+      case FormFieldTypes.phone:
         return Icons.phone;
-      case 'textarea':
+      case FormFieldTypes.textarea:
         return Icons.notes;
-      case 'select':
+      case FormFieldTypes.url:
+        return Icons.link;
+      case FormFieldTypes.number:
+        return Icons.numbers;
+
+      // Selection fields
+      case FormFieldTypes.dropdown:
         return Icons.arrow_drop_down_circle;
-      case 'checkbox':
+      case FormFieldTypes.searchableDropdown:
+        return Icons.search;
+      case FormFieldTypes.checkbox:
+      case FormFieldTypes.cupertinoCheckbox:
         return Icons.check_box;
-      case 'radio':
+      case FormFieldTypes.checkboxGroup:
+        return Icons.checklist;
+      case FormFieldTypes.radio:
         return Icons.radio_button_checked;
+      case FormFieldTypes.choiceChips:
+        return Icons.label;
+      case FormFieldTypes.filterChips:
+        return Icons.filter_alt;
+      case FormFieldTypes.switchField:
+      case FormFieldTypes.cupertinoSwitch:
+        return Icons.toggle_on;
+
+      // Date/Time fields
+      case FormFieldTypes.datePicker:
+        return Icons.calendar_today;
+      case FormFieldTypes.timePicker:
+        return Icons.access_time;
+      case FormFieldTypes.dateTimePicker:
+        return Icons.event;
+      case FormFieldTypes.dateRangePicker:
+        return Icons.date_range;
+
+      // Numeric fields
+      case FormFieldTypes.slider:
+      case FormFieldTypes.cupertinoSlider:
+        return Icons.tune;
+      case FormFieldTypes.rangeSlider:
+        return Icons.linear_scale;
+      case FormFieldTypes.touchSpin:
+        return Icons.add_circle_outline;
+      case FormFieldTypes.rating:
+        return Icons.star;
+
+      // Special fields
+      case FormFieldTypes.colorPicker:
+        return Icons.color_lens;
+      case FormFieldTypes.signaturePad:
+        return Icons.draw;
+      case FormFieldTypes.typeahead:
+        return Icons.keyboard;
+
+      // Cupertino specific
+      case FormFieldTypes.cupertinoSegmentedControl:
+      case FormFieldTypes.cupertinoSlidingSegmentedControl:
+        return Icons.view_carousel;
+
       default:
-        return Icons.text_fields;
+        return Icons.help_outline;
     }
+  }
+
+  String _getFieldTypeLabel(String type) {
+    final typeInfo = FormFieldTypes.allTypes.firstWhere(
+      (t) => t.value == type,
+      orElse: () => FieldTypeInfo(type, type, ''),
+    );
+    return typeInfo.label;
   }
 
   void _showAddFieldDialog() {
     showDialog(
       context: context,
-      builder: (context) => _AddFieldDialog(
-        onAdd: (field) {
+      builder: (context) => FieldConfigDialog(
+        onSave: (field) {
           setState(() {
             _fields.add(field);
+          });
+        },
+      ),
+    );
+  }
+
+  void _editField(FormFieldConfig field) {
+    showDialog(
+      context: context,
+      builder: (context) => FieldConfigDialog(
+        existingField: field,
+        onSave: (updatedField) {
+          setState(() {
+            final index = _fields.indexWhere((f) => f.id == field.id);
+            if (index != -1) {
+              _fields[index] = updatedField;
+            }
           });
         },
       ),
@@ -319,98 +416,5 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
 
   Future<void> _saveAndPublish() async {
     await _saveForm(publish: true);
-  }
-}
-
-class _AddFieldDialog extends StatefulWidget {
-  final Function(FormFieldConfig) onAdd;
-
-  const _AddFieldDialog({required this.onAdd});
-
-  @override
-  State<_AddFieldDialog> createState() => _AddFieldDialogState();
-}
-
-class _AddFieldDialogState extends State<_AddFieldDialog> {
-  final _labelController = TextEditingController();
-  String _fieldType = 'text';
-  bool _required = false;
-
-  @override
-  void dispose() {
-    _labelController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Add Field'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _labelController,
-            decoration: const InputDecoration(
-              labelText: 'Field Label',
-            ),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _fieldType,
-            decoration: const InputDecoration(
-              labelText: 'Field Type',
-            ),
-            items: const [
-              DropdownMenuItem(value: 'text', child: Text('Text')),
-              DropdownMenuItem(value: 'email', child: Text('Email')),
-              DropdownMenuItem(value: 'phone', child: Text('Phone')),
-              DropdownMenuItem(value: 'textarea', child: Text('Text Area')),
-              DropdownMenuItem(value: 'select', child: Text('Dropdown')),
-              DropdownMenuItem(value: 'checkbox', child: Text('Checkbox')),
-              DropdownMenuItem(value: 'radio', child: Text('Radio')),
-            ],
-            onChanged: (value) {
-              setState(() => _fieldType = value!);
-            },
-          ),
-          const SizedBox(height: 16),
-          CheckboxListTile(
-            title: const Text('Required'),
-            value: _required,
-            onChanged: (value) {
-              setState(() => _required = value!);
-            },
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_labelController.text.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please enter a field label')),
-              );
-              return;
-            }
-
-            final field = FormFieldConfig(
-              id: const Uuid().v4(),
-              type: _fieldType,
-              label: _labelController.text,
-              required: _required,
-            );
-
-            widget.onAdd(field);
-            Navigator.pop(context);
-          },
-          child: const Text('Add'),
-        ),
-      ],
-    );
   }
 }
