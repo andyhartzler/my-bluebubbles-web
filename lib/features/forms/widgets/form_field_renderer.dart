@@ -476,7 +476,7 @@ class FormFieldRenderer extends StatelessWidget {
           divisions: (config.maxValue ?? 5).toInt(),
           enabled: config.enabled,
           valueWidget: (value) => Text(
-            '${value.toInt()} / ${(config.maxValue ?? 5).toInt()}',
+            '${(value as num).toInt()} / ${(config.maxValue ?? 5).toInt()}',
             style: const TextStyle(fontSize: 14),
           ),
         ),
@@ -568,13 +568,33 @@ class FormFieldRenderer extends StatelessWidget {
 
   // Cupertino (iOS) field implementations
   Widget _buildCupertinoTextField() {
-    return FormBuilderCupertinoTextField(
-      name: config.id,
-      decoration: _buildDecoration(),
-      placeholder: config.placeholder,
-      maxLength: config.maxLength,
-      enabled: config.enabled,
-      validator: FormBuilderValidators.compose(_buildValidators()),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (config.label.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              config.label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          ),
+        FormBuilderCupertinoTextField(
+          name: config.id,
+          placeholder: config.placeholder,
+          maxLength: config.maxLength,
+          enabled: config.enabled,
+          validator: FormBuilderValidators.compose(_buildValidators()),
+        ),
+        if (config.help != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              config.help!,
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ),
+      ],
     );
   }
 
@@ -729,11 +749,11 @@ class FormFieldRenderer extends StatelessWidget {
         FormBuilderCupertinoSlidingSegmentedControl<String>(
           name: config.id,
           options: (config.options ?? [])
-              .asMap()
-              .map((index, option) => MapEntry(
-                    option.value,
-                    Text(option.label),
-                  )),
+              .map((option) => FormBuilderFieldOption(
+                    value: option.value,
+                    child: Text(option.label),
+                  ))
+              .toList(),
           enabled: config.enabled,
           validator: config.required ? FormBuilderValidators.required() : null,
         ),
