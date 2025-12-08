@@ -16,9 +16,9 @@ class Iframe extends StatefulWidget {
 }
 
 class _IframeState extends State<Iframe> {
-  final String _iframeId =
-      'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
+  String? _iframeId;
   bool _isLoading = true;
+  bool _isRegistered = false;
   String? _errorMessage;
 
   @override
@@ -30,25 +30,28 @@ class _IframeState extends State<Iframe> {
   Future<void> _registerIframe() async {
     debugPrint('📧 Listmonk: Initializing with Basic Auth');
 
-    // Get credentials from secure storage
-    final username =
-        await CredentialStorageService.getListmonkUsername() ?? 'admin';
-    final password =
-        await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
-
-    // Extract the base host from the source URL
-    final uri = Uri.parse(widget.src);
-    final baseHost = uri.host;
-    final path = uri.path;
-
-    // Build URL with Basic Auth embedded: https://username:password@host/path
-    final authenticatedUrl = 'https://$username:$password@$baseHost$path';
-
     try {
+      // Get credentials from secure storage
+      final username =
+          await CredentialStorageService.getListmonkUsername() ?? 'admin';
+      final password =
+          await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
+
+      // Extract the base host from the source URL
+      final uri = Uri.parse(widget.src);
+      final baseHost = uri.host;
+      final path = uri.path;
+
+      // Build URL with Basic Auth embedded: https://username:password@host/path
+      final authenticatedUrl = 'https://$username:$password@$baseHost$path';
+
+      // Create unique iframe ID
+      final iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
+
       // Register the view factory
       // ignore: undefined_prefixed_name
       ui.platformViewRegistry.registerViewFactory(
-        _iframeId,
+        iframeId,
         (int viewId) {
           final iframe = html.IFrameElement()
             ..src = authenticatedUrl
@@ -84,6 +87,13 @@ class _IframeState extends State<Iframe> {
       );
 
       debugPrint('📧 Listmonk: Iframe registered with Basic Auth URL');
+
+      if (mounted) {
+        setState(() {
+          _iframeId = iframeId;
+          _isRegistered = true;
+        });
+      }
     } catch (e) {
       debugPrint('❌ Listmonk: Error registering iframe: $e');
       if (mounted) {
@@ -97,6 +107,7 @@ class _IframeState extends State<Iframe> {
 
   @override
   Widget build(BuildContext context) {
+    // Show error if registration failed
     if (_errorMessage != null) {
       return Center(
         child: Column(
@@ -117,9 +128,27 @@ class _IframeState extends State<Iframe> {
       );
     }
 
+    // Wait for registration to complete before showing HtmlElementView
+    if (!_isRegistered || _iframeId == null) {
+      return Container(
+        color: Colors.white,
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Initializing Email Campaigns...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show iframe with loading overlay
     return Stack(
       children: [
-        HtmlElementView(viewType: _iframeId),
+        HtmlElementView(viewType: _iframeId!),
         if (_isLoading)
           Container(
             color: Colors.white,
