@@ -8,7 +8,6 @@ class VotesService {
   Stream<List<VotingForm>> watchVotes(String statusFilter) {
     var query = _supabase
         .from('form_schemas')
-        .stream(primaryKey: ['id'])
         .eq('form_type', 'vote');
 
     if (statusFilter != 'all') {
@@ -16,6 +15,7 @@ class VotesService {
     }
 
     return query
+        .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
         .map((data) => data.map((json) => VotingForm.fromJson(json)).toList());
   }
