@@ -6,22 +6,19 @@ class VotesService {
 
   // Voting forms are stored in form_schemas with form_type='vote'
   Stream<List<VotingForm>> watchVotes(String statusFilter) {
-    if (statusFilter == 'all') {
-      return _supabase
-          .from('form_schemas')
-          .stream(primaryKey: ['id'])
-          .eq('form_type', 'vote')
-          .order('created_at', ascending: false)
-          .map((data) => data.map((json) => VotingForm.fromJson(json)).toList());
-    } else {
-      return _supabase
-          .from('form_schemas')
-          .stream(primaryKey: ['id'])
-          .eq('form_type', 'vote')
-          .eq('status', statusFilter)
-          .order('created_at', ascending: false)
-          .map((data) => data.map((json) => VotingForm.fromJson(json)).toList());
-    }
+    return _supabase
+        .from('form_schemas')
+        .stream(primaryKey: ['id'])
+        .eq('form_type', 'vote')
+        .order('created_at', ascending: false)
+        .map((data) {
+      final votes = data.map((json) => VotingForm.fromJson(json)).toList();
+      if (statusFilter == 'all') {
+        return votes;
+      } else {
+        return votes.where((vote) => vote.status == statusFilter).toList();
+      }
+    });
   }
 
   Future<VotingForm> getVote(String id) async {
