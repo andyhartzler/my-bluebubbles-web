@@ -6,14 +6,13 @@ class FormsService {
   final _supabase = Supabase.instance.client;
 
   Stream<List<FormSchema>> watchForms(String typeFilter) {
-    var query = _supabase.from('form_schemas');
+    var query = _supabase.from('form_schemas').stream(primaryKey: ['id']);
 
     if (typeFilter != 'all') {
       query = query.eq('form_type', typeFilter);
     }
 
     return query
-        .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
         .map((data) => data.map((json) => FormSchema.fromJson(json)).toList());
   }
