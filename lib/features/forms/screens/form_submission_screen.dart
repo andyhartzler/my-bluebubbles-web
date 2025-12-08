@@ -84,118 +84,145 @@ class _FormSubmissionScreenState extends State<FormSubmissionScreen> {
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final padding = isMobile ? 12.0 : 16.0;
+    // Account for keyboard on mobile
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_formSchema!.title),
+        title: Text(
+          _formSchema!.title,
+          style: TextStyle(fontSize: isMobile ? 16 : 20),
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           if (_formSchema!.description != null)
             IconButton(
               icon: const Icon(Icons.info_outline),
               onPressed: _showFormInfo,
+              tooltip: 'Form Info',
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: FormBuilder(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Form header
-              if (_formSchema!.description != null) ...[
-                Card(
-                  color: Colors.blue[50],
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info, color: Colors.blue[700]),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            _formSchema!.description!,
-                            style: TextStyle(color: Colors.blue[900]),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-
-              // Form type badge
-              Chip(
-                label: Text(_formSchema!.formType.toUpperCase()),
-                avatar: Icon(
-                  _getFormTypeIcon(_formSchema!.formType),
-                  size: 16,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Render all fields
-              ..._formSchema!.schema.fields.map((field) {
-                return FormFieldRenderer(
-                  key: ValueKey(field.id),
-                  config: field,
-                  formKey: _formKey,
-                );
-              }).toList(),
-
-              const SizedBox(height: 24),
-
-              // Submit button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submitForm,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.green,
-                  ),
-                  child: _isSubmitting
-                      ? const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
+      body: GestureDetector(
+        // Dismiss keyboard when tapping outside form fields
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(padding, padding, padding, padding + bottomPadding),
+          child: FormBuilder(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Form header
+                if (_formSchema!.description != null) ...[
+                  Card(
+                    color: Colors.blue[50],
+                    child: Padding(
+                      padding: EdgeInsets.all(isMobile ? 12 : 16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info, color: Colors.blue[700], size: isMobile ? 20 : 24),
+                          SizedBox(width: isMobile ? 12 : 16),
+                          Expanded(
+                            child: Text(
+                              _formSchema!.description!,
+                              style: TextStyle(
+                                color: Colors.blue[900],
+                                fontSize: isMobile ? 13 : 14,
                               ),
                             ),
-                            SizedBox(width: 16),
-                            Text('Submitting...'),
-                          ],
-                        )
-                      : const Text(
-                          'Submit Form',
-                          style: TextStyle(fontSize: 18),
-                        ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Privacy/info text
-              if (_formSchema!.schema.confirmation?['message'] != null)
-                Card(
-                  color: Colors.grey[100],
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      _formSchema!.schema.confirmation!['message'] as String,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[700],
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                  SizedBox(height: isMobile ? 16 : 24),
+                ],
+
+                // Form type badge
+                Chip(
+                  label: Text(
+                    _formSchema!.formType.toUpperCase(),
+                    style: TextStyle(fontSize: isMobile ? 11 : 12),
+                  ),
+                  avatar: Icon(
+                    _getFormTypeIcon(_formSchema!.formType),
+                    size: isMobile ? 14 : 16,
+                  ),
+                  visualDensity: isMobile ? VisualDensity.compact : VisualDensity.standard,
                 ),
-            ],
+                SizedBox(height: isMobile ? 16 : 24),
+
+                // Render all fields
+                ..._formSchema!.schema.fields.map((field) {
+                  return FormFieldRenderer(
+                    key: ValueKey(field.id),
+                    config: field,
+                    formKey: _formKey,
+                  );
+                }).toList(),
+
+                SizedBox(height: isMobile ? 16 : 24),
+
+                // Submit button - larger touch target on mobile
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSubmitting ? null : _submitForm,
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: isMobile ? 14 : 16),
+                      backgroundColor: Colors.green,
+                      minimumSize: Size(double.infinity, isMobile ? 48 : 44),
+                    ),
+                    child: _isSubmitting
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: isMobile ? 18 : 20,
+                                height: isMobile ? 18 : 20,
+                                child: const CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Text(
+                                'Submitting...',
+                                style: TextStyle(fontSize: isMobile ? 14 : 16),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            'Submit Form',
+                            style: TextStyle(fontSize: isMobile ? 16 : 18),
+                          ),
+                  ),
+                ),
+
+                SizedBox(height: isMobile ? 12 : 16),
+
+                // Privacy/info text
+                if (_formSchema!.schema.confirmation?['message'] != null)
+                  Card(
+                    color: Colors.grey[100],
+                    child: Padding(
+                      padding: EdgeInsets.all(isMobile ? 10 : 12),
+                      child: Text(
+                        _formSchema!.schema.confirmation!['message'] as String,
+                        style: TextStyle(
+                          fontSize: isMobile ? 11 : 12,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

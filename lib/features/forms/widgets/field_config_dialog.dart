@@ -97,36 +97,81 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isMobile = screenWidth < 600;
+
+    // Responsive dialog sizing
+    final dialogWidth = isMobile
+        ? screenWidth * 0.95  // Nearly full width on mobile
+        : screenWidth > 1200
+            ? 800.0  // Max width on large screens
+            : screenWidth * 0.8;
+
+    final dialogHeight = isMobile
+        ? screenHeight * 0.9  // More height on mobile for scrolling
+        : screenHeight * 0.8;
+
+    final padding = isMobile ? 12.0 : 16.0;
+
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 24,
+        vertical: isMobile ? 16 : 24,
+      ),
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.8,
-        height: MediaQuery.of(context).size.height * 0.8,
-        padding: const EdgeInsets.all(16),
+        width: dialogWidth,
+        height: dialogHeight,
+        constraints: BoxConstraints(
+          minWidth: 280,
+          maxWidth: 900,
+          minHeight: 400,
+          maxHeight: screenHeight * 0.95,
+        ),
+        padding: EdgeInsets.all(padding),
         child: Column(
           children: [
             // Header
             Row(
               children: [
-                Text(
-                  widget.existingField == null ? 'Add Field' : 'Edit Field',
-                  style: Theme.of(context).textTheme.headlineSmall,
+                Expanded(
+                  child: Text(
+                    widget.existingField == null ? 'Add Field' : 'Edit Field',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontSize: isMobile ? 18 : 24,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.pop(context),
+                  tooltip: 'Close',
                 ),
               ],
             ),
             const Divider(),
 
-            // Tabs
+            // Tabs - responsive layout
             TabBar(
               controller: _tabController,
-              tabs: const [
-                Tab(text: 'Basic', icon: Icon(Icons.settings)),
-                Tab(text: 'Properties', icon: Icon(Icons.tune)),
-                Tab(text: 'Validation', icon: Icon(Icons.verified_user)),
+              labelPadding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 16),
+              tabs: [
+                Tab(
+                  text: isMobile ? null : 'Basic',
+                  icon: const Icon(Icons.settings),
+                  iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
+                ),
+                Tab(
+                  text: isMobile ? null : 'Properties',
+                  icon: const Icon(Icons.tune),
+                  iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
+                ),
+                Tab(
+                  text: isMobile ? null : 'Validation',
+                  icon: const Icon(Icons.verified_user),
+                  iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
+                ),
               ],
             ),
 
@@ -137,59 +182,90 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildBasicTab(),
-                    _buildPropertiesTab(),
-                    _buildValidationTab(),
+                    _buildBasicTab(isMobile: isMobile),
+                    _buildPropertiesTab(isMobile: isMobile),
+                    _buildValidationTab(isMobile: isMobile),
                   ],
                 ),
               ),
             ),
 
-            // Action buttons
+            // Action buttons - stack vertically on mobile
             const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _saveField,
-                  child: const Text('Save Field'),
-                ),
-              ],
-            ),
+            if (isMobile)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ElevatedButton(
+                    onPressed: _saveField,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('Save Field'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              )
+            else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _saveField,
+                    child: const Text('Save Field'),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBasicTab() {
+  Widget _buildBasicTab({bool isMobile = false}) {
+    final padding = isMobile ? 12.0 : 16.0;
+    final spacing = isMobile ? 12.0 : 16.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Field Type Selector
           Text(
             'Field Type',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontSize: isMobile ? 14 : 16,
+            ),
           ),
-          const SizedBox(height: 8),
-          _buildFieldTypeSelector(),
-          const SizedBox(height: 24),
+          SizedBox(height: isMobile ? 6 : 8),
+          _buildFieldTypeSelector(isMobile: isMobile),
+          SizedBox(height: isMobile ? 16 : 24),
 
           // Label
           TextFormField(
             controller: _labelController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Field Label *',
-              border: OutlineInputBorder(),
-              helperText: 'The label shown above the field',
+              border: const OutlineInputBorder(),
+              helperText: isMobile ? null : 'The label shown above the field',
+              contentPadding: isMobile
+                  ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
+                  : null,
             ),
+            style: TextStyle(fontSize: isMobile ? 14 : 16),
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Label is required';
@@ -197,42 +273,64 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
               return null;
             },
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: spacing),
 
           // Placeholder
           TextFormField(
             controller: _placeholderController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Placeholder',
-              border: OutlineInputBorder(),
-              helperText: 'Hint text shown in the field',
+              border: const OutlineInputBorder(),
+              helperText: isMobile ? null : 'Hint text shown in the field',
+              contentPadding: isMobile
+                  ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
+                  : null,
             ),
+            style: TextStyle(fontSize: isMobile ? 14 : 16),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: spacing),
 
           // Help Text
           TextFormField(
             controller: _helpController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Help Text',
-              border: OutlineInputBorder(),
-              helperText: 'Additional help text shown below the field',
+              border: const OutlineInputBorder(),
+              helperText: isMobile ? null : 'Additional help text shown below the field',
+              contentPadding: isMobile
+                  ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
+                  : null,
             ),
+            style: TextStyle(fontSize: isMobile ? 14 : 16),
             maxLines: 2,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: spacing),
 
-          // Required & Enabled switches
+          // Required & Enabled switches - more compact on mobile
           SwitchListTile(
-            title: const Text('Required Field'),
-            subtitle: const Text('User must fill this field'),
+            title: Text(
+              'Required Field',
+              style: TextStyle(fontSize: isMobile ? 14 : 16),
+            ),
+            subtitle: isMobile
+                ? null
+                : const Text('User must fill this field'),
             value: _required,
+            dense: isMobile,
+            contentPadding: isMobile ? EdgeInsets.zero : null,
             onChanged: (value) => setState(() => _required = value),
           ),
           SwitchListTile(
-            title: const Text('Enabled'),
-            subtitle: const Text('Field can be edited'),
+            title: Text(
+              'Enabled',
+              style: TextStyle(fontSize: isMobile ? 14 : 16),
+            ),
+            subtitle: isMobile
+                ? null
+                : const Text('Field can be edited'),
             value: _enabled,
+            dense: isMobile,
+            contentPadding: isMobile ? EdgeInsets.zero : null,
             onChanged: (value) => setState(() => _enabled = value),
           ),
         ],
@@ -240,19 +338,36 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     );
   }
 
-  Widget _buildFieldTypeSelector() {
+  Widget _buildFieldTypeSelector({bool isMobile = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: FormFieldTypes.categorizedTypes.entries.map((category) {
         return ExpansionTile(
-          title: Text(category.key),
+          title: Text(
+            category.key,
+            style: TextStyle(fontSize: isMobile ? 14 : 16),
+          ),
+          tilePadding: isMobile ? const EdgeInsets.symmetric(horizontal: 8) : null,
+          childrenPadding: isMobile ? EdgeInsets.zero : null,
           initiallyExpanded: category.value.any((field) => field.value == _fieldType),
           children: category.value.map((fieldType) {
             return RadioListTile<String>(
-              title: Text(fieldType.label),
-              subtitle: Text(fieldType.description),
+              title: Text(
+                fieldType.label,
+                style: TextStyle(fontSize: isMobile ? 13 : 14),
+              ),
+              subtitle: isMobile
+                  ? null
+                  : Text(
+                      fieldType.description,
+                      style: const TextStyle(fontSize: 12),
+                    ),
               value: fieldType.value,
               groupValue: _fieldType,
+              dense: isMobile,
+              contentPadding: isMobile
+                  ? const EdgeInsets.symmetric(horizontal: 8)
+                  : null,
               onChanged: (value) {
                 setState(() {
                   _fieldType = value!;
@@ -269,36 +384,44 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     );
   }
 
-  Widget _buildPropertiesTab() {
+  Widget _buildPropertiesTab({bool isMobile = false}) {
+    final padding = isMobile ? 12.0 : 16.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Field-Specific Properties',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontSize: isMobile ? 14 : 16,
+            ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 12 : 16),
 
           // Show different properties based on field type
           if (FormFieldTypes.requiresOptions(_fieldType)) ...[
-            _buildOptionsEditor(),
+            _buildOptionsEditor(isMobile: isMobile),
           ] else if (FormFieldTypes.isNumeric(_fieldType)) ...[
-            _buildNumericProperties(),
+            _buildNumericProperties(isMobile: isMobile),
           ] else if (FormFieldTypes.isDateTime(_fieldType)) ...[
-            _buildDateTimeProperties(),
+            _buildDateTimeProperties(isMobile: isMobile),
           ] else if (_fieldType == FormFieldTypes.textarea) ...[
-            _buildTextAreaProperties(),
+            _buildTextAreaProperties(isMobile: isMobile),
           ] else if (_fieldType == FormFieldTypes.colorPicker) ...[
-            _buildColorPickerProperties(),
+            _buildColorPickerProperties(isMobile: isMobile),
           ] else if (_fieldType == FormFieldTypes.rating) ...[
-            _buildRatingProperties(),
+            _buildRatingProperties(isMobile: isMobile),
           ] else ...[
-            const Center(
+            Center(
               child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Text('This field type has no additional properties'),
+                padding: EdgeInsets.all(isMobile ? 24 : 32),
+                child: Text(
+                  'This field type has no additional properties',
+                  style: TextStyle(fontSize: isMobile ? 13 : 14),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
           ],
@@ -307,27 +430,48 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     );
   }
 
-  Widget _buildOptionsEditor() {
+  Widget _buildOptionsEditor({bool isMobile = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Text('Options', style: TextStyle(fontWeight: FontWeight.bold)),
-            const Spacer(),
-            ElevatedButton.icon(
+        if (isMobile) ...[
+          Text(
+            'Options',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
               onPressed: _addOption,
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add, size: 18),
               label: const Text('Add Option'),
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
+          ),
+        ] else
+          Row(
+            children: [
+              const Text('Options', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: _addOption,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Option'),
+              ),
+            ],
+          ),
+        SizedBox(height: isMobile ? 12 : 16),
         if (_options.isEmpty)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.all(32),
-              child: Text('No options yet. Click "Add Option" to add one.'),
+              padding: EdgeInsets.all(isMobile ? 24 : 32),
+              child: Text(
+                isMobile
+                    ? 'No options yet. Tap "Add Option" to add one.'
+                    : 'No options yet. Click "Add Option" to add one.',
+                style: TextStyle(fontSize: isMobile ? 13 : 14),
+                textAlign: TextAlign.center,
+              ),
             ),
           )
         else
@@ -338,11 +482,19 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
             itemBuilder: (context, index) {
               final option = _options[index];
               return Card(
+                margin: EdgeInsets.only(bottom: isMobile ? 8 : 12),
                 child: ListTile(
-                  title: Text(option.label),
-                  subtitle: Text('Value: ${option.value}'),
+                  dense: isMobile,
+                  title: Text(
+                    option.label,
+                    style: TextStyle(fontSize: isMobile ? 14 : 16),
+                  ),
+                  subtitle: Text(
+                    'Value: ${option.value}',
+                    style: TextStyle(fontSize: isMobile ? 12 : 14),
+                  ),
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete),
+                    icon: Icon(Icons.delete, size: isMobile ? 20 : 24),
                     onPressed: () {
                       setState(() {
                         _options.removeAt(index);
@@ -357,52 +509,65 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     );
   }
 
-  Widget _buildNumericProperties() {
+  Widget _buildNumericProperties({bool isMobile = false}) {
+    final spacing = isMobile ? 12.0 : 16.0;
+    final contentPadding = isMobile
+        ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
+        : null;
+
     return Column(
       children: [
         TextFormField(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Minimum Value',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
+            contentPadding: contentPadding,
           ),
+          style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
           initialValue: _minValue?.toString() ?? '',
           onChanged: (value) {
             _minValue = double.tryParse(value);
           },
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: spacing),
         TextFormField(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Maximum Value',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
+            contentPadding: contentPadding,
           ),
+          style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
           initialValue: _maxValue?.toString() ?? '',
           onChanged: (value) {
             _maxValue = double.tryParse(value);
           },
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: spacing),
         TextFormField(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Initial Value',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
+            contentPadding: contentPadding,
           ),
+          style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
           initialValue: _initialValue?.toString() ?? '',
           onChanged: (value) {
             _initialValue = double.tryParse(value);
           },
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: spacing),
         if (_fieldType == FormFieldTypes.slider || _fieldType == FormFieldTypes.cupertinoSlider)
           TextFormField(
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Divisions',
-              border: OutlineInputBorder(),
-              helperText: 'Number of discrete values',
+              border: const OutlineInputBorder(),
+              helperText: isMobile ? null : 'Number of discrete values',
+              contentPadding: contentPadding,
             ),
+            style: TextStyle(fontSize: isMobile ? 14 : 16),
             keyboardType: TextInputType.number,
             initialValue: _divisions?.toString() ?? '',
             onChanged: (value) {
@@ -410,13 +575,15 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
             },
           ),
         if (_fieldType == FormFieldTypes.touchSpin) ...[
-          const SizedBox(height: 16),
+          SizedBox(height: spacing),
           TextFormField(
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Step',
-              border: OutlineInputBorder(),
-              helperText: 'Increment/decrement amount',
+              border: const OutlineInputBorder(),
+              helperText: isMobile ? null : 'Increment/decrement amount',
+              contentPadding: contentPadding,
             ),
+            style: TextStyle(fontSize: isMobile ? 14 : 16),
             keyboardType: TextInputType.number,
             initialValue: _step?.toString() ?? '1',
             onChanged: (value) {
@@ -428,13 +595,21 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     );
   }
 
-  Widget _buildDateTimeProperties() {
+  Widget _buildDateTimeProperties({bool isMobile = false}) {
     return Column(
       children: [
         ListTile(
-          title: const Text('First Selectable Date'),
-          subtitle: Text(_firstDate?.toString() ?? 'Not set'),
-          trailing: const Icon(Icons.calendar_today),
+          dense: isMobile,
+          contentPadding: isMobile ? EdgeInsets.zero : null,
+          title: Text(
+            'First Selectable Date',
+            style: TextStyle(fontSize: isMobile ? 14 : 16),
+          ),
+          subtitle: Text(
+            _firstDate?.toString() ?? 'Not set',
+            style: TextStyle(fontSize: isMobile ? 12 : 14),
+          ),
+          trailing: Icon(Icons.calendar_today, size: isMobile ? 20 : 24),
           onTap: () async {
             final date = await showDatePicker(
               context: context,
@@ -448,9 +623,17 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           },
         ),
         ListTile(
-          title: const Text('Last Selectable Date'),
-          subtitle: Text(_lastDate?.toString() ?? 'Not set'),
-          trailing: const Icon(Icons.calendar_today),
+          dense: isMobile,
+          contentPadding: isMobile ? EdgeInsets.zero : null,
+          title: Text(
+            'Last Selectable Date',
+            style: TextStyle(fontSize: isMobile ? 14 : 16),
+          ),
+          subtitle: Text(
+            _lastDate?.toString() ?? 'Not set',
+            style: TextStyle(fontSize: isMobile ? 12 : 14),
+          ),
+          trailing: Icon(Icons.calendar_today, size: isMobile ? 20 : 24),
           onTap: () async {
             final date = await showDatePicker(
               context: context,
@@ -467,39 +650,50 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     );
   }
 
-  Widget _buildTextAreaProperties() {
+  Widget _buildTextAreaProperties({bool isMobile = false}) {
+    final spacing = isMobile ? 12.0 : 16.0;
+    final contentPadding = isMobile
+        ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
+        : null;
+
     return Column(
       children: [
         TextFormField(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Minimum Lines',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
+            contentPadding: contentPadding,
           ),
+          style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
           initialValue: _minLines?.toString() ?? '3',
           onChanged: (value) {
             _minLines = int.tryParse(value);
           },
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: spacing),
         TextFormField(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Maximum Lines',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
+            contentPadding: contentPadding,
           ),
+          style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
           initialValue: _maxLines?.toString() ?? '5',
           onChanged: (value) {
             _maxLines = int.tryParse(value);
           },
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: spacing),
         TextFormField(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Maximum Length',
-            border: OutlineInputBorder(),
-            helperText: 'Maximum character count',
+            border: const OutlineInputBorder(),
+            helperText: isMobile ? null : 'Maximum character count',
+            contentPadding: contentPadding,
           ),
+          style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
           initialValue: _maxLength?.toString() ?? '',
           onChanged: (value) {
@@ -510,24 +704,34 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     );
   }
 
-  Widget _buildColorPickerProperties() {
-    return const Center(
+  Widget _buildColorPickerProperties({bool isMobile = false}) {
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text('Color picker will use default configuration'),
+        padding: EdgeInsets.all(isMobile ? 24 : 32),
+        child: Text(
+          'Color picker will use default configuration',
+          style: TextStyle(fontSize: isMobile ? 13 : 14),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
 
-  Widget _buildRatingProperties() {
+  Widget _buildRatingProperties({bool isMobile = false}) {
+    final contentPadding = isMobile
+        ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
+        : null;
+
     return Column(
       children: [
         TextFormField(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Maximum Rating',
-            border: OutlineInputBorder(),
-            helperText: 'Number of stars/icons',
+            border: const OutlineInputBorder(),
+            helperText: isMobile ? null : 'Number of stars/icons',
+            contentPadding: contentPadding,
           ),
+          style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
           initialValue: _maxValue?.toString() ?? '5',
           onChanged: (value) {
@@ -538,34 +742,58 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     );
   }
 
-  Widget _buildValidationTab() {
+  Widget _buildValidationTab({bool isMobile = false}) {
+    final padding = isMobile ? 12.0 : 16.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Validators',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontSize: isMobile ? 14 : 16,
+            ),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: isMobile ? 6 : 8),
+          Text(
             'Select validators to apply to this field',
-            style: TextStyle(color: Colors.grey),
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: isMobile ? 12 : 14,
+            ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 12 : 16),
 
           // Show validators grouped by category
           ...FormValidators.categorizedValidators.entries.map((category) {
             return ExpansionTile(
-              title: Text(category.key),
+              title: Text(
+                category.key,
+                style: TextStyle(fontSize: isMobile ? 14 : 16),
+              ),
+              tilePadding: isMobile ? const EdgeInsets.symmetric(horizontal: 8) : null,
+              childrenPadding: isMobile ? EdgeInsets.zero : null,
               initiallyExpanded: category.value.any((v) => _selectedValidators.contains(v.value)),
               children: category.value.map((validator) {
                 final isSelected = _selectedValidators.contains(validator.value);
                 return CheckboxListTile(
-                  title: Text(validator.label),
-                  subtitle: Text(validator.description),
+                  title: Text(
+                    validator.label,
+                    style: TextStyle(fontSize: isMobile ? 13 : 14),
+                  ),
+                  subtitle: isMobile
+                      ? null
+                      : Text(
+                          validator.description,
+                          style: const TextStyle(fontSize: 12),
+                        ),
                   value: isSelected,
+                  dense: isMobile,
+                  contentPadding: isMobile
+                      ? const EdgeInsets.symmetric(horizontal: 8)
+                      : null,
                   onChanged: (selected) {
                     setState(() {
                       if (selected == true) {
@@ -581,7 +809,7 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
                   },
                   secondary: isSelected && validator.requiresValue
                       ? IconButton(
-                          icon: const Icon(Icons.settings),
+                          icon: Icon(Icons.settings, size: isMobile ? 20 : 24),
                           onPressed: () => _showValidatorConfigDialog(validator),
                         )
                       : null,

@@ -71,6 +71,10 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final padding = isMobile ? 12.0 : 16.0;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.formId == null ? 'Create Form' : 'Edit Form'),
@@ -83,7 +87,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(padding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -122,73 +126,194 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Add Field Button
-            Row(
-              children: [
-                const Text(
-                  'Form Fields',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+            // Add Field Button - responsive layout
+            if (isMobile)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Form Fields',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const Spacer(),
-                ElevatedButton.icon(
-                  onPressed: _showAddFieldDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Field'),
-                ),
-              ],
-            ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _showAddFieldDialog,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Field'),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  const Text(
+                    'Form Fields',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  ElevatedButton.icon(
+                    onPressed: _showAddFieldDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Field'),
+                  ),
+                ],
+              ),
             const SizedBox(height: 16),
 
             // Fields List
             if (_fields.isEmpty)
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(32),
+                  padding: EdgeInsets.all(isMobile ? 24 : 32),
                   child: Text(
-                    'No fields yet. Click "Add Field" to get started.',
+                    isMobile
+                        ? 'No fields yet. Tap "Add Field" to start.'
+                        : 'No fields yet. Click "Add Field" to get started.',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: isMobile ? 14 : 16,
                       color: Colors.grey[600],
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               )
             else
-              ..._fields.map((field) => _buildFieldCard(field)).toList(),
+              ..._fields.map((field) => _buildFieldCard(field, isMobile: isMobile)).toList(),
 
             const SizedBox(height: 24),
 
-            // Publishing Controls
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
+            // Publishing Controls - stack vertically on mobile
+            if (isMobile)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OutlinedButton(
                     onPressed: _isSaving ? null : _saveForm,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                     child: const Text('Save Draft'),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
+                  const SizedBox(height: 12),
+                  ElevatedButton(
                     onPressed: _isSaving ? null : _saveAndPublish,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     child: const Text('Save & Publish'),
                   ),
-                ),
-              ],
-            ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _isSaving ? null : _saveForm,
+                      child: const Text('Save Draft'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _saveAndPublish,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                      ),
+                      child: const Text('Save & Publish'),
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFieldCard(FormFieldConfig field) {
+  Widget _buildFieldCard(FormFieldConfig field, {bool isMobile = false}) {
+    // On mobile, use a more compact layout
+    if (isMobile) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(_getFieldIcon(field.type), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      field.label,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (field.required)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Required',
+                        style: TextStyle(fontSize: 10, color: Colors.white),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getFieldTypeLabel(field.type),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                        if (field.validatorTypes != null && field.validatorTypes!.isNotEmpty)
+                          Text(
+                            '${field.validatorTypes!.length} validator(s)',
+                            style: TextStyle(fontSize: 11, color: Colors.blue[700]),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 20),
+                    onPressed: () => _editField(field),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 20),
+                    onPressed: () => _deleteField(field.id),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Desktop layout
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(

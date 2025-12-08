@@ -24,23 +24,27 @@ class _FormsListScreenState extends State<FormsListScreen>
   Widget build(BuildContext context) {
     super.build(context);
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final padding = isMobile ? 12.0 : 16.0;
+
     return Scaffold(
       body: Column(
         children: [
           // Filter Chips
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(padding),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildFilterChip('All', 'all'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Survey', 'survey'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Registration', 'registration'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Feedback', 'feedback'),
+                  _buildFilterChip('All', 'all', isMobile: isMobile),
+                  SizedBox(width: isMobile ? 6 : 8),
+                  _buildFilterChip('Survey', 'survey', isMobile: isMobile),
+                  SizedBox(width: isMobile ? 6 : 8),
+                  _buildFilterChip('Registration', 'registration', isMobile: isMobile),
+                  SizedBox(width: isMobile ? 6 : 8),
+                  _buildFilterChip('Feedback', 'feedback', isMobile: isMobile),
                 ],
               ),
             ),
@@ -63,29 +67,40 @@ class _FormsListScreenState extends State<FormsListScreen>
 
                 if (forms.isEmpty) {
                   return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.description_outlined,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No forms yet',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
+                    child: Padding(
+                      padding: EdgeInsets.all(padding),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.description_outlined,
+                            size: isMobile ? 48 : 64,
+                            color: Colors.grey[400],
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          onPressed: _createNewForm,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Create Form'),
-                        ),
-                      ],
+                          SizedBox(height: isMobile ? 12 : 16),
+                          Text(
+                            'No forms yet',
+                            style: TextStyle(
+                              fontSize: isMobile ? 16 : 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          SizedBox(height: isMobile ? 12 : 8),
+                          ElevatedButton.icon(
+                            onPressed: _createNewForm,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Create Form'),
+                            style: isMobile
+                                ? ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 12,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }
@@ -95,7 +110,7 @@ class _FormsListScreenState extends State<FormsListScreen>
                     setState(() {});
                   },
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(padding),
                     itemCount: forms.length,
                     itemBuilder: (context, index) {
                       final form = forms[index];
@@ -114,17 +129,23 @@ class _FormsListScreenState extends State<FormsListScreen>
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _createNewForm,
+        tooltip: 'Create Form',
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
+  Widget _buildFilterChip(String label, String value, {bool isMobile = false}) {
     final isSelected = _typeFilter == value;
 
     return FilterChip(
-      label: Text(label),
+      label: Text(
+        label,
+        style: TextStyle(fontSize: isMobile ? 12 : 14),
+      ),
       selected: isSelected,
+      visualDensity: isMobile ? VisualDensity.compact : VisualDensity.standard,
+      padding: isMobile ? const EdgeInsets.symmetric(horizontal: 4) : null,
       onSelected: (selected) {
         setState(() {
           _typeFilter = value;
