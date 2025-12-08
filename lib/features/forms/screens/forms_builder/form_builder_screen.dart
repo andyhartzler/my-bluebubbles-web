@@ -54,7 +54,8 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         _titleController.text = form.title;
         _descriptionController.text = form.description ?? '';
         _formType = form.formType;
-        _fields = form.schema.fields;
+        // Create a mutable copy of the fields list (Freezed returns immutable lists)
+        _fields = List.from(form.schema.fields);
         _isLoading = false;
       });
     } catch (e) {
