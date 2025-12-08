@@ -5,14 +5,13 @@ class JobsService {
   final _supabase = Supabase.instance.client;
 
   Stream<List<Job>> watchJobs(String statusFilter) {
-    var query = _supabase.from('jobs');
+    var query = _supabase.from('jobs').stream(primaryKey: ['id']);
 
     if (statusFilter != 'all') {
       query = query.eq('status', statusFilter);
     }
 
     return query
-        .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
         .map((data) => data.map((json) => Job.fromJson(json)).toList());
   }
