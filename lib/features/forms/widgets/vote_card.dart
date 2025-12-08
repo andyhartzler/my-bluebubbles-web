@@ -50,23 +50,34 @@ class VoteCard extends StatelessWidget {
                 spacing: 8,
                 children: [
                   Chip(
-                    label: Text(vote.votingType),
+                    label: Text('${vote.optionCount} options'),
                     visualDensity: VisualDensity.compact,
                   ),
-                  Chip(
-                    label: Text('${vote.options.length} options'),
-                    visualDensity: VisualDensity.compact,
-                  ),
+                  if (vote.isVotingActive)
+                    const Chip(
+                      label: Text('VOTING OPEN'),
+                      backgroundColor: Colors.green,
+                      labelStyle: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
                 ],
               ),
-              if (vote.endDate != null) ...[
+              if (vote.votingEndsAt != null) ...[
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     const Icon(Icons.event, size: 16),
                     const SizedBox(width: 4),
                     Text(
-                      'Ends: ${vote.endDate!.toLocal().toString().split(' ')[0]}',
+                      vote.isVotingActive
+                        ? 'Ends: ${vote.votingEndsAt!.toLocal().toString().split(' ')[0]}'
+                        : vote.hasEnded
+                          ? 'Ended: ${vote.votingEndsAt!.toLocal().toString().split(' ')[0]}'
+                          : 'Starts: ${vote.votingStartsAt != null ? vote.votingStartsAt!.toLocal().toString().split(' ')[0] : "TBD"}',
                       style: const TextStyle(fontSize: 14),
                     ),
                   ],

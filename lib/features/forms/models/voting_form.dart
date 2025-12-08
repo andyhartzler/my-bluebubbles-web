@@ -64,3 +64,54 @@ class Vote with _$Vote {
 
   factory Vote.fromJson(Map<String, dynamic> json) => _$VoteFromJson(json);
 }
+
+// Extension to make working with VotingForm easier
+extension VotingFormExtension on VotingForm {
+  /// Extract voting options from the schema
+  List<VotingOption> get options {
+    try {
+      final fields = schema['fields'] as List<dynamic>?;
+      if (fields == null) return [];
+
+      return fields
+          .map((field) => VotingOption.fromJson(field as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Get option count
+  int get optionCount => options.length;
+
+  /// Check if voting is currently active
+  bool get isVotingActive {
+    if (status != 'active') return false;
+
+    final now = DateTime.now();
+
+    // Check start date
+    if (votingStartsAt != null && now.isBefore(votingStartsAt!)) {
+      return false;
+    }
+
+    // Check end date
+    if (votingEndsAt != null && now.isAfter(votingEndsAt!)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Check if voting has ended
+  bool get hasEnded {
+    if (votingEndsAt == null) return false;
+    return DateTime.now().isAfter(votingEndsAt!);
+  }
+
+  /// Check if voting hasn't started yet
+  bool get notStarted {
+    if (votingStartsAt == null) return false;
+    return DateTime.now().isBefore(votingStartsAt!);
+  }
+}

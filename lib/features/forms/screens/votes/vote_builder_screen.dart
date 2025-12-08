@@ -19,11 +19,10 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   final _descriptionController = TextEditingController();
 
   List<VotingOption> _options = [];
-  String _votingType = 'single';
   bool _isLoading = false;
   bool _isSaving = false;
-  DateTime? _startDate;
-  DateTime? _endDate;
+  DateTime? _votingStartsAt;
+  DateTime? _votingEndsAt;
 
   @override
   void initState() {
@@ -49,10 +48,9 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
       setState(() {
         _titleController.text = vote.title;
         _descriptionController.text = vote.description ?? '';
-        _votingType = vote.votingType;
-        _options = vote.options;
-        _startDate = vote.startDate;
-        _endDate = vote.endDate;
+        _options = vote.options; // Uses extension method
+        _votingStartsAt = vote.votingStartsAt;
+        _votingEndsAt = vote.votingEndsAt;
         _isLoading = false;
       });
     } catch (e) {
@@ -98,22 +96,6 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
                 border: OutlineInputBorder(),
               ),
               maxLines: 2,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _votingType,
-              decoration: const InputDecoration(
-                labelText: 'Voting Type',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'single', child: Text('Single Choice')),
-                DropdownMenuItem(value: 'multiple', child: Text('Multiple Choice')),
-                DropdownMenuItem(value: 'ranked', child: Text('Ranked Choice')),
-              ],
-              onChanged: (value) {
-                setState(() => _votingType = value!);
-              },
             ),
             const SizedBox(height: 24),
             Row(
@@ -230,8 +212,9 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           description: _descriptionController.text.isEmpty
               ? null
               : _descriptionController.text,
-          votingType: _votingType,
           options: _options,
+          votingStartsAt: _votingStartsAt,
+          votingEndsAt: _votingEndsAt,
           status: publish ? 'active' : 'draft',
         );
       } else {
@@ -242,6 +225,8 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
               ? null
               : _descriptionController.text,
           options: _options,
+          votingStartsAt: _votingStartsAt,
+          votingEndsAt: _votingEndsAt,
           status: publish ? 'active' : null,
         );
       }
