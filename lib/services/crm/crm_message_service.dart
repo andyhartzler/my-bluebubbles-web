@@ -213,6 +213,22 @@ class CRMMessageService {
     );
   }
 
+  /// Send a simple text message to a phone number.
+  /// This is the public API for sending confirmation messages from forms/votes.
+  Future<bool> sendSimpleMessage({
+    required String phoneNumber,
+    required String message,
+  }) async {
+    if (!_isReady) return false;
+
+    return _sendSingleMessage(
+      phoneNumber: phoneNumber,
+      message: message,
+      includeContactCard: false,
+      attachments: const [],
+    );
+  }
+
   Future<void> handleIncomingAutomation(Chat chat, Message message) async {
     if (!_isReady) return;
     if (message.isFromMe ?? true) return;

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/voting_form.dart';
+import 'form_confirmation_service.dart';
 
 class VotesService {
   final _supabase = Supabase.instance.client;
@@ -55,11 +56,19 @@ class VotesService {
     // Email settings
     String? confirmationEmailTemplate,
     List<String>? notificationEmails,
+    // SMS settings
+    String? confirmationSmsMessage,
   }) async {
     // Build schema with voting options
     final schema = {
       'fields': options.map((o) => o.toJson()).toList(),
     };
+
+    // Build settings map with SMS confirmation if provided
+    final settings = <String, dynamic>{};
+    if (confirmationSmsMessage != null && confirmationSmsMessage.isNotEmpty) {
+      settings['confirmation_sms'] = confirmationSmsMessage;
+    }
 
     final response = await _supabase
         .from('form_schemas')
@@ -68,7 +77,7 @@ class VotesService {
           'description': description,
           'form_type': 'vote',
           'schema': schema,
-          'settings': {},
+          'settings': settings,
           'voting_starts_at': votingStartsAt?.toIso8601String(),
           'voting_ends_at': votingEndsAt?.toIso8601String(),
           'eligible_members': eligibleMembers,
@@ -126,6 +135,9 @@ class VotesService {
     bool clearConfirmationEmailTemplate = false,
     List<String>? notificationEmails,
     bool clearNotificationEmails = false,
+    // SMS settings
+    String? confirmationSmsMessage,
+    bool clearConfirmationSmsMessage = false,
   }) async {
     final updates = <String, dynamic>{};
 
@@ -198,6 +210,19 @@ class VotesService {
       updates['notification_emails'] = null;
     }
 
+    // SMS settings - stored in the settings JSON column
+    if (confirmationSmsMessage != null || clearConfirmationSmsMessage) {
+      // We need to fetch current settings and merge with new SMS value
+      final currentVote = await getVote(id);
+      final currentSettings = Map<String, dynamic>.from(currentVote.settings);
+      if (confirmationSmsMessage != null && confirmationSmsMessage.isNotEmpty) {
+        currentSettings['confirmation_sms'] = confirmationSmsMessage;
+      } else if (clearConfirmationSmsMessage) {
+        currentSettings.remove('confirmation_sms');
+      }
+      updates['settings'] = currentSettings;
+    }
+
     await _supabase
         .from('form_schemas')
         .update(updates)
@@ -237,8 +262,12 @@ class VotesService {
   Future<void> castVote(
     String voteId,
     String memberId,
-    Map<String, dynamic> voteData,
-  ) async {
+    Map<String, dynamic> voteData, {
+    String? voterEmail,
+    String? voterPhone,
+    String? voterName,
+    bool sendConfirmations = true,
+  }) async {
     // Record the vote in the votes table
     await _supabase.from('votes').insert({
       'voting_form_id': voteId,
@@ -247,6 +276,23 @@ class VotesService {
     });
 
     // The trigger update_vote_count() will automatically update results_data
+
+    // Send confirmation messages and emails if enabled
+    if (sendConfirmations && (voterEmail != null || voterPhone != null)) {
+      try {
+        final vote = await getVote(voteId);
+        await FormConfirmationService().sendVoteConfirmations(
+          vote: vote,
+          voterEmail: voterEmail,
+          voterPhone: voterPhone,
+          voterName: voterName,
+          voteData: voteData,
+        );
+      } catch (e) {
+        // Log but don't fail the vote if confirmations fail
+        print('Warning: Failed to send vote confirmations: $e');
+      }
+    }
   }
 
   // Check if a member can vote

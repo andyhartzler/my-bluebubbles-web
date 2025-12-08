@@ -13,6 +13,8 @@ class FormSubmission with _$FormSubmission {
     required Map<String, dynamic> data,
     @JsonKey(name: 'submitter_email') String? submitterEmail,
     @JsonKey(name: 'submitter_name') String? submitterName,
+    @JsonKey(name: 'submitter_phone') String? submitterPhone,
+    @Default('submitted') String status,
   }) = _FormSubmission;
 
   factory FormSubmission.fromJson(Map<String, dynamic> json) =>

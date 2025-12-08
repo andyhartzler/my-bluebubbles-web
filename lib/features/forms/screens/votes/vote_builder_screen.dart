@@ -21,6 +21,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   final _maxSubmissionsController = TextEditingController();
   final _confirmationEmailController = TextEditingController();
   final _notificationEmailsController = TextEditingController();
+  final _confirmationSmsController = TextEditingController();
 
   List<VotingOption> _options = [];
   bool _isLoading = false;
@@ -52,6 +53,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
     _maxSubmissionsController.dispose();
     _confirmationEmailController.dispose();
     _notificationEmailsController.dispose();
+    _confirmationSmsController.dispose();
     super.dispose();
   }
 
@@ -78,6 +80,10 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
         _notificationEmailsController.text = vote.notificationEmails?.join(', ') ?? '';
         _requireLogin = vote.requireLogin;
         _oneSubmissionPerUser = vote.oneSubmissionPerUser;
+
+        // Load SMS confirmation message from settings
+        _confirmationSmsController.text =
+            vote.settings['confirmation_sms'] as String? ?? '';
 
         _isLoading = false;
       });
@@ -299,12 +305,25 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
                           TextField(
                             controller: _confirmationEmailController,
                             decoration: const InputDecoration(
-                              labelText: 'Vote Confirmation Message (optional)',
+                              labelText: 'Confirmation Email Template (optional)',
                               hintText: 'Thank you for voting...',
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.email),
+                              helperText: 'Supports {{name}}, {{email}}, {{title}} variables',
                             ),
                             maxLines: 3,
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _confirmationSmsController,
+                            decoration: const InputDecoration(
+                              labelText: 'Confirmation SMS Message (optional)',
+                              hintText: 'Thank you {{name}} for voting!',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.sms),
+                              helperText: 'Supports {{name}}, {{title}} variables',
+                            ),
+                            maxLines: 2,
                           ),
                         ],
                       ),
@@ -599,6 +618,9 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
       final confirmationEmail = _confirmationEmailController.text.trim().isEmpty
           ? null
           : _confirmationEmailController.text.trim();
+      final confirmationSms = _confirmationSmsController.text.trim().isEmpty
+          ? null
+          : _confirmationSmsController.text.trim();
 
       if (widget.voteId == null) {
         await _votesService.createVote(
@@ -617,6 +639,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           slug: slug,
           confirmationEmailTemplate: confirmationEmail,
           notificationEmails: notificationEmails,
+          confirmationSmsMessage: confirmationSms,
         );
       } else {
         await _votesService.updateVote(
@@ -636,6 +659,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           slug: slug,
           confirmationEmailTemplate: confirmationEmail,
           notificationEmails: notificationEmails,
+          confirmationSmsMessage: confirmationSms,
         );
       }
 

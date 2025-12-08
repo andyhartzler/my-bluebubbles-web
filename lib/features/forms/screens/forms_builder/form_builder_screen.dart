@@ -27,6 +27,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   final _maxSubmissionsController = TextEditingController();
   final _confirmationEmailController = TextEditingController();
   final _notificationEmailsController = TextEditingController();
+  final _confirmationSmsController = TextEditingController();
 
   List<FormFieldConfig> _fields = [];
   String _formType = 'survey';
@@ -56,6 +57,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
     _maxSubmissionsController.dispose();
     _confirmationEmailController.dispose();
     _notificationEmailsController.dispose();
+    _confirmationSmsController.dispose();
     super.dispose();
   }
 
@@ -81,6 +83,10 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         _closesAt = form.closesAt;
         _requireLogin = form.requireLogin;
         _oneSubmissionPerUser = form.oneSubmissionPerUser;
+
+        // Load SMS confirmation message from schema
+        _confirmationSmsController.text =
+            form.schema.confirmation?['sms_message'] as String? ?? '';
 
         _isLoading = false;
       });
@@ -299,8 +305,21 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                               hintText: 'Thank you for submitting...',
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.email),
+                              helperText: 'Supports {{name}}, {{email}}, {{form_title}} variables',
                             ),
                             maxLines: 3,
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _confirmationSmsController,
+                            decoration: const InputDecoration(
+                              labelText: 'Confirmation SMS Message (optional)',
+                              hintText: 'Thank you {{name}} for your submission!',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.sms),
+                              helperText: 'Supports {{name}}, {{form_title}} variables',
+                            ),
+                            maxLines: 2,
                           ),
                         ],
                       ),
@@ -760,10 +779,17 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
     setState(() => _isSaving = true);
 
     try {
+      // Build confirmation map with SMS message if provided
+      final confirmationMap = <String, dynamic>{};
+      final smsMessage = _confirmationSmsController.text.trim();
+      if (smsMessage.isNotEmpty) {
+        confirmationMap['sms_message'] = smsMessage;
+      }
+
       final schema = FormSchemaData(
         fields: _fields,
         styling: {},
-        confirmation: {},
+        confirmation: confirmationMap,
       );
 
       final slug = _slugController.text.trim().isEmpty ? null : _slugController.text.trim();

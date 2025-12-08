@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/form_schema.dart';
 import '../models/form_submission.dart';
+import 'form_confirmation_service.dart';
 
 class FormsService {
   final _supabase = Supabase.instance.client;
@@ -199,19 +200,41 @@ class FormsService {
     required Map<String, dynamic> submissionData,
     String? submitterEmail,
     String? submitterName,
+    String? submitterPhone,
+    bool sendConfirmations = true,
   }) async {
     final response = await _supabase
         .from('form_submissions')
         .insert({
           'form_id': formId,
           'member_id': memberId,
-          'submission': submissionData,
+          'data': submissionData,
           'submitter_email': submitterEmail,
           'submitter_name': submitterName,
+          'submitter_phone': submitterPhone,
         })
         .select()
         .single();
 
-    return response['id'] as String;
+    final submissionId = response['id'] as String;
+
+    // Send confirmation messages and emails if enabled
+    if (sendConfirmations) {
+      try {
+        final form = await getForm(formId);
+        await FormConfirmationService().sendFormConfirmations(
+          form: form,
+          submitterEmail: submitterEmail,
+          submitterPhone: submitterPhone,
+          submitterName: submitterName,
+          submissionData: submissionData,
+        );
+      } catch (e) {
+        // Log but don't fail the submission if confirmations fail
+        print('Warning: Failed to send form confirmations: $e');
+      }
+    }
+
+    return submissionId;
   }
 }
