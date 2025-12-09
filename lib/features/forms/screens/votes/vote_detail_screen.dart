@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../models/voting_form.dart';
 import '../../services/votes_service.dart';
 import '../../widgets/results/vote_results_chart.dart';
@@ -107,7 +108,7 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
                   children: [
                     Icon(Icons.share),
                     SizedBox(width: 12),
-                    Text('Share'),
+                    Text('Share Vote Link'),
                   ],
                 ),
               ),
@@ -117,7 +118,7 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
                   children: [
                     Icon(Icons.link),
                     SizedBox(width: 12),
-                    Text('Copy Link'),
+                    Text('Copy Link to Clipboard'),
                   ],
                 ),
               ),
@@ -247,8 +248,91 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
             ],
             const SizedBox(height: 16),
             _buildVotingStatusBanner(theme, colorScheme, vote),
+            const SizedBox(height: 16),
+            _buildShareSection(theme, colorScheme, vote),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildShareSection(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    VotingForm vote,
+  ) {
+    final shareUrl = _getShareUrl();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.link, color: colorScheme.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Share with Members',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (shareUrl != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      shareUrl,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    onPressed: _copyVoteLink,
+                    tooltip: 'Copy Link',
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(4),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _shareVote,
+              icon: const Icon(Icons.share),
+              label: const Text('Share Vote Link'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -714,21 +798,180 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
     );
   }
 
+  String? _getShareUrl() {
+    final vote = _vote;
+    if (vote == null) return null;
+
+    // Use the slug if available, otherwise fall back to ID
+    final identifier = vote.slug ?? vote.id;
+    return 'https://forms.moyoungdemocrats.org/vote/$identifier';
+  }
+
   void _shareVote() {
-    // TODO: Implement share functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Share feature coming soon')),
-    );
+    if (_vote == null) return;
+
+    final slug = _vote!.slug;
+    if (slug == null || slug.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This vote does not have a shareable link. Please save the vote first.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    _showShareOptions();
   }
 
   void _copyVoteLink() {
-    // TODO: Copy actual vote link
-    Clipboard.setData(ClipboardData(text: 'Vote ID: ${_vote?.id}'));
+    final shareUrl = _getShareUrl();
+    if (shareUrl == null) return;
+
+    Clipboard.setData(ClipboardData(text: shareUrl));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Vote ID copied to clipboard'),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Link copied to clipboard!'),
+                  Text(
+                    shareUrl,
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  void _showShareOptions() {
+    final vote = _vote;
+    if (vote == null) return;
+
+    final shareUrl = _getShareUrl();
+    if (shareUrl == null) return;
+
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Share Vote Link',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Members can verify their membership and vote at this link:',
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+
+            // URL display with copy button
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      shareUrl,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: shareUrl));
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Link copied!')),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Share buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: shareUrl));
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Link copied!')),
+                      );
+                    },
+                    icon: const Icon(Icons.copy),
+                    label: const Text('Copy Link'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _openShareSheet();
+                    },
+                    icon: const Icon(Icons.share),
+                    label: const Text('Share'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openShareSheet() {
+    final vote = _vote;
+    if (vote == null) return;
+
+    final shareUrl = _getShareUrl();
+    if (shareUrl == null) return;
+
+    final description = vote.description;
+    final shareText = '''
+Vote Now: ${vote.title}
+
+${description != null && description.isNotEmpty ? '$description\n\n' : ''}Cast your vote here: $shareUrl
+''';
+
+    Share.share(shareText, subject: 'Vote: ${vote.title}');
   }
 }
