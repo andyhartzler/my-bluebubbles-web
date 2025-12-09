@@ -94,7 +94,43 @@ class Vote with _$Vote {
 
 // Extension to make working with VotingForm easier
 extension VotingFormExtension on VotingForm {
-  /// Extract voting options from the schema
+  /// Check if this vote uses the new multi-question format
+  bool get usesQuestions => schema['questions'] != null;
+
+  /// Extract questions from the schema (new format)
+  /// Falls back to converting old options to a single question
+  List<Map<String, dynamic>> get questions {
+    try {
+      // New format: questions array
+      final questionsData = schema['questions'] as List<dynamic>?;
+      if (questionsData != null) {
+        return questionsData.cast<Map<String, dynamic>>();
+      }
+
+      // Backwards compatibility: convert old fields to a single question
+      final fields = schema['fields'] as List<dynamic>?;
+      if (fields != null && fields.isNotEmpty) {
+        return [
+          {
+            'id': 'default',
+            'text': title, // Use vote title as question text
+            'question_type': 'multiple_choice',
+            'required': true,
+            'options': fields,
+          }
+        ];
+      }
+
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Get question count
+  int get questionCount => questions.length;
+
+  /// Extract voting options from the schema (legacy support)
   List<VotingOption> get options {
     try {
       final fields = schema['fields'] as List<dynamic>?;
@@ -108,8 +144,18 @@ extension VotingFormExtension on VotingForm {
     }
   }
 
-  /// Get option count
+  /// Get option count (legacy - for old single-question votes)
   int get optionCount => options.length;
+
+  /// Get total options across all questions
+  int get totalOptionCount {
+    int count = 0;
+    for (final q in questions) {
+      final opts = q['options'] as List<dynamic>?;
+      if (opts != null) count += opts.length;
+    }
+    return count;
+  }
 
   /// Check if voting is currently active
   bool get isVotingActive {

@@ -36,7 +36,10 @@ class VotesService {
   Future<String> createVote({
     required String title,
     String? description,
-    required List<VotingOption> options,
+    // Legacy: simple options list (converted to single multiple_choice question)
+    List<VotingOption>? options,
+    // New: full questions list with different types
+    List<Map<String, dynamic>>? questions,
     // Voting-specific fields
     DateTime? votingStartsAt,
     DateTime? votingEndsAt,
@@ -61,10 +64,21 @@ class VotesService {
     // Supporting documents
     List<Map<String, dynamic>>? supportingDocuments,
   }) async {
-    // Build schema with voting options
-    final schema = {
-      'fields': options.map((o) => o.toJson()).toList(),
-    };
+    // Build schema with voting questions or legacy options
+    final Map<String, dynamic> schema;
+    if (questions != null && questions.isNotEmpty) {
+      // New format: multiple questions with different types
+      schema = {
+        'questions': questions,
+      };
+    } else if (options != null && options.isNotEmpty) {
+      // Legacy format: single question with options stored in 'fields'
+      schema = {
+        'fields': options.map((o) => o.toJson()).toList(),
+      };
+    } else {
+      schema = {'questions': []};
+    }
 
     // Build settings map with SMS confirmation if provided
     final settings = <String, dynamic>{};
@@ -109,7 +123,10 @@ class VotesService {
     String id, {
     String? title,
     String? description,
+    // Legacy: simple options list
     List<VotingOption>? options,
+    // New: full questions list with different types
+    List<Map<String, dynamic>>? questions,
     // Voting-specific fields
     DateTime? votingStartsAt,
     bool clearVotingStartsAt = false,
@@ -149,7 +166,11 @@ class VotesService {
 
     if (title != null) updates['title'] = title;
     if (description != null) updates['description'] = description;
-    if (options != null) {
+
+    // Handle schema update - prefer questions over options
+    if (questions != null) {
+      updates['schema'] = {'questions': questions};
+    } else if (options != null) {
       updates['schema'] = {
         'fields': options.map((o) => o.toJson()).toList(),
       };
