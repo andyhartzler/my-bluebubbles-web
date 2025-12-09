@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:html' as html;
 import 'dart:ui' as ui;
+import 'dart:async';
 
 import '../../../services/credential_storage_service.dart';
 
 /// Web-specific iframe widget for Listmonk with automatic Basic Auth
 /// Uses HTTP Basic Authentication embedded in the URL for auto-login
+/// Falls back to manual login prompt on browsers that block credentials in iframes (Chrome)
 class Iframe extends StatefulWidget {
   final String src;
 
@@ -20,11 +22,19 @@ class _IframeState extends State<Iframe> {
   bool _isLoading = true;
   bool _isRegistered = false;
   String? _errorMessage;
+  bool _showLoginHelp = false;
+  Timer? _loginCheckTimer;
 
   @override
   void initState() {
     super.initState();
     _registerIframe();
+  }
+
+  @override
+  void dispose() {
+    _loginCheckTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _registerIframe() async {
@@ -48,6 +58,8 @@ class _IframeState extends State<Iframe> {
       // Create unique iframe ID
       final iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
 
+      html.IFrameElement? iframeElement;
+
       // Register the view factory
       // ignore: undefined_prefixed_name
       ui.platformViewRegistry.registerViewFactory(
@@ -63,12 +75,20 @@ class _IframeState extends State<Iframe> {
             // Prevent credentials from leaking in referrer header
             ..setAttribute('referrerpolicy', 'no-referrer');
 
+          iframeElement = iframe;
+
           iframe.onLoad.listen((_) {
             if (mounted) {
               setState(() {
                 _isLoading = false;
               });
-              debugPrint('📧 Listmonk: Loaded successfully');
+              debugPrint('📧 Listmonk: Iframe loaded');
+
+              // Check if we're still on login page after a delay
+              // This helps detect when Basic Auth in URL doesn't work (Chrome)
+              _loginCheckTimer = Timer(const Duration(seconds: 2), () {
+                _checkLoginState(iframe);
+              });
             }
           });
 
@@ -103,6 +123,56 @@ class _IframeState extends State<Iframe> {
         });
       }
     }
+  }
+
+  void _checkLoginState(html.IFrameElement iframe) {
+    try {
+      // Try to check if we can access the iframe content
+      // If we get an error, it might be cross-origin or on login page
+      final contentWindow = iframe.contentWindow;
+      if (contentWindow != null) {
+        try {
+          // Try to access the location (this will fail for cross-origin)
+          final location = contentWindow.location.href;
+          debugPrint('📧 Listmonk: Current URL: $location');
+
+          // If URL contains 'login', show help
+          if (location.contains('login') || location.contains('admin/login')) {
+            debugPrint('⚠️ Listmonk: Still on login page, Basic Auth may not work in this browser');
+            if (mounted) {
+              setState(() {
+                _showLoginHelp = true;
+              });
+            }
+          }
+        } catch (e) {
+          // Cross-origin access blocked - this is expected
+          // We can't tell if on login page, but assume Basic Auth worked
+          debugPrint('📧 Listmonk: Cross-origin (expected), assuming authenticated');
+        }
+      }
+    } catch (e) {
+      debugPrint('📧 Listmonk: Could not check login state: $e');
+    }
+  }
+
+  void _openInNewTab() {
+    final uri = Uri.parse(widget.src);
+    final publicUrl = 'https://${uri.host}${uri.path}';
+    html.window.open(publicUrl, '_blank');
+  }
+
+  void _tryDirectLogin() async {
+    // Get credentials and open authenticated URL in new tab
+    final username =
+        await CredentialStorageService.getListmonkUsername() ?? 'admin';
+    final password =
+        await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
+
+    final uri = Uri.parse(widget.src);
+    final authenticatedUrl = 'https://$username:$password@${uri.host}${uri.path}';
+
+    html.window.open(authenticatedUrl, '_blank');
   }
 
   @override
@@ -145,10 +215,12 @@ class _IframeState extends State<Iframe> {
       );
     }
 
-    // Show iframe with loading overlay
+    // Show iframe with loading overlay and optional login help
     return Stack(
       children: [
         HtmlElementView(viewType: _iframeId!),
+
+        // Loading overlay
         if (_isLoading)
           Container(
             color: Colors.white,
@@ -160,6 +232,69 @@ class _IframeState extends State<Iframe> {
                   SizedBox(height: 16),
                   Text('Loading Email Campaigns...'),
                 ],
+              ),
+            ),
+          ),
+
+        // Login help banner (shows if Basic Auth didn't work)
+        if (_showLoginHelp && !_isLoading)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Material(
+              elevation: 4,
+              color: Colors.orange[100],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange[800]),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Auto-login not supported in this browser',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange[900],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Chrome blocks auto-login for security. Please login manually or open in new tab.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    TextButton.icon(
+                      onPressed: _tryDirectLogin,
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text('Open in Tab'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.orange[900],
+                        backgroundColor: Colors.white,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () {
+                        setState(() {
+                          _showLoginHelp = false;
+                        });
+                      },
+                      color: Colors.orange[800],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
