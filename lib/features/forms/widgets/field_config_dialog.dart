@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../models/form_field_config.dart';
 import '../models/form_field_types.dart';
 import '../models/form_validators.dart';
+import '../models/identity_config.dart';
 
 /// Comprehensive field configuration dialog for all field types
 class FieldConfigDialog extends StatefulWidget {
@@ -916,8 +917,53 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     );
   }
 
+  /// Convert label to a field key (snake_case)
+  String _labelToKey(String label) {
+    return label
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9\s]'), '')
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+  }
+
   void _saveField() {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    // Generate field key from label
+    final fieldKey = _labelToKey(_labelController.text);
+
+    // Validate against reserved identity field keys
+    if (ReservedFieldKeys.isReserved(fieldKey)) {
+      final category = ReservedFieldKeys.getCategory(fieldKey);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'The field key "$fieldKey" is reserved for identity tracking ($category). '
+            'Please use a different label.',
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Also check if the label itself matches a reserved key
+    if (ReservedFieldKeys.isReserved(_labelController.text)) {
+      final category = ReservedFieldKeys.getCategory(_labelController.text);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'The label "${_labelController.text}" is reserved for identity tracking ($category). '
+            'Please use a different label, such as "Additional Phone" or "Work Email".',
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 4),
+        ),
+      );
       return;
     }
 
