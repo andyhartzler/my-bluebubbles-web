@@ -153,9 +153,17 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 DropdownMenuItem(value: 'survey', child: Text('Survey')),
                 DropdownMenuItem(value: 'registration', child: Text('Registration')),
                 DropdownMenuItem(value: 'feedback', child: Text('Feedback')),
+                DropdownMenuItem(value: 'vote', child: Text('Vote')),
               ],
               onChanged: (value) {
-                setState(() => _formType = value!);
+                setState(() {
+                  _formType = value!;
+                  // Auto-enable require_login for vote forms
+                  if (value == 'vote') {
+                    _requireLogin = true;
+                    _oneSubmissionPerUser = true;
+                  }
+                });
               },
             ),
             const SizedBox(height: 16),
@@ -253,16 +261,28 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                           const SizedBox(height: 8),
                           SwitchListTile(
                             title: const Text('Require Login'),
-                            subtitle: const Text('Users must be logged in to submit'),
+                            subtitle: Text(
+                              _formType == 'vote'
+                                  ? 'Required for vote forms (locked)'
+                                  : 'Users must be logged in to submit',
+                            ),
                             value: _requireLogin,
-                            onChanged: (value) => setState(() => _requireLogin = value),
+                            onChanged: _formType == 'vote'
+                                ? null // Locked for vote forms
+                                : (value) => setState(() => _requireLogin = value),
                             contentPadding: EdgeInsets.zero,
                           ),
                           SwitchListTile(
                             title: const Text('One Submission Per User'),
-                            subtitle: const Text('Each user can only submit once'),
+                            subtitle: Text(
+                              _formType == 'vote'
+                                  ? 'Required for vote forms (locked)'
+                                  : 'Each user can only submit once',
+                            ),
                             value: _oneSubmissionPerUser,
-                            onChanged: (value) => setState(() => _oneSubmissionPerUser = value),
+                            onChanged: _formType == 'vote'
+                                ? null // Locked for vote forms
+                                : (value) => setState(() => _oneSubmissionPerUser = value),
                             contentPadding: EdgeInsets.zero,
                           ),
                           const SizedBox(height: 8),
@@ -331,8 +351,8 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Identity Fields Notice (non-editable)
-            _buildIdentityFieldsNotice(isMobile: isMobile),
+            // Identity Fields Notice - conditional based on require_login
+            _buildIdentityFieldsSection(isMobile: isMobile),
 
             const SizedBox(height: 24),
 
@@ -447,6 +467,59 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Builds the identity fields section - shows different content based on require_login
+  Widget _buildIdentityFieldsSection({bool isMobile = false}) {
+    if (_requireLogin) {
+      // Member portal form - identity auto-captured from profile
+      return _buildMemberIdentityNotice(isMobile: isMobile);
+    } else {
+      // Public form - identity fields required
+      return _buildIdentityFieldsNotice(isMobile: isMobile);
+    }
+  }
+
+  /// Notice shown when require_login = true (member portal forms)
+  Widget _buildMemberIdentityNotice({bool isMobile = false}) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.verified_user, color: Colors.green.shade700, size: isMobile ? 18 : 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Member Identity Auto-Captured',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade900,
+                    fontSize: isMobile ? 14 : 16,
+                  ),
+                ),
+                SizedBox(height: isMobile ? 4 : 6),
+                Text(
+                  'Since login is required, submitter identity will be automatically captured from their member profile. No need to add identity fields.',
+                  style: TextStyle(
+                    color: Colors.green.shade700,
+                    fontSize: isMobile ? 12 : 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
