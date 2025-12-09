@@ -183,15 +183,29 @@ class FormsService {
   }
 
   Future<List<FormSubmission>> getSubmissions(String formId) async {
-    final response = await _supabase
-        .from('form_submissions')
-        .select('*, members(*)')
-        .eq('form_id', formId)
-        .order('created_at', ascending: false);
+    try {
+      final response = await _supabase
+          .from('form_submissions')
+          .select()
+          .eq('form_id', formId)
+          .order('created_at', ascending: false);
 
-    return (response as List)
-        .map((json) => FormSubmission.fromJson(json))
-        .toList();
+      final data = response as List;
+      print('FormsService.getSubmissions: Found ${data.length} submissions for form $formId');
+
+      return data.map((json) {
+        try {
+          return FormSubmission.fromJson(json as Map<String, dynamic>);
+        } catch (e) {
+          print('FormsService.getSubmissions: Error parsing submission: $e');
+          print('FormsService.getSubmissions: Raw JSON: $json');
+          rethrow;
+        }
+      }).toList();
+    } catch (e) {
+      print('FormsService.getSubmissions: Error fetching submissions: $e');
+      rethrow;
+    }
   }
 
   Future<String> createSubmission({
