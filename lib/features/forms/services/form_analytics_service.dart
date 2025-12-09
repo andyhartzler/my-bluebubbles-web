@@ -1,8 +1,16 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../services/crm/supabase_service.dart';
 
 /// Service for tracking form analytics and interactions
 class FormAnalyticsService {
   final _supabase = Supabase.instance.client;
+  final _crmService = CRMSupabaseService();
+
+  /// Get privileged client for bypassing RLS when reading submissions
+  SupabaseClient get _readClient =>
+      _crmService.isInitialized && _crmService.hasServiceRole
+          ? _crmService.privilegedClient
+          : _supabase;
 
   /// Track when a form is viewed
   Future<void> trackFormView(String formId, String? userId, {String? memberId}) async {
@@ -140,8 +148,8 @@ class FormAnalyticsService {
 
       final analyticsData = analyticsResponse as List;
 
-      // Get actual submission count from form_submissions table
-      final submissionCountResponse = await _supabase
+      // Get actual submission count from form_submissions table (use privileged client)
+      final submissionCountResponse = await _readClient
           .from('form_submissions')
           .select('id')
           .eq('form_id', formId);
@@ -173,9 +181,9 @@ class FormAnalyticsService {
       );
     } catch (e) {
       print('Error fetching analytics: $e');
-      // Try to get at least submission count
+      // Try to get at least submission count (use privileged client)
       try {
-        final submissionCountResponse = await _supabase
+        final submissionCountResponse = await _readClient
             .from('form_submissions')
             .select('id')
             .eq('form_id', formId);
@@ -254,8 +262,8 @@ class FormAnalyticsService {
     DateTime? endDate,
   }) async {
     try {
-      // First try to get from actual submissions (more reliable)
-      var query = _supabase
+      // First try to get from actual submissions (more reliable, use privileged client)
+      var query = _readClient
           .from('form_submissions')
           .select('created_at')
           .eq('form_id', formId);
@@ -298,7 +306,8 @@ class FormAnalyticsService {
   /// Get submission stats by status
   Future<Map<String, int>> getSubmissionsByStatus(String formId) async {
     try {
-      final response = await _supabase
+      // Use privileged client to bypass RLS
+      final response = await _readClient
           .from('form_submissions')
           .select('status')
           .eq('form_id', formId);
@@ -321,7 +330,8 @@ class FormAnalyticsService {
   /// Get recent submission activity (last N submissions with timestamps)
   Future<List<SubmissionActivity>> getRecentActivity(String formId, {int limit = 10}) async {
     try {
-      final response = await _supabase
+      // Use privileged client to bypass RLS
+      final response = await _readClient
           .from('form_submissions')
           .select('id, created_at, submitter_name, submitter_email, status')
           .eq('form_id', formId)

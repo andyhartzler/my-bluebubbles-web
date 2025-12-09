@@ -2,9 +2,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/form_schema.dart';
 import '../models/form_submission.dart';
 import 'form_confirmation_service.dart';
+import '../../../services/crm/supabase_service.dart';
 
 class FormsService {
   final _supabase = Supabase.instance.client;
+  final _crmService = CRMSupabaseService();
+
+  /// Get privileged client for bypassing RLS when reading submissions
+  SupabaseClient get _readClient =>
+      _crmService.isInitialized && _crmService.hasServiceRole
+          ? _crmService.privilegedClient
+          : _supabase;
 
   Stream<List<FormSchema>> watchForms(String typeFilter) {
     if (typeFilter == 'all') {
@@ -184,14 +192,15 @@ class FormsService {
 
   Future<List<FormSubmission>> getSubmissions(String formId) async {
     try {
-      final response = await _supabase
+      // Use privileged client to bypass RLS for reading submissions
+      final response = await _readClient
           .from('form_submissions')
           .select()
           .eq('form_id', formId)
           .order('created_at', ascending: false);
 
       final data = response as List;
-      print('FormsService.getSubmissions: Found ${data.length} submissions for form $formId');
+      print('FormsService.getSubmissions: Found ${data.length} submissions for form $formId (using ${_crmService.hasServiceRole ? "service role" : "anon"} client)');
 
       return data.map((json) {
         try {
