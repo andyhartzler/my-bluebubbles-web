@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:file_picker/file_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../utils/quill_html_converter.dart';
+import '../../../../utils/markdown_quill_loader.dart';
 import '../../models/voting_form.dart';
 import '../../services/votes_service.dart';
 
@@ -14,18 +19,27 @@ class VoteBuilderScreen extends StatefulWidget {
 
 class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   final _votesService = VotesService();
+  final _supabase = Supabase.instance.client;
   final _uuid = const Uuid();
   final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
   final _slugController = TextEditingController();
   final _maxSubmissionsController = TextEditingController();
   final _confirmationEmailController = TextEditingController();
   final _notificationEmailsController = TextEditingController();
   final _confirmationSmsController = TextEditingController();
 
+  // Rich text editor for description
+  late quill.QuillController _descriptionController;
+  final _descriptionFocusNode = FocusNode();
+  final _descriptionScrollController = ScrollController();
+
   List<VotingOption> _options = [];
   bool _isLoading = false;
   bool _isSaving = false;
+  bool _isUploadingDocument = false;
+
+  // Supporting documents
+  List<Map<String, dynamic>> _supportingDocuments = [];
 
   // Voting-specific settings
   DateTime? _votingStartsAt;
@@ -40,6 +54,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   @override
   void initState() {
     super.initState();
+    _descriptionController = quill.QuillController.basic();
     if (widget.voteId != null) {
       _loadVote();
     }
@@ -49,6 +64,8 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _descriptionFocusNode.dispose();
+    _descriptionScrollController.dispose();
     _slugController.dispose();
     _maxSubmissionsController.dispose();
     _confirmationEmailController.dispose();
@@ -65,7 +82,24 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
 
       setState(() {
         _titleController.text = vote.title;
-        _descriptionController.text = vote.description ?? '';
+
+        // Load description into Quill editor
+        final description = vote.description ?? '';
+        if (description.isNotEmpty) {
+          // Try to parse as HTML first, then fall back to plain text
+          try {
+            final doc = MarkdownQuillLoader.fromHtml(description);
+            _descriptionController = quill.QuillController(
+              document: doc,
+              selection: const TextSelection.collapsed(offset: 0),
+            );
+          } catch (e) {
+            // Fallback: treat as plain text
+            _descriptionController = quill.QuillController.basic();
+            _descriptionController.document.insert(0, description);
+          }
+        }
+
         _options = vote.options; // Uses extension method
 
         // Voting-specific fields
@@ -84,6 +118,11 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
         // Load SMS confirmation message from settings
         _confirmationSmsController.text =
             vote.settings['confirmation_sms'] as String? ?? '';
+
+        // Load supporting documents
+        _supportingDocuments = List<Map<String, dynamic>>.from(
+          vote.supportingDocuments ?? [],
+        );
 
         _isLoading = false;
       });
@@ -128,15 +167,14 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
+            const SizedBox(height: 16),
+
+            // Rich Text Description
+            _buildDescriptionEditor(isMobile),
+            const SizedBox(height: 16),
+
+            // Supporting Documents Section
+            _buildSupportingDocumentsSection(isMobile),
             const SizedBox(height: 16),
 
             // Voting Schedule Section
@@ -444,6 +482,515 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
     );
   }
 
+  Widget _buildDescriptionEditor(bool isMobile) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final selectionStyle = _descriptionController.getSelectionStyle();
+    final attributes = selectionStyle.attributes;
+    final boldActive = attributes.containsKey(quill.Attribute.bold.key);
+    final italicActive = attributes.containsKey(quill.Attribute.italic.key);
+    final underlineActive = attributes.containsKey(quill.Attribute.underline.key);
+    final linkActive = attributes.containsKey(quill.Attribute.link.key);
+
+    final toolbar = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _FormatButton(
+          icon: Icons.format_bold,
+          tooltip: 'Bold',
+          isActive: boldActive,
+          onPressed: () => _toggleDescriptionFormat(quill.Attribute.bold),
+        ),
+        _FormatButton(
+          icon: Icons.format_italic,
+          tooltip: 'Italic',
+          isActive: italicActive,
+          onPressed: () => _toggleDescriptionFormat(quill.Attribute.italic),
+        ),
+        _FormatButton(
+          icon: Icons.format_underline,
+          tooltip: 'Underline',
+          isActive: underlineActive,
+          onPressed: () => _toggleDescriptionFormat(quill.Attribute.underline),
+        ),
+        _FormatButton(
+          icon: Icons.link,
+          tooltip: 'Insert Link',
+          isActive: linkActive,
+          onPressed: _promptForDescriptionLink,
+        ),
+      ],
+    );
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.description, size: 20, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Description',
+                  style: TextStyle(
+                    fontSize: isMobile ? 14 : 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '(optional)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: colorScheme.outlineVariant),
+                borderRadius: BorderRadius.circular(8),
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: toolbar,
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: colorScheme.outlineVariant),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              constraints: const BoxConstraints(minHeight: 120, maxHeight: 200),
+              child: quill.QuillEditor(
+                focusNode: _descriptionFocusNode,
+                scrollController: _descriptionScrollController,
+                configurations: quill.QuillEditorConfigurations(
+                  controller: _descriptionController,
+                  scrollable: true,
+                  expands: false,
+                  padding: const EdgeInsets.all(12),
+                  placeholder: 'Add a description for this vote...',
+                  minHeight: 100,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Use the toolbar to format text: bold, italic, underline, or add hyperlinks.',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _toggleDescriptionFormat(quill.Attribute attribute) {
+    final selection = _descriptionController.selection;
+    if (!selection.isValid) return;
+    final currentStyle = _descriptionController.getSelectionStyle();
+    final isActive = currentStyle.attributes.containsKey(attribute.key);
+    final removal = quill.Attribute.clone(attribute, null);
+    _descriptionController.formatSelection(isActive ? removal : attribute);
+    setState(() {});
+  }
+
+  Future<void> _promptForDescriptionLink() async {
+    final selection = _descriptionController.selection;
+    if (!selection.isValid || selection.isCollapsed) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select text before adding a hyperlink.')),
+      );
+      return;
+    }
+
+    final currentStyle = _descriptionController.getSelectionStyle();
+    final existingLink =
+        currentStyle.attributes[quill.Attribute.link.key]?.value?.toString() ?? '';
+    final controller = TextEditingController(text: existingLink);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Insert Hyperlink'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'URL',
+              hintText: 'https://example.com',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+            keyboardType: TextInputType.url,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            if (existingLink.isNotEmpty)
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(''),
+                child: const Text('Remove Link'),
+              ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (result == null) return;
+
+    final trimmed = result.trim();
+    if (trimmed.isEmpty) {
+      final removal = quill.Attribute.clone(quill.Attribute.link, null);
+      _descriptionController.formatSelection(removal);
+    } else {
+      _descriptionController.formatSelection(quill.LinkAttribute(trimmed));
+    }
+    setState(() {});
+  }
+
+  Widget _buildSupportingDocumentsSection(bool isMobile) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.attach_file, size: 20, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Supporting Documents',
+                  style: TextStyle(
+                    fontSize: isMobile ? 14 : 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '(optional)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const Spacer(),
+                if (_isUploadingDocument)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: _uploadDocument,
+                    tooltip: 'Add Document',
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Upload documents that voters can reference (PDF, DOC, DOCX, etc.)',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (_supportingDocuments.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ..._supportingDocuments.asMap().entries.map((entry) {
+                final index = entry.key;
+                final doc = entry.value;
+                return _buildDocumentTile(doc, index, isMobile);
+              }),
+            ] else ...[
+              const SizedBox(height: 16),
+              Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.folder_open,
+                      size: 48,
+                      color: colorScheme.onSurfaceVariant.withOpacity(0.3),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No documents uploaded',
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _isUploadingDocument ? null : _uploadDocument,
+                      icon: const Icon(Icons.upload_file),
+                      label: const Text('Upload Document'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDocumentTile(Map<String, dynamic> doc, int index, bool isMobile) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final fileName = doc['name'] as String? ?? 'Unknown';
+    final fileSize = doc['size'] as int? ?? 0;
+    final fileUrl = doc['url'] as String?;
+
+    String formatFileSize(int bytes) {
+      if (bytes < 1024) return '$bytes B';
+      if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+
+    IconData getFileIcon(String name) {
+      final ext = name.split('.').last.toLowerCase();
+      switch (ext) {
+        case 'pdf':
+          return Icons.picture_as_pdf;
+        case 'doc':
+        case 'docx':
+          return Icons.description;
+        case 'xls':
+        case 'xlsx':
+          return Icons.table_chart;
+        case 'ppt':
+        case 'pptx':
+          return Icons.slideshow;
+        case 'jpg':
+        case 'jpeg':
+        case 'png':
+        case 'gif':
+          return Icons.image;
+        default:
+          return Icons.insert_drive_file;
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ListTile(
+        dense: isMobile,
+        leading: Icon(getFileIcon(fileName), color: colorScheme.primary),
+        title: Text(
+          fileName,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        subtitle: Text(formatFileSize(fileSize)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (fileUrl != null)
+              IconButton(
+                icon: const Icon(Icons.open_in_new, size: 20),
+                onPressed: () => _openDocumentUrl(fileUrl),
+                tooltip: 'Open',
+              ),
+            IconButton(
+              icon: Icon(Icons.delete, size: 20, color: colorScheme.error),
+              onPressed: () => _removeDocument(index),
+              tooltip: 'Remove',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'jpg', 'jpeg', 'png', 'gif'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+      if (file.bytes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not read file data')),
+          );
+        }
+        return;
+      }
+
+      setState(() => _isUploadingDocument = true);
+
+      // Generate a unique file path
+      final fileId = _uuid.v4();
+      final ext = file.extension ?? 'bin';
+      final voteIdPart = widget.voteId ?? 'new';
+      final path = 'votes/$voteIdPart/$fileId.$ext';
+
+      // Determine content type
+      String contentType = 'application/octet-stream';
+      switch (ext.toLowerCase()) {
+        case 'pdf':
+          contentType = 'application/pdf';
+          break;
+        case 'doc':
+          contentType = 'application/msword';
+          break;
+        case 'docx':
+          contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          break;
+        case 'xls':
+          contentType = 'application/vnd.ms-excel';
+          break;
+        case 'xlsx':
+          contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          break;
+        case 'ppt':
+          contentType = 'application/vnd.ms-powerpoint';
+          break;
+        case 'pptx':
+          contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+          break;
+        case 'txt':
+          contentType = 'text/plain';
+          break;
+        case 'rtf':
+          contentType = 'application/rtf';
+          break;
+        case 'jpg':
+        case 'jpeg':
+          contentType = 'image/jpeg';
+          break;
+        case 'png':
+          contentType = 'image/png';
+          break;
+        case 'gif':
+          contentType = 'image/gif';
+          break;
+      }
+
+      // Upload to Supabase storage
+      await _supabase.storage.from('form-documents').uploadBinary(
+        path,
+        file.bytes!,
+        fileOptions: FileOptions(contentType: contentType, upsert: true),
+      );
+
+      // Get the public URL
+      final publicUrl = _supabase.storage.from('form-documents').getPublicUrl(path);
+
+      // Add to the documents list
+      setState(() {
+        _supportingDocuments.add({
+          'id': fileId,
+          'name': file.name,
+          'size': file.size,
+          'path': path,
+          'url': publicUrl,
+          'content_type': contentType,
+          'uploaded_at': DateTime.now().toIso8601String(),
+        });
+        _isUploadingDocument = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Uploaded: ${file.name}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isUploadingDocument = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeDocument(int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Document'),
+        content: const Text('Are you sure you want to remove this document?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _supportingDocuments.removeAt(index);
+              });
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openDocumentUrl(String url) {
+    // For now, just copy the URL - in a real app you'd use url_launcher
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Document URL: $url')),
+    );
+  }
+
   Widget _buildOptionCard(VotingOption option, {bool isMobile = false}) {
     if (isMobile) {
       return Card(
@@ -622,12 +1169,23 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           ? null
           : _confirmationSmsController.text.trim();
 
+      // Convert Quill document to HTML
+      final document = _descriptionController.document;
+      final deltaOps = document.toDelta().toJson();
+      final deltaJson = deltaOps
+          .map<Map<String, dynamic>>(
+            (dynamic op) => Map<String, dynamic>.from(op as Map),
+          )
+          .toList(growable: false);
+      final plainText = document.toPlainText().trim();
+      final descriptionHtml = plainText.isEmpty
+          ? null
+          : QuillHtmlConverter.generateHtml(deltaJson, plainText);
+
       if (widget.voteId == null) {
         await _votesService.createVote(
           title: _titleController.text,
-          description: _descriptionController.text.isEmpty
-              ? null
-              : _descriptionController.text,
+          description: descriptionHtml,
           options: _options,
           votingStartsAt: _votingStartsAt,
           votingEndsAt: _votingEndsAt,
@@ -640,14 +1198,13 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           confirmationEmailTemplate: confirmationEmail,
           notificationEmails: notificationEmails,
           confirmationSmsMessage: confirmationSms,
+          supportingDocuments: _supportingDocuments.isEmpty ? null : _supportingDocuments,
         );
       } else {
         await _votesService.updateVote(
           widget.voteId!,
           title: _titleController.text,
-          description: _descriptionController.text.isEmpty
-              ? null
-              : _descriptionController.text,
+          description: descriptionHtml,
           options: _options,
           votingStartsAt: _votingStartsAt,
           votingEndsAt: _votingEndsAt,
@@ -660,6 +1217,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           confirmationEmailTemplate: confirmationEmail,
           notificationEmails: notificationEmails,
           confirmationSmsMessage: confirmationSms,
+          supportingDocuments: _supportingDocuments.isEmpty ? null : _supportingDocuments,
         );
       }
 
@@ -740,6 +1298,46 @@ class _AddOptionDialogState extends State<_AddOptionDialog> {
           child: const Text('Add'),
         ),
       ],
+    );
+  }
+}
+
+/// A simple format button for the rich text toolbar
+class _FormatButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final bool isActive;
+  final VoidCallback onPressed;
+
+  const _FormatButton({
+    required this.icon,
+    required this.tooltip,
+    required this.isActive,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: isActive ? colorScheme.primaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Icon(
+              icon,
+              size: 20,
+              color: isActive ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

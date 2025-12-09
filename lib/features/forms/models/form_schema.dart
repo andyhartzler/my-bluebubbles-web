@@ -60,6 +60,9 @@ class FormSchema with _$FormSchema {
     // Email settings
     @JsonKey(name: 'confirmation_email_template') String? confirmationEmailTemplate,
     @JsonKey(name: 'notification_emails') List<String>? notificationEmails,
+
+    // Supporting documents (list of document metadata objects)
+    @JsonKey(name: 'supporting_documents') List<Map<String, dynamic>>? supportingDocuments,
   }) = _FormSchema;
 
   factory FormSchema.fromJson(Map<String, dynamic> json) =>

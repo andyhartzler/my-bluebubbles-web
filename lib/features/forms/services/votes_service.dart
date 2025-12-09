@@ -58,6 +58,8 @@ class VotesService {
     List<String>? notificationEmails,
     // SMS settings
     String? confirmationSmsMessage,
+    // Supporting documents
+    List<Map<String, dynamic>>? supportingDocuments,
   }) async {
     // Build schema with voting options
     final schema = {
@@ -95,6 +97,7 @@ class VotesService {
           if (slug != null) 'slug': slug,
           if (confirmationEmailTemplate != null) 'confirmation_email_template': confirmationEmailTemplate,
           if (notificationEmails != null) 'notification_emails': notificationEmails,
+          if (supportingDocuments != null) 'supporting_documents': supportingDocuments,
         })
         .select()
         .single();
@@ -138,6 +141,9 @@ class VotesService {
     // SMS settings
     String? confirmationSmsMessage,
     bool clearConfirmationSmsMessage = false,
+    // Supporting documents
+    List<Map<String, dynamic>>? supportingDocuments,
+    bool clearSupportingDocuments = false,
   }) async {
     final updates = <String, dynamic>{};
 
@@ -221,6 +227,13 @@ class VotesService {
         currentSettings.remove('confirmation_sms');
       }
       updates['settings'] = currentSettings;
+    }
+
+    // Supporting documents
+    if (supportingDocuments != null) {
+      updates['supporting_documents'] = supportingDocuments;
+    } else if (clearSupportingDocuments) {
+      updates['supporting_documents'] = null;
     }
 
     await _supabase

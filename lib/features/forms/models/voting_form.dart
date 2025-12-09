@@ -55,6 +55,9 @@ class VotingForm with _$VotingForm {
     // Email settings
     @JsonKey(name: 'confirmation_email_template') String? confirmationEmailTemplate,
     @JsonKey(name: 'notification_emails') List<String>? notificationEmails,
+
+    // Supporting documents (list of document metadata objects)
+    @JsonKey(name: 'supporting_documents') List<Map<String, dynamic>>? supportingDocuments,
   }) = _VotingForm;
 
   factory VotingForm.fromJson(Map<String, dynamic> json) =>
