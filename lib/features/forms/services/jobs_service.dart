@@ -1,8 +1,16 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/job.dart';
+import '../../../services/crm/supabase_service.dart';
 
 class JobsService {
   final _supabase = Supabase.instance.client;
+  final _crmService = CRMSupabaseService();
+
+  /// Get privileged client for bypassing RLS when writing jobs
+  SupabaseClient get _writeClient =>
+      _crmService.isInitialized && _crmService.hasServiceRole
+          ? _crmService.privilegedClient
+          : _supabase;
 
   Stream<List<Job>> watchJobs(String statusFilter) {
     if (statusFilter == 'all') {
@@ -40,7 +48,7 @@ class JobsService {
   }
 
   Future<void> approveJob(String id) async {
-    await _supabase.from('jobs').update({
+    await _writeClient.from('jobs').update({
       'status': 'approved',
       'approved_at': DateTime.now().toIso8601String(),
       'approved_by': _supabase.auth.currentUser?.id,
@@ -50,7 +58,7 @@ class JobsService {
   }
 
   Future<void> rejectJob(String id, String reason) async {
-    await _supabase.from('jobs').update({
+    await _writeClient.from('jobs').update({
       'status': 'rejected',
       'rejection_reason': reason,
     }).eq('id', id);
@@ -59,21 +67,21 @@ class JobsService {
   }
 
   Future<void> updateJob(String id, Map<String, dynamic> updates) async {
-    await _supabase
+    await _writeClient
         .from('jobs')
         .update(updates)
         .eq('id', id);
   }
 
   Future<void> deleteJob(String id) async {
-    await _supabase
+    await _writeClient
         .from('jobs')
         .delete()
         .eq('id', id);
   }
 
   Future<void> toggleFeatured(String id, bool featured) async {
-    await _supabase
+    await _writeClient
         .from('jobs')
         .update({'featured': featured})
         .eq('id', id);
@@ -106,7 +114,7 @@ class JobsService {
     bool featured = false,
     List<String>? tags,
   }) async {
-    final response = await _supabase
+    final response = await _writeClient
         .from('jobs')
         .insert({
           'title': title,
@@ -273,7 +281,7 @@ class JobsService {
     }
 
     if (updates.isNotEmpty) {
-      await _supabase.from('jobs').update(updates).eq('id', id);
+      await _writeClient.from('jobs').update(updates).eq('id', id);
     }
   }
 }

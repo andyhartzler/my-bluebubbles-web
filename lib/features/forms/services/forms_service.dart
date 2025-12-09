@@ -229,10 +229,10 @@ class FormsService {
             ),
             subscribers:subscriber_id (
               id,
-              first_name,
-              last_name,
+              name,
               email,
-              phone
+              phone,
+              phone_e164
             )
           ''')
           .eq('form_id', formId)

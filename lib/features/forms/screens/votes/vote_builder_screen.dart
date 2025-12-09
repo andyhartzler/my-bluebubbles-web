@@ -35,7 +35,8 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   final _descriptionFocusNode = FocusNode();
   final _descriptionScrollController = ScrollController();
 
-  List<VotingOption> _options = [];
+  // Questions list (new format supporting multiple question types)
+  List<Map<String, dynamic>> _questions = [];
   bool _isLoading = false;
   bool _isSaving = false;
   bool _isUploadingDocument = false;
@@ -102,7 +103,8 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           }
         }
 
-        _options = vote.options; // Uses extension method
+        // Load questions - uses extension that handles backwards compatibility
+        _questions = List<Map<String, dynamic>>.from(vote.questions);
 
         // Voting-specific fields
         _votingStartsAt = vote.votingStartsAt;
@@ -374,64 +376,8 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Options Section
-            if (isMobile)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Voting Options',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _addOption,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Option'),
-                    ),
-                  ),
-                ],
-              )
-            else
-              Row(
-                children: [
-                  const Text(
-                    'Voting Options',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    onPressed: _addOption,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Option'),
-                  ),
-                ],
-              ),
-            const SizedBox(height: 16),
-            if (_options.isEmpty)
-              Center(
-                child: Padding(
-                  padding: EdgeInsets.all(isMobile ? 24 : 32),
-                  child: Text(
-                    'No options yet. Add at least 2 options.',
-                    style: TextStyle(
-                      fontSize: isMobile ? 14 : 16,
-                      color: Colors.grey[600],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              )
-            else
-              ..._options.map((option) => _buildOptionCard(option, isMobile: isMobile)).toList(),
+            // Questions Section
+            _buildQuestionsSection(isMobile),
             const SizedBox(height: 24),
 
             // Publishing Controls
@@ -1125,27 +1071,394 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
     return int.tryParse(text);
   }
 
-  void _addOption() {
+  // Question type definitions
+  static const _questionTypes = [
+    {'type': 'multiple_choice', 'label': 'Multiple Choice', 'description': 'Select one option', 'icon': Icons.radio_button_checked},
+    {'type': 'multiple_select', 'label': 'Multiple Select', 'description': 'Select multiple options', 'icon': Icons.check_box},
+    {'type': 'ranked_choice', 'label': 'Ranked Choice', 'description': 'Rank options in order', 'icon': Icons.format_list_numbered},
+    {'type': 'short_answer', 'label': 'Short Answer', 'description': 'Free text response', 'icon': Icons.short_text},
+    {'type': 'yes_no', 'label': 'Yes/No', 'description': 'Simple yes or no', 'icon': Icons.thumbs_up_down},
+    {'type': 'rating_scale', 'label': 'Rating Scale', 'description': 'Rate on a scale', 'icon': Icons.star_rate},
+  ];
+
+  bool _questionTypeHasOptions(String? type) {
+    return type == 'multiple_choice' || type == 'multiple_select' || type == 'ranked_choice';
+  }
+
+  String _getQuestionTypeLabel(String? type) {
+    final found = _questionTypes.firstWhere(
+      (t) => t['type'] == type,
+      orElse: () => {'label': 'Unknown'},
+    );
+    return found['label'] as String;
+  }
+
+  IconData _getQuestionTypeIcon(String? type) {
+    final found = _questionTypes.firstWhere(
+      (t) => t['type'] == type,
+      orElse: () => {'icon': Icons.help_outline},
+    );
+    return found['icon'] as IconData;
+  }
+
+  Widget _buildQuestionsSection(bool isMobile) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.quiz, size: 20, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Vote Questions',
+                  style: TextStyle(
+                    fontSize: isMobile ? 16 : 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: _addQuestion,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add Question'),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 12 : 16,
+                      vertical: isMobile ? 8 : 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_questions.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.quiz_outlined,
+                        size: 48,
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.3),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No questions yet',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Add questions for voters to answer',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ..._questions.asMap().entries.map((entry) {
+                return _buildQuestionCard(entry.key, entry.value, isMobile);
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _addQuestion() {
     showDialog(
       context: context,
-      builder: (context) => _AddOptionDialog(
-        onAdd: (label) {
+      builder: (context) => _AddQuestionDialog(
+        questionTypes: _questionTypes,
+        onAdd: (type, text) {
           setState(() {
-            _options.add(VotingOption(
-              id: _uuid.v4(),
-              label: label,
-            ));
+            _questions.add({
+              'id': _uuid.v4(),
+              'text': text,
+              'question_type': type,
+              'required': true,
+              if (_questionTypeHasOptions(type)) 'options': <Map<String, dynamic>>[],
+            });
           });
         },
       ),
     );
   }
 
-  void _deleteOption(String optionId) {
+  void _deleteQuestion(int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Question'),
+        content: const Text('Are you sure you want to delete this question?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _questions.removeAt(index);
+              });
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuestionCard(int index, Map<String, dynamic> question, bool isMobile) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final type = question['question_type'] as String?;
+    final text = question['text'] as String? ?? '';
+    final options = question['options'] as List<dynamic>? ?? [];
+    final hasOptions = _questionTypeHasOptions(type);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: ExpansionTile(
+        leading: CircleAvatar(
+          backgroundColor: colorScheme.primaryContainer,
+          child: Icon(_getQuestionTypeIcon(type), color: colorScheme.onPrimaryContainer, size: 20),
+        ),
+        title: Text(
+          text.isEmpty ? 'Question ${index + 1}' : text,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          _getQuestionTypeLabel(type) + (hasOptions ? ' • ${options.length} options' : ''),
+          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
+        ),
+        trailing: IconButton(
+          icon: Icon(Icons.delete_outline, color: colorScheme.error),
+          onPressed: () => _deleteQuestion(index),
+        ),
+        children: [
+          Padding(
+            padding: EdgeInsets.all(isMobile ? 12 : 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Question text editor
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Question Text',
+                    border: OutlineInputBorder(),
+                    hintText: 'Enter your question',
+                  ),
+                  controller: TextEditingController(text: text),
+                  onChanged: (value) {
+                    setState(() {
+                      _questions[index]['text'] = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Options section (for types that need options)
+                if (hasOptions) ...[
+                  Row(
+                    children: [
+                      Text(
+                        'Options',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () => _addOptionToQuestion(index),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add Option'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (options.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Add at least 2 options',
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        ),
+                      ),
+                    )
+                  else
+                    ReorderableListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: options.length,
+                      onReorder: (oldIndex, newIndex) {
+                        setState(() {
+                          if (newIndex > oldIndex) newIndex--;
+                          final optionsList = List<Map<String, dynamic>>.from(options);
+                          final item = optionsList.removeAt(oldIndex);
+                          optionsList.insert(newIndex, item);
+                          _questions[index]['options'] = optionsList;
+                        });
+                      },
+                      itemBuilder: (context, optIndex) {
+                        final opt = options[optIndex] as Map<String, dynamic>;
+                        return ListTile(
+                          key: ValueKey(opt['id']),
+                          leading: Icon(
+                            type == 'multiple_choice' ? Icons.radio_button_unchecked :
+                            type == 'multiple_select' ? Icons.check_box_outline_blank :
+                            Icons.drag_handle,
+                            size: 20,
+                          ),
+                          title: Text(opt['label'] as String? ?? ''),
+                          trailing: IconButton(
+                            icon: Icon(Icons.close, size: 18, color: colorScheme.error),
+                            onPressed: () => _deleteOptionFromQuestion(index, optIndex),
+                          ),
+                        );
+                      },
+                    ),
+                ],
+
+                // Rating scale settings
+                if (type == 'rating_scale') ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          decoration: const InputDecoration(
+                            labelText: 'Min Value',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                          controller: TextEditingController(
+                            text: (question['min_value'] ?? 1).toString(),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _questions[index]['min_value'] = int.tryParse(value) ?? 1;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextField(
+                          decoration: const InputDecoration(
+                            labelText: 'Max Value',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                          controller: TextEditingController(
+                            text: (question['max_value'] ?? 5).toString(),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _questions[index]['max_value'] = int.tryParse(value) ?? 5;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addOptionToQuestion(int questionIndex) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Option'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Option Label',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                setState(() {
+                  final options = List<Map<String, dynamic>>.from(
+                    _questions[questionIndex]['options'] as List<dynamic>? ?? [],
+                  );
+                  options.add({
+                    'id': _uuid.v4(),
+                    'label': controller.text,
+                  });
+                  _questions[questionIndex]['options'] = options;
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteOptionFromQuestion(int questionIndex, int optionIndex) {
     setState(() {
-      _options.removeWhere((o) => o.id == optionId);
+      final options = List<Map<String, dynamic>>.from(
+        _questions[questionIndex]['options'] as List<dynamic>,
+      );
+      options.removeAt(optionIndex);
+      _questions[questionIndex]['options'] = options;
     });
   }
+
+  // Legacy method - keep for reference, but no longer used
+  List<VotingOption> get _options => [];
+  set _options(List<VotingOption> _) {}
 
   Future<void> _saveVote({bool publish = false}) async {
     if (_titleController.text.isEmpty) {
@@ -1155,11 +1468,23 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
       return;
     }
 
-    if (_options.length < 2) {
+    if (_questions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least 2 options')),
+        const SnackBar(content: Text('Please add at least one question')),
       );
       return;
+    }
+
+    // Validate that questions with options have at least 2 options
+    for (final q in _questions) {
+      final type = q['question_type'] as String?;
+      final options = q['options'] as List<dynamic>?;
+      if (_questionTypeHasOptions(type) && (options == null || options.length < 2)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Question "${q['text']}" needs at least 2 options')),
+        );
+        return;
+      }
     }
 
     setState(() => _isSaving = true);
@@ -1192,7 +1517,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
         await _votesService.createVote(
           title: _titleController.text,
           description: descriptionHtml,
-          options: _options,
+          questions: _questions,
           votingStartsAt: _votingStartsAt,
           votingEndsAt: _votingEndsAt,
           resultsPublic: _resultsPublic,
@@ -1211,7 +1536,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           widget.voteId!,
           title: _titleController.text,
           description: descriptionHtml,
-          options: _options,
+          questions: _questions,
           votingStartsAt: _votingStartsAt,
           votingEndsAt: _votingEndsAt,
           resultsPublic: _resultsPublic,
@@ -1257,32 +1582,99 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   }
 }
 
-class _AddOptionDialog extends StatefulWidget {
-  final Function(String) onAdd;
+class _AddQuestionDialog extends StatefulWidget {
+  final List<Map<String, dynamic>> questionTypes;
+  final Function(String type, String text) onAdd;
 
-  const _AddOptionDialog({required this.onAdd});
+  const _AddQuestionDialog({
+    required this.questionTypes,
+    required this.onAdd,
+  });
 
   @override
-  State<_AddOptionDialog> createState() => _AddOptionDialogState();
+  State<_AddQuestionDialog> createState() => _AddQuestionDialogState();
 }
 
-class _AddOptionDialogState extends State<_AddOptionDialog> {
-  final _controller = TextEditingController();
+class _AddQuestionDialogState extends State<_AddQuestionDialog> {
+  final _textController = TextEditingController();
+  String? _selectedType;
 
   @override
   void dispose() {
-    _controller.dispose();
+    _textController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return AlertDialog(
-      title: const Text('Add Option'),
-      content: TextField(
-        controller: _controller,
-        decoration: const InputDecoration(
-          labelText: 'Option Label',
+      title: const Text('Add Question'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Question Type',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: widget.questionTypes.map((type) {
+                final isSelected = _selectedType == type['type'];
+                return ChoiceChip(
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        type['icon'] as IconData,
+                        size: 16,
+                        color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(type['label'] as String),
+                    ],
+                  ),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      _selectedType = selected ? type['type'] as String : null;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            if (_selectedType != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                widget.questionTypes.firstWhere((t) => t['type'] == _selectedType)['description'] as String,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: _textController,
+              decoration: const InputDecoration(
+                labelText: 'Question Text',
+                hintText: 'What would you like to ask?',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+              autofocus: true,
+            ),
+          ],
         ),
       ),
       actions: [
@@ -1291,17 +1683,13 @@ class _AddOptionDialogState extends State<_AddOptionDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: () {
-            if (_controller.text.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please enter an option label')),
-              );
-              return;
-            }
-            widget.onAdd(_controller.text);
-            Navigator.pop(context);
-          },
-          child: const Text('Add'),
+          onPressed: _selectedType == null || _textController.text.isEmpty
+              ? null
+              : () {
+                  widget.onAdd(_selectedType!, _textController.text);
+                  Navigator.pop(context);
+                },
+          child: const Text('Add Question'),
         ),
       ],
     );
