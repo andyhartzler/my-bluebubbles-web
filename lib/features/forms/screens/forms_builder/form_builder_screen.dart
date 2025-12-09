@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/form_schema.dart';
 import '../../models/form_field_config.dart';
 import '../../models/form_field_types.dart';
+import '../../models/identity_config.dart';
 import '../../services/forms_service.dart';
 import '../../widgets/field_config_dialog.dart';
 
@@ -330,6 +331,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
             ),
             const SizedBox(height: 24),
 
+            // Identity Fields Notice (non-editable)
+            _buildIdentityFieldsNotice(isMobile: isMobile),
+
+            const SizedBox(height: 24),
+
             // Add Field Button - responsive layout
             if (isMobile)
               Column(
@@ -442,6 +448,71 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildIdentityFieldsNotice({bool isMobile = false}) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lock_outline, color: Colors.blue.shade700, size: isMobile ? 18 : 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Identity Fields (Always Included)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade900,
+                    fontSize: isMobile ? 14 : 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: isMobile ? 6 : 8),
+          Text(
+            'Every form automatically includes Phone → Name → Email → Zip Code at the start. '
+            'These fields enable person lookup and analytics tracking.',
+            style: TextStyle(
+              color: Colors.blue.shade700,
+              fontSize: isMobile ? 12 : 14,
+            ),
+          ),
+          SizedBox(height: isMobile ? 10 : 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildIdentityFieldChip('Phone Number', Icons.phone, isMobile: isMobile),
+              _buildIdentityFieldChip('Full Name', Icons.person, isMobile: isMobile),
+              _buildIdentityFieldChip('Email', Icons.email, isMobile: isMobile),
+              _buildIdentityFieldChip('Zip Code', Icons.location_on, isMobile: isMobile),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdentityFieldChip(String label, IconData icon, {bool isMobile = false}) {
+    return Chip(
+      avatar: Icon(icon, size: isMobile ? 14 : 16, color: Colors.blue.shade700),
+      label: Text(
+        label,
+        style: TextStyle(fontSize: isMobile ? 11 : 12),
+      ),
+      backgroundColor: Colors.white,
+      padding: isMobile ? EdgeInsets.zero : null,
+      visualDensity: isMobile ? VisualDensity.compact : null,
     );
   }
 
