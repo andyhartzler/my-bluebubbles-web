@@ -6,6 +6,7 @@ import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import '../../models/voting_form.dart';
 import '../../services/votes_service.dart';
 import '../../widgets/results/vote_results_chart.dart';
+import 'vote_builder_screen.dart';
 
 class VoteDetailScreen extends StatefulWidget {
   final String voteId;
@@ -93,6 +94,11 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
         title: Text(_vote?.title ?? 'Vote Details'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: _editVote,
+            tooltip: 'Edit Vote',
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadVote,
             tooltip: 'Refresh',
@@ -100,6 +106,9 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
           PopupMenuButton<String>(
             onSelected: (value) {
               switch (value) {
+                case 'edit':
+                  _editVote();
+                  break;
                 case 'share':
                   _shareVote();
                   break;
@@ -109,6 +118,17 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined),
+                    SizedBox(width: 12),
+                    Text('Edit Vote'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
               const PopupMenuItem(
                 value: 'share',
                 child: Row(
@@ -669,6 +689,17 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
         ),
       );
     }
+  }
+
+  void _editVote() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VoteBuilderScreen(voteId: widget.voteId),
+      ),
+    ).then((_) {
+      // Reload the vote when returning from edit screen
+      _loadVote();
+    });
   }
 
   Widget _buildResultsHidden(ThemeData theme, ColorScheme colorScheme) {

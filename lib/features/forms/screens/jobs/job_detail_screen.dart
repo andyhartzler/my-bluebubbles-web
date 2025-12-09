@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/job.dart';
 import '../../services/jobs_service.dart';
+import 'job_builder_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -332,8 +333,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   void _editJob(Job job) {
-    // Navigate to edit screen
-    // TODO: Implement JobEditScreen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => JobBuilderScreen(jobId: job.id),
+      ),
+    ).then((_) {
+      setState(() {}); // Refresh after edit
+    });
   }
 
   void _openInBrowser() {
