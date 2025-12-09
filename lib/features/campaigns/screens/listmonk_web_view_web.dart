@@ -133,7 +133,12 @@ class _IframeState extends State<Iframe> {
       if (contentWindow != null) {
         try {
           // Try to access the location (this will fail for cross-origin)
-          final location = contentWindow.location.href;
+          // Cast to html.Location to access href property
+          final locationBase = contentWindow.location;
+          final location = (locationBase is html.Location)
+              ? (locationBase as html.Location).href
+              : iframe.src ?? '';
+
           debugPrint('📧 Listmonk: Current URL: $location');
 
           // If URL contains 'login', show help
