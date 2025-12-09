@@ -117,7 +117,9 @@ class VoteCard extends StatelessWidget {
                 spacing: 8,
                 children: [
                   Chip(
-                    label: Text('${vote.optionCount} options'),
+                    label: Text(vote.questionCount == 1
+                      ? '${vote.totalOptionCount} options'
+                      : '${vote.questionCount} questions'),
                     visualDensity: VisualDensity.compact,
                   ),
                   if (vote.isVotingActive)
