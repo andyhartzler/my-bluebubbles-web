@@ -1,6 +1,22 @@
 import 'package:flutter/material.dart';
 import '../models/voting_form.dart';
 
+/// Strip HTML tags from a string for plain text display
+String _stripHtmlTags(String htmlString) {
+  // Remove HTML tags
+  final withoutTags = htmlString.replaceAll(RegExp(r'<[^>]*>'), ' ');
+  // Decode common HTML entities
+  return withoutTags
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
 class VoteCard extends StatelessWidget {
   final VotingForm vote;
   final VoidCallback onTap;
@@ -87,10 +103,10 @@ class VoteCard extends StatelessWidget {
                   ],
                 ],
               ),
-              if (vote.description != null) ...[
+              if (vote.description != null && vote.description!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
-                  vote.description!,
+                  _stripHtmlTags(vote.description!),
                   style: const TextStyle(color: Colors.grey),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
@@ -269,11 +270,20 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
             ),
             if (vote.description != null && vote.description!.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(
-                vote.description!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              Html(
+                data: vote.description!,
+                style: {
+                  'body': Style(
+                    margin: Margins.zero,
+                    padding: HtmlPaddings.zero,
+                    fontSize: FontSize(14),
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  'a': Style(
+                    color: colorScheme.primary,
+                    textDecoration: TextDecoration.underline,
+                  ),
+                },
               ),
             ],
             const SizedBox(height: 16),
