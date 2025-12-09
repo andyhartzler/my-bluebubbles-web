@@ -943,47 +943,6 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
     );
   }
 
-  Widget _buildOptionCard(VotingOption option, {bool isMobile = false}) {
-    if (isMobile) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              const Icon(Icons.radio_button_checked, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  option.label,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete, size: 20),
-                onPressed: () => _deleteOption(option.id),
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: const Icon(Icons.radio_button_checked),
-        title: Text(option.label),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete),
-          onPressed: () => _deleteOption(option.id),
-        ),
-      ),
-    );
-  }
-
   Widget _buildDatePickerTile(
     String label,
     DateTime? value,
