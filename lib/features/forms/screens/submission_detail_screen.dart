@@ -267,9 +267,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           const SizedBox(height: 24),
 
           // Metadata section
-            _buildMetadataCard(context),
-          ],
-        ),
+          _buildMetadataCard(context),
+        ],
       ),
     );
   }
