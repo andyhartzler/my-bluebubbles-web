@@ -83,12 +83,7 @@ class SubmissionDetailScreen extends StatelessWidget {
               backgroundColor: colorScheme.primaryContainer,
               radius: 32,
               child: Text(
-                (submission.submitterName?.isNotEmpty == true
-                        ? submission.submitterName![0]
-                        : submission.submitterEmail?.isNotEmpty == true
-                            ? submission.submitterEmail![0]
-                            : '?')
-                    .toUpperCase(),
+                submission.displayInitial,
                 style: TextStyle(
                   color: colorScheme.onPrimaryContainer,
                   fontWeight: FontWeight.bold,
@@ -102,12 +97,12 @@ class SubmissionDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    submission.submitterName ?? 'Anonymous',
+                    submission.displayName,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  if (submission.submitterEmail != null) ...[
+                  if (submission.displayEmail != null && submission.displayEmail != submission.displayName) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -118,7 +113,7 @@ class SubmissionDetailScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          submission.submitterEmail!,
+                          submission.displayEmail!,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -126,7 +121,7 @@ class SubmissionDetailScreen extends StatelessWidget {
                       ],
                     ),
                   ],
-                  if (submission.submitterPhone != null) ...[
+                  if (submission.submitterPhone != null && submission.submitterPhone!.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
