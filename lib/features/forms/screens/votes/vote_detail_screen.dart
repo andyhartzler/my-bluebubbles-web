@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import '../../models/voting_form.dart';
 import '../../services/votes_service.dart';
 import '../../widgets/results/vote_results_chart.dart';
@@ -19,6 +21,7 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
   final _votesService = VotesService();
   late TabController _tabController;
   VotingForm? _vote;
+  List<Map<String, dynamic>> _voters = [];
   bool _isLoading = true;
   String? _error;
 
@@ -42,9 +45,13 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
     });
 
     try {
-      final vote = await _votesService.getVote(widget.voteId);
+      final results = await Future.wait([
+        _votesService.getVote(widget.voteId),
+        _votesService.getVoters(widget.voteId),
+      ]);
       setState(() {
-        _vote = vote;
+        _vote = results[0] as VotingForm;
+        _voters = results[1] as List<Map<String, dynamic>>;
         _isLoading = false;
       });
     } catch (e) {
@@ -199,6 +206,9 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
                 vote.hasEnded ||
                 vote.status == 'active') ...[
               VoteResultsChart(vote: vote),
+              const SizedBox(height: 24),
+              // Voters list
+              _buildVotersList(theme, colorScheme, vote),
             ] else ...[
               _buildResultsHidden(theme, colorScheme),
             ],
@@ -434,6 +444,231 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildVotersList(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    VotingForm vote,
+  ) {
+    if (_voters.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Icon(Icons.people, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Individual Votes',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_voters.length} voters',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ..._voters.map((voterData) => _buildVoterTile(
+                theme,
+                colorScheme,
+                voterData,
+                vote,
+              )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVoterTile(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    Map<String, dynamic> voterData,
+    VotingForm vote,
+  ) {
+    final memberData = voterData['members'] as Map<String, dynamic>?;
+    final voteData = voterData['vote_data'] as Map<String, dynamic>?;
+    final createdAt = voterData['created_at'] != null
+        ? DateTime.parse(voterData['created_at'].toString())
+        : null;
+
+    // Get member info
+    final memberName = memberData?['name']?.toString() ?? 'Unknown Voter';
+    final memberCity = memberData?['city']?.toString();
+    final memberState = memberData?['state']?.toString();
+    String? memberPhotoUrl;
+
+    // Get photo URL from profile_photos array
+    if (memberData != null && memberData['profile_photos'] != null) {
+      final profilePhotos = memberData['profile_photos'];
+      if (profilePhotos is List && profilePhotos.isNotEmpty) {
+        final firstPhoto = profilePhotos.first;
+        if (firstPhoto is Map) {
+          memberPhotoUrl = firstPhoto['public_url']?.toString() ??
+              firstPhoto['url']?.toString();
+        }
+      }
+    }
+
+    // Get the vote choice
+    String voteChoice = 'Unknown';
+    if (voteData != null) {
+      // vote_data typically contains the option ID or label they voted for
+      // Find the matching option from the vote schema
+      final selectedOptionId = voteData['selected_option'] ??
+          voteData['option_id'] ??
+          voteData['choice'];
+      if (selectedOptionId != null) {
+        final matchingOption = vote.options.firstWhere(
+          (opt) => opt.id == selectedOptionId || opt.label == selectedOptionId,
+          orElse: () => vote.options.isNotEmpty
+              ? VotingOption(
+                  id: '',
+                  label: selectedOptionId.toString(),
+                  votes: 0,
+                )
+              : VotingOption(id: '', label: 'Unknown', votes: 0),
+        );
+        voteChoice = matchingOption.label;
+      } else if (voteData.isNotEmpty) {
+        // Fallback: try to extract the vote choice from whatever is in vote_data
+        voteChoice = voteData.values.first?.toString() ?? 'Unknown';
+      }
+    }
+
+    // Build location string
+    String? location;
+    if (memberCity != null && memberState != null) {
+      location = '$memberCity, $memberState';
+    } else if (memberCity != null) {
+      location = memberCity;
+    } else if (memberState != null) {
+      location = memberState;
+    }
+
+    return InkWell(
+      onTap: memberData != null ? () => _viewMemberProfile(memberData) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            // Member photo
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: colorScheme.primaryContainer,
+              backgroundImage:
+                  memberPhotoUrl != null ? NetworkImage(memberPhotoUrl) : null,
+              child: memberPhotoUrl == null
+                  ? Text(
+                      memberName.isNotEmpty
+                          ? memberName[0].toUpperCase()
+                          : '?',
+                      style: TextStyle(
+                        color: colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            // Member info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    memberName,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (location != null)
+                    Text(
+                      location,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  if (createdAt != null)
+                    Text(
+                      'Voted ${_formatDate(createdAt)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Vote choice
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: colorScheme.tertiaryContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                voteChoice,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onTertiaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _viewMemberProfile(Map<String, dynamic> memberData) {
+    try {
+      final member = Member.fromJson(memberData);
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MemberDetailScreen(member: member),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not load member profile: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildResultsHidden(ThemeData theme, ColorScheme colorScheme) {

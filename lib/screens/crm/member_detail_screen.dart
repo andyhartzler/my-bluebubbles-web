@@ -25,6 +25,8 @@ import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:bluebubbles/features/forms/models/form_submission.dart';
 import 'package:bluebubbles/features/forms/services/forms_service.dart';
 import 'package:bluebubbles/features/forms/widgets/submission_status_badge.dart';
+import 'package:bluebubbles/features/forms/screens/submission_detail_screen.dart';
+import 'package:bluebubbles/features/forms/screens/votes/vote_detail_screen.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -2104,13 +2106,23 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             return ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
+              onTap: () => _viewFormSubmission(submission),
               leading: Icon(Icons.description_outlined, size: 20, color: theme.colorScheme.primary),
               title: Text(
-                'Form ${submission.formId.substring(0, 8)}...',
+                submission.displayName != 'Anonymous'
+                    ? submission.displayName
+                    : 'Form Submission',
                 style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
               ),
               subtitle: Text(dateFormat.format(submission.createdAt)),
-              trailing: SubmissionStatusBadge(status: submission.status, compact: true),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SubmissionStatusBadge(status: submission.status, compact: true),
+                  const SizedBox(width: 4),
+                  Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                ],
+              ),
             );
           }).toList(),
         ),
@@ -2125,20 +2137,46 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           icon: Icons.how_to_vote_outlined,
           count: _votesCast.length,
           children: _votesCast.take(3).map((vote) {
-            final title = vote['form_schemas']?['title'] ?? 'Vote';
-            final createdAt = vote['created_at'] != null
-                ? DateTime.tryParse(vote['created_at'] as String)
+            final title = vote['form_schemas']?['title']?.toString() ?? 'Vote';
+            final voteId = vote['form_schemas']?['id']?.toString();
+            final createdAtRaw = vote['created_at'];
+            final createdAt = createdAtRaw != null
+                ? DateTime.tryParse(createdAtRaw.toString())
                 : null;
+            final voteData = vote['vote_data'] as Map<String, dynamic>?;
+            // Show what they voted for if available
+            String? voteChoice;
+            if (voteData != null && voteData.isNotEmpty) {
+              final firstEntry = voteData.entries.first;
+              voteChoice = firstEntry.value?.toString();
+            }
             return ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
+              onTap: voteId != null ? () => _viewVoteDetails(voteId) : null,
               leading: Icon(Icons.check_circle_outline, size: 20, color: Colors.green),
               title: Text(
                 title,
                 style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                 overflow: TextOverflow.ellipsis,
               ),
-              subtitle: createdAt != null ? Text(dateFormat.format(createdAt)) : null,
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (createdAt != null) Text(dateFormat.format(createdAt)),
+                  if (voteChoice != null)
+                    Text(
+                      'Voted: $voteChoice',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.green,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
+              ),
+              trailing: voteId != null
+                  ? Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.onSurfaceVariant)
+                  : null,
             );
           }).toList(),
         ),
@@ -2153,11 +2191,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           icon: Icons.work_outline,
           count: _jobApplications.length,
           children: _jobApplications.take(3).map((job) {
-            final title = job['form_schemas']?['title'] ?? 'Application';
-            final createdAt = job['created_at'] != null
-                ? DateTime.tryParse(job['created_at'] as String)
+            final title = job['form_schemas']?['title']?.toString() ?? 'Application';
+            final createdAtRaw = job['created_at'];
+            final createdAt = createdAtRaw != null
+                ? DateTime.tryParse(createdAtRaw.toString())
                 : null;
-            final status = job['status'] as String? ?? 'submitted';
+            final status = job['status']?.toString() ?? 'submitted';
             return ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
@@ -2271,6 +2310,27 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           ),
         const SizedBox(height: 12),
       ],
+    );
+  }
+
+  void _viewFormSubmission(FormSubmission submission) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SubmissionDetailScreen(
+          formId: submission.formId,
+          submissionId: submission.id,
+        ),
+      ),
+    );
+  }
+
+  void _viewVoteDetails(String voteId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VoteDetailScreen(voteId: voteId),
+      ),
     );
   }
 
