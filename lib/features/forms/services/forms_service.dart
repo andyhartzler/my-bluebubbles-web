@@ -221,11 +221,11 @@ class FormsService {
             *,
             members:member_id (
               id,
-              first_name,
-              last_name,
+              name,
               email,
               phone,
-              photo_url
+              phone_e164,
+              profile_pictures
             ),
             subscribers:subscriber_id (
               id,
