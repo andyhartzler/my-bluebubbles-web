@@ -194,6 +194,23 @@ class FormsService {
         .eq('id', id);
   }
 
+  /// Get a single submission by ID
+  Future<FormSubmission?> getSubmission(String submissionId) async {
+    try {
+      final response = await _readClient
+          .from('form_submissions')
+          .select()
+          .eq('id', submissionId)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return FormSubmission.fromJson(response);
+    } catch (e) {
+      print('FormsService.getSubmission: Error fetching submission: $e');
+      return null;
+    }
+  }
+
   Future<List<FormSubmission>> getSubmissions(String formId) async {
     try {
       // Use privileged client to bypass RLS for reading submissions

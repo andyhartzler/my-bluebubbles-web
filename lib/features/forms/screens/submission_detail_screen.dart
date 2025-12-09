@@ -4,6 +4,7 @@ import '../models/form_schema.dart';
 import '../models/form_submission.dart';
 import '../models/form_field_config.dart';
 import '../widgets/submission_status_badge.dart';
+import '../services/forms_service.dart';
 import '../../../models/crm/member.dart';
 import '../../../models/crm/subscriber.dart';
 import '../../../screens/crm/member_detail_screen.dart';
@@ -12,14 +13,33 @@ import '../../../services/crm/subscriber_repository.dart';
 
 /// Beautiful submission detail screen showing all field responses
 class SubmissionDetailScreen extends StatefulWidget {
-  final FormSubmission submission;
-  final FormSchema form;
+  /// Constructor with pre-loaded data
+  final FormSubmission? submission;
+  final FormSchema? form;
+
+  /// Constructor with IDs to load data
+  final String? formId;
+  final String? submissionId;
 
   const SubmissionDetailScreen({
     Key? key,
-    required this.submission,
-    required this.form,
-  }) : super(key: key);
+    this.submission,
+    this.form,
+    this.formId,
+    this.submissionId,
+  })  : assert(
+          (submission != null && form != null) ||
+              (formId != null && submissionId != null),
+          'Either provide submission+form or formId+submissionId',
+        ),
+        super(key: key);
+
+  /// Named constructor for loading by IDs
+  const SubmissionDetailScreen.byId({
+    Key? key,
+    required String formId,
+    required String submissionId,
+  }) : this(key: key, formId: formId, submissionId: submissionId);
 
   @override
   State<SubmissionDetailScreen> createState() => _SubmissionDetailScreenState();
@@ -28,23 +48,77 @@ class SubmissionDetailScreen extends StatefulWidget {
 class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   final MemberRepository _memberRepo = MemberRepository();
   final SubscriberRepository _subscriberRepo = SubscriberRepository();
+  final FormsService _formsService = FormsService();
 
   Member? _linkedMember;
   Subscriber? _linkedSubscriber;
   bool _loadingLinkedPerson = false;
 
-  FormSubmission get submission => widget.submission;
-  FormSchema get form => widget.form;
+  // For loading by IDs
+  FormSubmission? _loadedSubmission;
+  FormSchema? _loadedForm;
+  bool _isLoading = true;
+  String? _loadError;
+
+  FormSubmission? get submission => widget.submission ?? _loadedSubmission;
+  FormSchema? get form => widget.form ?? _loadedForm;
 
   @override
   void initState() {
     super.initState();
-    _loadLinkedPerson();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // If data was provided directly, use it
+    if (widget.submission != null && widget.form != null) {
+      setState(() => _isLoading = false);
+      _loadLinkedPerson();
+      return;
+    }
+
+    // Otherwise load by IDs
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        _formsService.getSubmission(widget.submissionId!),
+        _formsService.getForm(widget.formId!),
+      ]);
+
+      final loadedSubmission = results[0] as FormSubmission?;
+      final loadedForm = results[1] as FormSchema;
+
+      if (loadedSubmission == null) {
+        setState(() {
+          _loadError = 'Submission not found';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _loadedSubmission = loadedSubmission;
+        _loadedForm = loadedForm;
+        _isLoading = false;
+      });
+
+      _loadLinkedPerson();
+    } catch (e) {
+      setState(() {
+        _loadError = 'Failed to load submission: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadLinkedPerson() async {
-    // Skip if no linked IDs
-    if (submission.memberId == null && submission.subscriberId == null) {
+    // Skip if no submission loaded or no linked IDs
+    if (submission == null) return;
+    if (submission!.memberId == null && submission!.subscriberId == null) {
       return;
     }
 
@@ -52,16 +126,16 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
     try {
       // Prefer member over subscriber
-      if (submission.memberId != null) {
-        final member = await _memberRepo.getMemberById(submission.memberId!);
+      if (submission!.memberId != null) {
+        final member = await _memberRepo.getMemberById(submission!.memberId!);
         if (mounted && member != null) {
           setState(() => _linkedMember = member);
         }
       }
 
       // Also load subscriber for additional context
-      if (submission.subscriberId != null) {
-        final subscriber = await _subscriberRepo.fetchSubscriberById(submission.subscriberId!);
+      if (submission!.subscriberId != null) {
+        final subscriber = await _subscriberRepo.fetchSubscriberById(submission!.subscriberId!);
         if (mounted && subscriber != null) {
           setState(() => _linkedSubscriber = subscriber);
         }
@@ -109,40 +183,90 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       appBar: AppBar(
         title: const Text('Submission Details'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.content_copy),
-            onPressed: () => _copySubmission(context),
-            tooltip: 'Copy to clipboard',
-          ),
+          if (!_isLoading && submission != null)
+            IconButton(
+              icon: const Icon(Icons.content_copy),
+              onPressed: () => _copySubmission(context),
+              tooltip: 'Copy to clipboard',
+            ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header card with submitter info
-            _buildHeaderCard(context),
-            const SizedBox(height: 20),
+      body: _buildBody(context, theme),
+    );
+  }
 
-            // Responses section
-            Text(
-              'Responses',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+  Widget _buildBody(BuildContext context, ThemeData theme) {
+    // Show loading state
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    // Show error state
+    if (_loadError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: theme.colorScheme.error,
               ),
+              const SizedBox(height: 16),
+              Text(
+                _loadError!,
+                style: theme.textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _loadData,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show empty state if no data
+    if (submission == null || form == null) {
+      return const Center(
+        child: Text('No submission data available'),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header card with submitter info
+          _buildHeaderCard(context),
+          const SizedBox(height: 20),
+
+          // Responses section
+          Text(
+            'Responses',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 16),
 
-            // Field responses
-            ...form.schema.fields.map((field) {
-              final value = submission.data[field.id];
-              return _buildFieldResponseCard(context, field, value);
-            }),
+          // Field responses
+          ...form!.schema.fields.map((field) {
+            final value = submission!.data[field.id];
+            return _buildFieldResponseCard(context, field, value);
+          }),
 
-            const SizedBox(height: 24),
+          const SizedBox(height: 24),
 
-            // Metadata section
+          // Metadata section
             _buildMetadataCard(context),
           ],
         ),
@@ -177,9 +301,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       displayPhone = _linkedSubscriber!.phoneE164 ?? _linkedSubscriber!.phone;
       profilePhotoUrl = null;
     } else {
-      displayName = submission.displayName;
-      displayEmail = submission.displayEmail;
-      displayPhone = submission.submitterPhone;
+      displayName = submission!.displayName;
+      displayEmail = submission!.displayEmail;
+      displayPhone = submission!.submitterPhone;
       profilePhotoUrl = null;
     }
 
@@ -334,7 +458,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               ),
               const SizedBox(width: 12),
               // Status badge using new widget
-              SubmissionStatusBadge(status: submission.status),
+              SubmissionStatusBadge(status: submission!.status),
             ],
           ),
         ),
@@ -962,16 +1086,16 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            _buildMetadataRow(context, 'Submission ID', submission.id),
-            _buildMetadataRow(context, 'Form ID', submission.formId),
-            if (submission.memberId != null)
-              _buildMetadataRow(context, 'Member ID', submission.memberId!),
+            _buildMetadataRow(context, 'Submission ID', submission!.id),
+            _buildMetadataRow(context, 'Form ID', submission!.formId),
+            if (submission!.memberId != null)
+              _buildMetadataRow(context, 'Member ID', submission!.memberId!),
             _buildMetadataRow(
               context,
               'Submitted At',
-              _formatDateTime(submission.createdAt),
+              _formatDateTime(submission!.createdAt),
             ),
-            _buildMetadataRow(context, 'Status', submission.status),
+            _buildMetadataRow(context, 'Status', submission!.status),
           ],
         ),
       ),
@@ -1070,25 +1194,27 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   }
 
   void _copySubmission(BuildContext context) {
+    if (submission == null || form == null) return;
+
     final buffer = StringBuffer();
-    buffer.writeln('Form: ${form.title}');
-    buffer.writeln('Submitted: ${_formatDateTime(submission.createdAt)}');
+    buffer.writeln('Form: ${form!.title}');
+    buffer.writeln('Submitted: ${_formatDateTime(submission!.createdAt)}');
     buffer.writeln('');
 
-    if (submission.submitterName != null) {
-      buffer.writeln('Name: ${submission.submitterName}');
+    if (submission!.submitterName != null) {
+      buffer.writeln('Name: ${submission!.submitterName}');
     }
-    if (submission.submitterEmail != null) {
-      buffer.writeln('Email: ${submission.submitterEmail}');
+    if (submission!.submitterEmail != null) {
+      buffer.writeln('Email: ${submission!.submitterEmail}');
     }
-    if (submission.submitterPhone != null) {
-      buffer.writeln('Phone: ${submission.submitterPhone}');
+    if (submission!.submitterPhone != null) {
+      buffer.writeln('Phone: ${submission!.submitterPhone}');
     }
     buffer.writeln('');
     buffer.writeln('Responses:');
 
-    for (final field in form.schema.fields) {
-      final value = submission.data[field.id];
+    for (final field in form!.schema.fields) {
+      final value = submission!.data[field.id];
       buffer.writeln('${field.label}: ${value ?? 'No response'}');
     }
 
