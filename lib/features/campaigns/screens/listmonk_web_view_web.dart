@@ -133,7 +133,12 @@ class _IframeState extends State<Iframe> {
       if (contentWindow != null) {
         try {
           // Try to access the location (this will fail for cross-origin)
-          final location = contentWindow.location.href;
+          // Cast to html.Location to access href property
+          final locationBase = contentWindow.location;
+          final location = (locationBase is html.Location)
+              ? (locationBase as html.Location).href
+              : iframe.src ?? '';
+
           debugPrint('📧 Listmonk: Current URL: $location');
 
           // If URL contains 'login', show help
@@ -156,24 +161,6 @@ class _IframeState extends State<Iframe> {
     }
   }
 
-  void _openInNewTab() {
-    final uri = Uri.parse(widget.src);
-    final publicUrl = 'https://${uri.host}${uri.path}';
-    html.window.open(publicUrl, '_blank');
-  }
-
-  void _tryDirectLogin() async {
-    // Get credentials and open authenticated URL in new tab
-    final username =
-        await CredentialStorageService.getListmonkUsername() ?? 'admin';
-    final password =
-        await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
-
-    final uri = Uri.parse(widget.src);
-    final authenticatedUrl = 'https://$username:$password@${uri.host}${uri.path}';
-
-    html.window.open(authenticatedUrl, '_blank');
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -236,7 +223,7 @@ class _IframeState extends State<Iframe> {
             ),
           ),
 
-        // Login help banner (shows if Basic Auth didn't work)
+        // Login credentials banner (shows if Basic Auth didn't work)
         if (_showLoginHelp && !_isLoading)
           Positioned(
             top: 0,
@@ -244,12 +231,13 @@ class _IframeState extends State<Iframe> {
             right: 0,
             child: Material(
               elevation: 4,
-              color: Colors.orange[100],
+              color: Colors.blue[50],
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, color: Colors.orange[800]),
+                    Icon(Icons.key, color: Colors.blue[700], size: 28),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -257,41 +245,93 @@ class _IframeState extends State<Iframe> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Auto-login not supported in this browser',
+                            'Please use these credentials to login below',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Colors.orange[900],
+                              fontSize: 14,
+                              color: Colors.blue[900],
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Chrome blocks auto-login for security. Please login manually or open in new tab.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange[800],
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.blue.shade200),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        'Username:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: SelectableText(
+                                        'admin',
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 13,
+                                          color: Colors.blue[900],
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        'Password:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: SelectableText(
+                                        'fucktrump67',
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 13,
+                                          color: Colors.blue[900],
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 12),
-                    TextButton.icon(
-                      onPressed: _tryDirectLogin,
-                      icon: const Icon(Icons.open_in_new, size: 16),
-                      label: const Text('Open in Tab'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.orange[900],
-                        backgroundColor: Colors.white,
-                      ),
-                    ),
                     IconButton(
-                      icon: const Icon(Icons.close, size: 18),
+                      icon: const Icon(Icons.close, size: 20),
                       onPressed: () {
                         setState(() {
                           _showLoginHelp = false;
                         });
                       },
-                      color: Colors.orange[800],
+                      color: Colors.blue[700],
+                      tooltip: 'Dismiss',
                     ),
                   ],
                 ),
