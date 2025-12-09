@@ -169,7 +169,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       displayEmail = _linkedMember!.email;
       displayPhone = _linkedMember!.phoneE164 ?? _linkedMember!.phone;
       profilePhotoUrl = _linkedMember!.profilePhotos.isNotEmpty
-          ? _linkedMember!.profilePhotos.first.url
+          ? _linkedMember!.profilePhotos.first.publicUrl
           : null;
     } else if (hasLinkedSubscriber) {
       displayName = _linkedSubscriber!.name;
