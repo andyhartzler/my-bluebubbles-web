@@ -238,6 +238,28 @@ class SubscriberRepository {
       ..sort((a, b) => a.compareTo(b));
   }
 
+  /// Fetch a single subscriber by ID
+  Future<Subscriber?> fetchSubscriberById(String id) async {
+    if (!isReady) return null;
+
+    try {
+      final response = await _readClient
+          .from('subscribers')
+          .select('''
+            *,
+            donor:donor_id(id,total_donated,donation_count,last_donation_date)
+          ''')
+          .eq('id', id)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return Subscriber.fromJson(response);
+    } catch (e) {
+      print('Error fetching subscriber by ID: $e');
+      return null;
+    }
+  }
+
   Future<Subscriber> updateSubscriber(
     String id, {
     required Map<String, dynamic> data,

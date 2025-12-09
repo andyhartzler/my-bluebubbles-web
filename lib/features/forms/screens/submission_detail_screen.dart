@@ -3,9 +3,15 @@ import 'package:flutter/services.dart';
 import '../models/form_schema.dart';
 import '../models/form_submission.dart';
 import '../models/form_field_config.dart';
+import '../widgets/submission_status_badge.dart';
+import '../../../models/crm/member.dart';
+import '../../../models/crm/subscriber.dart';
+import '../../../screens/crm/member_detail_screen.dart';
+import '../../../services/crm/member_repository.dart';
+import '../../../services/crm/subscriber_repository.dart';
 
 /// Beautiful submission detail screen showing all field responses
-class SubmissionDetailScreen extends StatelessWidget {
+class SubmissionDetailScreen extends StatefulWidget {
   final FormSubmission submission;
   final FormSchema form;
 
@@ -16,9 +22,88 @@ class SubmissionDetailScreen extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<SubmissionDetailScreen> createState() => _SubmissionDetailScreenState();
+}
+
+class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
+  final MemberRepository _memberRepo = MemberRepository();
+  final SubscriberRepository _subscriberRepo = SubscriberRepository();
+
+  Member? _linkedMember;
+  Subscriber? _linkedSubscriber;
+  bool _loadingLinkedPerson = false;
+
+  FormSubmission get submission => widget.submission;
+  FormSchema get form => widget.form;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLinkedPerson();
+  }
+
+  Future<void> _loadLinkedPerson() async {
+    // Skip if no linked IDs
+    if (submission.memberId == null && submission.subscriberId == null) {
+      return;
+    }
+
+    setState(() => _loadingLinkedPerson = true);
+
+    try {
+      // Prefer member over subscriber
+      if (submission.memberId != null) {
+        final member = await _memberRepo.getMemberById(submission.memberId!);
+        if (mounted && member != null) {
+          setState(() => _linkedMember = member);
+        }
+      }
+
+      // Also load subscriber for additional context
+      if (submission.subscriberId != null) {
+        final subscriber = await _subscriberRepo.fetchSubscriberById(submission.subscriberId!);
+        if (mounted && subscriber != null) {
+          setState(() => _linkedSubscriber = subscriber);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading linked person: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _loadingLinkedPerson = false);
+      }
+    }
+  }
+
+  void _navigateToMemberProfile() {
+    if (_linkedMember != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MemberDetailScreen(member: _linkedMember!),
+        ),
+      );
+    }
+  }
+
+  void _navigateToSubscriberProfile() {
+    // Show subscriber detail sheet
+    if (_linkedSubscriber != null) {
+      _showSubscriberDetailSheet(_linkedSubscriber!);
+    }
+  }
+
+  Future<void> _showSubscriberDetailSheet(Subscriber subscriber) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _SubscriberDetailBottomSheet(subscriber: subscriber),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -69,111 +154,283 @@ class SubmissionDetailScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    // Determine display info - prefer member, then subscriber, then raw submission
+    final hasLinkedMember = _linkedMember != null;
+    final hasLinkedSubscriber = _linkedSubscriber != null && !hasLinkedMember;
+    final hasLinkedPerson = hasLinkedMember || hasLinkedSubscriber;
+
+    String displayName;
+    String? displayEmail;
+    String? displayPhone;
+    String? profilePhotoUrl;
+
+    if (hasLinkedMember) {
+      displayName = _linkedMember!.name;
+      displayEmail = _linkedMember!.email;
+      displayPhone = _linkedMember!.phoneE164 ?? _linkedMember!.phone;
+      profilePhotoUrl = _linkedMember!.profilePhotos.isNotEmpty
+          ? _linkedMember!.profilePhotos.first.url
+          : null;
+    } else if (hasLinkedSubscriber) {
+      displayName = _linkedSubscriber!.name;
+      displayEmail = _linkedSubscriber!.email;
+      displayPhone = _linkedSubscriber!.phoneE164 ?? _linkedSubscriber!.phone;
+      profilePhotoUrl = null;
+    } else {
+      displayName = submission.displayName;
+      displayEmail = submission.displayEmail;
+      displayPhone = submission.submitterPhone;
+      profilePhotoUrl = null;
+    }
+
+    final isAnonymous = displayName == 'Anonymous' && !hasLinkedPerson;
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: colorScheme.outlineVariant),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: colorScheme.primaryContainer,
-              radius: 32,
-              child: Text(
-                submission.displayInitial,
-                style: TextStyle(
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: hasLinkedMember
+            ? _navigateToMemberProfile
+            : (hasLinkedSubscriber ? _navigateToSubscriberProfile : null),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              // Profile avatar with photo support
+              _buildProfileAvatar(
+                context,
+                displayName: displayName,
+                photoUrl: profilePhotoUrl,
+                hasLinkedPerson: hasLinkedPerson,
+                isAnonymous: isAnonymous,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Name with link indicator
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            displayName,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: hasLinkedPerson
+                                  ? colorScheme.primary
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        if (hasLinkedPerson) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: hasLinkedMember
+                                  ? Colors.blue.withOpacity(0.1)
+                                  : Colors.teal.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  hasLinkedMember
+                                      ? Icons.person
+                                      : Icons.contact_mail,
+                                  size: 12,
+                                  color: hasLinkedMember
+                                      ? Colors.blue
+                                      : Colors.teal,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  hasLinkedMember ? 'Member' : 'Subscriber',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: hasLinkedMember
+                                        ? Colors.blue
+                                        : Colors.teal,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (displayEmail != null && displayEmail != displayName) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.email_outlined,
+                            size: 16,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              displayEmail,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (displayPhone != null && displayPhone.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.phone_outlined,
+                            size: 16,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            displayPhone,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    // Show tap hint for linked profiles
+                    if (hasLinkedPerson) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.open_in_new,
+                            size: 14,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Tap to view profile',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Status badge using new widget
+              SubmissionStatusBadge(status: submission.status),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileAvatar(
+    BuildContext context, {
+    required String displayName,
+    String? photoUrl,
+    bool hasLinkedPerson = false,
+    bool isAnonymous = false,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Determine avatar color
+    Color backgroundColor;
+    Color foregroundColor;
+    if (hasLinkedPerson) {
+      backgroundColor = colorScheme.primaryContainer;
+      foregroundColor = colorScheme.onPrimaryContainer;
+    } else if (isAnonymous) {
+      backgroundColor = Colors.grey.shade200;
+      foregroundColor = Colors.grey.shade600;
+    } else {
+      backgroundColor = colorScheme.secondaryContainer;
+      foregroundColor = colorScheme.onSecondaryContainer;
+    }
+
+    // Get initial
+    String initial = '?';
+    if (displayName.isNotEmpty && displayName != 'Anonymous') {
+      initial = displayName[0].toUpperCase();
+    }
+
+    // If we have a photo URL, show the image
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return Stack(
+        children: [
+          CircleAvatar(
+            radius: 32,
+            backgroundImage: NetworkImage(photoUrl),
+            backgroundColor: backgroundColor,
+            onBackgroundImageError: (_, __) {},
+          ),
+          if (_loadingLinkedPerson)
+            Positioned.fill(
+              child: CircleAvatar(
+                radius: 32,
+                backgroundColor: Colors.black26,
+                child: const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    submission.displayName,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (submission.displayEmail != null && submission.displayEmail != submission.displayName) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.email_outlined,
-                          size: 16,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          submission.displayEmail!,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (submission.submitterPhone != null && submission.submitterPhone!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.phone_outlined,
-                          size: 16,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          submission.submitterPhone!,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
+        ],
+      );
+    }
+
+    // Otherwise show initial avatar
+    return Stack(
+      children: [
+        CircleAvatar(
+          backgroundColor: backgroundColor,
+          radius: 32,
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: foregroundColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.check_circle,
-                    size: 16,
-                    color: Colors.green,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    submission.status,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        if (_loadingLinkedPerson)
+          Positioned.fill(
+            child: CircleAvatar(
+              radius: 32,
+              backgroundColor: Colors.black26,
+              child: const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -840,6 +1097,252 @@ class SubmissionDetailScreen extends StatelessWidget {
       const SnackBar(
         content: Text('Submission copied to clipboard'),
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+}
+
+/// Bottom sheet for displaying subscriber details
+class _SubscriberDetailBottomSheet extends StatelessWidget {
+  final Subscriber subscriber;
+
+  const _SubscriberDetailBottomSheet({required this.subscriber});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: Colors.teal.withOpacity(0.1),
+                      child: Text(
+                        subscriber.name.isNotEmpty
+                            ? subscriber.name[0].toUpperCase()
+                            : '?',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            subscriber.name,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.contact_mail,
+                                size: 14,
+                                color: Colors.teal,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Subscriber',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: Colors.teal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Content
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _buildInfoTile(
+                      context,
+                      icon: Icons.email_outlined,
+                      label: 'Email',
+                      value: subscriber.email,
+                    ),
+                    if (subscriber.phoneE164 != null)
+                      _buildInfoTile(
+                        context,
+                        icon: Icons.phone_outlined,
+                        label: 'Phone',
+                        value: subscriber.phoneE164!,
+                      ),
+                    if (subscriber.city != null || subscriber.state != null)
+                      _buildInfoTile(
+                        context,
+                        icon: Icons.location_on_outlined,
+                        label: 'Location',
+                        value:
+                            '${subscriber.city ?? ''}${subscriber.city != null && subscriber.state != null ? ', ' : ''}${subscriber.state ?? ''}',
+                      ),
+                    if (subscriber.zipCode != null)
+                      _buildInfoTile(
+                        context,
+                        icon: Icons.local_post_office_outlined,
+                        label: 'Zip Code',
+                        value: subscriber.zipCode!,
+                      ),
+                    if (subscriber.county != null)
+                      _buildInfoTile(
+                        context,
+                        icon: Icons.map_outlined,
+                        label: 'County',
+                        value: subscriber.county!,
+                      ),
+                    if (subscriber.source != null)
+                      _buildInfoTile(
+                        context,
+                        icon: Icons.source_outlined,
+                        label: 'Source',
+                        value: subscriber.source!,
+                      ),
+                    if (subscriber.subscribed != null)
+                      _buildInfoTile(
+                        context,
+                        icon: subscriber.subscribed!
+                            ? Icons.check_circle_outline
+                            : Icons.cancel_outlined,
+                        label: 'Subscription Status',
+                        value: subscriber.subscribed! ? 'Subscribed' : 'Unsubscribed',
+                        valueColor:
+                            subscriber.subscribed! ? Colors.green : Colors.red,
+                      ),
+                    if (subscriber.donor != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Donor Information',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoTile(
+                        context,
+                        icon: Icons.volunteer_activism_outlined,
+                        label: 'Total Donated',
+                        value:
+                            '\$${(subscriber.donor!.totalDonated ?? 0).toStringAsFixed(2)}',
+                      ),
+                      _buildInfoTile(
+                        context,
+                        icon: Icons.numbers,
+                        label: 'Donation Count',
+                        value: '${subscriber.donor!.donationCount}',
+                      ),
+                    ],
+                    if (subscriber.notes != null &&
+                        subscriber.notes!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Notes',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(subscriber.notes!),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoTile(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: valueColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
