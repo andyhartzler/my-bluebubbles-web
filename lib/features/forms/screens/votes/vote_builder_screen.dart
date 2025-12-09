@@ -1632,6 +1632,7 @@ class _AddQuestionDialogState extends State<_AddQuestionDialog> {
               ),
               maxLines: 2,
               autofocus: true,
+              onChanged: (_) => setState(() {}),
             ),
           ],
         ),

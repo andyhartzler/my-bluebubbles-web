@@ -568,32 +568,6 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
       }
     }
 
-    // Get the vote choice
-    String voteChoice = 'Unknown';
-    if (voteData != null) {
-      // vote_data typically contains the option ID or label they voted for
-      // Find the matching option from the vote schema
-      final selectedOptionId = voteData['selected_option'] ??
-          voteData['option_id'] ??
-          voteData['choice'];
-      if (selectedOptionId != null) {
-        final matchingOption = vote.options.firstWhere(
-          (opt) => opt.id == selectedOptionId || opt.label == selectedOptionId,
-          orElse: () => vote.options.isNotEmpty
-              ? VotingOption(
-                  id: '',
-                  label: selectedOptionId.toString(),
-                  votes: 0,
-                )
-              : VotingOption(id: '', label: 'Unknown', votes: 0),
-        );
-        voteChoice = matchingOption.label;
-      } else if (voteData.isNotEmpty) {
-        // Fallback: try to extract the vote choice from whatever is in vote_data
-        voteChoice = voteData.values.first?.toString() ?? 'Unknown';
-      }
-    }
-
     // Build location string
     String? location;
     if (memberCity != null && memberState != null) {
@@ -604,83 +578,338 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
       location = memberState;
     }
 
-    return InkWell(
-      onTap: memberData != null ? () => _viewMemberProfile(memberData) : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            // Member photo
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: colorScheme.primaryContainer,
-              backgroundImage:
-                  memberPhotoUrl != null ? NetworkImage(memberPhotoUrl) : null,
-              child: memberPhotoUrl == null
-                  ? Text(
-                      memberName.isNotEmpty
-                          ? memberName[0].toUpperCase()
-                          : '?',
-                      style: TextStyle(
-                        color: colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            // Member info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    memberName,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (location != null)
-                    Text(
-                      location,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  if (createdAt != null)
-                    Text(
-                      'Voted ${_formatDate(createdAt)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
+    // Get answer summary for display
+    final answerSummary = _getVoterAnswerSummary(vote, voteData);
+
+    return ExpansionTile(
+      leading: CircleAvatar(
+        radius: 24,
+        backgroundColor: colorScheme.primaryContainer,
+        backgroundImage: memberPhotoUrl != null ? NetworkImage(memberPhotoUrl) : null,
+        child: memberPhotoUrl == null
+            ? Text(
+                memberName.isNotEmpty ? memberName[0].toUpperCase() : '?',
+                style: TextStyle(
+                  color: colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+            : null,
+      ),
+      title: Text(
+        memberName,
+        style: theme.textTheme.bodyLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (location != null)
+            Text(
+              location,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
-            // Vote choice
+          if (createdAt != null)
+            Text(
+              'Voted ${_formatDate(createdAt)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+        ],
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (answerSummary.isNotEmpty)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              constraints: const BoxConstraints(maxWidth: 120),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: colorScheme.tertiaryContainer,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                voteChoice,
-                style: theme.textTheme.labelMedium?.copyWith(
+                answerSummary,
+                style: theme.textTheme.labelSmall?.copyWith(
                   color: colorScheme.onTertiaryContainer,
                   fontWeight: FontWeight.w600,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right,
-              color: colorScheme.onSurfaceVariant,
+          const SizedBox(width: 4),
+          const Icon(Icons.expand_more),
+        ],
+      ),
+      children: [
+        _buildVoterAnswersDetail(theme, colorScheme, vote, voteData),
+        // View Profile button
+        if (memberData != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: OutlinedButton.icon(
+              onPressed: () => _viewMemberProfile(memberData),
+              icon: const Icon(Icons.person, size: 18),
+              label: const Text('View Profile'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 40),
+              ),
             ),
-          ],
+          ),
+      ],
+    );
+  }
+
+  String _getVoterAnswerSummary(VotingForm vote, Map<String, dynamic>? voteData) {
+    if (voteData == null || voteData.isEmpty) return 'No response';
+
+    final questions = vote.questions;
+    if (questions.isEmpty) return 'Voted';
+
+    // For single question, show the answer
+    if (questions.length == 1) {
+      final questionId = questions.first['id'] as String?;
+      if (questionId != null && voteData.containsKey(questionId)) {
+        final answer = voteData[questionId];
+        if (answer is String) return answer;
+        if (answer is List && answer.isNotEmpty) return answer.first.toString();
+        return answer?.toString() ?? 'Voted';
+      }
+      // Fallback to first value
+      return voteData.values.first?.toString() ?? 'Voted';
+    }
+
+    // For multiple questions, show count
+    return '${questions.length} answers';
+  }
+
+  Widget _buildVoterAnswersDetail(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    VotingForm vote,
+    Map<String, dynamic>? voteData,
+  ) {
+    if (voteData == null || voteData.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          'No responses recorded',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
         ),
+      );
+    }
+
+    final questions = vote.questions;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: questions.asMap().entries.map((entry) {
+          final index = entry.key;
+          final question = entry.value;
+          final questionId = question['id'] as String? ?? 'question_$index';
+          final questionText = question['text'] as String? ?? 'Question ${index + 1}';
+          final questionType = question['question_type'] as String? ?? 'multiple_choice';
+          final options = (question['options'] as List<dynamic>?) ?? [];
+
+          // Get the answer for this question
+          final answer = voteData[questionId] ?? voteData['question_$index'];
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Q${index + 1}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        questionText,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _buildAnswerDisplay(theme, colorScheme, questionType, options, answer),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
+  }
+
+  Widget _buildAnswerDisplay(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    String questionType,
+    List<dynamic> options,
+    dynamic answer,
+  ) {
+    if (answer == null) {
+      return Text(
+        'No answer',
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: colorScheme.onSurfaceVariant,
+          fontStyle: FontStyle.italic,
+        ),
+      );
+    }
+
+    switch (questionType) {
+      case 'multiple_choice':
+      case 'yes_no':
+        // Find the option label if answer is an ID
+        String displayAnswer = answer.toString();
+        for (final opt in options) {
+          if ((opt as Map<String, dynamic>)['id'] == answer) {
+            displayAnswer = opt['label'] as String? ?? answer.toString();
+            break;
+          }
+        }
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            displayAnswer,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+
+      case 'multiple_select':
+        final selections = answer is List ? answer : [answer];
+        return Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: selections.map((sel) {
+            String displayLabel = sel.toString();
+            for (final opt in options) {
+              if ((opt as Map<String, dynamic>)['id'] == sel) {
+                displayLabel = opt['label'] as String? ?? sel.toString();
+                break;
+              }
+            }
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                displayLabel,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSecondaryContainer,
+                ),
+              ),
+            );
+          }).toList(),
+        );
+
+      case 'ranked_choice':
+        final rankings = answer is List ? answer : [answer];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: rankings.asMap().entries.map((entry) {
+            final rank = entry.key + 1;
+            final item = entry.value;
+            String displayLabel = item.toString();
+            for (final opt in options) {
+              if ((opt as Map<String, dynamic>)['id'] == item) {
+                displayLabel = opt['label'] as String? ?? item.toString();
+                break;
+              }
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '$rank',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(displayLabel, style: theme.textTheme.bodyMedium),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+
+      case 'rating_scale':
+        final rating = int.tryParse(answer.toString()) ?? 0;
+        return Row(
+          children: List.generate(5, (index) {
+            return Icon(
+              index < rating ? Icons.star : Icons.star_border,
+              color: Colors.amber,
+              size: 24,
+            );
+          }),
+        );
+
+      case 'short_answer':
+      default:
+        return Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Text(
+            answer.toString(),
+            style: theme.textTheme.bodyMedium,
+          ),
+        );
+    }
   }
 
   void _viewMemberProfile(Map<String, dynamic> memberData) {
@@ -752,82 +981,22 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
 
   Widget _buildDetailsTab(ThemeData theme, ColorScheme colorScheme) {
     final vote = _vote!;
+    final questions = vote.questions;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Options list
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: colorScheme.outlineVariant),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Icon(Icons.list_alt, color: colorScheme.primary),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Voting Options',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${vote.options.length} options',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                ...vote.options.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final option = entry.value;
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: colorScheme.primaryContainer,
-                      child: Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          color: colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      option.label,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    subtitle: option.description != null
-                        ? Text(option.description!)
-                        : null,
-                  );
-                }),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+          // Questions list
+          ...questions.asMap().entries.map((entry) {
+            final index = entry.key;
+            final question = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _buildQuestionCard(theme, colorScheme, question, index),
+            );
+          }),
 
           // Schedule card
           Card(
@@ -965,6 +1134,215 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuestionCard(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    Map<String, dynamic> question,
+    int questionIndex,
+  ) {
+    final questionText = question['text'] as String? ?? 'Question ${questionIndex + 1}';
+    final questionType = question['question_type'] as String? ?? 'multiple_choice';
+    final options = (question['options'] as List<dynamic>?) ?? [];
+    final required = question['required'] as bool? ?? false;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Q${questionIndex + 1}',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    questionText,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                _buildQuestionTypeChip(theme, colorScheme, questionType),
+              ],
+            ),
+          ),
+          if (required)
+            Padding(
+              padding: const EdgeInsets.only(left: 20, bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Required',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          if (options.isNotEmpty) ...[
+            const Divider(height: 1),
+            ...options.asMap().entries.map((entry) {
+              final optIndex = entry.key;
+              final option = entry.value as Map<String, dynamic>;
+              final label = option['label'] as String? ?? 'Option';
+              final description = option['description'] as String?;
+
+              return ListTile(
+                leading: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: colorScheme.primaryContainer,
+                  child: Text(
+                    '${optIndex + 1}',
+                    style: TextStyle(
+                      color: colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                subtitle: description != null && description.isNotEmpty
+                    ? Text(description)
+                    : null,
+              );
+            }),
+          ] else if (questionType == 'short_answer') ...[
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Icon(Icons.text_fields, color: colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Free text response',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (questionType == 'yes_no') ...[
+            const Divider(height: 1),
+            ListTile(
+              leading: CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.green.withOpacity(0.2),
+                child: const Icon(Icons.check, color: Colors.green, size: 16),
+              ),
+              title: const Text('Yes', style: TextStyle(fontWeight: FontWeight.w500)),
+            ),
+            ListTile(
+              leading: CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.red.withOpacity(0.2),
+                child: const Icon(Icons.close, color: Colors.red, size: 16),
+              ),
+              title: const Text('No', style: TextStyle(fontWeight: FontWeight.w500)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuestionTypeChip(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    String questionType,
+  ) {
+    IconData icon;
+    String label;
+    Color color;
+
+    switch (questionType) {
+      case 'multiple_choice':
+        icon = Icons.radio_button_checked;
+        label = 'Single Choice';
+        color = Colors.blue;
+        break;
+      case 'multiple_select':
+        icon = Icons.check_box;
+        label = 'Multi-Select';
+        color = Colors.purple;
+        break;
+      case 'ranked_choice':
+        icon = Icons.format_list_numbered;
+        label = 'Ranked';
+        color = Colors.orange;
+        break;
+      case 'yes_no':
+        icon = Icons.thumbs_up_down;
+        label = 'Yes/No';
+        color = Colors.green;
+        break;
+      case 'rating_scale':
+        icon = Icons.star;
+        label = 'Rating';
+        color = Colors.amber;
+        break;
+      case 'short_answer':
+        icon = Icons.short_text;
+        label = 'Text';
+        color = Colors.teal;
+        break;
+      default:
+        icon = Icons.help_outline;
+        label = questionType;
+        color = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
