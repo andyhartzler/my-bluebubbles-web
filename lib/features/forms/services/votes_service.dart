@@ -347,9 +347,8 @@ class VotesService {
             email,
             phone,
             phone_e164,
-            city,
-            state,
-            profile_photos
+            county,
+            profile_pictures
           )
         ''')
         .eq('voting_form_id', votingFormId)
