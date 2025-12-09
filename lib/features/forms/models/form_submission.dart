@@ -141,20 +141,16 @@ extension FormSubmissionDisplay on FormSubmission {
     }
     // Try member name from joined data
     if (members != null) {
-      final firstName = members!['first_name']?.toString();
-      final lastName = members!['last_name']?.toString();
-      if ((firstName != null && firstName.isNotEmpty) ||
-          (lastName != null && lastName.isNotEmpty)) {
-        return [firstName, lastName].where((s) => s != null && s.isNotEmpty).join(' ');
+      final name = members!['name']?.toString();
+      if (name != null && name.isNotEmpty) {
+        return name;
       }
     }
     // Try subscriber name from joined data
     if (subscribers != null) {
-      final firstName = subscribers!['first_name']?.toString();
-      final lastName = subscribers!['last_name']?.toString();
-      if ((firstName != null && firstName.isNotEmpty) ||
-          (lastName != null && lastName.isNotEmpty)) {
-        return [firstName, lastName].where((s) => s != null && s.isNotEmpty).join(' ');
+      final name = subscribers!['name']?.toString();
+      if (name != null && name.isNotEmpty) {
+        return name;
       }
     }
     // Try email
@@ -192,9 +188,66 @@ extension FormSubmissionDisplay on FormSubmission {
   }
 
   String? get displayPhotoUrl {
-    if (members != null && members!['photo_url'] != null) {
-      return members!['photo_url']?.toString();
+    if (members == null) return null;
+
+    // Try to get profile pictures from joined member data
+    final profilePictures = members!['profile_pictures'];
+    if (profilePictures == null) return null;
+
+    // Handle list of photos
+    if (profilePictures is List && profilePictures.isNotEmpty) {
+      final firstPhoto = profilePictures.first;
+      return _extractPhotoUrl(firstPhoto);
     }
+
+    // Handle single photo entry
+    if (profilePictures is Map) {
+      return _extractPhotoUrl(profilePictures);
+    }
+
+    // Handle string URL directly
+    if (profilePictures is String && profilePictures.isNotEmpty) {
+      return profilePictures;
+    }
+
+    return null;
+  }
+
+  /// Helper to extract URL from a photo entry
+  String? _extractPhotoUrl(dynamic photo) {
+    if (photo == null) return null;
+
+    // If it's already a string URL, return it
+    if (photo is String && photo.isNotEmpty) {
+      return photo;
+    }
+
+    if (photo is Map) {
+      // Try common URL field names
+      final url = photo['publicUrl'] ??
+                  photo['public_url'] ??
+                  photo['url'];
+      if (url != null && url.toString().isNotEmpty) {
+        return url.toString();
+      }
+
+      // Try to construct URL from path
+      final path = photo['path']?.toString();
+      if (path != null && path.isNotEmpty) {
+        // If path is already a full URL, return it
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+          return path;
+        }
+        // If path starts with storage/, it's a relative Supabase storage path
+        if (path.startsWith('storage/')) {
+          return path; // Will be prefixed with Supabase URL by image widget
+        }
+        // Construct storage URL path
+        final bucket = photo['bucket']?.toString() ?? 'member-photos';
+        return 'storage/v1/object/public/$bucket/$path';
+      }
+    }
+
     return null;
   }
 
