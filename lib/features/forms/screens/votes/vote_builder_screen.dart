@@ -1229,17 +1229,16 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Question text editor
-                TextField(
+                TextFormField(
                   decoration: const InputDecoration(
                     labelText: 'Question Text',
                     border: OutlineInputBorder(),
                     hintText: 'Enter your question',
                   ),
-                  controller: TextEditingController(text: text),
+                  initialValue: text,
                   onChanged: (value) {
-                    setState(() {
-                      _questions[index]['text'] = value;
-                    });
+                    // Update without setState to avoid cursor reset
+                    _questions[index]['text'] = value;
                   },
                 ),
                 const SizedBox(height: 16),
@@ -1318,37 +1317,29 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: TextField(
+                        child: TextFormField(
                           decoration: const InputDecoration(
                             labelText: 'Min Value',
                             border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
-                          controller: TextEditingController(
-                            text: (question['min_value'] ?? 1).toString(),
-                          ),
+                          initialValue: (question['min_value'] ?? 1).toString(),
                           onChanged: (value) {
-                            setState(() {
-                              _questions[index]['min_value'] = int.tryParse(value) ?? 1;
-                            });
+                            _questions[index]['min_value'] = int.tryParse(value) ?? 1;
                           },
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: TextField(
+                        child: TextFormField(
                           decoration: const InputDecoration(
                             labelText: 'Max Value',
                             border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
-                          controller: TextEditingController(
-                            text: (question['max_value'] ?? 5).toString(),
-                          ),
+                          initialValue: (question['max_value'] ?? 5).toString(),
                           onChanged: (value) {
-                            setState(() {
-                              _questions[index]['max_value'] = int.tryParse(value) ?? 5;
-                            });
+                            _questions[index]['max_value'] = int.tryParse(value) ?? 5;
                           },
                         ),
                       ),
