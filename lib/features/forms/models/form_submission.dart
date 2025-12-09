@@ -1,3 +1,5 @@
+import 'package:bluebubbles/config/crm_config.dart';
+
 /// Form submission model with manual JSON serialization
 /// Note: Converted from Freezed to manual to avoid build_runner dependency issues
 class FormSubmission {
@@ -217,9 +219,13 @@ extension FormSubmissionDisplay on FormSubmission {
   String? _extractPhotoUrl(dynamic photo) {
     if (photo == null) return null;
 
-    // If it's already a string URL, return it
+    // If it's already a full URL string, return it
     if (photo is String && photo.isNotEmpty) {
-      return photo;
+      if (photo.startsWith('http://') || photo.startsWith('https://')) {
+        return photo;
+      }
+      // Construct full URL from relative path
+      return _buildFullUrl(photo);
     }
 
     if (photo is Map) {
@@ -228,7 +234,11 @@ extension FormSubmissionDisplay on FormSubmission {
                   photo['public_url'] ??
                   photo['url'];
       if (url != null && url.toString().isNotEmpty) {
-        return url.toString();
+        final urlStr = url.toString();
+        if (urlStr.startsWith('http://') || urlStr.startsWith('https://')) {
+          return urlStr;
+        }
+        return _buildFullUrl(urlStr);
       }
 
       // Try to construct URL from path
@@ -238,17 +248,34 @@ extension FormSubmissionDisplay on FormSubmission {
         if (path.startsWith('http://') || path.startsWith('https://')) {
           return path;
         }
-        // If path starts with storage/, it's a relative Supabase storage path
-        if (path.startsWith('storage/')) {
-          return path; // Will be prefixed with Supabase URL by image widget
-        }
         // Construct storage URL path
         final bucket = photo['bucket']?.toString() ?? 'member-photos';
-        return 'storage/v1/object/public/$bucket/$path';
+        final storagePath = path.startsWith('storage/')
+            ? path
+            : 'storage/v1/object/public/$bucket/$path';
+        return _buildFullUrl(storagePath);
       }
     }
 
     return null;
+  }
+
+  /// Build full URL from relative path using Supabase URL
+  String? _buildFullUrl(String relativePath) {
+    final supabaseUrl = CRMConfig.supabaseUrl;
+    if (supabaseUrl.isEmpty) return null;
+
+    // Ensure path starts with /
+    final normalizedPath = relativePath.startsWith('/')
+        ? relativePath
+        : '/$relativePath';
+
+    // Remove trailing slash from base URL if present
+    final baseUrl = supabaseUrl.endsWith('/')
+        ? supabaseUrl.substring(0, supabaseUrl.length - 1)
+        : supabaseUrl;
+
+    return '$baseUrl$normalizedPath';
   }
 
   String get displayInitial {
