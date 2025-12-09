@@ -16,11 +16,15 @@ class FormsService {
 
   Stream<List<FormSchema>> watchForms(String typeFilter) {
     if (typeFilter == 'all') {
+      // When showing 'all' forms, exclude votes since they have their own management screen
       return _supabase
           .from('form_schemas')
           .stream(primaryKey: ['id'])
           .order('created_at', ascending: false)
-          .map((data) => data.map((json) => FormSchema.fromJson(json)).toList());
+          .map((data) => data
+              .where((json) => json['form_type'] != 'vote')
+              .map((json) => FormSchema.fromJson(json))
+              .toList());
     } else {
       return _supabase
           .from('form_schemas')
@@ -193,9 +197,27 @@ class FormsService {
   Future<List<FormSubmission>> getSubmissions(String formId) async {
     try {
       // Use privileged client to bypass RLS for reading submissions
+      // Join with members table to get member details for display
       final response = await _readClient
           .from('form_submissions')
-          .select()
+          .select('''
+            *,
+            members:member_id (
+              id,
+              first_name,
+              last_name,
+              email,
+              phone,
+              photo_url
+            ),
+            subscribers:subscriber_id (
+              id,
+              first_name,
+              last_name,
+              email,
+              phone
+            )
+          ''')
           .eq('form_id', formId)
           .order('created_at', ascending: false);
 

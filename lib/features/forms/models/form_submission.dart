@@ -16,6 +16,7 @@ class FormSubmission {
   final String? subscriberId;
   final String status;
   final Map<String, dynamic>? members;
+  final Map<String, dynamic>? subscribers;
 
   const FormSubmission({
     required this.id,
@@ -33,6 +34,7 @@ class FormSubmission {
     this.subscriberId,
     this.status = 'submitted',
     this.members,
+    this.subscribers,
   });
 
   factory FormSubmission.fromJson(Map<String, dynamic> json) {
@@ -52,6 +54,7 @@ class FormSubmission {
       subscriberId: json['subscriber_id'] as String?,
       status: (json['status'] as String?) ?? 'submitted',
       members: json['members'] as Map<String, dynamic>?,
+      subscribers: json['subscribers'] as Map<String, dynamic>?,
     );
   }
 
@@ -72,6 +75,7 @@ class FormSubmission {
       'subscriber_id': subscriberId,
       'status': status,
       'members': members,
+      'subscribers': subscribers,
     };
   }
 
@@ -91,6 +95,7 @@ class FormSubmission {
     String? subscriberId,
     String? status,
     Map<String, dynamic>? members,
+    Map<String, dynamic>? subscribers,
   }) {
     return FormSubmission(
       id: id ?? this.id,
@@ -108,6 +113,7 @@ class FormSubmission {
       subscriberId: subscriberId ?? this.subscriberId,
       status: status ?? this.status,
       members: members ?? this.members,
+      subscribers: subscribers ?? this.subscribers,
     );
   }
 
@@ -135,9 +141,19 @@ extension FormSubmissionDisplay on FormSubmission {
     }
     // Try member name from joined data
     if (members != null) {
-      final firstName = members!['first_name'] as String?;
-      final lastName = members!['last_name'] as String?;
-      if (firstName != null || lastName != null) {
+      final firstName = members!['first_name']?.toString();
+      final lastName = members!['last_name']?.toString();
+      if ((firstName != null && firstName.isNotEmpty) ||
+          (lastName != null && lastName.isNotEmpty)) {
+        return [firstName, lastName].where((s) => s != null && s.isNotEmpty).join(' ');
+      }
+    }
+    // Try subscriber name from joined data
+    if (subscribers != null) {
+      final firstName = subscribers!['first_name']?.toString();
+      final lastName = subscribers!['last_name']?.toString();
+      if ((firstName != null && firstName.isNotEmpty) ||
+          (lastName != null && lastName.isNotEmpty)) {
         return [firstName, lastName].where((s) => s != null && s.isNotEmpty).join(' ');
       }
     }
@@ -153,8 +169,31 @@ extension FormSubmissionDisplay on FormSubmission {
     if (submitterEmail != null && submitterEmail!.isNotEmpty) {
       return submitterEmail;
     }
-    if (members != null) {
-      return members!['email'] as String?;
+    if (members != null && members!['email'] != null) {
+      return members!['email']?.toString();
+    }
+    if (subscribers != null && subscribers!['email'] != null) {
+      return subscribers!['email']?.toString();
+    }
+    return null;
+  }
+
+  String? get displayPhone {
+    if (submitterPhone != null && submitterPhone!.isNotEmpty) {
+      return submitterPhone;
+    }
+    if (members != null && members!['phone'] != null) {
+      return members!['phone']?.toString();
+    }
+    if (subscribers != null && subscribers!['phone'] != null) {
+      return subscribers!['phone']?.toString();
+    }
+    return null;
+  }
+
+  String? get displayPhotoUrl {
+    if (members != null && members!['photo_url'] != null) {
+      return members!['photo_url']?.toString();
     }
     return null;
   }

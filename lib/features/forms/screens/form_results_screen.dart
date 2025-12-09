@@ -658,17 +658,22 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
               // Header row
               Row(
                 children: [
-                  // Avatar
+                  // Avatar with photo if available
                   CircleAvatar(
                     backgroundColor: colorScheme.primaryContainer,
                     radius: 20,
-                    child: Text(
-                      submission.displayInitial,
-                      style: TextStyle(
-                        color: colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    backgroundImage: submission.displayPhotoUrl != null
+                        ? NetworkImage(submission.displayPhotoUrl!)
+                        : null,
+                    child: submission.displayPhotoUrl == null
+                        ? Text(
+                            submission.displayInitial,
+                            style: TextStyle(
+                              color: colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
                   ),
                   const SizedBox(width: 12),
                   // Name and email

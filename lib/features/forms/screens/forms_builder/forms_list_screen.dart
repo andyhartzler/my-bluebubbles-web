@@ -117,9 +117,14 @@ class _FormsListScreenState extends State<FormsListScreen>
                       final form = forms[index];
                       return FormCard(
                         form: form,
-                        onTap: () => _editForm(form),
-                        onView: form.status == 'active' ? () => _viewForm(form) : null,
-                        onViewResults: () => _viewResults(form),
+                        // Tap opens results view (or edit if no submissions)
+                        onTap: form.submissionCount > 0
+                            ? () => _viewResults(form)
+                            : () => _editForm(form),
+                        onEdit: () => _editForm(form),
+                        onViewResults: form.submissionCount > 0
+                            ? () => _viewResults(form)
+                            : null,
                       );
                     },
                   ),

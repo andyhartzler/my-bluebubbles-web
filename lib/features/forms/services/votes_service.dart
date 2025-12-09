@@ -332,4 +332,29 @@ class VotesService {
 
     return response != null;
   }
+
+  // Get voters with member details for a vote
+  Future<List<Map<String, dynamic>>> getVoters(String votingFormId) async {
+    final response = await _supabase
+        .from('votes')
+        .select('''
+          id,
+          vote_data,
+          created_at,
+          members:member_id (
+            id,
+            name,
+            email,
+            phone,
+            phone_e164,
+            city,
+            state,
+            profile_photos
+          )
+        ''')
+        .eq('voting_form_id', votingFormId)
+        .order('created_at', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response);
+  }
 }

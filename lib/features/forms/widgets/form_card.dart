@@ -4,14 +4,14 @@ import '../models/form_schema.dart';
 class FormCard extends StatelessWidget {
   final FormSchema form;
   final VoidCallback onTap;
-  final VoidCallback? onView;
+  final VoidCallback? onEdit;
   final VoidCallback? onViewResults;
 
   const FormCard({
     Key? key,
     required this.form,
     required this.onTap,
-    this.onView,
+    this.onEdit,
     this.onViewResults,
   }) : super(key: key);
 
@@ -114,15 +114,7 @@ class FormCard extends StatelessWidget {
               // Actions row
               Row(
                 children: [
-                  if (form.status == 'active' && onView != null)
-                    _buildActionButton(
-                      context,
-                      Icons.visibility_outlined,
-                      'Preview',
-                      onView!,
-                    ),
-                  if (form.submissionCount > 0 && onViewResults != null) ...[
-                    const SizedBox(width: 8),
+                  if (form.submissionCount > 0 && onViewResults != null)
                     _buildActionButton(
                       context,
                       Icons.bar_chart,
@@ -130,19 +122,19 @@ class FormCard extends StatelessWidget {
                       onViewResults!,
                       isPrimary: true,
                     ),
-                  ],
                   const Spacer(),
-                  IconButton(
-                    icon: Icon(
-                      Icons.edit_outlined,
-                      color: colorScheme.onSurfaceVariant,
+                  if (onEdit != null)
+                    IconButton(
+                      icon: Icon(
+                        Icons.edit_outlined,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      onPressed: onEdit,
+                      tooltip: 'Edit Form',
+                      style: IconButton.styleFrom(
+                        backgroundColor: colorScheme.surfaceContainerHighest,
+                      ),
                     ),
-                    onPressed: onTap,
-                    tooltip: 'Edit Form',
-                    style: IconButton.styleFrom(
-                      backgroundColor: colorScheme.surfaceContainerHighest,
-                    ),
-                  ),
                   const SizedBox(width: 4),
                   PopupMenuButton<String>(
                     icon: Icon(
