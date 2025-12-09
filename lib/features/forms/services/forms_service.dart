@@ -217,6 +217,44 @@ class FormsService {
     }
   }
 
+  /// Get all submissions by a specific subscriber
+  Future<List<FormSubmission>> getSubmissionsBySubscriberId(String subscriberId) async {
+    try {
+      final response = await _readClient
+          .from('form_submissions')
+          .select()
+          .eq('subscriber_id', subscriberId)
+          .order('created_at', ascending: false);
+
+      final data = response as List;
+      return data.map((json) {
+        return FormSubmission.fromJson(json as Map<String, dynamic>);
+      }).toList();
+    } catch (e) {
+      print('FormsService.getSubmissionsBySubscriberId: Error fetching submissions: $e');
+      return [];
+    }
+  }
+
+  /// Get all submissions by a specific member
+  Future<List<FormSubmission>> getSubmissionsByMemberId(String memberId) async {
+    try {
+      final response = await _readClient
+          .from('form_submissions')
+          .select()
+          .eq('member_id', memberId)
+          .order('created_at', ascending: false);
+
+      final data = response as List;
+      return data.map((json) {
+        return FormSubmission.fromJson(json as Map<String, dynamic>);
+      }).toList();
+    } catch (e) {
+      print('FormsService.getSubmissionsByMemberId: Error fetching submissions: $e');
+      return [];
+    }
+  }
+
   Future<String> createSubmission({
     required String formId,
     required String memberId,

@@ -22,6 +22,9 @@ import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/crm/wallet_notification_service.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
+import 'package:bluebubbles/features/forms/models/form_submission.dart';
+import 'package:bluebubbles/features/forms/services/forms_service.dart';
+import 'package:bluebubbles/features/forms/widgets/submission_status_badge.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -125,6 +128,13 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   String? _donorError;
   final NumberFormat _currencyFormat = NumberFormat.simpleCurrency();
 
+  // Form submissions, votes, and jobs activity
+  final FormsService _formsService = FormsService();
+  List<FormSubmission> _formSubmissions = [];
+  List<Map<String, dynamic>> _votesCast = [];
+  List<Map<String, dynamic>> _jobApplications = [];
+  bool _loadingMemberActivity = false;
+
   static const String _reportsBucket = 'member-documents';
 
   bool get _crmReady => _supabaseService.isInitialized;
@@ -168,6 +178,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       _fetchLatestMember();
       _loadWalletPassInfo();
       _loadDonorProfile();
+      _loadMemberActivity();
     }
   }
 
@@ -679,6 +690,57 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         setState(() {
           _loadingDonorProfile = false;
         });
+      }
+    }
+  }
+
+  /// Load member activity: form submissions, votes, and job applications
+  Future<void> _loadMemberActivity() async {
+    setState(() => _loadingMemberActivity = true);
+
+    try {
+      // Load form submissions
+      final submissions = await _formsService.getSubmissionsByMemberId(_member.id);
+      if (mounted) {
+        setState(() => _formSubmissions = submissions);
+      }
+
+      // Load votes cast by member
+      try {
+        final votesResponse = await _supabaseService.privilegedClient
+            .from('vote_records')
+            .select('*, form_schemas!inner(id, title)')
+            .eq('member_id', _member.id)
+            .order('created_at', ascending: false);
+
+        if (mounted && votesResponse is List) {
+          setState(() => _votesCast = List<Map<String, dynamic>>.from(votesResponse));
+        }
+      } catch (e) {
+        // Votes table may not exist, that's ok
+        debugPrint('Could not load vote records: $e');
+      }
+
+      // Load job applications
+      try {
+        final jobsResponse = await _supabaseService.privilegedClient
+            .from('job_applications')
+            .select('*, form_schemas!inner(id, title)')
+            .eq('member_id', _member.id)
+            .order('created_at', ascending: false);
+
+        if (mounted && jobsResponse is List) {
+          setState(() => _jobApplications = List<Map<String, dynamic>>.from(jobsResponse));
+        }
+      } catch (e) {
+        // Job applications table may not exist, that's ok
+        debugPrint('Could not load job applications: $e');
+      }
+    } catch (e) {
+      debugPrint('Error loading member activity: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _loadingMemberActivity = false);
       }
     }
   }
@@ -2004,6 +2066,214 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
+  /// Build member activity section (forms, votes, jobs)
+  /// Returns null if there's no activity to show
+  Widget? _buildMemberActivitySection() {
+    // Don't show anything if still loading or no data
+    if (_loadingMemberActivity) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    final hasFormSubmissions = _formSubmissions.isNotEmpty;
+    final hasVotes = _votesCast.isNotEmpty;
+    final hasJobApplications = _jobApplications.isNotEmpty;
+
+    // If no activity at all, return null (no placeholder)
+    if (!hasFormSubmissions && !hasVotes && !hasJobApplications) {
+      return null;
+    }
+
+    final theme = Theme.of(context);
+    final dateFormat = DateFormat('MMM d, y');
+    final sectionWidgets = <Widget>[];
+
+    // Form Submissions Section
+    if (hasFormSubmissions) {
+      sectionWidgets.add(
+        _buildActivitySubsection(
+          title: 'Form Submissions',
+          icon: Icons.assignment_outlined,
+          count: _formSubmissions.length,
+          children: _formSubmissions.take(3).map((submission) {
+            return ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.description_outlined, size: 20, color: theme.colorScheme.primary),
+              title: Text(
+                'Form ${submission.formId.substring(0, 8)}...',
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              ),
+              subtitle: Text(dateFormat.format(submission.createdAt)),
+              trailing: SubmissionStatusBadge(status: submission.status, compact: true),
+            );
+          }).toList(),
+        ),
+      );
+    }
+
+    // Votes Section
+    if (hasVotes) {
+      sectionWidgets.add(
+        _buildActivitySubsection(
+          title: 'Votes Cast',
+          icon: Icons.how_to_vote_outlined,
+          count: _votesCast.length,
+          children: _votesCast.take(3).map((vote) {
+            final title = vote['form_schemas']?['title'] ?? 'Vote';
+            final createdAt = vote['created_at'] != null
+                ? DateTime.tryParse(vote['created_at'] as String)
+                : null;
+            return ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.check_circle_outline, size: 20, color: Colors.green),
+              title: Text(
+                title,
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: createdAt != null ? Text(dateFormat.format(createdAt)) : null,
+            );
+          }).toList(),
+        ),
+      );
+    }
+
+    // Job Applications Section
+    if (hasJobApplications) {
+      sectionWidgets.add(
+        _buildActivitySubsection(
+          title: 'Job Applications',
+          icon: Icons.work_outline,
+          count: _jobApplications.length,
+          children: _jobApplications.take(3).map((job) {
+            final title = job['form_schemas']?['title'] ?? 'Application';
+            final createdAt = job['created_at'] != null
+                ? DateTime.tryParse(job['created_at'] as String)
+                : null;
+            final status = job['status'] as String? ?? 'submitted';
+            return ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.business_center_outlined, size: 20, color: Colors.purple),
+              title: Text(
+                title,
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: createdAt != null ? Text(dateFormat.format(createdAt)) : null,
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  status,
+                  style: theme.textTheme.labelSmall?.copyWith(color: Colors.purple),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(Icons.history, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Member Activity',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...sectionWidgets,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivitySubsection({
+    required String title,
+    required IconData icon,
+    required int count,
+    required List<Widget> children,
+  }) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '$count',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...children,
+        if (count > 3)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '+${count - 3} more',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
   Widget _buildOverviewTab(BuildContext context) {
     final theme = Theme.of(context);
     final phoneDisplay = _cleanText(_member.phone);
@@ -2044,10 +2314,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
     final walletSection = _buildWalletPassSection();
     final donorSection = _buildDonorSection();
+    final activitySection = _buildMemberActivitySection();
 
     final sections = <Widget?>[
       walletSection,
       donorSection,
+      activitySection,
       _buildOptionalSection('Contact Information', [
         _copyRow('Phone', primaryPhone, copyValue: phoneCopyValue),
         _copyRow('Email', email),

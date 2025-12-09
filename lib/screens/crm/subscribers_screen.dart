@@ -6,6 +6,9 @@ import 'package:intl/intl.dart';
 import 'package:bluebubbles/models/crm/subscriber.dart';
 import 'package:bluebubbles/services/crm/subscriber_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/features/forms/models/form_submission.dart';
+import 'package:bluebubbles/features/forms/services/forms_service.dart';
+import 'package:bluebubbles/features/forms/widgets/submission_status_badge.dart';
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
@@ -958,11 +961,75 @@ class _SubscriberDetailSheet extends StatefulWidget {
 
 class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
   late Subscriber _subscriber;
+  final FormsService _formsService = FormsService();
+  List<FormSubmission> _formSubmissions = [];
+  bool _loadingSubmissions = false;
 
   @override
   void initState() {
     super.initState();
     _subscriber = widget.subscriber;
+    _loadFormSubmissions();
+  }
+
+  Future<void> _loadFormSubmissions() async {
+    setState(() => _loadingSubmissions = true);
+    try {
+      final submissions = await _formsService.getSubmissionsBySubscriberId(_subscriber.id);
+      if (mounted) {
+        setState(() {
+          _formSubmissions = submissions;
+          _loadingSubmissions = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingSubmissions = false);
+      }
+    }
+  }
+
+  Widget _buildSubmissionTile(FormSubmission submission) {
+    final theme = Theme.of(context);
+    final dateFormat = DateFormat('MMM d, y');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withOpacity(0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Form ID: ${submission.formId.substring(0, 8)}...',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  dateFormat.format(submission.createdAt),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SubmissionStatusBadge(status: submission.status, compact: true),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1138,6 +1205,43 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                   Text('Events Attended', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Text('${_subscriber.eventAttendanceCount} events recorded'),
+                  const SizedBox(height: 12),
+                ],
+                // Form Submissions Section - only show if there are submissions
+                if (_loadingSubmissions) ...[
+                  const SizedBox(height: 8),
+                  const Center(child: CircularProgressIndicator()),
+                  const SizedBox(height: 12),
+                ] else if (_formSubmissions.isNotEmpty) ...[
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.assignment_outlined, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Form Submissions', style: theme.textTheme.titleMedium),
+                      const Spacer(),
+                      Text(
+                        '${_formSubmissions.length}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ..._formSubmissions.take(5).map((submission) => _buildSubmissionTile(submission)),
+                  if (_formSubmissions.length > 5)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '+${_formSubmissions.length - 5} more submissions',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 12),
                 ],
                 if (_subscriber.notes?.isNotEmpty ?? false) ...[
