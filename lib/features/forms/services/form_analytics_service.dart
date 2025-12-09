@@ -5,11 +5,12 @@ class FormAnalyticsService {
   final _supabase = Supabase.instance.client;
 
   /// Track when a form is viewed
-  Future<void> trackFormView(String formId, String? userId) async {
+  Future<void> trackFormView(String formId, String? userId, {String? memberId}) async {
     try {
       await _supabase.from('form_analytics').insert({
         'form_id': formId,
         'user_id': userId,
+        'member_id': memberId,
         'event_type': 'view',
         'timestamp': DateTime.now().toIso8601String(),
       });
@@ -20,11 +21,12 @@ class FormAnalyticsService {
   }
 
   /// Track when a form is started (first field interaction)
-  Future<void> trackFormStart(String formId, String? userId) async {
+  Future<void> trackFormStart(String formId, String? userId, {String? memberId}) async {
     try {
       await _supabase.from('form_analytics').insert({
         'form_id': formId,
         'user_id': userId,
+        'member_id': memberId,
         'event_type': 'start',
         'timestamp': DateTime.now().toIso8601String(),
       });
@@ -37,12 +39,14 @@ class FormAnalyticsService {
   Future<void> trackFormSubmission(
     String formId,
     String? userId,
-    Map<String, dynamic> submissionData,
-  ) async {
+    Map<String, dynamic> submissionData, {
+    String? memberId,
+  }) async {
     try {
       await _supabase.from('form_analytics').insert({
         'form_id': formId,
         'user_id': userId,
+        'member_id': memberId,
         'event_type': 'submit',
         'timestamp': DateTime.now().toIso8601String(),
         'metadata': {
@@ -59,12 +63,14 @@ class FormAnalyticsService {
   Future<void> trackFormAbandonment(
     String formId,
     String? userId,
-    Map<String, dynamic> partialData,
-  ) async {
+    Map<String, dynamic> partialData, {
+    String? memberId,
+  }) async {
     try {
       await _supabase.from('form_analytics').insert({
         'form_id': formId,
         'user_id': userId,
+        'member_id': memberId,
         'event_type': 'abandon',
         'timestamp': DateTime.now().toIso8601String(),
         'metadata': {
@@ -82,14 +88,16 @@ class FormAnalyticsService {
     String formId,
     String fieldId,
     String fieldType,
-    String? userId,
-  ) async {
+    String? userId, {
+    String? memberId,
+  }) async {
     try {
       await _supabase.from('form_field_analytics').insert({
         'form_id': formId,
         'field_id': fieldId,
         'field_type': fieldType,
         'user_id': userId,
+        'member_id': memberId,
         'event_type': 'interaction',
         'timestamp': DateTime.now().toIso8601String(),
       });
@@ -103,13 +111,15 @@ class FormAnalyticsService {
     String formId,
     String fieldId,
     String errorMessage,
-    String? userId,
-  ) async {
+    String? userId, {
+    String? memberId,
+  }) async {
     try {
       await _supabase.from('form_field_analytics').insert({
         'form_id': formId,
         'field_id': fieldId,
         'user_id': userId,
+        'member_id': memberId,
         'event_type': 'validation_error',
         'timestamp': DateTime.now().toIso8601String(),
         'metadata': {'error': errorMessage},
@@ -119,44 +129,78 @@ class FormAnalyticsService {
     }
   }
 
-  /// Get form analytics summary
+  /// Get form analytics summary - combines form_analytics with actual submission counts
   Future<FormAnalyticsSummary> getFormAnalytics(String formId) async {
     try {
-      final response = await _supabase
+      // Get analytics events
+      final analyticsResponse = await _supabase
           .from('form_analytics')
           .select()
           .eq('form_id', formId);
 
-      final data = response as List;
+      final analyticsData = analyticsResponse as List;
 
-      final views = data.where((e) => e['event_type'] == 'view').length;
-      final starts = data.where((e) => e['event_type'] == 'start').length;
-      final submissions = data.where((e) => e['event_type'] == 'submit').length;
-      final abandonments = data.where((e) => e['event_type'] == 'abandon').length;
+      // Get actual submission count from form_submissions table
+      final submissionCountResponse = await _supabase
+          .from('form_submissions')
+          .select('id')
+          .eq('form_id', formId);
 
-      final completionRate = starts > 0 ? (submissions / starts * 100) : 0.0;
-      final abandonmentRate = starts > 0 ? (abandonments / starts * 100) : 0.0;
+      final actualSubmissions = (submissionCountResponse as List).length;
+
+      final views = analyticsData.where((e) => e['event_type'] == 'view').length;
+      final starts = analyticsData.where((e) => e['event_type'] == 'start').length;
+      final trackedSubmissions = analyticsData.where((e) => e['event_type'] == 'submit').length;
+      final abandonments = analyticsData.where((e) => e['event_type'] == 'abandon').length;
+
+      // Use actual submissions as the authoritative count
+      final submissions = actualSubmissions > trackedSubmissions ? actualSubmissions : trackedSubmissions;
+
+      // Calculate rates based on starts (if we have starts data)
+      // Otherwise estimate based on submissions
+      final effectiveStarts = starts > 0 ? starts : submissions;
+      final completionRate = effectiveStarts > 0 ? (submissions / effectiveStarts * 100) : (submissions > 0 ? 100.0 : 0.0);
+      final abandonmentRate = effectiveStarts > 0 ? (abandonments / effectiveStarts * 100) : 0.0;
 
       return FormAnalyticsSummary(
         formId: formId,
-        totalViews: views,
-        totalStarts: starts,
+        totalViews: views > 0 ? views : submissions, // Estimate views if not tracked
+        totalStarts: effectiveStarts,
         totalSubmissions: submissions,
         totalAbandonments: abandonments,
-        completionRate: completionRate,
-        abandonmentRate: abandonmentRate,
+        completionRate: completionRate.clamp(0, 100),
+        abandonmentRate: abandonmentRate.clamp(0, 100),
       );
     } catch (e) {
       print('Error fetching analytics: $e');
-      return FormAnalyticsSummary(
-        formId: formId,
-        totalViews: 0,
-        totalStarts: 0,
-        totalSubmissions: 0,
-        totalAbandonments: 0,
-        completionRate: 0,
-        abandonmentRate: 0,
-      );
+      // Try to get at least submission count
+      try {
+        final submissionCountResponse = await _supabase
+            .from('form_submissions')
+            .select('id')
+            .eq('form_id', formId);
+        final actualSubmissions = (submissionCountResponse as List).length;
+
+        return FormAnalyticsSummary(
+          formId: formId,
+          totalViews: actualSubmissions,
+          totalStarts: actualSubmissions,
+          totalSubmissions: actualSubmissions,
+          totalAbandonments: 0,
+          completionRate: actualSubmissions > 0 ? 100.0 : 0.0,
+          abandonmentRate: 0,
+        );
+      } catch (_) {
+        return FormAnalyticsSummary(
+          formId: formId,
+          totalViews: 0,
+          totalStarts: 0,
+          totalSubmissions: 0,
+          totalAbandonments: 0,
+          completionRate: 0,
+          abandonmentRate: 0,
+        );
+      }
     }
   }
 
@@ -203,32 +247,37 @@ class FormAnalyticsService {
   }
 
   /// Get time-series data for form submissions
+  /// Uses form_submissions table as primary source, falls back to form_analytics
   Future<List<TimeSeriesData>> getSubmissionTimeSeries(
     String formId, {
     DateTime? startDate,
     DateTime? endDate,
   }) async {
     try {
+      // First try to get from actual submissions (more reliable)
       var query = _supabase
-          .from('form_analytics')
-          .select()
-          .eq('form_id', formId)
-          .eq('event_type', 'submit');
+          .from('form_submissions')
+          .select('created_at')
+          .eq('form_id', formId);
 
       if (startDate != null) {
-        query = query.gte('timestamp', startDate.toIso8601String());
+        query = query.gte('created_at', startDate.toIso8601String());
       }
       if (endDate != null) {
-        query = query.lte('timestamp', endDate.toIso8601String());
+        query = query.lte('created_at', endDate.toIso8601String());
       }
 
-      final response = await query;
+      final response = await query.order('created_at', ascending: true);
       final data = response as List;
+
+      if (data.isEmpty) {
+        return [];
+      }
 
       // Group by date
       final dateMap = <String, int>{};
       for (final item in data) {
-        final timestamp = DateTime.parse(item['timestamp'] as String);
+        final timestamp = DateTime.parse(item['created_at'] as String);
         final dateKey = '${timestamp.year}-${timestamp.month.toString().padLeft(2, '0')}-${timestamp.day.toString().padLeft(2, '0')}';
         dateMap[dateKey] = (dateMap[dateKey] ?? 0) + 1;
       }
@@ -242,6 +291,53 @@ class FormAnalyticsService {
         ..sort((a, b) => a.date.compareTo(b.date));
     } catch (e) {
       print('Error fetching time series: $e');
+      return [];
+    }
+  }
+
+  /// Get submission stats by status
+  Future<Map<String, int>> getSubmissionsByStatus(String formId) async {
+    try {
+      final response = await _supabase
+          .from('form_submissions')
+          .select('status')
+          .eq('form_id', formId);
+
+      final data = response as List;
+      final statusMap = <String, int>{};
+
+      for (final item in data) {
+        final status = item['status'] as String? ?? 'submitted';
+        statusMap[status] = (statusMap[status] ?? 0) + 1;
+      }
+
+      return statusMap;
+    } catch (e) {
+      print('Error fetching submission stats: $e');
+      return {};
+    }
+  }
+
+  /// Get recent submission activity (last N submissions with timestamps)
+  Future<List<SubmissionActivity>> getRecentActivity(String formId, {int limit = 10}) async {
+    try {
+      final response = await _supabase
+          .from('form_submissions')
+          .select('id, created_at, submitter_name, submitter_email, status')
+          .eq('form_id', formId)
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      final data = response as List;
+      return data.map((item) => SubmissionActivity(
+        id: item['id'] as String,
+        createdAt: DateTime.parse(item['created_at'] as String),
+        submitterName: item['submitter_name'] as String?,
+        submitterEmail: item['submitter_email'] as String?,
+        status: item['status'] as String? ?? 'submitted',
+      )).toList();
+    } catch (e) {
+      print('Error fetching recent activity: $e');
       return [];
     }
   }
@@ -306,4 +402,31 @@ class TimeSeriesData {
     required this.date,
     required this.count,
   });
+}
+
+/// Submission activity for recent activity list
+class SubmissionActivity {
+  final String id;
+  final DateTime createdAt;
+  final String? submitterName;
+  final String? submitterEmail;
+  final String status;
+
+  SubmissionActivity({
+    required this.id,
+    required this.createdAt,
+    this.submitterName,
+    this.submitterEmail,
+    required this.status,
+  });
+
+  String get displayName {
+    if (submitterName != null && submitterName!.isNotEmpty) {
+      return submitterName!;
+    }
+    if (submitterEmail != null && submitterEmail!.isNotEmpty) {
+      return submitterEmail!;
+    }
+    return 'Anonymous';
+  }
 }
