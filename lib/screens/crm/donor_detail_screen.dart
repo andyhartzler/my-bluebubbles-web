@@ -150,12 +150,13 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     final eventsCount = donations.where((d) => (d.eventId ?? d.eventName) != null).length;
     final isRecurring = donor.isRecurringDonor ?? false;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(theme, donor, totalGiven, isRecurring),
+    return SelectionArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(theme, donor, totalGiven, isRecurring),
           const SizedBox(height: 16),
           _buildContactCard(theme, donor),
           const SizedBox(height: 16),
@@ -177,6 +178,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
           const SizedBox(height: 16),
           _buildDonationHistory(theme, donations),
         ],
+        ),
       ),
     );
   }

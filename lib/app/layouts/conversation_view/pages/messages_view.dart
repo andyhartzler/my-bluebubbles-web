@@ -431,11 +431,12 @@ class MessagesViewState extends OptimizedState<MessagesView> {
                       reverse: true,
                       controller: scrollController,
                       showScrollbar: true,
-                      child: CustomScrollView(
-                        controller: scrollController,
-                        reverse: true,
-                        physics: ThemeSwitcher.getScrollPhysics(),
-                        slivers: <Widget>[
+                      child: SelectionArea(
+                        child: CustomScrollView(
+                          controller: scrollController,
+                          reverse: true,
+                          physics: ThemeSwitcher.getScrollPhysics(),
+                          slivers: <Widget>[
                           if (showSmartReplies || internalSmartReplies.isNotEmpty)
                             SliverToBoxAdapter(
                               child: Obx(() => AnimatedSize(
@@ -625,6 +626,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
                             padding: EdgeInsets.all(70),
                           ),
                         ],
+                        ),
                       ),
                     ),
                   ),

@@ -2209,19 +2209,20 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     final mapCard = _buildMapCard();
     final hasMap = mapCard is! SizedBox;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: IconButton(
-              icon: const Icon(Icons.edit, color: Colors.white),
-              tooltip: 'Edit event',
-              onPressed: () => setState(() => _editingDetails = true),
+    return SelectionArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.edit, color: Colors.white),
+                tooltip: 'Edit event',
+                onPressed: () => setState(() => _editingDetails = true),
+              ),
             ),
-          ),
           Card(
             color: Colors.transparent,
             elevation: 0,
@@ -2351,6 +2352,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
           _buildImageUploadSection(),
           _buildDeleteButton(),
         ],
+        ),
       ),
     );
   }

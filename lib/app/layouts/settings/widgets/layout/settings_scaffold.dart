@@ -92,7 +92,8 @@ class SettingsScaffold extends StatelessWidget {
               children: [
                 stickyPrefix ?? const SizedBox.shrink(),
                 Expanded(
-                  child: Obx(() => CustomScrollView(
+                  child: Obx(() => SelectionArea(
+                    child: CustomScrollView(
                       controller: controller,
                       shrinkWrap: true,
                       physics: ThemeSwitcher.getScrollPhysics(),
@@ -206,6 +207,7 @@ class SettingsScaffold extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
                     ),
                   ),
                 ),

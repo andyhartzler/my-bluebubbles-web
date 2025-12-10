@@ -259,9 +259,10 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
         final topPadding = 24.0;
         final bottomPadding = isCompact ? 16.0 : 32.0;
 
-        return CustomScrollView(
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-          slivers: [
+        return SelectionArea(
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+            slivers: [
             SliverPadding(
               padding: EdgeInsets.fromLTRB(horizontalPadding, topPadding, horizontalPadding, 0),
               sliver: SliverToBoxAdapter(
@@ -280,6 +281,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
               sliver: _buildMeetingSliver(filteredMeetings),
             ),
           ],
+          ),
         );
       },
     );

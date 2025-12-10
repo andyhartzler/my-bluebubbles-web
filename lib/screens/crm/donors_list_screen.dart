@@ -1170,10 +1170,11 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     final averageGift = _totalDonors == 0 ? 0 : _totalRaised / _totalDonors;
 
     return _buildScaffold(
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Row(
+      child: SelectionArea(
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
@@ -1299,6 +1300,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
