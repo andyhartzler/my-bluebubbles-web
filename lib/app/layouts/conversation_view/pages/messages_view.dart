@@ -364,7 +364,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
   Widget build(BuildContext context) {
     const moonIcon = CupertinoIcons.moon_fill;
     return DropRegion(
-      hitTestBehavior: HitTestBehavior.translucent,
+      hitTestBehavior: HitTestBehavior.deferToChild,
       formats: Formats.standardFormats,
       onDropOver: (DropOverEvent event) {
         if (!event.session.allowedOperations.contains(DropOperation.copy)) {
