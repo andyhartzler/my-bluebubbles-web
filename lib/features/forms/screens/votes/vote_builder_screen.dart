@@ -53,6 +53,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   bool _requireLogin = false;
   bool _oneSubmissionPerUser = true; // Default true for votes
   bool _showSettings = false;
+  bool _executiveOnly = false; // Restrict voting to executive committee members
 
   @override
   void initState() {
@@ -118,6 +119,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
         _notificationEmailsController.text = vote.notificationEmails?.join(', ') ?? '';
         _requireLogin = vote.requireLogin;
         _oneSubmissionPerUser = vote.oneSubmissionPerUser;
+        _executiveOnly = vote.executiveOnly;
 
         // Load SMS confirmation message from settings
         _confirmationSmsController.text =
@@ -308,6 +310,13 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
                             subtitle: const Text('Each user can only vote once'),
                             value: _oneSubmissionPerUser,
                             onChanged: (value) => setState(() => _oneSubmissionPerUser = value),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          SwitchListTile(
+                            title: const Text('Executive Committee Only'),
+                            subtitle: const Text('Only executive committee members can vote'),
+                            value: _executiveOnly,
+                            onChanged: (value) => setState(() => _executiveOnly = value),
                             contentPadding: EdgeInsets.zero,
                           ),
                           const SizedBox(height: 8),
@@ -1474,6 +1483,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           status: publish ? 'active' : 'draft',
           requireLogin: _requireLogin,
           oneSubmissionPerUser: _oneSubmissionPerUser,
+          executiveOnly: _executiveOnly,
           maxSubmissions: maxSubmissions,
           slug: slug,
           confirmationEmailTemplate: confirmationEmail,
@@ -1493,6 +1503,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           status: publish ? 'active' : null,
           requireLogin: _requireLogin,
           oneSubmissionPerUser: _oneSubmissionPerUser,
+          executiveOnly: _executiveOnly,
           maxSubmissions: maxSubmissions,
           slug: slug,
           confirmationEmailTemplate: confirmationEmail,

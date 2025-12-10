@@ -58,6 +58,9 @@ class VotingForm with _$VotingForm {
 
     // Supporting documents (list of document metadata objects)
     @JsonKey(name: 'supporting_documents') List<Map<String, dynamic>>? supportingDocuments,
+
+    // Executive Committee Only - restricts voting to executive committee members
+    @JsonKey(name: 'executive_only') @Default(false) bool executiveOnly,
   }) = _VotingForm;
 
   factory VotingForm.fromJson(Map<String, dynamic> json) =>
