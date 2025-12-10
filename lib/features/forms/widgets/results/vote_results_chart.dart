@@ -7,12 +7,15 @@ class VoteResultsChart extends StatefulWidget {
   final VotingForm vote;
   final bool showAnimation;
   final Map<String, dynamic>? resultsData;
+  /// Optional pre-calculated questions with vote counts (overrides vote.questions)
+  final List<Map<String, dynamic>>? calculatedQuestions;
 
   const VoteResultsChart({
     Key? key,
     required this.vote,
     this.showAnimation = true,
     this.resultsData,
+    this.calculatedQuestions,
   }) : super(key: key);
 
   @override
@@ -61,11 +64,15 @@ class _VoteResultsChartState extends State<VoteResultsChart>
     super.dispose();
   }
 
+  /// Get questions - prefer calculatedQuestions if provided
+  List<Map<String, dynamic>> get _questions =>
+      widget.calculatedQuestions ?? widget.vote.questions;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final questions = widget.vote.questions;
+    final questions = _questions;
 
     if (questions.isEmpty) {
       return _buildEmptyState(theme, colorScheme);
