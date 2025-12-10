@@ -5,8 +5,11 @@ import 'package:share_plus/share_plus.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import '../../models/voting_form.dart';
+import '../../models/vote_analytics.dart';
 import '../../services/votes_service.dart';
 import '../../widgets/results/vote_results_chart.dart';
+import '../../widgets/results/participation_card.dart';
+import '../../widgets/analytics/vote_analytics_tab.dart';
 import 'vote_builder_screen.dart';
 
 class VoteDetailScreen extends StatefulWidget {
@@ -25,13 +28,14 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
   VotingForm? _vote;
   List<Map<String, dynamic>> _voters = [];
   Map<String, Map<String, int>> _calculatedVoteCounts = {}; // question_id -> {option_id -> count}
+  VoteResultsSummary? _resultsSummary;
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadVote();
   }
 
@@ -51,9 +55,11 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
       final results = await Future.wait([
         _votesService.getVote(widget.voteId),
         _votesService.getVoters(widget.voteId),
+        _votesService.getVoteResultsSummary(widget.voteId),
       ]);
       final vote = results[0] as VotingForm;
       final voters = results[1] as List<Map<String, dynamic>>;
+      final resultsSummary = results[2] as VoteResultsSummary;
 
       // Calculate vote counts from actual votes
       final voteCounts = _calculateVoteCounts(vote, voters);
@@ -62,6 +68,7 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
         _vote = vote;
         _voters = voters;
         _calculatedVoteCounts = voteCounts;
+        _resultsSummary = resultsSummary;
         _isLoading = false;
       });
     } catch (e) {
@@ -240,6 +247,7 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
           controller: _tabController,
           tabs: const [
             Tab(text: 'Results', icon: Icon(Icons.bar_chart)),
+            Tab(text: 'Analytics', icon: Icon(Icons.analytics)),
             Tab(text: 'Details', icon: Icon(Icons.info_outline)),
           ],
         ),
@@ -252,6 +260,7 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
                   controller: _tabController,
                   children: [
                     _buildResultsTab(theme, colorScheme),
+                    VoteAnalyticsTab(formId: widget.voteId),
                     _buildDetailsTab(theme, colorScheme),
                   ],
                 ),
@@ -304,6 +313,12 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
             // Vote header
             _buildVoteHeader(theme, colorScheme, vote),
             const SizedBox(height: 24),
+
+            // Participation card (if results summary is available)
+            if (_resultsSummary != null) ...[
+              ParticipationCard(results: _resultsSummary!),
+              const SizedBox(height: 24),
+            ],
 
             // Results visualization
             if (vote.resultsPublic ||
