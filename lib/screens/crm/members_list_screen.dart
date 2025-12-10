@@ -1389,11 +1389,13 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
     return RefreshIndicator(
       onRefresh: _refreshAll,
-      child: CustomScrollView(
-        controller: _scrollController,
-        key: const PageStorageKey<String>('members-scroll-view'),
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        slivers: slivers,
+      child: SelectionArea(
+        child: CustomScrollView(
+          controller: _scrollController,
+          key: const PageStorageKey<String>('members-scroll-view'),
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          slivers: slivers,
+        ),
       ),
     );
   }

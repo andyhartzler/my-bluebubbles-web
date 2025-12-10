@@ -2584,10 +2584,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           }
         }
 
-        return ListView(
-          padding: listPadding,
-          children: [
-            Center(child: _buildProfilePhoto()),
+        return SelectionArea(
+          child: ListView(
+            padding: listPadding,
+            children: [
+              Center(child: _buildProfilePhoto()),
             const SizedBox(height: 16),
             Center(
               child: Column(
@@ -2699,6 +2700,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               onPressed: _crmReady ? _toggleOptOut : null,
             ),
           ],
+          ),
         );
       },
     );

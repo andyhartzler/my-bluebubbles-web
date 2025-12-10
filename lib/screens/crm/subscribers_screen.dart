@@ -262,12 +262,13 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
         final horizontalPadding = isCompact ? 12.0 : 28.0;
         final bottomPadding = isCompact ? 16.0 : 32.0;
 
-        return CustomScrollView(
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          slivers: [
+        return SelectionArea(
+          child: CustomScrollView(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            slivers: [
             SliverPadding(
               padding: EdgeInsets.fromLTRB(
                 horizontalPadding,
@@ -317,6 +318,7 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
                 ),
               ),
           ],
+          ),
         );
       },
     );

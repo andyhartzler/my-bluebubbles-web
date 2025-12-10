@@ -90,11 +90,12 @@ class _SamsungConversationListState extends OptimizedState<SamsungConversationLi
                     .archivedHelper(controller.showArchivedChats)
                     .unknownSendersHelper(controller.showUnknownSenders);
 
-                return CustomScrollView(
-                  physics: ThemeSwitcher.getScrollPhysics(),
-                  controller: controller.samsungScrollController,
-                  slivers: [
-                    SamsungHeader(parentController: controller),
+                return SelectionArea(
+                  child: CustomScrollView(
+                    physics: ThemeSwitcher.getScrollPhysics(),
+                    controller: controller.samsungScrollController,
+                    slivers: [
+                      SamsungHeader(parentController: controller),
                     if (!chats.loadedChatBatch.value || _chats.bigPinHelper(false).isEmpty)
                       SliverToBoxAdapter(
                         child: Center(
@@ -165,6 +166,7 @@ class _SamsungConversationListState extends OptimizedState<SamsungConversationLi
                       ),
                     ),
                   ],
+                  ),
                 );
               }),
             ),
