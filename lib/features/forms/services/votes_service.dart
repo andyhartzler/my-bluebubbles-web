@@ -1,6 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/voting_form.dart';
+import '../models/vote_analytics.dart';
 import 'form_confirmation_service.dart';
+import 'form_analytics_service.dart';
 import '../../../services/crm/supabase_service.dart';
 
 class VotesService {
@@ -465,5 +467,255 @@ class VotesService {
     if (labels.isEmpty) return null;
     if (labels.length == 1) return labels.first;
     return labels.join(', ');
+  }
+
+  // ============================================
+  // Vote Analytics Methods
+  // ============================================
+
+  final _analyticsService = FormAnalyticsService();
+
+  /// Get comprehensive vote analytics
+  Future<VoteAnalytics> getVoteAnalytics(String voteId) async {
+    try {
+      // Get form analytics summary
+      final formAnalytics = await _analyticsService.getFormAnalytics(voteId);
+
+      // Get time series data for daily activity
+      final timeSeries = await _analyticsService.getSubmissionTimeSeries(voteId);
+
+      // Build daily activity with cumulative counts
+      final dailyActivity = <DailyActivityData>[];
+      int cumulativeVotes = 0;
+      for (final data in timeSeries) {
+        cumulativeVotes += data.count;
+        dailyActivity.add(DailyActivityData(
+          date: data.date,
+          views: data.count, // Approximating views with submissions
+          submissions: data.count,
+          cumulativeVotes: cumulativeVotes,
+        ));
+      }
+
+      // Get field-level analytics
+      final fieldAnalyticsData = await _analyticsService.getFieldAnalytics(voteId);
+      final fieldAnalytics = fieldAnalyticsData.map((f) => VoteFieldAnalytics(
+        fieldId: f.fieldId,
+        fieldLabel: null, // Would need to join with schema
+        interactions: f.interactions,
+        completions: f.interactions, // Approximate
+        averageTimeSpent: 0,
+        dropOffRate: 0,
+      )).toList();
+
+      return VoteAnalytics.fromFormAnalytics(
+        formId: voteId,
+        totalViews: formAnalytics.totalViews,
+        totalStarts: formAnalytics.totalStarts,
+        totalSubmissions: formAnalytics.totalSubmissions,
+        totalAbandons: formAnalytics.totalAbandonments,
+        fieldAnalytics: fieldAnalytics,
+        dailyActivity: dailyActivity,
+      );
+    } catch (e) {
+      print('Error getting vote analytics: $e');
+      return VoteAnalytics.empty(voteId);
+    }
+  }
+
+  /// Get vote results summary with participation metrics
+  Future<VoteResultsSummary> getVoteResultsSummary(String voteId) async {
+    final vote = await getVote(voteId);
+    final voters = await getVoters(voteId);
+    final eligibleCount = await getEligibleVotersCount(voteId, vote.eligibleMembers);
+
+    // Calculate results per question
+    final questionResults = <QuestionResultData>[];
+
+    for (final question in vote.questions) {
+      final questionId = question['id'] as String? ?? 'default';
+      final questionText = question['text'] as String? ?? 'Question';
+      final questionType = question['question_type'] as String? ?? 'multiple_choice';
+      final options = (question['options'] as List<dynamic>?) ?? [];
+
+      // Count votes per option
+      final optionCounts = <String, int>{};
+      for (final option in options) {
+        final optId = (option as Map<String, dynamic>)['id'] as String?;
+        if (optId != null) {
+          optionCounts[optId] = 0;
+        }
+      }
+
+      // Count from voter data
+      for (final voter in voters) {
+        final voteData = voter['vote_data'] as Map<String, dynamic>?;
+        if (voteData == null) continue;
+
+        final answer = voteData[questionId];
+        if (answer is String) {
+          optionCounts[answer] = (optionCounts[answer] ?? 0) + 1;
+        } else if (answer is List) {
+          for (final item in answer) {
+            if (item is String) {
+              optionCounts[item] = (optionCounts[item] ?? 0) + 1;
+            }
+          }
+        }
+      }
+
+      // Calculate percentages and find winner
+      final totalForQuestion = optionCounts.values.fold(0, (a, b) => a + b);
+      String? winner;
+      int maxVotes = 0;
+
+      final optionResults = <OptionResultData>[];
+      for (final option in options) {
+        final optMap = option as Map<String, dynamic>;
+        final optId = optMap['id'] as String?;
+        final optLabel = optMap['label'] as String? ?? optId ?? 'Option';
+        final count = optionCounts[optId] ?? 0;
+        final percentage = totalForQuestion > 0
+            ? (count / totalForQuestion * 100)
+            : 0.0;
+
+        if (count > maxVotes) {
+          maxVotes = count;
+          winner = optId;
+        }
+
+        optionResults.add(OptionResultData(
+          value: optId ?? '',
+          label: optLabel,
+          count: count,
+          percentage: percentage,
+        ));
+      }
+
+      questionResults.add(QuestionResultData(
+        fieldId: questionId,
+        question: questionText,
+        questionType: questionType,
+        options: optionResults,
+        winner: questionType == 'multiple_choice' ? winner : null,
+      ));
+    }
+
+    return VoteResultsSummary.fromVoteData(
+      formId: voteId,
+      totalVotes: voters.length,
+      eligibleVoters: eligibleCount,
+      questionResults: questionResults,
+    );
+  }
+
+  /// Get count of eligible voters for a vote
+  Future<int> getEligibleVotersCount(
+    String voteId,
+    Map<String, dynamic>? eligibleMembers,
+  ) async {
+    try {
+      if (eligibleMembers == null || eligibleMembers.isEmpty) {
+        // All current chapter members are eligible
+        final response = await _readClient
+            .from('members')
+            .select('id')
+            .eq('current_chapter_member', 'Yes');
+        return (response as List).length;
+      }
+
+      // Custom eligibility filter
+      var query = _readClient.from('members').select('id');
+
+      // Apply eligibility filters
+      final chapterNames = eligibleMembers['chapter_names'] as List<dynamic>?;
+      if (chapterNames != null && chapterNames.isNotEmpty) {
+        query = query.inFilter('chapter_name', chapterNames.cast<String>());
+      }
+
+      final membershipStatus = eligibleMembers['membership_status'] as String?;
+      if (membershipStatus != null) {
+        query = query.eq('current_chapter_member', membershipStatus);
+      }
+
+      final response = await query;
+      return (response as List).length;
+    } catch (e) {
+      print('Error getting eligible voters count: $e');
+      return 0;
+    }
+  }
+
+  /// Export votes to CSV format
+  Future<String> exportVotesToCsv(String voteId) async {
+    final vote = await getVote(voteId);
+    final voters = await getVoters(voteId);
+    final questions = vote.questions;
+
+    // Build CSV header
+    final headers = ['Voter Name', 'Email', 'County', 'Voted At'];
+    for (final question in questions) {
+      final questionText = question['text'] as String? ?? 'Question';
+      headers.add(questionText);
+    }
+
+    final lines = [headers.map(_escapeCSV).join(',')];
+
+    // Build CSV rows
+    for (final voter in voters) {
+      final memberData = voter['members'] as Map<String, dynamic>?;
+      final voteData = voter['vote_data'] as Map<String, dynamic>?;
+      final createdAt = voter['created_at'] as String?;
+
+      final row = [
+        _escapeCSV(memberData?['name']?.toString() ?? ''),
+        _escapeCSV(memberData?['email']?.toString() ?? ''),
+        _escapeCSV(memberData?['county']?.toString() ?? ''),
+        createdAt ?? '',
+      ];
+
+      for (final question in questions) {
+        final questionId = question['id'] as String? ?? 'default';
+        final options = (question['options'] as List<dynamic>?) ?? [];
+        final answer = voteData?[questionId];
+
+        String answerDisplay = '';
+        if (answer is String) {
+          // Look up label
+          for (final opt in options) {
+            if ((opt as Map<String, dynamic>)['id'] == answer) {
+              answerDisplay = opt['label'] as String? ?? answer;
+              break;
+            }
+          }
+          if (answerDisplay.isEmpty) answerDisplay = answer;
+        } else if (answer is List) {
+          final labels = <String>[];
+          for (final ans in answer) {
+            for (final opt in options) {
+              if ((opt as Map<String, dynamic>)['id'] == ans) {
+                labels.add(opt['label'] as String? ?? ans.toString());
+                break;
+              }
+            }
+          }
+          answerDisplay = labels.join('; ');
+        }
+
+        row.add(_escapeCSV(answerDisplay));
+      }
+
+      lines.add(row.join(','));
+    }
+
+    return lines.join('\n');
+  }
+
+  /// Escape a value for CSV
+  String _escapeCSV(String value) {
+    if (value.contains(',') || value.contains('"') || value.contains('\n')) {
+      return '"${value.replaceAll('"', '""')}"';
+    }
+    return value;
   }
 }
