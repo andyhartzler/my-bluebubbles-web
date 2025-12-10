@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/job.dart';
 import '../../../services/crm/supabase_service.dart';
@@ -6,39 +7,99 @@ class JobsService {
   final _supabase = Supabase.instance.client;
   final _crmService = CRMSupabaseService();
 
-  /// Get privileged client for bypassing RLS when writing jobs
-  SupabaseClient get _writeClient =>
+  /// Get privileged client for bypassing RLS when reading/writing jobs
+  SupabaseClient get _privilegedClient =>
       _crmService.isInitialized && _crmService.hasServiceRole
           ? _crmService.privilegedClient
           : _supabase;
 
+  /// Get privileged client for bypassing RLS when writing jobs
+  SupabaseClient get _writeClient => _privilegedClient;
+
+  /// Get privileged client for bypassing RLS when reading jobs
+  SupabaseClient get _readClient => _privilegedClient;
+
   Stream<List<Job>> watchJobs(String statusFilter) {
-    if (statusFilter == 'all') {
-      return _supabase
-          .from('jobs')
-          .stream(primaryKey: ['id'])
-          .order('created_at', ascending: false)
-          .map((data) => data.map((json) => Job.fromJson(json)).toList());
-    } else {
-      return _supabase
-          .from('jobs')
-          .stream(primaryKey: ['id'])
-          .eq('status', statusFilter)
-          .order('created_at', ascending: false)
-          .map((data) => data.map((json) => Job.fromJson(json)).toList());
+    // Use a polling approach with the privileged client to bypass RLS
+    final controller = StreamController<List<Job>>.broadcast();
+    Timer? timer;
+
+    void fetchJobs() async {
+      try {
+        List<Job> jobs;
+        if (statusFilter == 'all') {
+          final response = await _readClient
+              .from('jobs')
+              .select()
+              .order('created_at', ascending: false);
+          jobs = (response as List).map((json) => Job.fromJson(json)).toList();
+        } else {
+          final response = await _readClient
+              .from('jobs')
+              .select()
+              .eq('status', statusFilter)
+              .order('created_at', ascending: false);
+          jobs = (response as List).map((json) => Job.fromJson(json)).toList();
+        }
+        if (!controller.isClosed) {
+          controller.add(jobs);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
     }
+
+    // Initial fetch
+    fetchJobs();
+
+    // Poll every 5 seconds for updates
+    timer = Timer.periodic(const Duration(seconds: 5), (_) => fetchJobs());
+
+    controller.onCancel = () {
+      timer?.cancel();
+    };
+
+    return controller.stream;
   }
 
   Stream<int> watchPendingCount() {
-    return _supabase
-        .from('jobs')
-        .stream(primaryKey: ['id'])
-        .eq('status', 'pending')
-        .map((data) => data.length);
+    // Use a polling approach with the privileged client to bypass RLS
+    final controller = StreamController<int>.broadcast();
+    Timer? timer;
+
+    void fetchCount() async {
+      try {
+        final response = await _readClient
+            .from('jobs')
+            .select('id')
+            .eq('status', 'pending');
+        if (!controller.isClosed) {
+          controller.add((response as List).length);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    // Initial fetch
+    fetchCount();
+
+    // Poll every 5 seconds for updates
+    timer = Timer.periodic(const Duration(seconds: 5), (_) => fetchCount());
+
+    controller.onCancel = () {
+      timer?.cancel();
+    };
+
+    return controller.stream;
   }
 
   Future<Job> getJob(String id) async {
-    final response = await _supabase
+    final response = await _readClient
         .from('jobs')
         .select()
         .eq('id', id)

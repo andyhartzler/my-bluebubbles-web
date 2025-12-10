@@ -653,43 +653,69 @@ class VotesService {
         }
       }
 
+      // Calculate the cutoff date for age 36 (members must be 36 or younger)
+      final now = DateTime.now();
+      final cutoffDate = DateTime(now.year - 36, now.month, now.day);
+      final cutoffDateStr = cutoffDate.toIso8601String().split('T').first;
+
       if (eligibleMembers == null || eligibleMembers.isEmpty) {
-        // All current chapter members are eligible
+        if (isExecutiveOnly) {
+          // For executive-only votes, only count executive committee members
+          final response = await _readClient
+              .from('members')
+              .select('id')
+              .eq('executive_committee', true);
+          return (response as List).length;
+        } else {
+          // For regular votes, count members who are 36 or younger
+          // date_of_birth must be >= cutoffDate (born on or after the cutoff)
+          final response = await _readClient
+              .from('members')
+              .select('id')
+              .gte('date_of_birth', cutoffDateStr);
+          return (response as List).length;
+        }
+      }
+
+      // Custom eligibility filter
+      if (isExecutiveOnly) {
+        // For executive-only votes with custom filters
+        var query = _readClient.from('members').select('id').eq('executive_committee', true);
+
+        // Apply eligibility filters
+        final chapterNames = eligibleMembers['chapter_names'] as List<dynamic>?;
+        if (chapterNames != null && chapterNames.isNotEmpty) {
+          query = query.inFilter('chapter_name', chapterNames.cast<String>());
+        }
+
+        final membershipStatus = eligibleMembers['membership_status'] as String?;
+        if (membershipStatus != null) {
+          query = query.eq('current_chapter_member', membershipStatus);
+        }
+
+        final response = await query;
+        return (response as List).length;
+      } else {
+        // For regular votes with custom filters, include age filter
         var query = _readClient
             .from('members')
             .select('id')
-            .eq('current_chapter_member', 'Yes');
+            .gte('date_of_birth', cutoffDateStr);
 
-        // If executive only, also filter by executive_committee
-        if (isExecutiveOnly) {
-          query = query.eq('executive_committee', true);
+        // Apply eligibility filters
+        final chapterNames = eligibleMembers['chapter_names'] as List<dynamic>?;
+        if (chapterNames != null && chapterNames.isNotEmpty) {
+          query = query.inFilter('chapter_name', chapterNames.cast<String>());
+        }
+
+        final membershipStatus = eligibleMembers['membership_status'] as String?;
+        if (membershipStatus != null) {
+          query = query.eq('current_chapter_member', membershipStatus);
         }
 
         final response = await query;
         return (response as List).length;
       }
-
-      // Custom eligibility filter
-      var query = _readClient.from('members').select('id');
-
-      // If executive only, filter by executive_committee
-      if (isExecutiveOnly) {
-        query = query.eq('executive_committee', true);
-      }
-
-      // Apply eligibility filters
-      final chapterNames = eligibleMembers['chapter_names'] as List<dynamic>?;
-      if (chapterNames != null && chapterNames.isNotEmpty) {
-        query = query.inFilter('chapter_name', chapterNames.cast<String>());
-      }
-
-      final membershipStatus = eligibleMembers['membership_status'] as String?;
-      if (membershipStatus != null) {
-        query = query.eq('current_chapter_member', membershipStatus);
-      }
-
-      final response = await query;
-      return (response as List).length;
     } catch (e) {
       print('Error getting eligible voters count: $e');
       return 0;
