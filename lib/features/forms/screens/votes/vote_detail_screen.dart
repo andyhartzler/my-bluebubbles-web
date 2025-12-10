@@ -4,6 +4,7 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import '../../models/voting_form.dart';
@@ -183,6 +184,95 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
     } else {
       return 'Ending soon';
     }
+  }
+
+  /// Extract photo URL from member data (handles various formats)
+  String? _extractMemberPhotoUrl(Map<String, dynamic>? memberData) {
+    if (memberData == null) return null;
+
+    final profilePictures = memberData['profile_pictures'];
+    if (profilePictures == null) return null;
+
+    // Handle list of photos
+    if (profilePictures is List && profilePictures.isNotEmpty) {
+      final firstPhoto = profilePictures.first;
+      return _extractPhotoUrl(firstPhoto);
+    }
+
+    // Handle single photo entry
+    if (profilePictures is Map) {
+      return _extractPhotoUrl(profilePictures);
+    }
+
+    // Handle string URL directly
+    if (profilePictures is String && profilePictures.isNotEmpty) {
+      return profilePictures;
+    }
+
+    return null;
+  }
+
+  /// Helper to extract URL from a photo entry
+  String? _extractPhotoUrl(dynamic photo) {
+    if (photo == null) return null;
+
+    // If it's already a full URL string, return it
+    if (photo is String && photo.isNotEmpty) {
+      if (photo.startsWith('http://') || photo.startsWith('https://')) {
+        return photo;
+      }
+      // Construct full URL from relative path
+      return _buildPhotoFullUrl(photo);
+    }
+
+    if (photo is Map) {
+      // Try common URL field names (camelCase and snake_case)
+      final url = photo['publicUrl'] ??
+                  photo['public_url'] ??
+                  photo['url'];
+      if (url != null && url.toString().isNotEmpty) {
+        final urlStr = url.toString();
+        if (urlStr.startsWith('http://') || urlStr.startsWith('https://')) {
+          return urlStr;
+        }
+        return _buildPhotoFullUrl(urlStr);
+      }
+
+      // Try to construct URL from path
+      final path = photo['path']?.toString();
+      if (path != null && path.isNotEmpty) {
+        // If path is already a full URL, return it
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+          return path;
+        }
+        // Construct storage URL path
+        final bucket = photo['bucket']?.toString() ?? 'member-photos';
+        final storagePath = path.startsWith('storage/')
+            ? path
+            : 'storage/v1/object/public/$bucket/$path';
+        return _buildPhotoFullUrl(storagePath);
+      }
+    }
+
+    return null;
+  }
+
+  /// Build full URL from relative path using Supabase URL
+  String? _buildPhotoFullUrl(String relativePath) {
+    final supabaseUrl = CRMConfig.supabaseUrl;
+    if (supabaseUrl.isEmpty) return null;
+
+    // Ensure path starts with /
+    final normalizedPath = relativePath.startsWith('/')
+        ? relativePath
+        : '/$relativePath';
+
+    // Remove trailing slash from base URL if present
+    final baseUrl = supabaseUrl.endsWith('/')
+        ? supabaseUrl.substring(0, supabaseUrl.length - 1)
+        : supabaseUrl;
+
+    return '$baseUrl$normalizedPath';
   }
 
   @override
@@ -665,19 +755,9 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
     final memberName = memberData?['name']?.toString() ?? 'Unknown Voter';
     final memberCity = memberData?['city']?.toString();
     final memberState = memberData?['state']?.toString();
-    String? memberPhotoUrl;
 
-    // Get photo URL from profile_pictures array
-    if (memberData != null && memberData['profile_pictures'] != null) {
-      final profilePictures = memberData['profile_pictures'];
-      if (profilePictures is List && profilePictures.isNotEmpty) {
-        final firstPhoto = profilePictures.first;
-        if (firstPhoto is Map) {
-          memberPhotoUrl = firstPhoto['public_url']?.toString() ??
-              firstPhoto['url']?.toString();
-        }
-      }
-    }
+    // Get photo URL from profile_pictures (using robust extraction like FormSubmission)
+    final memberPhotoUrl = _extractMemberPhotoUrl(memberData);
 
     // Build location string
     String? location;
