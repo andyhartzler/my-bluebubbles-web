@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:timezone/timezone.dart' as tz;
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import '../../models/voting_form.dart';
@@ -155,7 +157,15 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
   }
 
   String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+    // Convert to Central Time
+    final central = tz.getLocation('America/Chicago');
+    final centralTime = tz.TZDateTime.from(date.toUtc(), central);
+
+    // Format as M/d/yyyy h:mm a (12-hour format with AM/PM)
+    final dateFormat = DateFormat('M/d/yyyy');
+    final timeFormat = DateFormat('h:mm a');
+
+    return '${dateFormat.format(centralTime)} ${timeFormat.format(centralTime)}';
   }
 
   String _formatTimeRemaining(DateTime endDate) {
