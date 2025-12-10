@@ -62,6 +62,7 @@ class VotesService {
     // Access control
     bool requireLogin = false,
     bool oneSubmissionPerUser = true, // Default true for votes (one vote per person)
+    bool executiveOnly = false, // Restrict voting to executive committee members
     // Submission limits
     int? maxSubmissions,
     // Custom URL
@@ -117,6 +118,7 @@ class VotesService {
           else if (votingEndsAt != null) 'closes_at': votingEndsAt.toIso8601String(),
           'require_login': requireLogin,
           'one_submission_per_user': oneSubmissionPerUser,
+          'executive_only': executiveOnly,
           if (maxSubmissions != null) 'max_submissions': maxSubmissions,
           if (slug != null) 'slug': slug,
           if (confirmationEmailTemplate != null) 'confirmation_email_template': confirmationEmailTemplate,
@@ -154,6 +156,7 @@ class VotesService {
     // Access control
     bool? requireLogin,
     bool? oneSubmissionPerUser,
+    bool? executiveOnly,
     // Submission limits
     int? maxSubmissions,
     bool clearMaxSubmissions = false,
@@ -220,6 +223,7 @@ class VotesService {
     // Access control
     if (requireLogin != null) updates['require_login'] = requireLogin;
     if (oneSubmissionPerUser != null) updates['one_submission_per_user'] = oneSubmissionPerUser;
+    if (executiveOnly != null) updates['executive_only'] = executiveOnly;
 
     // Submission limits
     if (maxSubmissions != null) {
@@ -342,6 +346,28 @@ class VotesService {
   // Check if a member can vote
   Future<bool> canMemberVote(String memberId, String votingFormId) async {
     try {
+      // First check if this is an executive-only vote
+      final vote = await getVote(votingFormId);
+
+      if (vote.executiveOnly) {
+        // Check if the member is on the executive committee
+        final memberResponse = await _readClient
+            .from('members')
+            .select('executive_committee')
+            .eq('id', memberId)
+            .maybeSingle();
+
+        if (memberResponse == null) {
+          return false; // Member not found
+        }
+
+        final isExecutiveCommittee = memberResponse['executive_committee'] as bool? ?? false;
+        if (!isExecutiveCommittee) {
+          return false; // Not an executive committee member
+        }
+      }
+
+      // Then check other eligibility criteria via RPC
       final response = await _readClient.rpc('can_member_vote', params: {
         'p_member_id': memberId,
         'p_voting_form_id': votingFormId,
@@ -612,20 +638,44 @@ class VotesService {
   /// Get count of eligible voters for a vote
   Future<int> getEligibleVotersCount(
     String voteId,
-    Map<String, dynamic>? eligibleMembers,
-  ) async {
+    Map<String, dynamic>? eligibleMembers, {
+    bool? executiveOnly,
+  }) async {
     try {
+      // If executiveOnly is not provided, fetch the vote to check
+      bool isExecutiveOnly = executiveOnly ?? false;
+      if (executiveOnly == null) {
+        try {
+          final vote = await getVote(voteId);
+          isExecutiveOnly = vote.executiveOnly;
+        } catch (e) {
+          // If we can't fetch the vote, continue without executive filter
+        }
+      }
+
       if (eligibleMembers == null || eligibleMembers.isEmpty) {
         // All current chapter members are eligible
-        final response = await _readClient
+        var query = _readClient
             .from('members')
             .select('id')
             .eq('current_chapter_member', 'Yes');
+
+        // If executive only, also filter by executive_committee
+        if (isExecutiveOnly) {
+          query = query.eq('executive_committee', true);
+        }
+
+        final response = await query;
         return (response as List).length;
       }
 
       // Custom eligibility filter
       var query = _readClient.from('members').select('id');
+
+      // If executive only, filter by executive_committee
+      if (isExecutiveOnly) {
+        query = query.eq('executive_committee', true);
+      }
 
       // Apply eligibility filters
       final chapterNames = eligibleMembers['chapter_names'] as List<dynamic>?;
