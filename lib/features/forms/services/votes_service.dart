@@ -1,9 +1,17 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/voting_form.dart';
 import 'form_confirmation_service.dart';
+import '../../../services/crm/supabase_service.dart';
 
 class VotesService {
   final _supabase = Supabase.instance.client;
+  final _crmService = CRMSupabaseService();
+
+  /// Get privileged client for bypassing RLS when reading votes
+  SupabaseClient get _readClient =>
+      _crmService.isInitialized && _crmService.hasServiceRole
+          ? _crmService.privilegedClient
+          : _supabase;
 
   // Voting forms are stored in form_schemas with form_type='vote'
   Stream<List<VotingForm>> watchVotes(String statusFilter) {
@@ -23,7 +31,7 @@ class VotesService {
   }
 
   Future<VotingForm> getVote(String id) async {
-    final response = await _supabase
+    final response = await _readClient
         .from('form_schemas')
         .select()
         .eq('id', id)
@@ -332,7 +340,7 @@ class VotesService {
   // Check if a member can vote
   Future<bool> canMemberVote(String memberId, String votingFormId) async {
     try {
-      final response = await _supabase.rpc('can_member_vote', params: {
+      final response = await _readClient.rpc('can_member_vote', params: {
         'p_member_id': memberId,
         'p_voting_form_id': votingFormId,
       });
@@ -344,7 +352,7 @@ class VotesService {
 
   // Check if member has already voted
   Future<bool> hasVoted(String memberId, String votingFormId) async {
-    final response = await _supabase
+    final response = await _readClient
         .from('votes')
         .select('id')
         .eq('voting_form_id', votingFormId)
@@ -356,7 +364,7 @@ class VotesService {
 
   // Get voters with member details for a vote
   Future<List<Map<String, dynamic>>> getVoters(String votingFormId) async {
-    final response = await _supabase
+    final response = await _readClient
         .from('votes')
         .select('''
           id,
@@ -380,7 +388,7 @@ class VotesService {
 
   /// Get all votes cast by a specific member, with vote form details
   Future<List<Map<String, dynamic>>> getVotesByMember(String memberId) async {
-    final response = await _supabase
+    final response = await _readClient
         .from('votes')
         .select('''
           id,
