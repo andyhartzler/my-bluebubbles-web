@@ -24,6 +24,7 @@ import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/string_utils.dart';
 import 'package:bluebubbles/features/forms/models/form_submission.dart';
 import 'package:bluebubbles/features/forms/services/forms_service.dart';
+import 'package:bluebubbles/features/forms/services/votes_service.dart';
 import 'package:bluebubbles/features/forms/widgets/submission_status_badge.dart';
 import 'package:bluebubbles/features/forms/screens/submission_detail_screen.dart';
 import 'package:bluebubbles/features/forms/screens/votes/vote_detail_screen.dart';
@@ -132,6 +133,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
   // Form submissions, votes, and jobs activity
   final FormsService _formsService = FormsService();
+  final VotesService _votesService = VotesService();
   List<FormSubmission> _formSubmissions = [];
   List<Map<String, dynamic>> _votesCast = [];
   List<Map<String, dynamic>> _jobApplications = [];
@@ -707,20 +709,15 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         setState(() => _formSubmissions = submissions);
       }
 
-      // Load votes cast by member
+      // Load votes cast by member using VotesService
       try {
-        final votesResponse = await _supabaseService.privilegedClient
-            .from('vote_records')
-            .select('*, form_schemas!inner(id, title)')
-            .eq('member_id', _member.id)
-            .order('created_at', ascending: false);
-
-        if (mounted && votesResponse is List) {
-          setState(() => _votesCast = List<Map<String, dynamic>>.from(votesResponse));
+        final votesResponse = await _votesService.getVotesByMember(_member.id);
+        if (mounted) {
+          setState(() => _votesCast = votesResponse);
         }
       } catch (e) {
         // Votes table may not exist, that's ok
-        debugPrint('Could not load vote records: $e');
+        debugPrint('Could not load votes: $e');
       }
 
       // Load job applications
@@ -2138,18 +2135,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           count: _votesCast.length,
           children: _votesCast.take(3).map((vote) {
             final title = vote['form_schemas']?['title']?.toString() ?? 'Vote';
-            final voteId = vote['form_schemas']?['id']?.toString();
+            final voteId = vote['form_schemas']?['id']?.toString() ?? vote['voting_form_id']?.toString();
             final createdAtRaw = vote['created_at'];
             final createdAt = createdAtRaw != null
                 ? DateTime.tryParse(createdAtRaw.toString())
                 : null;
             final voteData = vote['vote_data'] as Map<String, dynamic>?;
-            // Show what they voted for if available
-            String? voteChoice;
-            if (voteData != null && voteData.isNotEmpty) {
-              final firstEntry = voteData.entries.first;
-              voteChoice = firstEntry.value?.toString();
-            }
+            final schema = vote['form_schemas']?['schema'] as Map<String, dynamic>?;
+
+            // Get the vote choice label (not just the ID)
+            String? voteChoice = _getVoteChoiceLabel(voteData, schema);
+
             return ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
@@ -2323,6 +2319,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         ),
       ),
     );
+  }
+
+  /// Get the label for a vote choice by looking up the option ID in the schema
+  String? _getVoteChoiceLabel(
+    Map<String, dynamic>? voteData,
+    Map<String, dynamic>? schema,
+  ) {
+    return VotesService.getVoteChoiceLabel(voteData, schema);
   }
 
   void _viewVoteDetails(String voteId) {

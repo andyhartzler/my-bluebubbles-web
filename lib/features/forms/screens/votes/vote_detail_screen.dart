@@ -24,6 +24,7 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
   late TabController _tabController;
   VotingForm? _vote;
   List<Map<String, dynamic>> _voters = [];
+  Map<String, Map<String, int>> _calculatedVoteCounts = {}; // question_id -> {option_id -> count}
   bool _isLoading = true;
   String? _error;
 
@@ -51,9 +52,16 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
         _votesService.getVote(widget.voteId),
         _votesService.getVoters(widget.voteId),
       ]);
+      final vote = results[0] as VotingForm;
+      final voters = results[1] as List<Map<String, dynamic>>;
+
+      // Calculate vote counts from actual votes
+      final voteCounts = _calculateVoteCounts(vote, voters);
+
       setState(() {
-        _vote = results[0] as VotingForm;
-        _voters = results[1] as List<Map<String, dynamic>>;
+        _vote = vote;
+        _voters = voters;
+        _calculatedVoteCounts = voteCounts;
         _isLoading = false;
       });
     } catch (e) {
@@ -62,6 +70,81 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
         _isLoading = false;
       });
     }
+  }
+
+  /// Calculate vote counts from the actual voter data
+  Map<String, Map<String, int>> _calculateVoteCounts(
+    VotingForm vote,
+    List<Map<String, dynamic>> voters,
+  ) {
+    final counts = <String, Map<String, int>>{};
+
+    // Initialize counts for all questions and options
+    for (final question in vote.questions) {
+      final questionId = question['id'] as String? ?? 'default';
+      counts[questionId] = <String, int>{};
+
+      final options = question['options'] as List<dynamic>? ?? [];
+      for (final option in options) {
+        final optionId = (option as Map<String, dynamic>)['id'] as String?;
+        if (optionId != null) {
+          counts[questionId]![optionId] = 0;
+        }
+      }
+    }
+
+    // Count votes from each voter
+    for (final voter in voters) {
+      final voteData = voter['vote_data'] as Map<String, dynamic>?;
+      if (voteData == null) continue;
+
+      for (final entry in voteData.entries) {
+        final questionId = entry.key;
+        final answer = entry.value;
+
+        if (counts.containsKey(questionId)) {
+          if (answer is String) {
+            // Single choice answer
+            counts[questionId]![answer] = (counts[questionId]![answer] ?? 0) + 1;
+          } else if (answer is List) {
+            // Multiple select or ranked choice
+            for (final item in answer) {
+              if (item is String) {
+                counts[questionId]![item] = (counts[questionId]![item] ?? 0) + 1;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return counts;
+  }
+
+  /// Get questions with calculated vote counts
+  List<Map<String, dynamic>> get _questionsWithVoteCounts {
+    if (_vote == null) return [];
+
+    return _vote!.questions.map((question) {
+      final questionId = question['id'] as String? ?? 'default';
+      final options = question['options'] as List<dynamic>? ?? [];
+      final questionCounts = _calculatedVoteCounts[questionId] ?? {};
+
+      // Create new options list with calculated vote counts
+      final updatedOptions = options.map((opt) {
+        final option = Map<String, dynamic>.from(opt as Map<String, dynamic>);
+        final optionId = option['id'] as String?;
+        if (optionId != null) {
+          option['votes'] = questionCounts[optionId] ?? 0;
+        }
+        return option;
+      }).toList();
+
+      return {
+        ...question,
+        'options': updatedOptions,
+      };
+    }).toList();
   }
 
   String _formatDate(DateTime date) {
@@ -226,7 +309,10 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
             if (vote.resultsPublic ||
                 vote.hasEnded ||
                 vote.status == 'active') ...[
-              VoteResultsChart(vote: vote),
+              VoteResultsChart(
+                vote: vote,
+                calculatedQuestions: _questionsWithVoteCounts,
+              ),
               const SizedBox(height: 24),
               // Voters list
               _buildVotersList(theme, colorScheme, vote),
@@ -556,11 +642,11 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
     final memberState = memberData?['state']?.toString();
     String? memberPhotoUrl;
 
-    // Get photo URL from profile_photos array
-    if (memberData != null && memberData['profile_photos'] != null) {
-      final profilePhotos = memberData['profile_photos'];
-      if (profilePhotos is List && profilePhotos.isNotEmpty) {
-        final firstPhoto = profilePhotos.first;
+    // Get photo URL from profile_pictures array
+    if (memberData != null && memberData['profile_pictures'] != null) {
+      final profilePictures = memberData['profile_pictures'];
+      if (profilePictures is List && profilePictures.isNotEmpty) {
+        final firstPhoto = profilePictures.first;
         if (firstPhoto is Map) {
           memberPhotoUrl = firstPhoto['public_url']?.toString() ??
               firstPhoto['url']?.toString();
@@ -670,17 +756,45 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
     final questions = vote.questions;
     if (questions.isEmpty) return 'Voted';
 
-    // For single question, show the answer
+    // For single question, show the answer label
     if (questions.length == 1) {
-      final questionId = questions.first['id'] as String?;
+      final question = questions.first;
+      final questionId = question['id'] as String?;
+      final options = (question['options'] as List<dynamic>?) ?? [];
+
       if (questionId != null && voteData.containsKey(questionId)) {
         final answer = voteData[questionId];
-        if (answer is String) return answer;
-        if (answer is List && answer.isNotEmpty) return answer.first.toString();
+        // Look up the option label
+        if (answer is String) {
+          for (final opt in options) {
+            if (opt is Map<String, dynamic> && opt['id'] == answer) {
+              return opt['label']?.toString() ?? answer;
+            }
+          }
+          return answer;
+        }
+        if (answer is List && answer.isNotEmpty) {
+          // Get first answer's label
+          final firstAns = answer.first;
+          for (final opt in options) {
+            if (opt is Map<String, dynamic> && opt['id'] == firstAns) {
+              return opt['label']?.toString() ?? firstAns.toString();
+            }
+          }
+          return firstAns.toString();
+        }
         return answer?.toString() ?? 'Voted';
       }
       // Fallback to first value
-      return voteData.values.first?.toString() ?? 'Voted';
+      final firstValue = voteData.values.first;
+      if (firstValue is String) {
+        for (final opt in options) {
+          if (opt is Map<String, dynamic> && opt['id'] == firstValue) {
+            return opt['label']?.toString() ?? firstValue;
+          }
+        }
+      }
+      return firstValue?.toString() ?? 'Voted';
     }
 
     // For multiple questions, show count

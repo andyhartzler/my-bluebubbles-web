@@ -377,4 +377,85 @@ class VotesService {
 
     return List<Map<String, dynamic>>.from(response);
   }
+
+  /// Get all votes cast by a specific member, with vote form details
+  Future<List<Map<String, dynamic>>> getVotesByMember(String memberId) async {
+    final response = await _supabase
+        .from('votes')
+        .select('''
+          id,
+          vote_data,
+          created_at,
+          voting_form_id,
+          form_schemas!voting_form_id (
+            id,
+            title,
+            schema,
+            voting_starts_at,
+            voting_ends_at
+          )
+        ''')
+        .eq('member_id', memberId)
+        .order('created_at', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Get vote choice label from vote_data and schema
+  static String? getVoteChoiceLabel(
+    Map<String, dynamic>? voteData,
+    Map<String, dynamic>? schema,
+  ) {
+    if (voteData == null || voteData.isEmpty) return null;
+    if (schema == null) return voteData.values.first?.toString();
+
+    final questions = schema['questions'] as List<dynamic>?;
+    if (questions == null || questions.isEmpty) {
+      // Try old format with 'fields'
+      final fields = schema['fields'] as List<dynamic>?;
+      if (fields != null) {
+        final firstOptionId = voteData.values.first?.toString();
+        for (final field in fields) {
+          if (field is Map<String, dynamic> && field['id'] == firstOptionId) {
+            return field['label']?.toString();
+          }
+        }
+      }
+      return voteData.values.first?.toString();
+    }
+
+    final labels = <String>[];
+    for (final question in questions) {
+      if (question is! Map<String, dynamic>) continue;
+      final questionId = question['id'] as String?;
+      if (questionId == null) continue;
+
+      final answer = voteData[questionId];
+      if (answer == null) continue;
+
+      final options = question['options'] as List<dynamic>?;
+      if (options == null) continue;
+
+      for (final option in options) {
+        if (option is! Map<String, dynamic>) continue;
+        final optionId = option['id'];
+        if (answer is String && optionId == answer) {
+          final label = option['label']?.toString();
+          if (label != null) labels.add(label);
+          break;
+        } else if (answer is List) {
+          for (final ans in answer) {
+            if (optionId == ans) {
+              final label = option['label']?.toString();
+              if (label != null) labels.add(label);
+            }
+          }
+        }
+      }
+    }
+
+    if (labels.isEmpty) return null;
+    if (labels.length == 1) return labels.first;
+    return labels.join(', ');
+  }
 }
