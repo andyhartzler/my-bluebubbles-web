@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -21,10 +20,27 @@ class CommitteesDashboardScreen extends StatefulWidget {
 class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
   final CommitteeRepository _repository = CommitteeRepository();
   final Map<String, CommitteeStats> _stats = {};
+  Map<String, int> _overallStats = {};
   bool _loading = true;
   String? _error;
 
   bool get _crmReady => CRMConfig.crmEnabled && CRMSupabaseService().isInitialized;
+
+  /// Returns committees sorted: College Democrats first, High School Democrats second, then alphabetically
+  List<Committee> get _sortedCommittees {
+    final committees = List<Committee>.from(CommitteeDefinitions.all);
+    committees.sort((a, b) {
+      // College Democrats always first
+      if (a.id == 'College Democrats') return -1;
+      if (b.id == 'College Democrats') return 1;
+      // High School Democrats second
+      if (a.id == 'High School Democrats') return -1;
+      if (b.id == 'High School Democrats') return 1;
+      // Rest alphabetically
+      return a.displayName.compareTo(b.displayName);
+    });
+    return committees;
+  }
 
   @override
   void initState() {
@@ -47,20 +63,16 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
     });
 
     try {
-      final futures = CommitteeDefinitions.all.map((committee) async {
-        final stats = await _repository.getCommitteeStats(committee);
-        return MapEntry(committee.id, stats);
-      });
-
-      final results = await Future.wait(futures);
+      // Load committee stats and overall stats in parallel
+      final results = await Future.wait([
+        _loadCommitteeStats(),
+        _repository.getOverallStats(),
+      ]);
 
       if (!mounted) return;
 
       setState(() {
-        _stats.clear();
-        for (final entry in results) {
-          _stats[entry.key] = entry.value;
-        }
+        _overallStats = results[1] as Map<String, int>;
         _loading = false;
       });
     } catch (e) {
@@ -70,6 +82,24 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _loadCommitteeStats() async {
+    final futures = CommitteeDefinitions.all.map((committee) async {
+      final stats = await _repository.getCommitteeStats(committee);
+      return MapEntry(committee.id, stats);
+    });
+
+    final results = await Future.wait(futures);
+
+    if (!mounted) return;
+
+    setState(() {
+      _stats.clear();
+      for (final entry in results) {
+        _stats[entry.key] = entry.value;
+      }
+    });
   }
 
   void _openCommitteeWorkspace(Committee committee) {
@@ -149,6 +179,7 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
 
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
+    final sortedCommittees = _sortedCommittees;
 
     return SelectionArea(
       child: ListView(
@@ -185,129 +216,235 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Committee grid
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth > 900;
-              final isMedium = constraints.maxWidth > 600;
-              final crossAxisCount = isWide ? 3 : (isMedium ? 2 : 1);
-              final childAspectRatio = isWide ? 1.3 : (isMedium ? 1.4 : 2.0);
+          // Overall stat cards
+          _buildStatCardsRow(context),
+          const SizedBox(height: 32),
 
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: childAspectRatio,
-                ),
-                itemCount: CommitteeDefinitions.all.length,
-                itemBuilder: (context, index) {
-                  final committee = CommitteeDefinitions.all[index];
-                  final stats = _stats[committee.id];
-                  return _buildCommitteeCard(context, committee, stats);
-                },
-              );
-            },
-          ),
+          // Committee list (full-width horizontal tiles)
+          ...sortedCommittees.map((committee) {
+            final stats = _stats[committee.id];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _buildCommitteeTile(context, committee, stats),
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildCommitteeCard(BuildContext context, Committee committee, CommitteeStats? stats) {
+  Widget _buildStatCardsRow(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // Calculate totals
+    int totalMembers = 0;
+    for (final stats in _stats.values) {
+      totalMembers += stats.memberCount;
+    }
+
+    final slackMessages = _overallStats['slackMessages'] ?? 0;
+    final messagesSent = _overallStats['messagesSent'] ?? 0;
+    final countiesRepresented = _overallStats['countiesRepresented'] ?? 0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 600;
+
+        final cards = [
+          _StatCard(
+            icon: Icons.chat_bubble_outline,
+            iconColor: Colors.purple,
+            label: 'Slack Messages',
+            value: _formatNumber(slackMessages),
+          ),
+          _StatCard(
+            icon: Icons.people_outline,
+            iconColor: Colors.blue,
+            label: 'Active Members',
+            value: _formatNumber(totalMembers),
+          ),
+          _StatCard(
+            icon: Icons.message_outlined,
+            iconColor: Colors.green,
+            label: 'Messages Sent',
+            value: _formatNumber(messagesSent),
+          ),
+          _StatCard(
+            icon: Icons.location_on_outlined,
+            iconColor: Colors.orange,
+            label: 'Counties',
+            value: _formatNumber(countiesRepresented),
+          ),
+        ];
+
+        if (isNarrow) {
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: _buildStatCard(cards[0], theme)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildStatCard(cards[1], theme)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _buildStatCard(cards[2], theme)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildStatCard(cards[3], theme)),
+                ],
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          children: cards.map((card) => Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: _buildStatCard(card, theme),
+            ),
+          )).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCard(_StatCard card, ThemeData theme) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: card.iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(card.icon, color: card.iconColor, size: 24),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              card.value,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              card.label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommitteeTile(BuildContext context, Committee committee, CommitteeStats? stats) {
     final theme = Theme.of(context);
 
     return Card(
-      elevation: 3,
+      elevation: 2,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: () => _openCommitteeWorkspace(committee),
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [committee.primaryColor, committee.secondaryColor],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
           ),
           padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              // Icon and member count row
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    child: Icon(committee.icon, color: Colors.white),
-                  ),
-                  const Spacer(),
-                  if (stats != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.people, size: 16, color: Colors.white),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${stats.memberCount}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+              // Committee icon
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                child: Icon(committee.icon, color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 20),
+
+              // Committee name and description
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      committee.displayName,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Committee name
-              Text(
-                committee.displayName,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+                    const SizedBox(height: 4),
+                    Text(
+                      committee.description,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(width: 16),
 
-              // Leadership - show all chairs and co-chairs
+              // Leadership bubbles (side by side)
               if (stats != null && stats.allLeaders.isNotEmpty) ...[
-                _buildLeadershipRow(stats),
-                const SizedBox(height: 8),
+                _buildLeadershipBubbles(stats),
+                const SizedBox(width: 16),
               ],
 
-              // Committee-specific stats
-              Expanded(
-                child: _buildCommitteeSpecificStats(committee, stats),
-              ),
-
-              // Arrow indicator
-              Align(
-                alignment: Alignment.centerRight,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
+              // Member count badge
+              if (stats != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(999),
                   ),
-                  child: const Icon(
-                    Icons.arrow_forward,
-                    color: Colors.white,
-                    size: 16,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.people, size: 18, color: Colors.white),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${stats.memberCount}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+              const SizedBox(width: 12),
+
+              // Arrow indicator
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.arrow_forward,
+                  color: Colors.white,
+                  size: 20,
                 ),
               ),
             ],
@@ -317,157 +454,59 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
     );
   }
 
-  Widget _buildLeadershipRow(CommitteeStats? stats) {
-    if (stats == null) return const SizedBox.shrink();
+  Widget _buildLeadershipBubbles(CommitteeStats stats) {
+    final leaders = stats.allLeaders;
+    if (leaders.isEmpty) return const SizedBox.shrink();
 
-    final leaders = <Widget>[];
-
-    // Add all chairs
-    for (final chair in stats.chairs) {
-      leaders.add(_buildLeaderChip(chair.name, chair.photoUrl, chair.title ?? 'Chair'));
-    }
-    // Add all co-chairs
-    for (final coChair in stats.coChairs) {
-      leaders.add(_buildLeaderChip(coChair.name, coChair.photoUrl, coChair.title ?? 'Co-Chair'));
-    }
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 4,
-      children: leaders,
-    );
-  }
-
-  Widget _buildLeaderChip(String name, String? photoUrl, String role) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            radius: 10,
-            backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-            backgroundColor: Colors.white.withOpacity(0.3),
-            child: photoUrl == null
-                ? Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(fontSize: 10, color: Colors.white),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCommitteeSpecificStats(Committee committee, CommitteeStats? stats) {
-    if (stats == null) return const SizedBox.shrink();
-
-    final specific = stats.specificStats;
-    final currency = NumberFormat.compactSimpleCurrency();
-
-    switch (committee.id) {
-      case 'Communications':
-        return _buildStatsList([
-          _StatItem(Icons.send, '${specific['totalCampaignsSent'] ?? 0} campaigns sent'),
-          _StatItem(Icons.email, '${specific['totalEmailsDelivered'] ?? 0} emails delivered'),
-        ]);
-
-      case 'Political Affairs':
-        return _buildStatsList([
-          _StatItem(Icons.event, '${specific['totalEvents'] ?? 0} total events'),
-          _StatItem(Icons.upcoming, '${specific['upcomingEvents'] ?? 0} upcoming'),
-        ]);
-
-      case 'Policy & Advocacy':
-        return _buildStatsList([
-          _StatItem(Icons.edit_note, '${specific['totalAdvocacyEmailsGenerated'] ?? 0} emails generated'),
-          _StatItem(Icons.send, '${specific['totalAdvocacyEmailsSent'] ?? 0} sent'),
-        ]);
-
-      case 'Membership & Outreach':
-        return _buildStatsList([
-          _StatItem(Icons.people, '${specific['totalMembers'] ?? 0} total members'),
-          _StatItem(Icons.verified_user, '${specific['activeMembers'] ?? 0} active'),
-        ]);
-
-      case 'Fundraising':
-        final totalRaised = specific['totalRaised'] as double? ?? 0.0;
-        return _buildStatsList([
-          _StatItem(Icons.people, '${specific['totalDonors'] ?? 0} donors'),
-          _StatItem(Icons.attach_money, currency.format(totalRaised)),
-        ]);
-
-      case 'College Democrats':
-        return _buildStatsList([
-          _StatItem(Icons.school, '${specific['totalCollegeChapters'] ?? 0} chapters'),
-          _StatItem(Icons.verified, '${specific['charteredCollegeChapters'] ?? 0} chartered'),
-          _StatItem(Icons.account_balance, '${specific['uniqueColleges'] ?? 0} colleges'),
-        ]);
-
-      case 'High School Democrats':
-        return _buildStatsList([
-          _StatItem(Icons.school, '${specific['totalHSChapters'] ?? 0} chapters'),
-          _StatItem(Icons.verified, '${specific['charteredHSChapters'] ?? 0} chartered'),
-          _StatItem(Icons.domain, '${specific['uniqueHighSchools'] ?? 0} schools'),
-        ]);
-
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  Widget _buildStatsList(List<_StatItem> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // Show up to 2 leaders side by side
+    return Row(
       mainAxisSize: MainAxisSize.min,
-      children: items.map((item) {
+      children: leaders.take(2).map((leader) {
         return Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(item.icon, size: 14, color: Colors.white.withOpacity(0.8)),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  item.label,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 12,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+          padding: const EdgeInsets.only(left: 4),
+          child: Tooltip(
+            message: '${leader.name}\n${leader.title ?? "Leader"}',
+            child: CircleAvatar(
+              radius: 20,
+              backgroundImage: leader.photoUrl != null ? NetworkImage(leader.photoUrl!) : null,
+              backgroundColor: Colors.white.withOpacity(0.3),
+              child: leader.photoUrl == null
+                  ? Text(
+                      leader.name.isNotEmpty ? leader.name[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
+            ),
           ),
         );
       }).toList(),
     );
   }
+
+  String _formatNumber(int number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    }
+    return number.toString();
+  }
 }
 
-class _StatItem {
+class _StatCard {
   final IconData icon;
+  final Color iconColor;
   final String label;
+  final String value;
 
-  const _StatItem(this.icon, this.label);
+  const _StatCard({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+  });
 }

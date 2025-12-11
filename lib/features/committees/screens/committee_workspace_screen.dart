@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_overview_tab.dart';
@@ -43,7 +44,12 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
       ),
       _TabDefinition(
         label: 'Slack',
-        icon: Icons.chat_outlined,
+        iconWidget: SvgPicture.asset(
+          'assets/icon/slack-icon.svg',
+          width: 24,
+          height: 24,
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+        ),
         builder: () => CommitteeSlackTab(committee: committee),
       ),
       _TabDefinition(
@@ -134,7 +140,7 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                 controller: _tabController,
                 isScrollable: true,
                 tabs: _tabs.map((tab) => Tab(
-                  icon: Icon(tab.icon),
+                  icon: tab.iconWidget ?? Icon(tab.icon),
                   text: tab.label,
                 )).toList(),
               ),
@@ -239,13 +245,12 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
       return const SizedBox.shrink();
     }
 
-    // Display leaders in a vertical column on the right
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.center,
+    // Display leaders side by side in a horizontal row (Chair first, then Co-Chair)
+    return Row(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.end,
       children: _leaders.map((leader) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.only(left: 8),
         child: _buildLeaderChip(leader),
       )).toList(),
     );
@@ -303,12 +308,14 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
 
 class _TabDefinition {
   final String label;
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final Widget Function() builder;
 
   const _TabDefinition({
     required this.label,
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.builder,
-  });
+  }) : assert(icon != null || iconWidget != null);
 }

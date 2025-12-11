@@ -1,3 +1,5 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
@@ -5,7 +7,7 @@ import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
-import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
+import 'package:bluebubbles/services/crm/crm_message_service.dart';
 
 class CommitteeMessagesTab extends StatefulWidget {
   final Committee committee;
@@ -19,13 +21,24 @@ class CommitteeMessagesTab extends StatefulWidget {
 class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
     with SingleTickerProviderStateMixin {
   final CommitteeRepository _repository = CommitteeRepository();
+  final CRMMessageService _messageService = CRMMessageService.instance;
+  final TextEditingController _messageController = TextEditingController();
+
   late TabController _tabController;
   List<Member> _members = [];
   Set<String> _memberPhoneNumbers = {};
   bool _loading = true;
-  bool _openingComposer = false;
+  bool _sending = false;
+  int _currentProgress = 0;
+  int _totalMessages = 0;
+  Map<String, int> _transportPreview = {};
+  final List<PlatformFile> _attachments = [];
 
   Committee get committee => widget.committee;
+
+  List<Member> get _membersWithPhone => _members.where(
+    (m) => m.canContact && m.primaryPhone != null && m.primaryPhone!.isNotEmpty,
+  ).toList();
 
   @override
   void initState() {
@@ -37,6 +50,7 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
   @override
   void dispose() {
     _tabController.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
@@ -54,9 +68,22 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
         }
       }
 
+      // Get transport breakdown
+      final contactableMembers = members.where((m) => m.canContact).toList();
+      Map<String, int> transports = {};
+      if (contactableMembers.isNotEmpty) {
+        try {
+          transports = await _messageService.previewTransportBreakdown(contactableMembers);
+        } catch (_) {
+          transports = {};
+        }
+      }
+
+      if (!mounted) return;
       setState(() {
         _members = members;
         _memberPhoneNumbers = phoneNumbers;
+        _transportPreview = transports;
         _loading = false;
       });
     } catch (e) {
@@ -65,22 +92,209 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
     }
   }
 
-  Future<void> _openMessageComposer() async {
-    if (_openingComposer) return;
+  Future<void> _pickAttachments() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      withData: kIsWeb,
+    );
 
-    setState(() => _openingComposer = true);
+    if (result == null) return;
+
+    setState(() {
+      for (final file in result.files) {
+        final alreadyExists = _attachments.any((existing) {
+          if (existing.identifier != null && file.identifier != null) {
+            return existing.identifier == file.identifier;
+          }
+          if (existing.path != null && file.path != null) {
+            return existing.path == file.path;
+          }
+          return existing.name == file.name && existing.bytes == file.bytes;
+        });
+
+        if (!alreadyExists) {
+          _attachments.add(file);
+        }
+      }
+    });
+  }
+
+  void _removeAttachment(PlatformFile file) {
+    setState(() {
+      _attachments.remove(file);
+    });
+  }
+
+  Future<void> _sendMessages() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a message')),
+      );
+      return;
+    }
+
+    final recipients = _membersWithPhone;
+    if (recipients.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No members with phone numbers')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Message'),
+        content: Text(
+          'Send this message to ${recipients.length} ${committee.displayName} members?\n\n'
+          'Messages will be sent at a rate of ${CRMMessageService.messagesPerMinute} per minute.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _sending = true;
+      _currentProgress = 0;
+      _totalMessages = recipients.length;
+    });
 
     try {
       final filter = MessageFilter(committees: [committee.name]);
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => BulkMessageScreen(initialFilter: filter),
+      final results = await _messageService.sendBulkMessages(
+        filter: filter,
+        messageText: message,
+        onProgress: (current, total) {
+          if (!mounted) return;
+          setState(() {
+            _currentProgress = current;
+            _totalMessages = total;
+          });
+        },
+        attachments: List<PlatformFile>.from(_attachments),
+      );
+
+      final successCount = results.values.where((v) => v).length;
+
+      if (!mounted) return;
+      setState(() => _sending = false);
+
+      // Clear the message after sending
+      _messageController.clear();
+      _attachments.clear();
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Messages Sent'),
+          content: Text('Successfully sent $successCount of ${results.length} messages'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
         ),
       );
-    } finally {
-      if (mounted) {
-        setState(() => _openingComposer = false);
-      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _sending = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sending messages: $e')),
+      );
+    }
+  }
+
+  Future<void> _sendIntroMessages() async {
+    final eligible = _membersWithPhone.where((m) => m.introSentAt == null).toList();
+    if (eligible.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All members have already received the intro message')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Send Intro Message'),
+        content: Text(
+          'Send the Missouri Young Democrats intro message to ${eligible.length} ${committee.displayName} members?\n\n'
+          'Members who have already received the intro will be skipped.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Send Intro'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _sending = true;
+      _currentProgress = 0;
+      _totalMessages = eligible.length;
+    });
+
+    try {
+      final filter = MessageFilter(committees: [committee.name]);
+      final results = await _messageService.sendIntroToFilteredMembers(
+        filter,
+        onProgress: (current, total) {
+          if (!mounted) return;
+          setState(() {
+            _currentProgress = current;
+            _totalMessages = total;
+          });
+        },
+      );
+
+      final successCount = results.values.where((v) => v).length;
+
+      if (!mounted) return;
+      setState(() => _sending = false);
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Intro Messages Sent'),
+          content: Text('Successfully sent intro to $successCount members'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+
+      // Reload members to update intro status
+      _loadMembers();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _sending = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sending intro messages: $e')),
+      );
     }
   }
 
@@ -96,7 +310,7 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
           child: TabBar(
             controller: _tabController,
             tabs: const [
-              Tab(text: 'Send Message'),
+              Tab(text: 'Compose'),
               Tab(text: 'Conversations'),
             ],
           ),
@@ -120,154 +334,207 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
       return const Center(child: CircularProgressIndicator());
     }
 
-    final membersWithPhone = _members.where(
-      (m) => m.primaryPhone != null && m.primaryPhone!.isNotEmpty,
-    ).toList();
+    final recipients = _membersWithPhone;
+    final alreadyIntroduced = recipients.where((m) => m.introSentAt != null).length;
+    final introEligible = recipients.length - alreadyIntroduced;
 
-    return ListView(
-      padding: const EdgeInsets.all(24),
+    return Column(
       children: [
-        // Compose card
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.message_outlined,
-                  size: 48,
-                  color: committee.primaryColor,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Send Message to ${committee.displayName}',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Send an SMS/iMessage to all ${membersWithPhone.length} committee members with phone numbers.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Recipients preview
-                Container(
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Recipients info card
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: committee.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.people, color: committee.primaryColor),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Recipients',
-                              style: TextStyle(
+                      Row(
+                        children: [
+                          Icon(Icons.people, color: committee.primaryColor),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Recipients: ${recipients.length} members',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: committee.primaryColor,
                               ),
                             ),
-                            Text(
-                              '${membersWithPhone.length} members with phone numbers',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: committee.primaryColor.withOpacity(0.8),
+                          ),
+                        ],
+                      ),
+                      if (_transportPreview.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: _transportPreview.entries.map((entry) {
+                            return Chip(
+                              avatar: Icon(
+                                entry.key == 'iMessage' ? Icons.message : Icons.sms,
+                                size: 16,
                               ),
-                            ),
-                          ],
+                              label: Text('${entry.value} ${entry.key}'),
+                              visualDensity: VisualDensity.compact,
+                            );
+                          }).toList(),
                         ),
+                      ],
+                      if (alreadyIntroduced > 0) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '$alreadyIntroduced already received intro ($introEligible eligible)',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Message composer card
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Compose Message',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _messageController,
+                        maxLines: 6,
+                        maxLength: 500,
+                        decoration: InputDecoration(
+                          hintText: 'Type your message here...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          filled: true,
+                        ),
+                        enabled: !_sending && recipients.isNotEmpty,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Attachments section
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ..._attachments.map(
+                            (file) => InputChip(
+                              label: Text(file.name),
+                              avatar: const Icon(Icons.attachment, size: 18),
+                              onDeleted: _sending ? null : () => _removeAttachment(file),
+                            ),
+                          ),
+                          if (!_sending && recipients.isNotEmpty)
+                            OutlinedButton.icon(
+                              onPressed: _pickAttachments,
+                              icon: const Icon(Icons.attach_file, size: 18),
+                              label: Text(_attachments.isEmpty ? 'Add attachments' : 'Add more'),
+                            ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+              ),
+              const SizedBox(height: 16),
 
-                // Compose button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: membersWithPhone.isEmpty || _openingComposer
-                        ? null
-                        : _openMessageComposer,
-                    icon: _openingComposer
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.edit),
-                    label: Text(_openingComposer ? 'Opening...' : 'Open Message Composer'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: committee.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
+              // Quick actions
+              if (recipients.isNotEmpty && !_sending)
+                OutlinedButton.icon(
+                  onPressed: introEligible > 0 ? _sendIntroMessages : null,
+                  icon: const Icon(Icons.auto_awesome),
+                  label: Text(introEligible > 0
+                      ? 'Send MYD Intro to $introEligible Members'
+                      : 'All Members Have Received Intro'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.all(14),
                   ),
                 ),
-
-                if (membersWithPhone.isEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'No members have phone numbers configured.',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontSize: 12,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ],
-            ),
+            ],
           ),
         ),
 
-        const SizedBox(height: 24),
-
-        // Member list preview
-        Text(
-          'Committee Members',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        ...membersWithPhone.take(5).map((member) => ListTile(
-          leading: CircleAvatar(
-            backgroundColor: committee.primaryColor.withOpacity(0.2),
-            child: Text(
-              member.name.isNotEmpty ? member.name[0] : '?',
-              style: TextStyle(color: committee.primaryColor),
-            ),
-          ),
-          title: Text(member.name),
-          subtitle: Text(member.primaryPhone ?? ''),
-          dense: true,
-        )),
-
-        if (membersWithPhone.length > 5)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '... and ${membersWithPhone.length - 5} more members',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
-              ),
-            ),
-          ),
+        // Send button footer
+        _buildSendFooter(recipients),
       ],
+    );
+  }
+
+  Widget _buildSendFooter(List<Member> recipients) {
+    if (_sending) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            LinearProgressIndicator(
+              value: _totalMessages > 0 ? _currentProgress / _totalMessages : 0,
+              backgroundColor: committee.primaryColor.withOpacity(0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(committee.primaryColor),
+            ),
+            const SizedBox(height: 8),
+            Text('Sending $_currentProgress of $_totalMessages...'),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: _messageController.text.trim().isEmpty || recipients.isEmpty
+              ? null
+              : _sendMessages,
+          icon: const Icon(Icons.send),
+          label: Text('Send to ${recipients.length} Members'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: committee.primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+        ),
+      ),
     );
   }
 
@@ -308,7 +575,6 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
     }
 
     // Use the ConversationList widget filtered by committee member phone numbers
-    // This is an exact copy of the main Conversations page with filtering applied
     return ConversationList(
       key: ValueKey('committee-conversations-${committee.id}'),
       showArchivedChats: false,
