@@ -370,18 +370,27 @@ class _CommitteeMeetingsTabState extends State<CommitteeMeetingsTab> {
     required String label,
     required Widget child,
   }) {
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(999),
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(28),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16),
-          const SizedBox(width: 6),
-          child,
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            '$label:',
+            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(width: 12),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 120),
+            child: child,
+          ),
         ],
       ),
     );
