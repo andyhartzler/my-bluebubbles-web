@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart' as file_picker;
 
 class PlatformFile {
   PlatformFile({
@@ -6,7 +7,8 @@ class PlatformFile {
     required this.name,
     required this.size,
     this.bytes,
-  }) : assert(path != null || bytes != null);
+    this.identifier,
+  });
 
   factory PlatformFile.fromMap(Map data, {Stream<List<int>>? readStream}) {
     return PlatformFile(
@@ -14,6 +16,18 @@ class PlatformFile {
       path: data['path'],
       bytes: data['bytes'],
       size: data['size'],
+      identifier: data['identifier'],
+    );
+  }
+
+  /// Creates a PlatformFile from a file_picker PlatformFile.
+  factory PlatformFile.fromPicker(file_picker.PlatformFile pickerFile) {
+    return PlatformFile(
+      name: pickerFile.name,
+      path: pickerFile.path,
+      bytes: pickerFile.bytes,
+      size: pickerFile.size,
+      identifier: pickerFile.identifier,
     );
   }
 
@@ -36,6 +50,9 @@ class PlatformFile {
 
   /// The file size in bytes.
   final int size;
+
+  /// A unique identifier for this file (used on some platforms).
+  final String? identifier;
 
   /// File extension for this file.
   String? get extension => name.split('.').last;

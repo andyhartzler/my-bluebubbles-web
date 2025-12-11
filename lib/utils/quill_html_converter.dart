@@ -1,10 +1,23 @@
 import 'dart:convert';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 /// Utility helpers for converting Flutter Quill documents/deltas into HTML.
 class QuillHtmlConverter {
   static final HtmlEscape _textEscape = const HtmlEscape();
   static final HtmlEscape _attributeEscape =
       const HtmlEscape(HtmlEscapeMode.attribute);
+
+  /// Converts a Quill document to HTML.
+  /// This is a convenience wrapper around [generateHtml].
+  static String convertToHtml(quill.Document document) {
+    final deltaJson = document.toDelta().toJson();
+    final plainText = document.toPlainText();
+    final jsonList = deltaJson
+        .whereType<Map<String, dynamic>>()
+        .toList()
+        .cast<Map<String, dynamic>>();
+    return generateHtml(jsonList, plainText);
+  }
 
   /// Generates HTML from a delta JSON representation while respecting inline
   /// styling information. Falls back to an empty string if the document has no
