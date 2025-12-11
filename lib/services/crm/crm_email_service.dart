@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:mime/mime.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:universal_io/io.dart' as io;
@@ -383,6 +384,109 @@ class CRMEmailService {
       recipients: personalizedRecipients,
       attachments: attachments,
     );
+  }
+
+  /// Sends bulk emails to members matching the given filter.
+  /// This method sends emails one at a time and reports progress.
+  /// Returns a map of email addresses to success status.
+  Future<Map<String, bool>> sendBulkEmail({
+    required MessageFilter filter,
+    required String subject,
+    required String bodyHtml,
+    required String bodyPlainText,
+    String? fromEmail,
+    void Function(int current, int total)? onProgress,
+    List<PlatformFile>? attachments,
+  }) async {
+    // Get members from the repository based on filter
+    final members = await _getMembersForFilter(filter);
+
+    // Filter to only members with email addresses
+    final membersWithEmail = members
+        .where((m) => m.preferredEmail != null && m.preferredEmail!.isNotEmpty)
+        .toList();
+
+    if (membersWithEmail.isEmpty) {
+      throw CRMEmailException('No members with email addresses found for the given filter.');
+    }
+
+    // Build attachments
+    final emailAttachments = <CRMEmailAttachment>[];
+    if (attachments != null) {
+      for (final file in attachments) {
+        final attachment = await buildAttachmentFromPlatformFile(file);
+        if (attachment != null) {
+          emailAttachments.add(attachment);
+        }
+      }
+    }
+
+    final results = <String, bool>{};
+    final total = membersWithEmail.length;
+
+    for (var i = 0; i < membersWithEmail.length; i++) {
+      final member = membersWithEmail[i];
+      final email = member.preferredEmail!;
+
+      onProgress?.call(i + 1, total);
+
+      try {
+        await sendEmail(
+          to: [email],
+          subject: subject,
+          htmlBody: bodyHtml,
+          textBody: bodyPlainText,
+          fromEmail: fromEmail,
+          attachments: emailAttachments,
+        );
+        results[email] = true;
+      } catch (e) {
+        results[email] = false;
+      }
+    }
+
+    return results;
+  }
+
+  /// Gets members for the given filter. Currently only supports committee filtering.
+  Future<List<Member>> _getMembersForFilter(MessageFilter filter) async {
+    // For now, we'll need to get members from Supabase based on committees
+    if (filter.committees == null || filter.committees!.isEmpty) {
+      return [];
+    }
+
+    final supabaseService = CRMSupabaseService();
+    if (!supabaseService.isInitialized) {
+      try {
+        await supabaseService.initialize();
+      } catch (error) {
+        throw CRMEmailException(
+          'Failed to initialize CRM Supabase service: $error',
+          cause: error,
+        );
+      }
+    }
+
+    if (!supabaseService.isInitialized) {
+      throw CRMEmailException(
+        'Supabase credentials are not configured.',
+      );
+    }
+
+    try {
+      // Query members table for committee membership
+      final response = await supabaseService.privilegedClient
+          .from('members')
+          .select()
+          .overlaps('committees', filter.committees!);
+
+      final members = (response as List)
+          .map((data) => Member.fromJson(data as Map<String, dynamic>))
+          .toList();
+      return members;
+    } catch (e) {
+      throw CRMEmailException('Failed to fetch members: $e', cause: e);
+    }
   }
 
   /// Builds an email attachment from a [PlatformFile]. Returns null if the

@@ -363,8 +363,8 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
                       // Toolbar
                       if (!_sending && recipients.isNotEmpty)
                         quill.QuillSimpleToolbar(
-                          controller: _bodyController,
-                          configurations: const quill.QuillSimpleToolbarConfigurations(
+                          configurations: quill.QuillSimpleToolbarConfigurations(
+                            controller: _bodyController,
                             showBoldButton: true,
                             showItalicButton: true,
                             showUnderLineButton: true,
@@ -402,13 +402,12 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
                         ),
                         height: 200,
                         child: quill.QuillEditor(
-                          controller: _bodyController,
                           focusNode: _bodyFocusNode,
                           scrollController: _bodyScrollController,
                           configurations: quill.QuillEditorConfigurations(
+                            controller: _bodyController,
                             padding: const EdgeInsets.all(12),
                             placeholder: 'Compose your email message...',
-                            readOnly: _sending || recipients.isEmpty,
                           ),
                         ),
                       ),
