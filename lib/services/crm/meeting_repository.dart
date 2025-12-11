@@ -29,6 +29,18 @@ class MeetingRepository {
     return meetings.first;
   }
 
+  /// Fetch meetings filtered by committee name
+  Future<List<Meeting>> getMeetingsByCommittee(
+    String committeeName, {
+    bool includeAttendance = true,
+  }) async {
+    final results = await _fetchMeetings(
+      includeAttendance: includeAttendance,
+      committeeName: committeeName,
+    );
+    return results;
+  }
+
   Future<List<MeetingAttendance>> getAttendanceForMeeting(String meetingId) async {
     if (!_isReady) return [];
 
@@ -53,6 +65,7 @@ class MeetingRepository {
   Future<List<Meeting>> _fetchMeetings({
     bool includeAttendance = true,
     String? meetingId,
+    String? committeeName,
   }) async {
     if (!_isReady) return [];
 
@@ -64,6 +77,10 @@ class MeetingRepository {
 
       if (meetingId != null) {
         query = query.eq('id', meetingId);
+      }
+
+      if (committeeName != null) {
+        query = query.eq('committee', committeeName);
       }
 
       final response = await query.order('meeting_date', ascending: false);

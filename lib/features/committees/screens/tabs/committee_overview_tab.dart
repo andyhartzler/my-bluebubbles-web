@@ -16,10 +16,14 @@ class CommitteeOverviewTab extends StatefulWidget {
 class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
   final CommitteeRepository _repository = CommitteeRepository();
   CommitteeStats? _stats;
+  Map<String, int> _schoolDistribution = {};
   bool _loading = true;
   String? _error;
 
   Committee get committee => widget.committee;
+
+  bool get _isSchoolCommittee =>
+      committee.id == 'College Democrats' || committee.id == 'High School Democrats';
 
   @override
   void initState() {
@@ -35,9 +39,19 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
 
     try {
       final stats = await _repository.getCommitteeStats(committee);
+
+      // Load school distribution for College/HS Democrats
+      Map<String, int> distribution = {};
+      if (committee.id == 'College Democrats') {
+        distribution = await _repository.getCollegeDistribution();
+      } else if (committee.id == 'High School Democrats') {
+        distribution = await _repository.getHighSchoolDistribution();
+      }
+
       if (!mounted) return;
       setState(() {
         _stats = stats;
+        _schoolDistribution = distribution;
         _loading = false;
       });
     } catch (e) {
@@ -84,6 +98,10 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
         children: [
           _buildStatsSection(context),
           const SizedBox(height: 24),
+          if (_isSchoolCommittee && _schoolDistribution.isNotEmpty) ...[
+            _buildSchoolVisualizationSection(context),
+            const SizedBox(height: 24),
+          ],
           _buildQuickActionsSection(context),
           const SizedBox(height: 24),
           _buildCommitteeInfoSection(context),
@@ -320,6 +338,146 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     );
   }
 
+  Widget _buildSchoolVisualizationSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final isCollege = committee.id == 'College Democrats';
+    final schoolLabel = isCollege ? 'Colleges' : 'High Schools';
+    final schoolIcon = isCollege ? Icons.account_balance : Icons.domain;
+
+    // Sort schools by member count (descending)
+    final sortedSchools = _schoolDistribution.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final totalMembers = sortedSchools.fold<int>(0, (sum, e) => sum + e.value);
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(schoolIcon, color: committee.primaryColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '$schoolLabel Represented',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: committee.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${sortedSchools.length} ${schoolLabel.toLowerCase()}',
+                    style: TextStyle(
+                      color: committee.primaryColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$totalMembers members across ${sortedSchools.length} ${schoolLabel.toLowerCase()}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: sortedSchools.map((entry) {
+                final school = entry.key;
+                final count = entry.value;
+                final percentage = (count / totalMembers * 100).round();
+
+                return _buildSchoolChip(
+                  school: school,
+                  count: count,
+                  percentage: percentage,
+                  isCollege: isCollege,
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSchoolChip({
+    required String school,
+    required int count,
+    required int percentage,
+    required bool isCollege,
+  }) {
+    // Color intensity based on member count relative to the max
+    final maxCount = _schoolDistribution.values.reduce((a, b) => a > b ? a : b);
+    final intensity = (count / maxCount).clamp(0.3, 1.0);
+
+    final baseColor = isCollege ? Colors.blue : Colors.green;
+    final chipColor = baseColor.withOpacity(intensity * 0.15 + 0.05);
+    final borderColor = baseColor.withOpacity(intensity * 0.4 + 0.1);
+    final textColor = baseColor.shade700;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: chipColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isCollege ? Icons.school : Icons.domain,
+            size: 16,
+            color: textColor,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              school,
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: baseColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count',
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildQuickActionsSection(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -421,7 +579,7 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
-            if (_stats?.chairName != null || _stats?.coChairName != null) ...[
+            if (_stats != null && (_stats!.chairs.isNotEmpty || _stats!.coChairs.isNotEmpty)) ...[
               const Divider(),
               const SizedBox(height: 12),
               Text(
@@ -429,10 +587,18 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
                 style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              if (_stats?.chairName != null)
-                _buildLeaderRow('Chair', _stats!.chairName!, _stats?.chairPhotoUrl),
-              if (_stats?.coChairName != null)
-                _buildLeaderRow('Co-Chair', _stats!.coChairName!, _stats?.coChairPhotoUrl),
+              // Show all chairs
+              ..._stats!.chairs.map((chair) => _buildLeaderRow(
+                _stats!.chairs.length > 1 ? 'Co-Chair' : 'Chair',
+                chair.name,
+                chair.photoUrl,
+              )),
+              // Show all co-chairs
+              ..._stats!.coChairs.map((coChair) => _buildLeaderRow(
+                'Co-Chair',
+                coChair.name,
+                coChair.photoUrl,
+              )),
             ],
           ],
         ),
