@@ -61,6 +61,9 @@ class VotingForm with _$VotingForm {
 
     // Executive Committee Only - restricts voting to executive committee members
     @JsonKey(name: 'executive_only') @Default(false) bool executiveOnly,
+
+    // Committee association - ties vote to a specific committee
+    String? committee,
   }) = _VotingForm;
 
   factory VotingForm.fromJson(Map<String, dynamic> json) =>

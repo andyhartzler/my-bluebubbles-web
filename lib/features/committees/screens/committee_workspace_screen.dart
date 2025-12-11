@@ -11,6 +11,7 @@ import 'package:bluebubbles/features/committees/screens/tabs/committee_donors_ta
 import 'package:bluebubbles/features/committees/screens/tabs/committee_chapters_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_campaigns_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_meetings_tab.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/committee_votes_tab.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/canvas_board/screens/committee_canvas_tab.dart';
 
@@ -113,6 +114,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
           isFullscreen: _isCanvasFullscreen,
           onFullscreenChanged: _setCanvasFullscreen,
         ),
+      ),
+      _TabDefinition(
+        label: 'Votes',
+        icon: Icons.how_to_vote_outlined,
+        builder: () => CommitteeVotesTab(committee: committee),
       ),
     ];
 

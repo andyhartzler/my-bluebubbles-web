@@ -16,20 +16,32 @@ class VotesService {
           : _supabase;
 
   // Voting forms are stored in form_schemas with form_type='vote'
-  Stream<List<VotingForm>> watchVotes(String statusFilter) {
+  Stream<List<VotingForm>> watchVotes(String statusFilter, {String? committee}) {
     return _supabase
         .from('form_schemas')
         .stream(primaryKey: ['id'])
         .eq('form_type', 'vote')
         .order('created_at', ascending: false)
         .map((data) {
-      final votes = data.map((json) => VotingForm.fromJson(json)).toList();
-      if (statusFilter == 'all') {
-        return votes;
-      } else {
-        return votes.where((vote) => vote.status == statusFilter).toList();
+      var votes = data.map((json) => VotingForm.fromJson(json)).toList();
+
+      // Filter by committee if provided
+      if (committee != null) {
+        votes = votes.where((vote) => vote.committee == committee).toList();
       }
+
+      // Filter by status
+      if (statusFilter != 'all') {
+        votes = votes.where((vote) => vote.status == statusFilter).toList();
+      }
+
+      return votes;
     });
+  }
+
+  /// Watch votes for a specific committee
+  Stream<List<VotingForm>> watchVotesForCommittee(String committee, String statusFilter) {
+    return watchVotes(statusFilter, committee: committee);
   }
 
   Future<VotingForm> getVote(String id) async {
@@ -74,6 +86,8 @@ class VotesService {
     String? confirmationSmsMessage,
     // Supporting documents
     List<Map<String, dynamic>>? supportingDocuments,
+    // Committee association
+    String? committee,
   }) async {
     // Build schema with voting questions or legacy options
     final Map<String, dynamic> schema;
@@ -124,6 +138,8 @@ class VotesService {
           if (confirmationEmailTemplate != null) 'confirmation_email_template': confirmationEmailTemplate,
           if (notificationEmails != null) 'notification_emails': notificationEmails,
           if (supportingDocuments != null) 'supporting_documents': supportingDocuments,
+          // Committee association
+          if (committee != null) 'committee': committee,
         })
         .select()
         .single();
