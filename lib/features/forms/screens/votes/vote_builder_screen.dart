@@ -60,14 +60,16 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   String? _restrictToCommittee;
 
   // Available committees for restriction dropdown
+  // Note: These names must match the values stored in the members.committee array
   static const List<String> _availableCommittees = [
     'High School Democrats',
-    'Membership & Outreach Committee',
-    'Communications Committee',
+    'Membership & Outreach',
+    'Communications',
     'College Democrats',
-    'Fundraising Committee',
-    'Policy & Advocacy Committee',
-    'Political Affairs Committee',
+    'Fundraising',
+    'Policy & Advocacy',
+    'Political Affairs',
+    'Executive Committee',
   ];
 
   @override
