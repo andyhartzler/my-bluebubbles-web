@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -20,6 +21,7 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
   final CommitteeRepository _repository = CommitteeRepository();
   late TabController _tabController;
   List<Member> _members = [];
+  Set<String> _memberPhoneNumbers = {};
   bool _loading = true;
   bool _openingComposer = false;
 
@@ -43,8 +45,18 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
     try {
       final members = await _repository.getMembersForCommittee(committee.name);
       if (!mounted) return;
+
+      // Extract phone numbers from members
+      final phoneNumbers = <String>{};
+      for (final member in members) {
+        if (member.primaryPhone != null && member.primaryPhone!.isNotEmpty) {
+          phoneNumbers.add(member.primaryPhone!);
+        }
+      }
+
       setState(() {
         _members = members;
+        _memberPhoneNumbers = phoneNumbers;
         _loading = false;
       });
     } catch (e) {
@@ -92,6 +104,7 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
         Expanded(
           child: TabBarView(
             controller: _tabController,
+            physics: const NeverScrollableScrollPhysics(),
             children: [
               _buildComposeTab(),
               _buildConversationsTab(),
@@ -263,11 +276,7 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
       return const Center(child: CircularProgressIndicator());
     }
 
-    final membersWithPhone = _members.where(
-      (m) => m.primaryPhone != null && m.primaryPhone!.isNotEmpty,
-    ).toList();
-
-    if (membersWithPhone.isEmpty) {
+    if (_memberPhoneNumbers.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -298,97 +307,14 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadMembers,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.forum_outlined, color: committee.primaryColor),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Committee Conversations',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'View message conversations with committee members from the main Conversations page. Filter by committee member names or phone numbers.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '${membersWithPhone.length} members available for messaging',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Quick member list for conversations
-          Text(
-            'Committee Members',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Select a member to view their conversation history',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          ...membersWithPhone.map((member) => Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundImage: member.primaryProfilePhotoUrl != null
-                    ? NetworkImage(member.primaryProfilePhotoUrl!)
-                    : null,
-                backgroundColor: committee.primaryColor.withOpacity(0.2),
-                child: member.primaryProfilePhotoUrl == null
-                    ? Text(
-                        member.name.isNotEmpty ? member.name[0] : '?',
-                        style: TextStyle(color: committee.primaryColor),
-                      )
-                    : null,
-              ),
-              title: Text(member.name),
-              subtitle: Text(member.primaryPhone ?? ''),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                // In a full implementation, this would navigate to the
-                // conversation with this member
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('View conversation with ${member.name}'),
-                  ),
-                );
-              },
-            ),
-          )),
-        ],
-      ),
+    // Use the ConversationList widget filtered by committee member phone numbers
+    // This is an exact copy of the main Conversations page with filtering applied
+    return ConversationList(
+      key: ValueKey('committee-conversations-${committee.id}'),
+      showArchivedChats: false,
+      showUnknownSenders: false,
+      filterPhoneNumbers: _memberPhoneNumbers,
+      isEmbedded: true,
     );
   }
 }

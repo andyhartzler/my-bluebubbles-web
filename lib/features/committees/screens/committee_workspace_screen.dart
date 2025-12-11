@@ -143,6 +143,7 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         },
         body: TabBarView(
           controller: _tabController,
+          physics: const NeverScrollableScrollPhysics(),
           children: _tabs.map((tab) => tab.builder()).toList(),
         ),
       ),

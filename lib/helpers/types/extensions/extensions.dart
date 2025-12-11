@@ -123,6 +123,36 @@ extension ChatListHelpers on RxList<Chat> {
       return where((e) => e.isGroup || (!e.isGroup && e.participants.firstOrNull?.contact != null)).toList().obs;
     }
   }
+
+  /// Helper to filter chats to only those with participants matching the given phone numbers
+  /// Used for committee-specific conversation filtering
+  RxList<Chat> phoneNumbersHelper(Set<String>? phoneNumbers) {
+    if (phoneNumbers == null || phoneNumbers.isEmpty) return this;
+
+    // Normalize phone numbers for comparison (strip non-digits)
+    final normalizedNumbers = phoneNumbers
+        .map((p) => p.replaceAll(RegExp(r'[^\d+]'), ''))
+        .where((p) => p.isNotEmpty)
+        .toSet();
+
+    if (normalizedNumbers.isEmpty) return this;
+
+    return where((chat) {
+      // Check if any participant's address matches any of the phone numbers
+      for (final participant in chat.participants) {
+        final normalizedAddress = participant.address.replaceAll(RegExp(r'[^\d+]'), '');
+        // Check if the address matches any number (handling +1 prefix differences)
+        for (final number in normalizedNumbers) {
+          if (normalizedAddress == number ||
+              normalizedAddress.endsWith(number) ||
+              number.endsWith(normalizedAddress)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }).toList().obs;
+  }
 }
 
 extension PlatformSpecificCapitalize on String {

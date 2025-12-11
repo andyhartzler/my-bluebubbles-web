@@ -31,6 +31,8 @@ import 'package:get/get.dart';
 class ConversationListController extends StatefulController {
   final bool showArchivedChats;
   final bool showUnknownSenders;
+  final Set<String>? filterPhoneNumbers;
+  final bool isEmbedded;
   final ScrollController iosScrollController = ScrollController();
   final ScrollController materialScrollController = ScrollController();
   final ScrollController samsungScrollController = ScrollController();
@@ -38,7 +40,12 @@ class ConversationListController extends StatefulController {
   bool showMaterialFABText = true;
   double materialScrollStartPosition = 0;
 
-  ConversationListController({required this.showArchivedChats, required this.showUnknownSenders});
+  ConversationListController({
+    required this.showArchivedChats,
+    required this.showUnknownSenders,
+    this.filterPhoneNumbers,
+    this.isEmbedded = false,
+  });
 
   void updateSelectedChats() {
     if (ss.settings.skin.value == Skins.Material) {
@@ -97,18 +104,30 @@ class ConversationListController extends StatefulController {
 }
 
 class ConversationList extends CustomStateful<ConversationListController> {
-  ConversationList({super.key, required bool showArchivedChats, required bool showUnknownSenders})
-      : super(
+  final Set<String>? filterPhoneNumbers;
+  final bool isEmbedded;
+
+  ConversationList({
+    super.key,
+    required bool showArchivedChats,
+    required bool showUnknownSenders,
+    this.filterPhoneNumbers,
+    this.isEmbedded = false,
+  }) : super(
             parentController: Get.put(
                 ConversationListController(
                   showArchivedChats: showArchivedChats,
                   showUnknownSenders: showUnknownSenders,
+                  filterPhoneNumbers: filterPhoneNumbers,
+                  isEmbedded: isEmbedded,
                 ),
-                tag: showArchivedChats
-                    ? "Archived"
-                    : showUnknownSenders
-                        ? "Unknown"
-                        : "Messages"));
+                tag: filterPhoneNumbers != null
+                    ? "Committee-${filterPhoneNumbers.hashCode}"
+                    : showArchivedChats
+                        ? "Archived"
+                        : showUnknownSenders
+                            ? "Unknown"
+                            : "Messages"));
 
   @override
   State<StatefulWidget> createState() => _ConversationListState();
@@ -118,11 +137,13 @@ class _ConversationListState extends CustomState<ConversationList, void, Convers
   @override
   void initState() {
     super.initState();
-    tag = controller.showArchivedChats
-        ? "Archived"
-        : controller.showUnknownSenders
-            ? "Unknown"
-            : "Messages";
+    tag = controller.filterPhoneNumbers != null
+        ? "Committee-${controller.filterPhoneNumbers.hashCode}"
+        : controller.showArchivedChats
+            ? "Archived"
+            : controller.showUnknownSenders
+                ? "Unknown"
+                : "Messages";
 
     if (!ss.settings.reachedConversationList.value) {
       Timer.periodic(const Duration(seconds: 1), (Timer t) {
@@ -170,7 +191,11 @@ class _ConversationListState extends CustomState<ConversationList, void, Convers
       samsungSkin: SamsungConversationList(parentController: controller),
     );
 
-    if (controller.showArchivedChats || controller.showUnknownSenders) return child;
+    // When embedded or filtered, return the child directly without tablet wrappers
+    if (controller.showArchivedChats || controller.showUnknownSenders ||
+        controller.isEmbedded || controller.filterPhoneNumbers != null) {
+      return child;
+    }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(

@@ -30,6 +30,10 @@ class CupertinoConversationListState extends OptimizedState<CupertinoConversatio
 
   bool get showUnknown => widget.parentController.showUnknownSenders;
 
+  Set<String>? get filterPhoneNumbers => widget.parentController.filterPhoneNumbers;
+
+  bool get isEmbedded => widget.parentController.isEmbedded;
+
   Color get backgroundColor => ss.settings.windowEffect.value == WindowEffect.disabled ? context.theme.colorScheme.background : Colors.transparent;
 
   ConversationListController get controller => widget.parentController;
@@ -50,7 +54,7 @@ class CupertinoConversationListState extends OptimizedState<CupertinoConversatio
     return Scaffold(
       backgroundColor: ss.settings.windowEffect.value != WindowEffect.disabled ? Colors.transparent : context.theme.colorScheme.background,
       extendBodyBehindAppBar: !showArchived && !showUnknown,
-      floatingActionButton: Obx(() => !ss.settings.moveChatCreatorToHeader.value && !showArchived && !showUnknown
+      floatingActionButton: Obx(() => !ss.settings.moveChatCreatorToHeader.value && !showArchived && !showUnknown && !isEmbedded && filterPhoneNumbers == null
           ? ConversationListFAB(parentController: controller)
           : const SizedBox.shrink()),
       appBar: showArchived || showUnknown
@@ -76,7 +80,7 @@ class CupertinoConversationListState extends OptimizedState<CupertinoConversatio
                       if (!showArchived && !showUnknown) CupertinoHeader(controller: controller),
                     Obx(() {
                       ns.listener.value;
-                      final _chats = chats.chats.archivedHelper(showArchived).unknownSendersHelper(showUnknown).bigPinHelper(true);
+                      final _chats = chats.chats.archivedHelper(showArchived).unknownSendersHelper(showUnknown).phoneNumbersHelper(filterPhoneNumbers).bigPinHelper(true);
 
                       if (_chats.isEmpty) {
                         return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -198,7 +202,7 @@ class CupertinoConversationListState extends OptimizedState<CupertinoConversatio
                       );
                     }),
                     Obx(() {
-                      final _chats = chats.chats.archivedHelper(showArchived).unknownSendersHelper(showUnknown).bigPinHelper(false);
+                      final _chats = chats.chats.archivedHelper(showArchived).unknownSendersHelper(showUnknown).phoneNumbersHelper(filterPhoneNumbers).bigPinHelper(false);
 
                       if (!chats.loadedChatBatch.value || _chats.isEmpty) {
                         return SliverToBoxAdapter(
@@ -212,11 +216,13 @@ class CupertinoConversationListState extends OptimizedState<CupertinoConversatio
                                     child: Text(
                                       !chats.loadedChatBatch.value
                                           ? "Loading chats..."
-                                          : showArchived
-                                              ? "You have no archived chats"
-                                              : showUnknown
-                                                  ? "You have no messages from unknown senders :)"
-                                                  : "You have no chats :(",
+                                          : filterPhoneNumbers != null
+                                              ? "No conversations with committee members"
+                                              : showArchived
+                                                  ? "You have no archived chats"
+                                                  : showUnknown
+                                                      ? "You have no messages from unknown senders :)"
+                                                      : "You have no chats :(",
                                       style: context.textTheme.labelLarge,
                                       textAlign: TextAlign.center,
                                     ),
