@@ -1,13 +1,16 @@
+import 'package:file_picker/file_picker.dart' as file_picker;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 
+import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
-import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
-import 'package:bluebubbles/screens/crm/member_detail/email_history_tab.dart';
-import 'package:bluebubbles/screens/crm/member_detail/email_history_provider.dart';
-import 'package:provider/provider.dart';
+import 'package:bluebubbles/services/crm/crm_email_service.dart';
+import 'package:bluebubbles/utils/quill_html_converter.dart';
 
 class CommitteeEmailTab extends StatefulWidget {
   final Committee committee;
@@ -21,22 +24,54 @@ class CommitteeEmailTab extends StatefulWidget {
 class _CommitteeEmailTabState extends State<CommitteeEmailTab>
     with SingleTickerProviderStateMixin {
   final CommitteeRepository _repository = CommitteeRepository();
+  final CRMEmailService _emailService = CRMEmailService.instance;
+
+  final TextEditingController _subjectController = TextEditingController();
+  late quill.QuillController _bodyController;
+  final FocusNode _bodyFocusNode = FocusNode();
+  final ScrollController _bodyScrollController = ScrollController();
+  final List<PlatformFile> _attachments = [];
+
   late TabController _tabController;
   List<Member> _members = [];
   bool _loading = true;
+  bool _sending = false;
+  int _currentProgress = 0;
+  int _totalEmails = 0;
+  late String _selectedFromEmail;
 
   Committee get committee => widget.committee;
+
+  List<Member> get _membersWithEmail => _members.where(
+    (m) => m.preferredEmail != null && m.preferredEmail!.isNotEmpty,
+  ).toList();
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _bodyController = quill.QuillController.basic();
+
+    // Initialize from email
+    final senders = CRMConfig.allowedSenderEmails;
+    if (senders.contains(CRMConfig.defaultSenderEmail)) {
+      _selectedFromEmail = CRMConfig.defaultSenderEmail;
+    } else if (senders.isNotEmpty) {
+      _selectedFromEmail = senders.first;
+    } else {
+      _selectedFromEmail = CRMConfig.defaultSenderEmail;
+    }
+
     _loadMembers();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _subjectController.dispose();
+    _bodyController.dispose();
+    _bodyFocusNode.dispose();
+    _bodyScrollController.dispose();
     super.dispose();
   }
 
@@ -55,13 +90,143 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
     }
   }
 
-  void _openEmailComposer() {
-    final filter = MessageFilter(committees: [committee.name]);
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => BulkEmailScreen(initialFilter: filter),
+  Future<void> _pickAttachments() async {
+    final result = await file_picker.FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      withData: kIsWeb,
+    );
+
+    if (result == null) return;
+
+    setState(() {
+      for (final file in result.files) {
+        final alreadyExists = _attachments.any((existing) {
+          if (existing.identifier != null && file.identifier != null) {
+            return existing.identifier == file.identifier;
+          }
+          if (existing.path != null && file.path != null) {
+            return existing.path == file.path;
+          }
+          return existing.name == file.name && existing.bytes == file.bytes;
+        });
+
+        if (!alreadyExists) {
+          _attachments.add(PlatformFile.fromPicker(file));
+        }
+      }
+    });
+  }
+
+  void _removeAttachment(PlatformFile file) {
+    setState(() {
+      _attachments.remove(file);
+    });
+  }
+
+  Future<void> _sendEmails() async {
+    final subject = _subjectController.text.trim();
+    if (subject.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a subject')),
+      );
+      return;
+    }
+
+    final bodyHtml = QuillHtmlConverter.convertToHtml(_bodyController.document);
+    final bodyPlainText = _bodyController.document.toPlainText().trim();
+
+    if (bodyPlainText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter an email body')),
+      );
+      return;
+    }
+
+    final recipients = _membersWithEmail;
+    if (recipients.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No members with email addresses')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Email'),
+        content: Text(
+          'Send this email to ${recipients.length} ${committee.displayName} members?\n\n'
+          'Subject: $subject',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Send'),
+          ),
+        ],
       ),
     );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _sending = true;
+      _currentProgress = 0;
+      _totalEmails = recipients.length;
+    });
+
+    try {
+      final filter = MessageFilter(committees: [committee.name]);
+      final results = await _emailService.sendBulkEmail(
+        filter: filter,
+        subject: subject,
+        bodyHtml: bodyHtml,
+        bodyPlainText: bodyPlainText,
+        fromEmail: _selectedFromEmail,
+        onProgress: (current, total) {
+          if (!mounted) return;
+          setState(() {
+            _currentProgress = current;
+            _totalEmails = total;
+          });
+        },
+        attachments: List<PlatformFile>.from(_attachments),
+      );
+
+      final successCount = results.values.where((v) => v).length;
+
+      if (!mounted) return;
+      setState(() => _sending = false);
+
+      // Clear the form after sending
+      _subjectController.clear();
+      _bodyController.clear();
+      _attachments.clear();
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Emails Sent'),
+          content: Text('Successfully sent $successCount of ${results.length} emails'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _sending = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sending emails: $e')),
+      );
+    }
   }
 
   @override
@@ -70,23 +235,24 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
 
     return Column(
       children: [
-        // Tab bar for history vs compose
+        // Tab bar
         Material(
           color: theme.colorScheme.surface,
           child: TabBar(
             controller: _tabController,
             tabs: const [
-              Tab(text: 'Email History'),
-              Tab(text: 'Send Email'),
+              Tab(text: 'Compose'),
+              Tab(text: 'History'),
             ],
           ),
         ),
         Expanded(
           child: TabBarView(
             controller: _tabController,
+            physics: const NeverScrollableScrollPhysics(),
             children: [
-              _buildHistoryTab(),
               _buildComposeTab(),
+              _buildHistoryTab(),
             ],
           ),
         ),
@@ -94,77 +260,289 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
     );
   }
 
-  Widget _buildHistoryTab() {
+  Widget _buildComposeTab() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_members.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+    final recipients = _membersWithEmail;
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              Icon(
-                Icons.email_outlined,
-                size: 64,
-                color: Theme.of(context).disabledColor,
+              // Recipients info card
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.people, color: committee.primaryColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Recipients: ${recipients.length} members',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              'From: $_selectedFromEmail',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (CRMConfig.allowedSenderEmails.length > 1)
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.arrow_drop_down),
+                          onSelected: (email) {
+                            setState(() => _selectedFromEmail = email);
+                          },
+                          itemBuilder: (context) => CRMConfig.allowedSenderEmails
+                              .map((email) => PopupMenuItem(
+                                    value: email,
+                                    child: Text(email),
+                                  ))
+                              .toList(),
+                        ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              Text(
-                'No members in this committee',
-                style: Theme.of(context).textTheme.titleMedium,
+
+              // Subject field
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: TextField(
+                    controller: _subjectController,
+                    decoration: InputDecoration(
+                      labelText: 'Subject',
+                      hintText: 'Enter email subject...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                    ),
+                    enabled: !_sending && recipients.isNotEmpty,
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Add members to see their email history.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+              const SizedBox(height: 16),
+
+              // Email body editor
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Message Body',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Toolbar
+                      if (!_sending && recipients.isNotEmpty)
+                        quill.QuillSimpleToolbar(
+                          controller: _bodyController,
+                          configurations: const quill.QuillSimpleToolbarConfigurations(
+                            showBoldButton: true,
+                            showItalicButton: true,
+                            showUnderLineButton: true,
+                            showStrikeThrough: false,
+                            showListBullets: true,
+                            showListNumbers: true,
+                            showLink: true,
+                            showFontFamily: false,
+                            showFontSize: false,
+                            showCodeBlock: false,
+                            showQuote: false,
+                            showIndent: false,
+                            showInlineCode: false,
+                            showColorButton: false,
+                            showBackgroundColorButton: false,
+                            showClearFormat: true,
+                            showAlignmentButtons: true,
+                            showHeaderStyle: false,
+                            showDividers: true,
+                            showSearchButton: false,
+                            showSubscript: false,
+                            showSuperscript: false,
+                            showDirection: false,
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+
+                      // Editor
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).dividerColor,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        height: 200,
+                        child: quill.QuillEditor(
+                          controller: _bodyController,
+                          focusNode: _bodyFocusNode,
+                          scrollController: _bodyScrollController,
+                          configurations: quill.QuillEditorConfigurations(
+                            padding: const EdgeInsets.all(12),
+                            placeholder: 'Compose your email message...',
+                            readOnly: _sending || recipients.isEmpty,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Attachments
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Attachments',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (!_sending && recipients.isNotEmpty)
+                            TextButton.icon(
+                              onPressed: _pickAttachments,
+                              icon: const Icon(Icons.attach_file),
+                              label: const Text('Add'),
+                            ),
+                        ],
+                      ),
+                      if (_attachments.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            'No attachments added',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
+                            ),
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _attachments.map(
+                            (file) => InputChip(
+                              label: Text(file.name),
+                              avatar: const Icon(Icons.attachment, size: 18),
+                              onDeleted: _sending ? null : () => _removeAttachment(file),
+                            ),
+                          ).toList(),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+        ),
+
+        // Send button footer
+        _buildSendFooter(recipients),
+      ],
+    );
+  }
+
+  Widget _buildSendFooter(List<Member> recipients) {
+    if (_sending) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            LinearProgressIndicator(
+              value: _totalEmails > 0 ? _currentProgress / _totalEmails : 0,
+              backgroundColor: committee.primaryColor.withOpacity(0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(committee.primaryColor),
+            ),
+            const SizedBox(height: 8),
+            Text('Sending $_currentProgress of $_totalEmails emails...'),
+          ],
         ),
       );
     }
 
-    // Use the first member with an email to display history
-    // In a real implementation, you might want to aggregate or show a list
-    final membersWithEmail = _members.where(
-      (m) => m.preferredEmail != null && m.preferredEmail!.isNotEmpty,
-    ).toList();
+    final hasContent = _subjectController.text.trim().isNotEmpty &&
+        _bodyController.document.toPlainText().trim().isNotEmpty;
 
-    if (membersWithEmail.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.email_outlined,
-                size: 64,
-                color: Theme.of(context).disabledColor,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No email addresses',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Committee members don\'t have email addresses configured.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
-                ),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: !hasContent || recipients.isEmpty ? null : _sendEmails,
+          icon: const Icon(Icons.send),
+          label: Text('Send Email to ${recipients.length} Members'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: committee.primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
           ),
         ),
-      );
+      ),
+    );
+  }
+
+  Widget _buildHistoryTab() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
     }
 
     return RefreshIndicator(
@@ -195,18 +573,8 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '${membersWithEmail.length} members with email addresses',
+                    '${_membersWithEmail.length} members with email addresses',
                     style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _openEmailComposer,
-                    icon: const Icon(Icons.send),
-                    label: const Text('Email All Committee Members'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: committee.primaryColor,
-                      foregroundColor: Colors.white,
-                    ),
                   ),
                 ],
               ),
@@ -214,209 +582,54 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
           ),
           const SizedBox(height: 24),
 
-          // Recent emails section
+          // Info text
           Text(
-            'Recent Emails',
+            'Email History',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'View email history for individual members in their profile.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+            'To view detailed email history for individual members, navigate to their profile from the Members tab.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
-          // Show email history for a sample member if provider is available
-          _buildEmailHistorySection(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmailHistorySection() {
-    final provider = _maybeReadProvider(context);
-    if (provider == null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            'Email history provider not available.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ),
-      );
-    }
-
-    // Show aggregated view of emails to committee members
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'To view email history, select a member from the Members tab.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  EmailHistoryProvider? _maybeReadProvider(BuildContext context) {
-    try {
-      return Provider.of<EmailHistoryProvider>(context, listen: false);
-    } on ProviderNotFoundException {
-      return null;
-    }
-  }
-
-  Widget _buildComposeTab() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    final membersWithEmail = _members.where(
-      (m) => m.preferredEmail != null && m.preferredEmail!.isNotEmpty,
-    ).toList();
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        // Compose card
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.email_outlined,
-                  size: 48,
-                  color: committee.primaryColor,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Send Email to ${committee.displayName}',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Compose and send an email to all ${membersWithEmail.length} committee members with email addresses.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Recipients preview
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: committee.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.people, color: committee.primaryColor),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Recipients',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: committee.primaryColor,
-                              ),
-                            ),
-                            Text(
-                              '${membersWithEmail.length} committee members',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: committee.primaryColor.withOpacity(0.8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Compose button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: membersWithEmail.isEmpty ? null : _openEmailComposer,
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Open Email Composer'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: committee.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-
-                if (membersWithEmail.isEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'No members have email addresses configured.',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontSize: 12,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ],
+          // Member list with email addresses
+          Text(
+            'Members with Email',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ),
-
-        const SizedBox(height: 24),
-
-        // Member list preview
-        Text(
-          'Committee Members',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        ...membersWithEmail.take(5).map((member) => ListTile(
-          leading: CircleAvatar(
-            child: Text(member.name.isNotEmpty ? member.name[0] : '?'),
-          ),
-          title: Text(member.name),
-          subtitle: Text(member.preferredEmail ?? ''),
-          dense: true,
-        )),
-
-        if (membersWithEmail.length > 5)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '... and ${membersWithEmail.length - 5} more members',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+          const SizedBox(height: 8),
+          ..._membersWithEmail.take(10).map((member) => ListTile(
+            leading: CircleAvatar(
+              backgroundColor: committee.primaryColor.withOpacity(0.2),
+              child: Text(
+                member.name.isNotEmpty ? member.name[0] : '?',
+                style: TextStyle(color: committee.primaryColor),
               ),
             ),
-          ),
-      ],
+            title: Text(member.name),
+            subtitle: Text(member.preferredEmail ?? ''),
+            dense: true,
+          )),
+          if (_membersWithEmail.length > 10)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '... and ${_membersWithEmail.length - 10} more members',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

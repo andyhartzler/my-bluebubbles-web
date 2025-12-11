@@ -79,7 +79,7 @@ class CommitteeRepository {
           memberId: member.id,
           name: member.name,
           title: member.executiveTitle,
-          photoUrl: member.primaryPhotoUrl,
+          photoUrl: member.primaryProfilePhotoUrl,
           email: member.preferredEmail,
           phone: member.primaryPhone,
         ));
@@ -566,6 +566,74 @@ class CommitteeRepository {
         'participants': <Map<String, dynamic>>[],
       };
     }
+  }
+
+  /// Get overall stats for the committees dashboard
+  Future<Map<String, int>> getOverallStats() async {
+    if (!isReady) {
+      return {
+        'slackMessages': 0,
+        'messagesSent': 0,
+        'countiesRepresented': 0,
+      };
+    }
+
+    final stats = <String, int>{};
+
+    try {
+      // Total Slack messages
+      final PostgrestResponse slackResponse = await _readClient
+          .from('slack_messages')
+          .select('id')
+          .count(CountOption.exact);
+      stats['slackMessages'] = slackResponse.count ?? 0;
+    } catch (e) {
+      print('Error getting Slack messages count: $e');
+      stats['slackMessages'] = 0;
+    }
+
+    try {
+      // Total messages sent (from messages table or similar)
+      // Using a message log or tracking table if available
+      final PostgrestResponse messagesResponse = await _readClient
+          .from('message_log')
+          .select('id')
+          .count(CountOption.exact);
+      stats['messagesSent'] = messagesResponse.count ?? 0;
+    } catch (e) {
+      // If message_log doesn't exist, try another approach or return 0
+      stats['messagesSent'] = 0;
+    }
+
+    try {
+      // Count unique counties from members table
+      final countyData = await _readClient
+          .from('members')
+          .select('county')
+          .not('county', 'is', null);
+
+      final uniqueCounties = <String>{};
+      for (final item in countyData as List<dynamic>) {
+        if (item is Map) {
+          final county = item['county']?.toString();
+          if (county != null && county.isNotEmpty) {
+            // Normalize county name (remove "County" suffix if present)
+            final normalized = county
+                .replaceAll(RegExp(r'\s*county\s*$', caseSensitive: false), '')
+                .trim();
+            if (normalized.isNotEmpty) {
+              uniqueCounties.add(normalized.toLowerCase());
+            }
+          }
+        }
+      }
+      stats['countiesRepresented'] = uniqueCounties.length;
+    } catch (e) {
+      print('Error getting counties count: $e');
+      stats['countiesRepresented'] = 0;
+    }
+
+    return stats;
   }
 
   List<Member> _mapMembers(List<dynamic> data) {

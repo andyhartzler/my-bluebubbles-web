@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -6,8 +5,10 @@ import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
+import 'package:bluebubbles/utils/slack_message_formatter.dart';
 
 class CommitteeSlackTab extends StatefulWidget {
   final Committee committee;
@@ -25,6 +26,7 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
 
   List<Map<String, dynamic>> _messages = [];
   Map<String, Map<String, String>> _slackUserMappings = {};
+  Map<String, Member> _memberCache = {};
   String? _channelId;
   bool _loading = true;
   bool _loadingMore = false;
@@ -32,9 +34,6 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
   int _offset = 0;
   static const int _pageSize = 50;
   bool _hasMore = true;
-
-  // Regex to match Slack user mentions like <@U0A2FQDCGMP> or @U0A2FQDCGMP
-  static final RegExp _mentionRegex = RegExp(r'<@([A-Z0-9]+)>|@([A-Z0-9]{9,})');
 
   Committee get committee => widget.committee;
 
@@ -68,6 +67,9 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
       final messages = results[1] as List<Map<String, dynamic>>;
       final userMappings = results[2] as Map<String, Map<String, String>>;
 
+      // Fetch member data for users with linked member_id
+      await _loadMemberData(userMappings);
+
       if (!mounted) return;
 
       setState(() {
@@ -84,6 +86,33 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
         _error = 'Failed to load Slack messages: $e';
         _loading = false;
       });
+    }
+  }
+
+  /// Load member data for users who have linked member IDs
+  Future<void> _loadMemberData(Map<String, Map<String, String>> userMappings) async {
+    final memberIds = <String>{};
+    for (final mapping in userMappings.values) {
+      final memberId = mapping['member_id'];
+      if (memberId != null && memberId.isNotEmpty) {
+        memberIds.add(memberId);
+      }
+    }
+
+    if (memberIds.isEmpty) return;
+
+    try {
+      // Fetch all members in parallel
+      final futures = memberIds.map((id) => _memberRepository.getMemberById(id));
+      final members = await Future.wait(futures);
+
+      for (final member in members) {
+        if (member != null) {
+          _memberCache[member.id] = member;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading member data: $e');
     }
   }
 
@@ -257,140 +286,154 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
     final userMapping = slackUserId != null ? _slackUserMappings[slackUserId] : null;
     String? userName;
     String? avatarUrl;
+    String? memberId = userMapping?['member_id'];
+    Member? linkedMember;
 
     if (userMapping != null) {
       userName = userMapping['real_name']?.isNotEmpty == true
           ? userMapping['real_name']
           : userMapping['display_name'];
       avatarUrl = userMapping['avatar_url'];
+
+      // If there's a linked member, use their profile photo instead
+      if (memberId != null && memberId.isNotEmpty) {
+        linkedMember = _memberCache[memberId];
+        if (linkedMember != null) {
+          final memberPhotoUrl = linkedMember.primaryProfilePhotoUrl;
+          if (memberPhotoUrl != null && memberPhotoUrl.isNotEmpty) {
+            avatarUrl = memberPhotoUrl;
+          }
+          userName = linkedMember.name;
+        }
+      }
     }
+
+    final canNavigate = linkedMember != null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                  backgroundColor: committee.primaryColor.withOpacity(0.2),
-                  child: avatarUrl == null
-                      ? Icon(Icons.person, size: 20, color: committee.primaryColor)
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        userName ?? 'Unknown User',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (postedAt != null)
-                        Text(
-                          _timestampFormat.format(postedAt.toLocal()),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.textTheme.bodySmall?.color?.withOpacity(0.6),
-                          ),
-                        ),
-                    ],
+      child: InkWell(
+        onTap: canNavigate ? () => _navigateToMemberProfile(linkedMember!) : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header row
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                        ? NetworkImage(avatarUrl)
+                        : null,
+                    backgroundColor: committee.primaryColor.withOpacity(0.2),
+                    child: avatarUrl == null || avatarUrl.isEmpty
+                        ? Icon(Icons.person, size: 20, color: committee.primaryColor)
+                        : null,
                   ),
-                ),
-                if (isThreadReply)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: committee.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.reply, size: 14, color: committee.primaryColor),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Thread',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: committee.primaryColor,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                userName ?? 'Unknown User',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  decoration: canNavigate ? TextDecoration.underline : null,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (canNavigate) ...[
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.open_in_new,
+                                size: 14,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ],
+                          ],
                         ),
+                        if (postedAt != null)
+                          Text(
+                            _timestampFormat.format(postedAt.toLocal()),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.textTheme.bodySmall?.color?.withOpacity(0.6),
+                            ),
+                          ),
                       ],
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 12),
+                  if (isThreadReply)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: committee.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.reply, size: 14, color: committee.primaryColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Thread',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: committee.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
 
-            // Message text with parsed mentions
-            _buildMessageText(messageText, theme),
-          ],
+              // Message text with parsed formatting
+              _buildMessageText(messageText, theme),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  /// Build message text with clickable user mentions
+  /// Build message text with parsed Slack formatting (links, bold, mentions, emojis)
   Widget _buildMessageText(String messageText, ThemeData theme) {
     if (messageText.isEmpty) {
       return Text(
         '[No text content]',
-        style: theme.textTheme.bodyMedium,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontStyle: FontStyle.italic,
+          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+        ),
       );
     }
 
-    // Parse mentions and build rich text
-    final spans = <InlineSpan>[];
-    int lastMatchEnd = 0;
+    // Use SlackMessageFormatter to parse the message
+    final spans = SlackMessageFormatter.parse(
+      messageText,
+      baseStyle: theme.textTheme.bodyMedium ?? const TextStyle(),
+      linkColor: theme.colorScheme.primary,
+      mentionColor: committee.primaryColor,
+      userMappings: _slackUserMappings,
+      onMentionTap: (userId, memberId) {
+        if (memberId != null && memberId.isNotEmpty) {
+          _navigateToMemberProfileById(memberId);
+        }
+      },
+    );
 
-    for (final match in _mentionRegex.allMatches(messageText)) {
-      // Add text before this match
-      if (match.start > lastMatchEnd) {
-        spans.add(TextSpan(
-          text: messageText.substring(lastMatchEnd, match.start),
-          style: theme.textTheme.bodyMedium,
-        ));
-      }
-
-      // Get the Slack user ID from the match (group 1 for <@ID>, group 2 for @ID)
-      final slackUserId = match.group(1) ?? match.group(2);
-      final userInfo = slackUserId != null ? _slackUserMappings[slackUserId] : null;
-      final displayName = userInfo?['real_name']?.isNotEmpty == true
-          ? userInfo!['real_name']!
-          : (userInfo?['display_name']?.isNotEmpty == true
-              ? userInfo!['display_name']!
-              : slackUserId ?? 'Unknown');
-      final memberId = userInfo?['member_id'];
-
-      // Add clickable mention span
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: _buildMentionChip(displayName, memberId, userInfo?['avatar_url']),
-      ));
-
-      lastMatchEnd = match.end;
-    }
-
-    // Add any remaining text after the last match
-    if (lastMatchEnd < messageText.length) {
-      spans.add(TextSpan(
-        text: messageText.substring(lastMatchEnd),
-        style: theme.textTheme.bodyMedium,
-      ));
-    }
-
-    // If no mentions found, just return plain text
     if (spans.isEmpty) {
       return Text(
         messageText,
@@ -403,67 +446,50 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
     );
   }
 
-  /// Build a clickable chip for a user mention
-  Widget _buildMentionChip(String displayName, String? memberId, String? avatarUrl) {
-    final hasValidMemberId = memberId != null && memberId.isNotEmpty;
-
-    return GestureDetector(
-      onTap: hasValidMemberId ? () => _navigateToMemberProfile(memberId) : null,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: committee.primaryColor.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (avatarUrl != null && avatarUrl.isNotEmpty) ...[
-              CircleAvatar(
-                radius: 8,
-                backgroundImage: NetworkImage(avatarUrl),
-              ),
-              const SizedBox(width: 4),
-            ],
-            Text(
-              '@$displayName',
-              style: TextStyle(
-                color: committee.primaryColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                decoration: hasValidMemberId ? TextDecoration.underline : null,
-              ),
-            ),
-          ],
+  /// Navigate to member profile screen from a Member object
+  void _navigateToMemberProfile(Member member) {
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(
+          child: MemberDetailScreen(member: member),
         ),
       ),
     );
   }
 
-  /// Navigate to member profile screen
-  Future<void> _navigateToMemberProfile(String memberId) async {
-    try {
-      final member = await _memberRepository.getMemberById(memberId);
-      if (member != null && mounted) {
-        Navigator.of(context).push(
-          ThemeSwitcher.buildPageRoute(
-            builder: (context) => TitleBarWrapper(
-              child: MemberDetailScreen(member: member),
-            ),
+  /// Navigate to member profile screen by member ID
+  Future<void> _navigateToMemberProfileById(String memberId) async {
+    // Check cache first
+    Member? member = _memberCache[memberId];
+
+    if (member == null) {
+      try {
+        member = await _memberRepository.getMemberById(memberId);
+        if (member != null) {
+          _memberCache[memberId] = member;
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error loading member: $e')),
+          );
+        }
+        return;
+      }
+    }
+
+    if (member != null && mounted) {
+      Navigator.of(context).push(
+        ThemeSwitcher.buildPageRoute(
+          builder: (context) => TitleBarWrapper(
+            child: MemberDetailScreen(member: member!),
           ),
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Member not found')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading member: $e')),
-        );
-      }
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Member not found')),
+      );
     }
   }
 }
