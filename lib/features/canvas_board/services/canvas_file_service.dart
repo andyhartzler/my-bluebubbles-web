@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as path;
@@ -127,6 +129,20 @@ class CanvasFileService {
     final fileName = '${_uuid.v4()}.$extension';
     final storagePath = '$boardId/images/$fileName';
 
+    // Decode image to get dimensions
+    int? width;
+    int? height;
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      width = frame.image.width;
+      height = frame.image.height;
+      frame.image.dispose();
+    } catch (e) {
+      // Failed to decode - continue without dimensions
+      debugPrint('Failed to decode image dimensions: $e');
+    }
+
     try {
       await _supabase.client.storage
           .from(_bucketName)
@@ -138,6 +154,8 @@ class CanvasFileService {
 
       return ImageUploadResult(
         imageUrl: imageUrl,
+        width: width,
+        height: height,
         fileSize: bytes.length,
         fileName: originalFileName ?? fileName,
       );

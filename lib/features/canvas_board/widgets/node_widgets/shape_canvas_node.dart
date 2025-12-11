@@ -31,23 +31,17 @@ class ShapeCanvasNode extends StatelessWidget {
     return Colors.blue;
   }
 
-  // Check metadata for special shape flags
-  bool get _hasArrow => node.metadata?['has_arrow'] == true;
-  bool get _isFreehand => node.metadata?['is_freehand'] == true;
+  // Check metadata for render type (used when DB constraint limits shape_type values)
+  String? get _renderAs => node.metadata?['render_as'] as String?;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     // Determine effective shape type based on metadata
-    String effectiveShapeType = node.shapeType ?? 'rectangle';
-    if (effectiveShapeType == 'line') {
-      if (_hasArrow) {
-        effectiveShapeType = 'arrow';
-      } else if (_isFreehand) {
-        effectiveShapeType = 'freehand';
-      }
-    }
+    // The DB only allows 'rectangle' and 'circle', so we use 'render_as' metadata
+    // for lines, arrows, and freehand drawings
+    String effectiveShapeType = _renderAs ?? node.shapeType ?? 'rectangle';
 
     return GestureDetector(
       onTap: onTap,

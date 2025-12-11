@@ -11,8 +11,9 @@ import '../../services/votes_service.dart';
 
 class VoteBuilderScreen extends StatefulWidget {
   final String? voteId;
+  final String? committee; // Optional committee association
 
-  const VoteBuilderScreen({Key? key, this.voteId}) : super(key: key);
+  const VoteBuilderScreen({Key? key, this.voteId, this.committee}) : super(key: key);
 
   @override
   State<VoteBuilderScreen> createState() => _VoteBuilderScreenState();
@@ -1490,6 +1491,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           notificationEmails: notificationEmails,
           confirmationSmsMessage: confirmationSms,
           supportingDocuments: _supportingDocuments.isEmpty ? null : _supportingDocuments,
+          committee: widget.committee,
         );
       } else {
         await _votesService.updateVote(
