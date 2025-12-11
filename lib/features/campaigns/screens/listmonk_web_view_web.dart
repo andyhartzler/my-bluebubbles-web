@@ -5,9 +5,13 @@ import 'dart:async';
 
 import '../../../services/credential_storage_service.dart';
 
-/// Web-specific iframe widget for Listmonk with automatic Basic Auth
-/// Uses HTTP Basic Authentication embedded in the URL for auto-login
-/// Falls back to manual login prompt on browsers that block credentials in iframes (Chrome)
+/// Web-specific iframe widget for Listmonk with robust authentication handling
+///
+/// Multi-layer authentication strategy:
+/// 1. Tries HTTP Basic Auth in URL (works in Safari)
+/// 2. Detects browser type and shows credentials proactively for Chrome
+/// 3. Provides always-visible "Show Login Help" button as ultimate fallback
+/// 4. Multiple detection methods with timeouts
 class Iframe extends StatefulWidget {
   final String src;
 
@@ -23,7 +27,11 @@ class _IframeState extends State<Iframe> {
   bool _isRegistered = false;
   String? _errorMessage;
   bool _showLoginHelp = false;
+  bool _helpDismissed = false;
   Timer? _loginCheckTimer;
+  Timer? _fallbackTimer;
+  String _username = 'admin';
+  String _password = 'fucktrump67';
 
   @override
   void initState() {
@@ -34,31 +42,42 @@ class _IframeState extends State<Iframe> {
   @override
   void dispose() {
     _loginCheckTimer?.cancel();
+    _fallbackTimer?.cancel();
     super.dispose();
   }
 
+  /// Detect if this is Safari (which supports Basic Auth in iframes)
+  bool get _isSafari {
+    final userAgent = html.window.navigator.userAgent.toLowerCase();
+    return userAgent.contains('safari') && !userAgent.contains('chrome');
+  }
+
   Future<void> _registerIframe() async {
-    debugPrint('📧 Listmonk: Initializing with Basic Auth');
+    debugPrint('📧 Listmonk: Initializing with multi-layer auth strategy');
 
     try {
       // Get credentials from secure storage
-      final username =
-          await CredentialStorageService.getListmonkUsername() ?? 'admin';
-      final password =
-          await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
+      _username = await CredentialStorageService.getListmonkUsername() ?? 'admin';
+      _password = await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
 
       // Extract the base host from the source URL
       final uri = Uri.parse(widget.src);
       final baseHost = uri.host;
       final path = uri.path;
 
-      // Build URL with Basic Auth embedded: https://username:password@host/path
-      final authenticatedUrl = 'https://$username:$password@$baseHost$path';
+      // Build URL with Basic Auth embedded
+      final authenticatedUrl = 'https://$_username:$_password@$baseHost$path';
+
+      debugPrint('📧 Listmonk: Browser detection - Safari: $_isSafari');
+
+      // For non-Safari browsers, proactively show help after loading
+      // (Chrome/Firefox/Edge block Basic Auth in iframes)
+      if (!_isSafari) {
+        debugPrint('⚠️ Listmonk: Non-Safari browser detected, will show credentials proactively');
+      }
 
       // Create unique iframe ID
       final iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
-
-      html.IFrameElement? iframeElement;
 
       // Register the view factory
       // ignore: undefined_prefixed_name
@@ -72,10 +91,7 @@ class _IframeState extends State<Iframe> {
             ..style.height = '100%'
             ..allow = 'clipboard-read; clipboard-write'
             ..setAttribute('loading', 'eager')
-            // Prevent credentials from leaking in referrer header
             ..setAttribute('referrerpolicy', 'no-referrer');
-
-          iframeElement = iframe;
 
           iframe.onLoad.listen((_) {
             if (mounted) {
@@ -84,11 +100,8 @@ class _IframeState extends State<Iframe> {
               });
               debugPrint('📧 Listmonk: Iframe loaded');
 
-              // Check if we're still on login page after a delay
-              // This helps detect when Basic Auth in URL doesn't work (Chrome)
-              _loginCheckTimer = Timer(const Duration(seconds: 2), () {
-                _checkLoginState(iframe);
-              });
+              // Multi-layer detection strategy
+              _startLoginDetection();
             }
           });
 
@@ -106,7 +119,7 @@ class _IframeState extends State<Iframe> {
         },
       );
 
-      debugPrint('📧 Listmonk: Iframe registered with Basic Auth URL');
+      debugPrint('📧 Listmonk: Iframe registered');
 
       if (mounted) {
         setState(() {
@@ -125,42 +138,48 @@ class _IframeState extends State<Iframe> {
     }
   }
 
-  void _checkLoginState(html.IFrameElement iframe) {
-    try {
-      // Try to check if we can access the iframe content
-      // If we get an error, it might be cross-origin or on login page
-      final contentWindow = iframe.contentWindow;
-      if (contentWindow != null) {
-        try {
-          // Try to access the location (this will fail for cross-origin)
-          // Cast to html.Location to access href property
-          final locationBase = contentWindow.location;
-          final location = (locationBase is html.Location)
-              ? (locationBase as html.Location).href
-              : iframe.src ?? '';
-
-          debugPrint('📧 Listmonk: Current URL: $location');
-
-          // If URL contains 'login', show help
-          if (location.contains('login') || location.contains('admin/login')) {
-            debugPrint('⚠️ Listmonk: Still on login page, Basic Auth may not work in this browser');
-            if (mounted) {
-              setState(() {
-                _showLoginHelp = true;
-              });
-            }
-          }
-        } catch (e) {
-          // Cross-origin access blocked - this is expected
-          // We can't tell if on login page, but assume Basic Auth worked
-          debugPrint('📧 Listmonk: Cross-origin (expected), assuming authenticated');
+  void _startLoginDetection() {
+    // Strategy 1: For non-Safari browsers, show credentials immediately
+    // (we know Basic Auth won't work)
+    if (!_isSafari && !_helpDismissed) {
+      _loginCheckTimer = Timer(const Duration(seconds: 1), () {
+        debugPrint('📧 Listmonk: Showing credentials for non-Safari browser');
+        if (mounted && !_helpDismissed) {
+          setState(() {
+            _showLoginHelp = true;
+          });
         }
-      }
-    } catch (e) {
-      debugPrint('📧 Listmonk: Could not check login state: $e');
+      });
     }
+
+    // Strategy 2: Ultimate fallback - always show after 5 seconds if not dismissed
+    // This ensures help is NEVER silently hidden when user needs it
+    _fallbackTimer = Timer(const Duration(seconds: 5), () {
+      debugPrint('📧 Listmonk: Fallback timer - ensuring credentials are available');
+      if (mounted && !_showLoginHelp && !_helpDismissed) {
+        debugPrint('⚠️ Listmonk: Auto-showing credentials banner (fallback)');
+        setState(() {
+          _showLoginHelp = true;
+        });
+      }
+    });
   }
 
+  void _dismissHelp() {
+    setState(() {
+      _showLoginHelp = false;
+      _helpDismissed = true;
+    });
+    debugPrint('📧 Listmonk: User dismissed credentials banner');
+  }
+
+  void _showHelp() {
+    setState(() {
+      _showLoginHelp = true;
+      _helpDismissed = false;
+    });
+    debugPrint('📧 Listmonk: User requested credentials banner');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +221,7 @@ class _IframeState extends State<Iframe> {
       );
     }
 
-    // Show iframe with loading overlay and optional login help
+    // Show iframe with loading overlay, credentials banner, and help button
     return Stack(
       children: [
         HtmlElementView(viewType: _iframeId!),
@@ -223,7 +242,7 @@ class _IframeState extends State<Iframe> {
             ),
           ),
 
-        // Login credentials banner (shows if Basic Auth didn't work)
+        // Login credentials banner
         if (_showLoginHelp && !_isLoading)
           Positioned(
             top: 0,
@@ -278,7 +297,7 @@ class _IframeState extends State<Iframe> {
                                     ),
                                     Expanded(
                                       child: SelectableText(
-                                        'admin',
+                                        _username,
                                         style: TextStyle(
                                           fontFamily: 'monospace',
                                           fontSize: 13,
@@ -305,7 +324,7 @@ class _IframeState extends State<Iframe> {
                                     ),
                                     Expanded(
                                       child: SelectableText(
-                                        'fucktrump67',
+                                        _password,
                                         style: TextStyle(
                                           fontFamily: 'monospace',
                                           fontSize: 13,
@@ -325,15 +344,45 @@ class _IframeState extends State<Iframe> {
                     const SizedBox(width: 12),
                     IconButton(
                       icon: const Icon(Icons.close, size: 20),
-                      onPressed: () {
-                        setState(() {
-                          _showLoginHelp = false;
-                        });
-                      },
+                      onPressed: _dismissHelp,
                       color: Colors.blue[700],
                       tooltip: 'Dismiss',
                     ),
                   ],
+                ),
+              ),
+            ),
+          ),
+
+        // Always-visible "Show Login Help" button when banner is dismissed
+        if (!_showLoginHelp && !_isLoading)
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Material(
+              elevation: 2,
+              borderRadius: BorderRadius.circular(20),
+              color: Colors.blue[700],
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: _showHelp,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.help_outline, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Show Login Credentials',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
