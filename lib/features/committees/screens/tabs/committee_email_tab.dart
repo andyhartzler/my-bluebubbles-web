@@ -7,6 +7,7 @@ import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/services/pending_share_content.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
@@ -63,7 +64,35 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
       _selectedFromEmail = CRMConfig.defaultSenderEmail;
     }
 
+    // Check for pending email content (e.g., from vote share)
+    _checkPendingEmailContent();
+
     _loadMembers();
+  }
+
+  void _checkPendingEmailContent() {
+    final pending = PendingShareContent();
+    if (pending.hasPendingEmail) {
+      // Set subject
+      if (pending.pendingEmailSubject != null) {
+        _subjectController.text = pending.pendingEmailSubject!;
+      }
+      // Set body using HTML converter
+      if (pending.pendingEmailBody != null) {
+        try {
+          final document = QuillHtmlConverter.htmlToQuillDocument(pending.pendingEmailBody!);
+          _bodyController = quill.QuillController(
+            document: document,
+            selection: const TextSelection.collapsed(offset: 0),
+          );
+        } catch (e) {
+          // If HTML conversion fails, just use plain text
+          debugPrint('Failed to convert HTML to Quill: $e');
+        }
+      }
+      // Clear the pending content
+      pending.clearPendingEmail();
+    }
   }
 
   @override

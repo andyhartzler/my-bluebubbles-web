@@ -119,7 +119,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
       _TabDefinition(
         label: 'Votes',
         icon: Icons.how_to_vote_outlined,
-        builder: () => CommitteeVotesTab(committee: committee),
+        builder: () => CommitteeVotesTab(
+          committee: committee,
+          onNavigateToEmail: () => _navigateToTab(3),  // Email tab is at index 3
+          onNavigateToMessages: () => _navigateToTab(4),  // Messages tab is at index 4
+        ),
       ),
     ];
 
