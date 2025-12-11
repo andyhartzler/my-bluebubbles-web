@@ -1223,13 +1223,17 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
         offsetY: newOffsetY,
       );
     });
-    _debounceSave();
+    // Mark as having unsaved changes (debounced save will happen on resize end)
+    _hasUnsavedChanges = true;
   }
 
   void _onResizeEnd(CanvasNode node) {
     if (_resizingNodeId == node.id) {
-      // Save the final size
-      _saveNodes();
+      // Save the final size by finding the updated node in the list
+      final index = _nodes.indexWhere((n) => n.id == node.id);
+      if (index != -1) {
+        _updateNode(_nodes[index]);
+      }
     }
     setState(() {
       _resizingNodeId = null;
