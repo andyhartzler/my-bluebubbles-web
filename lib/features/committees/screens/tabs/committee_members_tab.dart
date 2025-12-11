@@ -9,8 +9,15 @@ import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 
 class CommitteeMembersTab extends StatefulWidget {
   final Committee committee;
+  final String? initialSchoolFilter;
+  final VoidCallback? onSchoolFilterCleared;
 
-  const CommitteeMembersTab({super.key, required this.committee});
+  const CommitteeMembersTab({
+    super.key,
+    required this.committee,
+    this.initialSchoolFilter,
+    this.onSchoolFilterCleared,
+  });
 
   @override
   State<CommitteeMembersTab> createState() => _CommitteeMembersTabState();
@@ -46,8 +53,22 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
   @override
   void initState() {
     super.initState();
+    _selectedSchoolFilter = widget.initialSchoolFilter;
     _loadMembers();
     _searchController.addListener(_filterMembers);
+  }
+
+  @override
+  void didUpdateWidget(covariant CommitteeMembersTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Apply new school filter if it changed
+    if (widget.initialSchoolFilter != oldWidget.initialSchoolFilter &&
+        widget.initialSchoolFilter != null) {
+      setState(() {
+        _selectedSchoolFilter = widget.initialSchoolFilter;
+      });
+      _filterMembers();
+    }
   }
 
   @override
@@ -113,6 +134,10 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
       _selectedSchoolFilter = school;
     });
     _filterMembers();
+    // Notify parent if filter is cleared
+    if (school == null) {
+      widget.onSchoolFilterCleared?.call();
+    }
   }
 
   void _openMemberDetail(Member member) {

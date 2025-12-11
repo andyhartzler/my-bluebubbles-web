@@ -29,20 +29,45 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
   late TabController _tabController;
   List<CommitteeLeader> _leaders = [];
   bool _loadingLeaders = true;
+  String? _schoolFilter;
 
   Committee get committee => widget.committee;
+
+  void _navigateToTab(int index) {
+    if (index >= 0 && index < _tabs.length) {
+      _tabController.animateTo(index);
+    }
+  }
+
+  void _filterMembersBySchool(String schoolName) {
+    setState(() {
+      _schoolFilter = schoolName;
+    });
+    // Navigate to members tab (index 1)
+    _tabController.animateTo(1);
+  }
 
   List<_TabDefinition> get _tabs {
     final tabs = <_TabDefinition>[
       _TabDefinition(
         label: 'Overview',
         icon: Icons.dashboard_outlined,
-        builder: () => CommitteeOverviewTab(committee: committee),
+        builder: () => CommitteeOverviewTab(
+          committee: committee,
+          onNavigateToTab: _navigateToTab,
+          onFilterMembersBySchool: _filterMembersBySchool,
+        ),
       ),
       _TabDefinition(
         label: 'Members',
         icon: Icons.people_outline,
-        builder: () => CommitteeMembersTab(committee: committee),
+        builder: () => CommitteeMembersTab(
+          committee: committee,
+          initialSchoolFilter: _schoolFilter,
+          onSchoolFilterCleared: () {
+            setState(() => _schoolFilter = null);
+          },
+        ),
       ),
       _TabDefinition(
         label: 'Slack',
@@ -257,11 +282,30 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
       return const SizedBox.shrink();
     }
 
+    // Sort leaders: Chairs first, then Co-Chairs, alphabetical within each group
+    final sortedLeaders = List<CommitteeLeader>.from(_leaders)
+      ..sort((a, b) {
+        final aTitle = a.title?.toLowerCase() ?? '';
+        final bTitle = b.title?.toLowerCase() ?? '';
+
+        // Determine if each is a chair or co-chair
+        final aIsCoChair = aTitle.contains('co-chair') || aTitle.contains('vice');
+        final bIsCoChair = bTitle.contains('co-chair') || bTitle.contains('vice');
+
+        // Chairs come before Co-Chairs
+        if (aIsCoChair != bIsCoChair) {
+          return aIsCoChair ? 1 : -1; // Co-chairs come after chairs
+        }
+
+        // Same role - sort alphabetically by name
+        return a.name.compareTo(b.name);
+      });
+
     // Display leaders side by side in a horizontal row (Chair first, then Co-Chair)
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.end,
-      children: _leaders.map((leader) => Padding(
+      children: sortedLeaders.map((leader) => Padding(
         padding: const EdgeInsets.only(left: 8),
         child: _buildLeaderChip(leader),
       )).toList(),

@@ -61,7 +61,7 @@ class _CommitteeMeetingsTabState extends State<CommitteeMeetingsTab> {
     try {
       // Fetch meetings filtered by committee
       final meetings = await _meetingRepository.getMeetingsByCommittee(
-        committee.name,
+        committee.meetingsFilterName,
         includeAttendance: true,
       );
 
@@ -250,27 +250,17 @@ class _CommitteeMeetingsTabState extends State<CommitteeMeetingsTab> {
   }
 
   Widget _buildContent() {
-    final filteredMeetings = _filterMeetings(_meetings);
+    // Show all meetings without filtering (filters removed per design)
+    final sortedMeetings = List<Meeting>.from(_meetings)
+      ..sort((a, b) => b.meetingDate.compareTo(a.meetingDate));
 
     return CustomScrollView(
       physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          sliver: SliverToBoxAdapter(
-            child: _buildHeader(filteredMeetings.length),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          sliver: SliverToBoxAdapter(
-            child: _buildFilterControls(),
-          ),
-        ),
         const SliverToBoxAdapter(child: SizedBox(height: 16)),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          sliver: _buildMeetingSliver(filteredMeetings),
+          sliver: _buildMeetingSliver(sortedMeetings),
         ),
       ],
     );
