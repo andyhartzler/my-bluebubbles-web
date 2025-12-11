@@ -640,46 +640,45 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
         children: [
           Column(
             children: [
-              // Toolbar (hide in fullscreen)
-              if (!_isFullscreen)
-                CanvasToolbar(
-                  selectedTool: _selectedTool,
-                  onToolSelected: (tool) => setState(() => _selectedTool = tool),
-                  selectedColor: _selectedColor,
-                  onColorSelected: (color) => setState(() => _selectedColor = color),
-                  strokeWidth: _strokeWidth,
-                  onStrokeWidthChanged: (width) =>
-                      setState(() => _strokeWidth = width),
-                  onUndo: _undo,
-                  onRedo: _redo,
-                  onDelete: _deleteSelectedNodes,
-                  canUndo: _undoStack.isNotEmpty,
-                  canRedo: _redoStack.isNotEmpty,
-                  hasSelection: _selectedNodeIds.isNotEmpty,
-                ),
+              // Toolbar - always visible (including fullscreen)
+              CanvasToolbar(
+                selectedTool: _selectedTool,
+                onToolSelected: (tool) => setState(() => _selectedTool = tool),
+                selectedColor: _selectedColor,
+                onColorSelected: (color) => setState(() => _selectedColor = color),
+                strokeWidth: _strokeWidth,
+                onStrokeWidthChanged: (width) =>
+                    setState(() => _strokeWidth = width),
+                onUndo: _undo,
+                onRedo: _redo,
+                onDelete: _deleteSelectedNodes,
+                canUndo: _undoStack.isNotEmpty,
+                canRedo: _redoStack.isNotEmpty,
+                hasSelection: _selectedNodeIds.isNotEmpty,
+              ),
               // Main content
               Expanded(
                 child: Row(
                   children: [
-                    // Sidebar (hide in fullscreen)
-                    if (!_isFullscreen)
-                      CanvasSidebar(
-                        onAddMember: _addMemberNode,
-                        onAddEvent: _addEventNode,
-                        onAddChapter: _addChapterNode,
-                        onAddDonor: _addDonorNode,
-                        onAddNote: _addNoteNode,
-                        onAddImage: _addImageNode,
-                        onAddFile: _addFileNode,
-                        onZoomIn: _zoomIn,
-                        onZoomOut: _zoomOut,
-                        onFitView: _fitView,
-                        onResetView: _resetView,
-                        onToggleFullscreen: () => _toggleFullscreen(true),
-                        zoomLevel: _zoomLevel,
-                        showDonors: committee.hasDonorsTab,
-                        showChapters: committee.hasChaptersTab,
-                      ),
+                    // Sidebar - always visible (including fullscreen)
+                    CanvasSidebar(
+                      onAddMember: _addMemberNode,
+                      onAddEvent: _addEventNode,
+                      onAddChapter: _addChapterNode,
+                      onAddDonor: _addDonorNode,
+                      onAddNote: _addNoteNode,
+                      onAddImage: _addImageNode,
+                      onAddFile: _addFileNode,
+                      onZoomIn: _zoomIn,
+                      onZoomOut: _zoomOut,
+                      onFitView: _fitView,
+                      onResetView: _resetView,
+                      onToggleFullscreen: () => _toggleFullscreen(!_isFullscreen),
+                      zoomLevel: _zoomLevel,
+                      showDonors: committee.hasDonorsTab,
+                      showChapters: committee.hasChaptersTab,
+                      isFullscreen: _isFullscreen,
+                    ),
                     // Canvas
                     Expanded(
                       child: _buildCanvas(),
@@ -735,24 +734,6 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
                     ),
                   );
                 },
-              ),
-            ),
-          // Fullscreen toggle button
-          if (_isFullscreen)
-            Positioned(
-              top: 16,
-              right: 16,
-              child: Material(
-                color: Colors.black.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(8),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () => _toggleFullscreen(false),
-                  child: const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Icon(Icons.fullscreen_exit, color: Colors.white, size: 24),
-                  ),
-                ),
               ),
             ),
         ],
@@ -917,7 +898,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
         break;
       case CanvasTool.circle:
         if ((endPoint - startPoint).distance > 10) {
-          await _addShapeNode(startPoint, endPoint, 'ellipse');
+          await _addShapeNode(startPoint, endPoint, 'circle');
         }
         break;
       case CanvasTool.text:
@@ -954,10 +935,12 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       offsetY: minY,
       width: maxX - minX + _strokeWidth * 2,
       height: maxY - minY + _strokeWidth * 2,
-      nodeType: CanvasNodeType.freehand,
+      nodeType: CanvasNodeType.shape, // Use 'shape' type (DB doesn't allow 'freehand')
+      shapeType: 'line', // Store as line type with path data for freehand
       shapeColor: '#${_selectedColor.value.toRadixString(16).substring(2)}',
       strokeWidth: _strokeWidth,
       pathData: pathPoints,
+      metadata: {'is_freehand': true}, // Mark as freehand in metadata
     ));
   }
 
@@ -982,10 +965,11 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       width: width,
       height: height,
       nodeType: CanvasNodeType.shape,
-      shapeType: isArrow ? 'arrow' : 'line',
+      shapeType: 'line', // Use 'line' for both line and arrow (DB constraint)
       shapeColor: '#${_selectedColor.value.toRadixString(16).substring(2)}',
       strokeWidth: _strokeWidth,
       pathData: '${relStart.dx},${relStart.dy};${relEnd.dx},${relEnd.dy}',
+      metadata: isArrow ? {'has_arrow': true} : null, // Store arrow flag in metadata
     ));
   }
 

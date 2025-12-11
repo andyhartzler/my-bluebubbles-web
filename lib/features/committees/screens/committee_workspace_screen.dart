@@ -31,8 +31,12 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
   bool _loadingLeaders = true;
   String? _schoolFilter;
   bool _isCanvasFullscreen = false;
+  int _currentTabIndex = 0;
 
   Committee get committee => widget.committee;
+
+  // Board tab is at index 6 (after Overview, Members, Slack, Email, Messages, Meetings)
+  bool get _isOnBoardTab => _currentTabIndex == 6;
 
   void _setCanvasFullscreen(bool fullscreen) {
     setState(() {
@@ -146,11 +150,20 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _loadLeaders();
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    setState(() {
+      _currentTabIndex = _tabController.index;
+    });
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -180,6 +193,80 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
           committee: committee,
           isFullscreen: true,
           onFullscreenChanged: _setCanvasFullscreen,
+        ),
+      );
+    }
+
+    // When on Board tab, use a non-scrollable layout to keep the header fixed
+    if (_isOnBoardTab) {
+      return Scaffold(
+        body: Column(
+          children: [
+            // Fixed header with tabs
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [committee.primaryColor, committee.secondaryColor],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Compact header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            child: Icon(committee.icon, color: Colors.white, size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              committee.displayName,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Tab bar
+                    TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      tabs: _tabs.map((tab) => Tab(
+                        icon: tab.iconWidget ?? Icon(tab.icon),
+                        text: tab.label,
+                      )).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Tab content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: _tabs.map((tab) => tab.builder()).toList(),
+              ),
+            ),
+          ],
         ),
       );
     }

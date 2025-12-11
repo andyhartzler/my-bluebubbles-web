@@ -31,9 +31,23 @@ class ShapeCanvasNode extends StatelessWidget {
     return Colors.blue;
   }
 
+  // Check metadata for special shape flags
+  bool get _hasArrow => node.metadata?['has_arrow'] == true;
+  bool get _isFreehand => node.metadata?['is_freehand'] == true;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // Determine effective shape type based on metadata
+    String effectiveShapeType = node.shapeType ?? 'rectangle';
+    if (effectiveShapeType == 'line') {
+      if (_hasArrow) {
+        effectiveShapeType = 'arrow';
+      } else if (_isFreehand) {
+        effectiveShapeType = 'freehand';
+      }
+    }
 
     return GestureDetector(
       onTap: onTap,
@@ -46,7 +60,7 @@ class ShapeCanvasNode extends StatelessWidget {
             CustomPaint(
               size: Size(node.width, node.height),
               painter: _ShapePainter(
-                shapeType: node.shapeType ?? 'rectangle',
+                shapeType: effectiveShapeType,
                 color: shapeColor,
                 strokeWidth: node.strokeWidth ?? 2.0,
                 pathData: node.pathData,
@@ -128,6 +142,9 @@ class _ShapePainter extends CustomPainter {
       case 'arrow':
         _drawArrow(canvas, size, strokePaint);
         break;
+      case 'freehand':
+        _drawFreehand(canvas, size, strokePaint);
+        break;
       default:
         _drawRectangle(canvas, size, fillPaint, strokePaint);
     }
@@ -191,6 +208,33 @@ class _ShapePainter extends CustomPainter {
       Offset(size.width - strokeWidth, size.height - strokeWidth),
       stroke,
     );
+  }
+
+  void _drawFreehand(Canvas canvas, Size size, Paint stroke) {
+    if (pathData == null) return;
+
+    final points = _parsePathData(pathData!);
+    if (points.length < 2) return;
+
+    // Calculate the offset to adjust points relative to the node bounds
+    double minX = double.infinity, minY = double.infinity;
+    for (final p in points) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+    }
+
+    final path = Path();
+    final adjustedPoints = points.map((p) => Offset(
+      p.dx - minX + strokeWidth,
+      p.dy - minY + strokeWidth,
+    )).toList();
+
+    path.moveTo(adjustedPoints[0].dx, adjustedPoints[0].dy);
+    for (int i = 1; i < adjustedPoints.length; i++) {
+      path.lineTo(adjustedPoints[i].dx, adjustedPoints[i].dy);
+    }
+
+    canvas.drawPath(path, stroke);
   }
 
   void _drawArrow(Canvas canvas, Size size, Paint stroke) {
