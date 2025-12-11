@@ -1676,7 +1676,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
         if (event != null) {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => EventDetailScreen(event: event),
+              builder: (_) => EventDetailScreen(initialEvent: event),
             ),
           );
         }
