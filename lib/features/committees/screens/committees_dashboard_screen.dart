@@ -283,8 +283,8 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
               ),
               const SizedBox(height: 8),
 
-              // Leadership
-              if (stats?.chairName != null || stats?.coChairName != null) ...[
+              // Leadership - show all chairs and co-chairs
+              if (stats != null && stats.allLeaders.isNotEmpty) ...[
                 _buildLeadershipRow(stats),
                 const SizedBox(height: 8),
               ],
@@ -318,13 +318,17 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
   }
 
   Widget _buildLeadershipRow(CommitteeStats? stats) {
+    if (stats == null) return const SizedBox.shrink();
+
     final leaders = <Widget>[];
 
-    if (stats?.chairName != null) {
-      leaders.add(_buildLeaderChip(stats!.chairName!, stats.chairPhotoUrl, 'Chair'));
+    // Add all chairs
+    for (final chair in stats.chairs) {
+      leaders.add(_buildLeaderChip(chair.name, chair.photoUrl, chair.title ?? 'Chair'));
     }
-    if (stats?.coChairName != null) {
-      leaders.add(_buildLeaderChip(stats!.coChairName!, stats.coChairPhotoUrl, 'Co-Chair'));
+    // Add all co-chairs
+    for (final coChair in stats.coChairs) {
+      leaders.add(_buildLeaderChip(coChair.name, coChair.photoUrl, coChair.title ?? 'Co-Chair'));
     }
 
     return Wrap(

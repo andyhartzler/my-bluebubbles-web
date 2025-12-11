@@ -33,8 +33,8 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
   static const int _pageSize = 50;
   bool _hasMore = true;
 
-  // Regex to match Slack user mentions like <@U0A2FQDCGMP>
-  static final RegExp _mentionRegex = RegExp(r'<@([A-Z0-9]+)>');
+  // Regex to match Slack user mentions like <@U0A2FQDCGMP> or @U0A2FQDCGMP
+  static final RegExp _mentionRegex = RegExp(r'<@([A-Z0-9]+)>|@([A-Z0-9]{9,})');
 
   Committee get committee => widget.committee;
 
@@ -251,15 +251,18 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
     final postedAtStr = message['posted_at']?.toString();
     final postedAt = postedAtStr != null ? DateTime.tryParse(postedAtStr) : null;
     final isThreadReply = message['thread_ts'] != null;
+    final slackUserId = message['slack_user_id']?.toString();
 
-    // Get user info from joined table
-    final userMapping = message['slack_user_mapping'];
+    // Get user info from our mappings using slack_user_id
+    final userMapping = slackUserId != null ? _slackUserMappings[slackUserId] : null;
     String? userName;
     String? avatarUrl;
 
-    if (userMapping is Map) {
-      userName = userMapping['real_name']?.toString() ?? userMapping['display_name']?.toString();
-      avatarUrl = userMapping['avatar_url']?.toString();
+    if (userMapping != null) {
+      userName = userMapping['real_name']?.isNotEmpty == true
+          ? userMapping['real_name']
+          : userMapping['display_name'];
+      avatarUrl = userMapping['avatar_url'];
     }
 
     return Card(
@@ -360,14 +363,14 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
         ));
       }
 
-      // Get the Slack user ID from the match
-      final slackUserId = match.group(1);
+      // Get the Slack user ID from the match (group 1 for <@ID>, group 2 for @ID)
+      final slackUserId = match.group(1) ?? match.group(2);
       final userInfo = slackUserId != null ? _slackUserMappings[slackUserId] : null;
       final displayName = userInfo?['real_name']?.isNotEmpty == true
           ? userInfo!['real_name']!
           : (userInfo?['display_name']?.isNotEmpty == true
               ? userInfo!['display_name']!
-              : '@$slackUserId');
+              : slackUserId ?? 'Unknown');
       final memberId = userInfo?['member_id'];
 
       // Add clickable mention span
