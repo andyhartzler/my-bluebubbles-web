@@ -58,6 +58,123 @@ class CommitteeRepository {
     }
   }
 
+  /// Add a member to a committee
+  /// Updates the committee array column for the member
+  Future<bool> addMemberToCommittee(String memberId, String committeeName) async {
+    if (!isReady) return false;
+
+    try {
+      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+
+      // First get the current committee list for this member
+      final memberData = await _readClient
+          .from('members')
+          .select('committee')
+          .eq('id', memberId)
+          .single();
+
+      final currentCommittees = <String>[];
+      if (memberData['committee'] != null) {
+        currentCommittees.addAll(
+          (memberData['committee'] as List<dynamic>).map((e) => e.toString()),
+        );
+      }
+
+      // Check if already in committee
+      if (currentCommittees.contains(committeeName)) {
+        return true; // Already a member
+      }
+
+      // Add the new committee
+      currentCommittees.add(committeeName);
+
+      // Update the member
+      await writeClient
+          .from('members')
+          .update({'committee': currentCommittees})
+          .eq('id', memberId);
+
+      return true;
+    } catch (e) {
+      print('Error adding member to committee: $e');
+      return false;
+    }
+  }
+
+  /// Remove a member from a committee
+  /// Updates the committee array column for the member
+  Future<bool> removeMemberFromCommittee(String memberId, String committeeName) async {
+    if (!isReady) return false;
+
+    try {
+      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+
+      // First get the current committee list for this member
+      final memberData = await _readClient
+          .from('members')
+          .select('committee')
+          .eq('id', memberId)
+          .single();
+
+      final currentCommittees = <String>[];
+      if (memberData['committee'] != null) {
+        currentCommittees.addAll(
+          (memberData['committee'] as List<dynamic>).map((e) => e.toString()),
+        );
+      }
+
+      // Remove the committee
+      currentCommittees.remove(committeeName);
+
+      // Update the member
+      await writeClient
+          .from('members')
+          .update({'committee': currentCommittees})
+          .eq('id', memberId);
+
+      return true;
+    } catch (e) {
+      print('Error removing member from committee: $e');
+      return false;
+    }
+  }
+
+  /// Get all members NOT in a specific committee (for adding new members)
+  Future<List<Member>> getMembersNotInCommittee(String committeeName, {String? searchQuery}) async {
+    if (!isReady) return [];
+
+    try {
+      // Get all members and filter out those in the committee
+      var query = _readClient
+          .from('members')
+          .select()
+          .order('name', ascending: true);
+
+      final data = await query;
+      final allMembers = _mapMembers(data as List<dynamic>);
+
+      // Filter to members NOT in this committee
+      var filtered = allMembers.where((m) {
+        final committees = m.committee ?? [];
+        return !committees.contains(committeeName);
+      }).toList();
+
+      // Apply search query if provided
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        final query = searchQuery.toLowerCase();
+        filtered = filtered.where((m) {
+          return m.name.toLowerCase().contains(query) ||
+              (m.email?.toLowerCase().contains(query) ?? false);
+        }).toList();
+      }
+
+      return filtered.take(50).toList(); // Limit results
+    } catch (e) {
+      print('Error fetching non-committee members: $e');
+      return [];
+    }
+  }
+
   /// Get committee leadership (executive committee members for this committee)
   /// Looks at executive_committee = TRUE and executive_role column for committee name
   Future<List<CommitteeLeader>> getCommitteeLeadership(String committeeName) async {
@@ -407,6 +524,60 @@ class CommitteeRepository {
     }
 
     return stats;
+  }
+
+  /// Get distribution of colleges with member counts
+  Future<Map<String, int>> getCollegeDistribution() async {
+    if (!isReady) return {};
+
+    try {
+      final collegeData = await _readClient
+          .from('members')
+          .select('college')
+          .contains('committee', ['College Democrats'])
+          .not('college', 'is', null);
+
+      final distribution = <String, int>{};
+      for (final item in collegeData as List<dynamic>) {
+        if (item is Map) {
+          final college = item['college']?.toString().trim();
+          if (college != null && college.isNotEmpty) {
+            distribution[college] = (distribution[college] ?? 0) + 1;
+          }
+        }
+      }
+      return distribution;
+    } catch (e) {
+      print('Error getting college distribution: $e');
+      return {};
+    }
+  }
+
+  /// Get distribution of high schools with member counts
+  Future<Map<String, int>> getHighSchoolDistribution() async {
+    if (!isReady) return {};
+
+    try {
+      final hsData = await _readClient
+          .from('members')
+          .select('high_school')
+          .contains('committee', ['High School Democrats'])
+          .not('high_school', 'is', null);
+
+      final distribution = <String, int>{};
+      for (final item in hsData as List<dynamic>) {
+        if (item is Map) {
+          final hs = item['high_school']?.toString().trim();
+          if (hs != null && hs.isNotEmpty) {
+            distribution[hs] = (distribution[hs] ?? 0) + 1;
+          }
+        }
+      }
+      return distribution;
+    } catch (e) {
+      print('Error getting high school distribution: $e');
+      return {};
+    }
   }
 
   /// Get Slack channel ID for a committee

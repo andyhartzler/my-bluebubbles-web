@@ -10,6 +10,7 @@ import 'package:bluebubbles/features/committees/screens/tabs/committee_messages_
 import 'package:bluebubbles/features/committees/screens/tabs/committee_donors_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_chapters_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_campaigns_tab.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/committee_meetings_tab.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
@@ -61,6 +62,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         label: 'Messages',
         icon: Icons.message_outlined,
         builder: () => CommitteeMessagesTab(committee: committee),
+      ),
+      _TabDefinition(
+        label: 'Meetings',
+        icon: Icons.video_camera_front_outlined,
+        builder: () => CommitteeMeetingsTab(committee: committee),
       ),
     ];
 

@@ -24,8 +24,24 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
   List<Member> _filteredMembers = [];
   bool _loading = true;
   String? _error;
+  String? _selectedSchoolFilter;
 
   Committee get committee => widget.committee;
+
+  bool get _isSchoolCommittee =>
+      committee.id == 'College Democrats' || committee.id == 'High School Democrats';
+
+  /// Get unique schools from members for the filter dropdown
+  List<String> get _uniqueSchools {
+    final schools = <String>{};
+    for (final member in _members) {
+      final school = _getSchoolDisplayName(member);
+      if (school != null && school.isNotEmpty) {
+        schools.add(school);
+      }
+    }
+    return schools.toList()..sort();
+  }
 
   @override
   void initState() {
@@ -65,19 +81,38 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
 
   void _filterMembers() {
     final query = _searchController.text.toLowerCase().trim();
-    if (query.isEmpty) {
-      setState(() => _filteredMembers = _members);
-      return;
-    }
 
     setState(() {
       _filteredMembers = _members.where((member) {
+        // Apply school filter first if selected
+        if (_selectedSchoolFilter != null && _selectedSchoolFilter!.isNotEmpty) {
+          final memberSchool = _getSchoolDisplayName(member);
+          if (memberSchool != _selectedSchoolFilter) {
+            return false;
+          }
+        }
+
+        // Apply text search filter
+        if (query.isEmpty) {
+          return true;
+        }
+
         return member.name.toLowerCase().contains(query) ||
             (member.email?.toLowerCase().contains(query) ?? false) ||
             (member.phone?.toLowerCase().contains(query) ?? false) ||
-            (member.chapterName?.toLowerCase().contains(query) ?? false);
+            (member.chapterName?.toLowerCase().contains(query) ?? false) ||
+            (member.college?.toLowerCase().contains(query) ?? false) ||
+            (member.highSchool?.toLowerCase().contains(query) ?? false);
       }).toList();
     });
+  }
+
+  void _setSchoolFilter(String? school) {
+    if (_selectedSchoolFilter == school) return;
+    setState(() {
+      _selectedSchoolFilter = school;
+    });
+    _filterMembers();
   }
 
   void _openMemberDetail(Member member) {
@@ -88,6 +123,19 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
         ),
       ),
     );
+  }
+
+  /// Get the appropriate school name to display based on committee type
+  String? _getSchoolDisplayName(Member member) {
+    if (committee.id == 'College Democrats') {
+      // Show college name for College Democrats
+      return member.college;
+    } else if (committee.id == 'High School Democrats') {
+      // Show high school name for High School Democrats
+      return member.highSchool;
+    }
+    // For other committees, show chapter name if available
+    return member.chapterName;
   }
 
   @override
@@ -118,80 +166,342 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadMembers,
-      child: Column(
-        children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search ${committee.displayName} members...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+    final schoolLabel = committee.id == 'College Democrats' ? 'College' : 'High School';
+
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _loadMembers,
+        child: Column(
+          children: [
+            // Search bar
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search ${committee.displayName} members...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
                 ),
-                filled: true,
               ),
             ),
-          ),
 
-          // Member count
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  '${_filteredMembers.length} member${_filteredMembers.length == 1 ? '' : 's'}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _loadMembers,
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
-          ),
-
-          // Member list
-          Expanded(
-            child: _filteredMembers.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.people_outline,
-                          size: 64,
-                          color: Theme.of(context).disabledColor,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _searchController.text.isNotEmpty
-                              ? 'No members match your search'
-                              : 'No members in this committee',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ],
+            // School filter dropdown (only for College/HS Democrats)
+            if (_isSchoolCommittee && _uniqueSchools.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Icon(
+                      committee.id == 'College Democrats' ? Icons.school : Icons.domain,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _filteredMembers.length,
-                    itemBuilder: (context, index) {
-                      final member = _filteredMembers[index];
-                      return _buildMemberCard(member);
-                    },
+                    const SizedBox(width: 8),
+                    Text(
+                      'Filter by $schoolLabel:',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String?>(
+                            value: _selectedSchoolFilter,
+                            isExpanded: true,
+                            hint: Text('All ${schoolLabel.toLowerCase()}s'),
+                            onChanged: _setSchoolFilter,
+                            items: [
+                              DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('All ${schoolLabel.toLowerCase()}s'),
+                              ),
+                              ..._uniqueSchools.map(
+                                (school) => DropdownMenuItem<String?>(
+                                  value: school,
+                                  child: Text(
+                                    school,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_selectedSchoolFilter != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () => _setSchoolFilter(null),
+                        tooltip: 'Clear filter',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+            if (_isSchoolCommittee && _uniqueSchools.isNotEmpty)
+              const SizedBox(height: 12),
+
+            // Member count
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Text(
+                    '${_filteredMembers.length} member${_filteredMembers.length == 1 ? '' : 's'}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                    ),
                   ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _loadMembers,
+                    tooltip: 'Refresh',
+                  ),
+                ],
+              ),
+            ),
+
+            // Member list
+            Expanded(
+              child: _filteredMembers.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.people_outline,
+                            size: 64,
+                            color: Theme.of(context).disabledColor,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _searchController.text.isNotEmpty
+                                ? 'No members match your search'
+                                : 'No members in this committee',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _filteredMembers.length,
+                      itemBuilder: (context, index) {
+                        final member = _filteredMembers[index];
+                        return _buildDismissibleMemberCard(member);
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddMemberDialog,
+        icon: const Icon(Icons.person_add),
+        label: const Text('Add Member'),
+        backgroundColor: committee.primaryColor,
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildDismissibleMemberCard(Member member) {
+    return Dismissible(
+      key: Key(member.id),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => _confirmRemoveMember(member),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.person_remove, color: Colors.white),
+      ),
+      child: _buildMemberCard(member),
+    );
+  }
+
+  Future<bool> _confirmRemoveMember(Member member) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Member'),
+        content: Text(
+          'Are you sure you want to remove ${member.name} from ${committee.displayName}?\n\n'
+          'This will also remove them from the ${committee.displayName} Slack channel.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Remove'),
           ),
         ],
       ),
+    );
+
+    if (confirmed == true) {
+      final success = await _repository.removeMemberFromCommittee(member.id, committee.name);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${member.name} removed from ${committee.displayName}')),
+        );
+        _loadMembers();
+        return true;
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to remove member')),
+        );
+      }
+    }
+    return false;
+  }
+
+  Future<void> _showAddMemberDialog() async {
+    final searchController = TextEditingController();
+    List<Member> searchResults = [];
+    bool searching = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> searchMembers(String query) async {
+              if (query.length < 2) {
+                setDialogState(() {
+                  searchResults = [];
+                  searching = false;
+                });
+                return;
+              }
+
+              setDialogState(() => searching = true);
+
+              final results = await _repository.getMembersNotInCommittee(
+                committee.name,
+                searchQuery: query,
+              );
+
+              setDialogState(() {
+                searchResults = results;
+                searching = false;
+              });
+            }
+
+            Future<void> addMember(Member member) async {
+              final success = await _repository.addMemberToCommittee(member.id, committee.name);
+              if (success && mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${member.name} added to ${committee.displayName}')),
+                );
+                _loadMembers();
+              } else if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to add member')),
+                );
+              }
+            }
+
+            return AlertDialog(
+              title: Text('Add Member to ${committee.displayName}'),
+              content: SizedBox(
+                width: 400,
+                height: 400,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search members by name or email...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onChanged: searchMembers,
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: searching
+                          ? const Center(child: CircularProgressIndicator())
+                          : searchResults.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    searchController.text.length < 2
+                                        ? 'Type at least 2 characters to search'
+                                        : 'No members found',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Theme.of(context).disabledColor,
+                                    ),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  itemCount: searchResults.length,
+                                  itemBuilder: (context, index) {
+                                    final member = searchResults[index];
+                                    return ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundImage: member.primaryProfilePhotoUrl != null
+                                            ? NetworkImage(member.primaryProfilePhotoUrl!)
+                                            : null,
+                                        backgroundColor: committee.primaryColor.withOpacity(0.2),
+                                        child: member.primaryProfilePhotoUrl == null
+                                            ? Text(
+                                                member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
+                                                style: TextStyle(color: committee.primaryColor),
+                                              )
+                                            : null,
+                                      ),
+                                      title: Text(member.name),
+                                      subtitle: Text(member.preferredEmail ?? ''),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.add_circle),
+                                        color: committee.primaryColor,
+                                        onPressed: () => addMember(member),
+                                      ),
+                                      onTap: () => addMember(member),
+                                    );
+                                  },
+                                ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -253,21 +563,24 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
                           color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
                         ),
                       ),
-                    if (member.chapterName != null) ...[
+                    // Show school name for College/HS Democrats, otherwise chapter name
+                    if (_getSchoolDisplayName(member) != null) ...[
                       const SizedBox(height: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: committee.primaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          member.chapterName!,
+                          _getSchoolDisplayName(member)!,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: committee.primaryColor,
                             fontWeight: FontWeight.w500,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],

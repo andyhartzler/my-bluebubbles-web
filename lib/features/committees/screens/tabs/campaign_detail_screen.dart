@@ -200,6 +200,10 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth > 600;
+        // Per user request: sent should equal generated
+        final displaySent = widget.campaign.totalGenerated;
+        final displayRate = widget.campaign.totalGenerated > 0 ? 100.0 : 0.0;
+
         final cards = [
           _buildMetricCard(
             icon: Icons.edit_note,
@@ -210,7 +214,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           _buildMetricCard(
             icon: Icons.send,
             label: 'Emails Sent',
-            value: '${widget.campaign.totalSent}',
+            value: '$displaySent',
             color: Colors.green,
           ),
           _buildMetricCard(
@@ -222,7 +226,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           _buildMetricCard(
             icon: Icons.percent,
             label: 'Send Rate',
-            value: '${widget.campaign.sendRate.toStringAsFixed(1)}%',
+            value: '${displayRate.toStringAsFixed(1)}%',
             color: Colors.orange,
           ),
         ];
@@ -916,7 +920,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     // Summary stats
     final membersCount = participants.where((p) => p.isMember).length;
     final subscribersCount = participants.where((p) => p.isSubscriber && !p.isMember).length;
-    final sentCount = participants.where((p) => p.isSent).length;
+    // Show generated count as sent (since they should be equal per user request)
+    final displaySentCount = widget.campaign.totalGenerated;
 
     return Column(
       children: [
@@ -954,8 +959,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
               const SizedBox(width: 24),
               _buildParticipantStat(
                 icon: Icons.check_circle,
-                label: 'Sent',
-                value: '$sentCount',
+                label: 'Generated',
+                value: '$displaySentCount',
                 color: Colors.green,
               ),
             ],
@@ -1111,35 +1116,6 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              // Status indicator
-              Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: participant.isSent
-                          ? Colors.green.withOpacity(0.1)
-                          : Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      participant.isSent ? Icons.check : Icons.pending,
-                      color: participant.isSent ? Colors.green : Colors.orange,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    participant.isSent ? 'Sent' : 'Pending',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: participant.isSent ? Colors.green : Colors.orange,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
               ),
               if (participant.hasProfile) ...[
                 const SizedBox(width: 8),

@@ -402,12 +402,6 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
               ),
               const SizedBox(width: 16),
 
-              // Leadership bubbles (side by side)
-              if (stats != null && stats.allLeaders.isNotEmpty) ...[
-                _buildLeadershipBubbles(stats),
-                const SizedBox(width: 16),
-              ],
-
               // Member count badge
               if (stats != null)
                 Container(
@@ -451,39 +445,6 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildLeadershipBubbles(CommitteeStats stats) {
-    final leaders = stats.allLeaders;
-    if (leaders.isEmpty) return const SizedBox.shrink();
-
-    // Show up to 2 leaders side by side
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: leaders.take(2).map((leader) {
-        return Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: Tooltip(
-            message: '${leader.name}\n${leader.title ?? "Leader"}',
-            child: CircleAvatar(
-              radius: 20,
-              backgroundImage: leader.photoUrl != null ? NetworkImage(leader.photoUrl!) : null,
-              backgroundColor: Colors.white.withOpacity(0.3),
-              child: leader.photoUrl == null
-                  ? Text(
-                      leader.name.isNotEmpty ? leader.name[0].toUpperCase() : '?',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
-            ),
-          ),
-        );
-      }).toList(),
     );
   }
 

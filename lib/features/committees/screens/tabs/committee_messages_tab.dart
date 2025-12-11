@@ -231,7 +231,7 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
       builder: (context) => AlertDialog(
         title: const Text('Send Intro Message'),
         content: Text(
-          'Send the Missouri Young Democrats intro message to ${eligible.length} ${committee.displayName} members?\n\n'
+          'Send the intro message and contact card to ${eligible.length} ${committee.displayName} members?\n\n'
           'Members who have already received the intro will be skipped.',
         ),
         actions: [
@@ -463,7 +463,7 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
                   onPressed: introEligible > 0 ? _sendIntroMessages : null,
                   icon: const Icon(Icons.auto_awesome),
                   label: Text(introEligible > 0
-                      ? 'Send MYD Intro to $introEligible Members'
+                      ? 'Send Intro Message + Contact Card to $introEligible Members'
                       : 'All Members Have Received Intro'),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.all(14),

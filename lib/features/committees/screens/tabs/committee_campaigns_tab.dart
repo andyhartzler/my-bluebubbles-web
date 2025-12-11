@@ -416,6 +416,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
               const SizedBox(height: 20),
 
               // Stats row
+              // Per user request: sent should equal generated
               Row(
                 children: [
                   _buildCampaignStat(
@@ -428,7 +429,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
                   _buildCampaignStat(
                     icon: Icons.send,
                     label: 'Sent',
-                    value: '${campaign.totalSent}',
+                    value: '${campaign.totalGenerated}',
                     color: Colors.green,
                   ),
                   const SizedBox(width: 16),
@@ -442,7 +443,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
                   _buildCampaignStat(
                     icon: Icons.percent,
                     label: 'Send Rate',
-                    value: '${campaign.sendRate.toStringAsFixed(1)}%',
+                    value: '${campaign.totalGenerated > 0 ? '100.0' : '0.0'}%',
                     color: Colors.orange,
                   ),
                 ],
