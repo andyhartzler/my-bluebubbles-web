@@ -20,6 +20,10 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
   final _votesService = VotesService();
   String _statusFilter = 'all';
 
+  /// Get the committee name used for database operations
+  /// Uses meetingsFilterName which includes "Committee" suffix to match DB constraint
+  String get _committeeDbName => widget.committee.meetingsFilterName;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -53,7 +57,7 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
           Expanded(
             child: StreamBuilder<List<VotingForm>>(
               stream: _votesService.watchVotesForCommittee(
-                widget.committee.name,
+                _committeeDbName,
                 _statusFilter,
               ),
               builder: (context, snapshot) {
@@ -154,7 +158,7 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
       context,
       MaterialPageRoute(
         builder: (_) => VoteBuilderScreen(
-          committee: widget.committee.name,
+          committee: _committeeDbName,
         ),
       ),
     );
@@ -175,7 +179,7 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
       MaterialPageRoute(
         builder: (_) => VoteBuilderScreen(
           voteId: vote.id,
-          committee: widget.committee.name,
+          committee: _committeeDbName,
         ),
       ),
     );
