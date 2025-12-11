@@ -6,8 +6,15 @@ import 'package:bluebubbles/features/committees/services/committee_repository.da
 
 class CommitteeOverviewTab extends StatefulWidget {
   final Committee committee;
+  final void Function(int tabIndex)? onNavigateToTab;
+  final void Function(String schoolName)? onFilterMembersBySchool;
 
-  const CommitteeOverviewTab({super.key, required this.committee});
+  const CommitteeOverviewTab({
+    super.key,
+    required this.committee,
+    this.onNavigateToTab,
+    this.onFilterMembersBySchool,
+  });
 
   @override
   State<CommitteeOverviewTab> createState() => _CommitteeOverviewTabState();
@@ -261,12 +268,6 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
           color: Colors.blue,
         ));
         cards.add(_buildStatCard(
-          icon: Icons.verified,
-          label: 'Chartered',
-          value: '${specific['charteredCollegeChapters'] ?? 0}',
-          color: Colors.green,
-        ));
-        cards.add(_buildStatCard(
           icon: Icons.account_balance,
           label: 'Unique Colleges',
           value: '${specific['uniqueColleges'] ?? 0}',
@@ -280,12 +281,6 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
           label: 'Total Chapters',
           value: '${specific['totalHSChapters'] ?? 0}',
           color: Colors.green,
-        ));
-        cards.add(_buildStatCard(
-          icon: Icons.verified,
-          label: 'Chartered',
-          value: '${specific['charteredHSChapters'] ?? 0}',
-          color: Colors.blue,
         ));
         cards.add(_buildStatCard(
           icon: Icons.domain,
@@ -430,50 +425,57 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     final borderColor = baseColor.withOpacity(intensity * 0.4 + 0.1);
     final textColor = baseColor.shade700;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: chipColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isCollege ? Icons.school : Icons.domain,
-            size: 16,
-            color: textColor,
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              school,
-              style: TextStyle(
-                color: textColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-              overflow: TextOverflow.ellipsis,
+    return InkWell(
+      onTap: () {
+        // Navigate to members tab with school filter
+        widget.onFilterMembersBySchool?.call(school);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: chipColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isCollege ? Icons.school : Icons.domain,
+              size: 16,
+              color: textColor,
             ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: baseColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '$count',
-              style: TextStyle(
-                color: textColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                school,
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: baseColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -508,24 +510,24 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
                   icon: Icons.email_outlined,
                   label: 'Email Committee',
                   onPressed: () {
-                    // Navigate to email tab
-                    DefaultTabController.of(context).animateTo(3);
+                    // Navigate to email tab (index 3)
+                    widget.onNavigateToTab?.call(3);
                   },
                 ),
                 _buildActionButton(
                   icon: Icons.message_outlined,
                   label: 'Message Committee',
                   onPressed: () {
-                    // Navigate to messages tab
-                    DefaultTabController.of(context).animateTo(4);
+                    // Navigate to messages tab (index 4)
+                    widget.onNavigateToTab?.call(4);
                   },
                 ),
                 _buildActionButton(
                   icon: Icons.people_outline,
                   label: 'View Members',
                   onPressed: () {
-                    // Navigate to members tab
-                    DefaultTabController.of(context).animateTo(1);
+                    // Navigate to members tab (index 1)
+                    widget.onNavigateToTab?.call(1);
                   },
                 ),
               ],

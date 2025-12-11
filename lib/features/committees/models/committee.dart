@@ -13,6 +13,8 @@ class Committee {
   final bool hasDonorsTab;
   final bool hasCampaignsTab;
   final String? chapterTypeFilter;
+  /// The name used to filter meetings in the database (includes "Committee" suffix where needed)
+  final String? _meetingsFilterName;
 
   const Committee({
     required this.id,
@@ -26,9 +28,13 @@ class Committee {
     this.hasDonorsTab = false,
     this.hasCampaignsTab = false,
     this.chapterTypeFilter,
-  });
+    String? meetingsFilterName,
+  }) : _meetingsFilterName = meetingsFilterName;
 
   String get routeName => id.toLowerCase().replaceAll(' ', '-').replaceAll('&', 'and');
+
+  /// Returns the name to use when filtering meetings from the database
+  String get meetingsFilterName => _meetingsFilterName ?? name;
 }
 
 /// Static committee definitions
@@ -37,11 +43,11 @@ class CommitteeDefinitions {
 
   static const _unityBlue = Color(0xFF273351);
   static const _momentumBlue = Color(0xFF32A6DE);
-  static const _sunriseGold = Color(0xFFFDB813);
-  static const _grassrootsGreen = Color(0xFF43A047);
-  static const _justicePurple = Color(0xFF6A1B9A);
-  static const _actionOrange = Color(0xFFE65100);
-  static const _communityTeal = Color(0xFF00796B);
+  // Additional blue variations for committees
+  static const _steelBlue = Color(0xFF4682B4);
+  static const _navyBlue = Color(0xFF1E3A5F);
+  static const _slateBlue = Color(0xFF5A7FA3);
+  static const _royalBlue = Color(0xFF2B4B8C);
 
   static const communications = Committee(
     id: 'Communications',
@@ -51,6 +57,7 @@ class CommitteeDefinitions {
     icon: Icons.campaign_outlined,
     primaryColor: _momentumBlue,
     secondaryColor: _unityBlue,
+    meetingsFilterName: 'Communications Committee',
   );
 
   static const politicalAffairs = Committee(
@@ -61,6 +68,7 @@ class CommitteeDefinitions {
     icon: Icons.how_to_vote_outlined,
     primaryColor: _unityBlue,
     secondaryColor: _momentumBlue,
+    meetingsFilterName: 'Political Affairs Committee',
   );
 
   static const policyAdvocacy = Committee(
@@ -69,9 +77,10 @@ class CommitteeDefinitions {
     displayName: 'Policy & Advocacy',
     description: 'Develops policy positions and leads advocacy campaigns on key issues.',
     icon: Icons.gavel_outlined,
-    primaryColor: _justicePurple,
-    secondaryColor: _unityBlue,
+    primaryColor: _royalBlue,
+    secondaryColor: _slateBlue,
     hasCampaignsTab: true,
+    meetingsFilterName: 'Policy & Advocacy Committee',
   );
 
   static const membershipOutreach = Committee(
@@ -80,8 +89,9 @@ class CommitteeDefinitions {
     displayName: 'Membership & Outreach',
     description: 'Grows and engages the membership base through recruitment and community events.',
     icon: Icons.people_outline,
-    primaryColor: _communityTeal,
-    secondaryColor: _grassrootsGreen,
+    primaryColor: _navyBlue,
+    secondaryColor: _steelBlue,
+    meetingsFilterName: 'Membership & Outreach Committee',
   );
 
   static const fundraising = Committee(
@@ -90,9 +100,10 @@ class CommitteeDefinitions {
     displayName: 'Fundraising',
     description: 'Leads fundraising efforts to support organizational initiatives and programs.',
     icon: Icons.volunteer_activism_outlined,
-    primaryColor: _sunriseGold,
-    secondaryColor: _actionOrange,
+    primaryColor: _steelBlue,
+    secondaryColor: _navyBlue,
     hasDonorsTab: true,
+    meetingsFilterName: 'Fundraising Committee',
   );
 
   static const collegeDemocrats = Committee(
@@ -113,8 +124,8 @@ class CommitteeDefinitions {
     displayName: 'High School Democrats',
     description: 'Engages and empowers high school students in Democratic political participation.',
     icon: Icons.emoji_people_outlined,
-    primaryColor: _grassrootsGreen,
-    secondaryColor: _communityTeal,
+    primaryColor: _slateBlue,
+    secondaryColor: _royalBlue,
     hasChaptersTab: true,
     chapterTypeFilter: 'highschool',
   );
