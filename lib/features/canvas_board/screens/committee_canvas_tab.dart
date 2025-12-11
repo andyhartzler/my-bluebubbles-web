@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
@@ -39,7 +40,7 @@ class CommitteeCanvasTab extends StatefulWidget {
   State<CommitteeCanvasTab> createState() => _CommitteeCanvasTabState();
 }
 
-class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
+class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTickerProviderStateMixin {
   final _canvasBoardService = CanvasBoardService();
   final _canvasFileService = CanvasFileService();
   final _committeeRepository = CommitteeRepository();
@@ -70,6 +71,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
   // Edit state
   String? _editingNodeId;
   final _noteTextController = TextEditingController();
+  final FocusNode _canvasFocusNode = FocusNode();
 
   // Undo/Redo
   final List<_CanvasAction> _undoStack = [];
@@ -79,15 +81,36 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
   Timer? _saveTimer;
   bool _hasUnsavedChanges = false;
 
+  // Save indicator animation
+  late AnimationController _saveIndicatorController;
+  late Animation<double> _saveIndicatorOpacity;
+  bool _showSaveIndicator = false;
+  String _saveStatus = 'Saved';
+
   // Drag state
   Offset? _dragStartOffset;
   Offset? _nodeDragStart;
+
+  // Drawing state for shapes/lines
+  Offset? _drawStartPoint;
+  List<Offset> _currentDrawingPoints = [];
+  bool _isDrawing = false;
+
+  // Fullscreen mode
+  bool _isFullscreen = false;
 
   Committee get committee => widget.committee;
 
   @override
   void initState() {
     super.initState();
+    _saveIndicatorController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _saveIndicatorOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _saveIndicatorController, curve: Curves.easeInOut),
+    );
     _loadBoard();
   }
 
@@ -95,6 +118,8 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
   void dispose() {
     _saveTimer?.cancel();
     _noteTextController.dispose();
+    _canvasFocusNode.dispose();
+    _saveIndicatorController.dispose();
     super.dispose();
   }
 
@@ -191,7 +216,15 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
   void _scheduleSave() {
     _hasUnsavedChanges = true;
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(seconds: 2), _saveBoard);
+
+    // Show saving indicator
+    setState(() {
+      _showSaveIndicator = true;
+      _saveStatus = 'Saving...';
+    });
+    _saveIndicatorController.forward();
+
+    _saveTimer = Timer(const Duration(milliseconds: 800), _saveBoard);
   }
 
   Future<void> _saveBoard() async {
@@ -205,9 +238,31 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
         zoomLevel: _zoomLevel,
       );
       _hasUnsavedChanges = false;
+
+      if (mounted) {
+        setState(() {
+          _saveStatus = 'Saved';
+        });
+
+        // Fade out after a delay
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted && !_hasUnsavedChanges) {
+            _saveIndicatorController.reverse().then((_) {
+              if (mounted) {
+                setState(() {
+                  _showSaveIndicator = false;
+                });
+              }
+            });
+          }
+        });
+      }
     } catch (e) {
       // Show error toast
       if (mounted) {
+        setState(() {
+          _saveStatus = 'Failed to save';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to save: $e'),
@@ -537,87 +592,440 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
     }
 
     return Focus(
+      focusNode: _canvasFocusNode,
       autofocus: true,
       onKeyEvent: _handleKeyEvent,
-      child: Column(
+      child: Stack(
         children: [
-          // Toolbar
-          CanvasToolbar(
-            selectedTool: _selectedTool,
-            onToolSelected: (tool) => setState(() => _selectedTool = tool),
-            selectedColor: _selectedColor,
-            onColorSelected: (color) => setState(() => _selectedColor = color),
-            strokeWidth: _strokeWidth,
-            onStrokeWidthChanged: (width) =>
-                setState(() => _strokeWidth = width),
-            onUndo: _undo,
-            onRedo: _redo,
-            onDelete: _deleteSelectedNodes,
-            canUndo: _undoStack.isNotEmpty,
-            canRedo: _redoStack.isNotEmpty,
-            hasSelection: _selectedNodeIds.isNotEmpty,
+          Column(
+            children: [
+              // Toolbar (hide in fullscreen)
+              if (!_isFullscreen)
+                CanvasToolbar(
+                  selectedTool: _selectedTool,
+                  onToolSelected: (tool) => setState(() => _selectedTool = tool),
+                  selectedColor: _selectedColor,
+                  onColorSelected: (color) => setState(() => _selectedColor = color),
+                  strokeWidth: _strokeWidth,
+                  onStrokeWidthChanged: (width) =>
+                      setState(() => _strokeWidth = width),
+                  onUndo: _undo,
+                  onRedo: _redo,
+                  onDelete: _deleteSelectedNodes,
+                  canUndo: _undoStack.isNotEmpty,
+                  canRedo: _redoStack.isNotEmpty,
+                  hasSelection: _selectedNodeIds.isNotEmpty,
+                ),
+              // Main content
+              Expanded(
+                child: Row(
+                  children: [
+                    // Sidebar (hide in fullscreen)
+                    if (!_isFullscreen)
+                      CanvasSidebar(
+                        onAddMember: _addMemberNode,
+                        onAddEvent: _addEventNode,
+                        onAddChapter: _addChapterNode,
+                        onAddDonor: _addDonorNode,
+                        onAddNote: _addNoteNode,
+                        onAddImage: _addImageNode,
+                        onAddFile: _addFileNode,
+                        onZoomIn: _zoomIn,
+                        onZoomOut: _zoomOut,
+                        onFitView: _fitView,
+                        onResetView: _resetView,
+                        onToggleFullscreen: () => setState(() => _isFullscreen = true),
+                        zoomLevel: _zoomLevel,
+                        showDonors: committee.hasDonorsTab,
+                        showChapters: committee.hasChaptersTab,
+                      ),
+                    // Canvas
+                    Expanded(
+                      child: _buildCanvas(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          // Main content
-          Expanded(
-            child: Row(
-              children: [
-                // Sidebar
-                CanvasSidebar(
-                  onAddMember: _addMemberNode,
-                  onAddEvent: _addEventNode,
-                  onAddChapter: _addChapterNode,
-                  onAddDonor: _addDonorNode,
-                  onAddNote: _addNoteNode,
-                  onAddImage: _addImageNode,
-                  onAddFile: _addFileNode,
-                  onZoomIn: _zoomIn,
-                  onZoomOut: _zoomOut,
-                  onFitView: _fitView,
-                  onResetView: _resetView,
-                  zoomLevel: _zoomLevel,
-                  showDonors: committee.hasDonorsTab,
-                  showChapters: committee.hasChaptersTab,
-                ),
-                // Canvas
-                Expanded(
-                  child: _buildCanvas(),
-                ),
-              ],
+          // Floating save indicator
+          if (_showSaveIndicator)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: AnimatedBuilder(
+                animation: _saveIndicatorOpacity,
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: _saveIndicatorOpacity.value,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_saveStatus == 'Saving...')
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                              ),
+                            )
+                          else if (_saveStatus == 'Saved')
+                            const Icon(Icons.check, size: 14, color: Colors.green)
+                          else
+                            const Icon(Icons.error_outline, size: 14, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Text(
+                            _saveStatus,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-          // Status bar
-          _buildStatusBar(),
+          // Fullscreen toggle button
+          if (_isFullscreen)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Material(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => setState(() => _isFullscreen = false),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.fullscreen_exit, color: Colors.white, size: 24),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
   Widget _buildCanvas() {
-    return GestureDetector(
-      onPanStart: _onCanvasPanStart,
-      onPanUpdate: _onCanvasPanUpdate,
-      onPanEnd: _onCanvasPanEnd,
-      onTapDown: _onCanvasTap,
-      child: Container(
-        color: Colors.grey[100],
-        child: ClipRect(
-          child: CustomPaint(
-            painter: _GridPainter(
-              offset: _viewportOffset,
-              zoom: _zoomLevel,
-            ),
-            child: Stack(
-              children: [
-                // Nodes
-                ..._nodes.map((node) => _buildPositionedNode(node)),
-                // Connections (draw on top for visibility)
-                ..._buildConnections(),
-              ],
+    return Listener(
+      // Handle mouse scroll for zoom
+      onPointerSignal: (event) {
+        if (event is PointerScrollEvent) {
+          _handleScroll(event);
+        }
+      },
+      child: GestureDetector(
+        // Handle pinch to zoom
+        onScaleStart: _onScaleStart,
+        onScaleUpdate: _onScaleUpdate,
+        onScaleEnd: _onScaleEnd,
+        onTapDown: _onCanvasTap,
+        onDoubleTap: _onCanvasDoubleTap,
+        child: Container(
+          color: Colors.grey[100],
+          child: ClipRect(
+            child: CustomPaint(
+              painter: _GridPainter(
+                offset: _viewportOffset,
+                zoom: _zoomLevel,
+              ),
+              foregroundPainter: _isDrawing ? _DrawingPainter(
+                tool: _selectedTool,
+                points: _currentDrawingPoints,
+                startPoint: _drawStartPoint,
+                color: _selectedColor,
+                strokeWidth: _strokeWidth,
+                zoom: _zoomLevel,
+                offset: _viewportOffset,
+              ) : null,
+              child: Stack(
+                children: [
+                  // Nodes
+                  ..._nodes.map((node) => _buildPositionedNode(node)),
+                  // Connections (draw on top for visibility)
+                  ..._buildConnections(),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  void _handleScroll(PointerScrollEvent event) {
+    // Mouse wheel zoom
+    final zoomDelta = event.scrollDelta.dy > 0 ? 0.9 : 1.1;
+    final newZoom = (_zoomLevel * zoomDelta).clamp(0.1, 5.0);
+
+    // Zoom towards mouse position
+    final mousePos = event.localPosition;
+    final beforeZoomX = (mousePos.dx - _viewportOffset.dx) / _zoomLevel;
+    final beforeZoomY = (mousePos.dy - _viewportOffset.dy) / _zoomLevel;
+
+    setState(() {
+      _zoomLevel = newZoom;
+      _viewportOffset = Offset(
+        mousePos.dx - beforeZoomX * _zoomLevel,
+        mousePos.dy - beforeZoomY * _zoomLevel,
+      );
+    });
+    _scheduleSave();
+  }
+
+  double _baseZoom = 1.0;
+  Offset _baseOffset = Offset.zero;
+  Offset _scaleStartFocalPoint = Offset.zero;
+
+  void _onScaleStart(ScaleStartDetails details) {
+    _baseZoom = _zoomLevel;
+    _baseOffset = _viewportOffset;
+    _scaleStartFocalPoint = details.focalPoint;
+
+    // Check if we're starting a drawing operation
+    if (_isDrawingTool(_selectedTool)) {
+      _isDrawing = true;
+      final canvasPoint = _screenToCanvas(details.focalPoint);
+      _drawStartPoint = canvasPoint;
+      _currentDrawingPoints = [canvasPoint];
+    }
+  }
+
+  void _onScaleUpdate(ScaleUpdateDetails details) {
+    if (_isDrawing && _isDrawingTool(_selectedTool)) {
+      // Continue drawing
+      final canvasPoint = _screenToCanvas(details.focalPoint);
+      setState(() {
+        if (_selectedTool == CanvasTool.draw) {
+          _currentDrawingPoints.add(canvasPoint);
+        } else {
+          // For shapes, just update the end point
+          if (_currentDrawingPoints.length == 1) {
+            _currentDrawingPoints.add(canvasPoint);
+          } else {
+            _currentDrawingPoints[1] = canvasPoint;
+          }
+        }
+      });
+      return;
+    }
+
+    // Pinch to zoom
+    if (details.scale != 1.0) {
+      final newZoom = (_baseZoom * details.scale).clamp(0.1, 5.0);
+
+      // Calculate new offset to keep focal point stationary
+      final focalOffset = details.focalPoint - _scaleStartFocalPoint;
+      final scaleFactor = newZoom / _baseZoom;
+
+      setState(() {
+        _zoomLevel = newZoom;
+        _viewportOffset = Offset(
+          _baseOffset.dx + focalOffset.dx + (_scaleStartFocalPoint.dx - _baseOffset.dx) * (1 - scaleFactor),
+          _baseOffset.dy + focalOffset.dy + (_scaleStartFocalPoint.dy - _baseOffset.dy) * (1 - scaleFactor),
+        );
+      });
+    } else {
+      // Pan (single finger drag)
+      if (_selectedTool == CanvasTool.pan ||
+          (_selectedTool == CanvasTool.select && _selectedNodeIds.isEmpty)) {
+        setState(() {
+          _viewportOffset = _baseOffset + (details.focalPoint - _scaleStartFocalPoint);
+        });
+      }
+    }
+  }
+
+  void _onScaleEnd(ScaleEndDetails details) {
+    if (_isDrawing && _isDrawingTool(_selectedTool)) {
+      _finishDrawing();
+    }
+    _scheduleSave();
+  }
+
+  bool _isDrawingTool(CanvasTool tool) {
+    return tool == CanvasTool.draw ||
+           tool == CanvasTool.arrow ||
+           tool == CanvasTool.line ||
+           tool == CanvasTool.rectangle ||
+           tool == CanvasTool.circle ||
+           tool == CanvasTool.text;
+  }
+
+  Offset _screenToCanvas(Offset screenPoint) {
+    return Offset(
+      (screenPoint.dx - _viewportOffset.dx) / _zoomLevel,
+      (screenPoint.dy - _viewportOffset.dy) / _zoomLevel,
+    );
+  }
+
+  Future<void> _finishDrawing() async {
+    if (!_isDrawing || _drawStartPoint == null) return;
+
+    final startPoint = _drawStartPoint!;
+    final endPoint = _currentDrawingPoints.length > 1
+        ? _currentDrawingPoints.last
+        : startPoint;
+
+    setState(() {
+      _isDrawing = false;
+    });
+
+    // Create the appropriate node based on tool
+    switch (_selectedTool) {
+      case CanvasTool.draw:
+        if (_currentDrawingPoints.length > 2) {
+          await _addFreehandNode(_currentDrawingPoints);
+        }
+        break;
+      case CanvasTool.arrow:
+      case CanvasTool.line:
+        if ((endPoint - startPoint).distance > 10) {
+          await _addConnectionLine(startPoint, endPoint, _selectedTool == CanvasTool.arrow);
+        }
+        break;
+      case CanvasTool.rectangle:
+        if ((endPoint - startPoint).distance > 10) {
+          await _addShapeNode(startPoint, endPoint, 'rectangle');
+        }
+        break;
+      case CanvasTool.circle:
+        if ((endPoint - startPoint).distance > 10) {
+          await _addShapeNode(startPoint, endPoint, 'ellipse');
+        }
+        break;
+      case CanvasTool.text:
+        await _addTextNodeAt(startPoint);
+        break;
+      default:
+        break;
+    }
+
+    _currentDrawingPoints = [];
+    _drawStartPoint = null;
+  }
+
+  Future<void> _addFreehandNode(List<Offset> points) async {
+    if (_board == null || points.isEmpty) return;
+
+    // Convert points to path string
+    final pathPoints = points.map((p) => '${p.dx},${p.dy}').join(';');
+
+    // Calculate bounds
+    double minX = double.infinity, minY = double.infinity;
+    double maxX = double.negativeInfinity, maxY = double.negativeInfinity;
+    for (final p in points) {
+      minX = math.min(minX, p.dx);
+      minY = math.min(minY, p.dy);
+      maxX = math.max(maxX, p.dx);
+      maxY = math.max(maxY, p.dy);
+    }
+
+    await _addNode(CanvasNode(
+      id: '',
+      boardId: _board!.id,
+      offsetX: minX,
+      offsetY: minY,
+      width: maxX - minX + _strokeWidth * 2,
+      height: maxY - minY + _strokeWidth * 2,
+      nodeType: CanvasNodeType.freehand,
+      shapeColor: '#${_selectedColor.value.toRadixString(16).substring(2)}',
+      strokeWidth: _strokeWidth,
+      pathData: pathPoints,
+    ));
+  }
+
+  Future<void> _addConnectionLine(Offset start, Offset end, bool isArrow) async {
+    if (_board == null) return;
+
+    // For lines/arrows, we create a shape node
+    final minX = math.min(start.dx, end.dx);
+    final minY = math.min(start.dy, end.dy);
+    final width = (end.dx - start.dx).abs() + _strokeWidth * 2;
+    final height = (end.dy - start.dy).abs() + _strokeWidth * 2;
+
+    // Store relative start/end points
+    final relStart = Offset(start.dx - minX + _strokeWidth, start.dy - minY + _strokeWidth);
+    final relEnd = Offset(end.dx - minX + _strokeWidth, end.dy - minY + _strokeWidth);
+
+    await _addNode(CanvasNode(
+      id: '',
+      boardId: _board!.id,
+      offsetX: minX - _strokeWidth,
+      offsetY: minY - _strokeWidth,
+      width: width,
+      height: height,
+      nodeType: CanvasNodeType.shape,
+      shapeType: isArrow ? 'arrow' : 'line',
+      shapeColor: '#${_selectedColor.value.toRadixString(16).substring(2)}',
+      strokeWidth: _strokeWidth,
+      pathData: '${relStart.dx},${relStart.dy};${relEnd.dx},${relEnd.dy}',
+    ));
+  }
+
+  Future<void> _addShapeNode(Offset start, Offset end, String shapeType) async {
+    if (_board == null) return;
+
+    final minX = math.min(start.dx, end.dx);
+    final minY = math.min(start.dy, end.dy);
+    final width = (end.dx - start.dx).abs();
+    final height = (end.dy - start.dy).abs();
+
+    await _addNode(CanvasNode(
+      id: '',
+      boardId: _board!.id,
+      offsetX: minX,
+      offsetY: minY,
+      width: width,
+      height: height,
+      nodeType: CanvasNodeType.shape,
+      shapeType: shapeType,
+      shapeColor: '#${_selectedColor.value.toRadixString(16).substring(2)}',
+      strokeWidth: _strokeWidth,
+    ));
+  }
+
+  Future<void> _addTextNodeAt(Offset position) async {
+    await _addNode(CanvasNode(
+      id: '',
+      boardId: _board?.id ?? '',
+      offsetX: position.dx,
+      offsetY: position.dy,
+      width: 200,
+      height: 50,
+      nodeType: CanvasNodeType.text,
+      textContent: '',
+    ));
+
+    // Start editing the new text node after a small delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_nodes.isNotEmpty) {
+        final newNode = _nodes.last;
+        if (newNode.nodeType == CanvasNodeType.text) {
+          _startEditingText(newNode);
+        }
+      }
+    });
+  }
+
+  void _onCanvasDoubleTap() {
+    // Toggle fullscreen on double tap
+    setState(() {
+      _isFullscreen = !_isFullscreen;
+    });
   }
 
   Widget _buildPositionedNode(CanvasNode node) {
@@ -771,63 +1179,6 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
     }).toList();
   }
 
-  Widget _buildStatusBar() {
-    return Container(
-      height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        border: Border(top: BorderSide(color: Colors.grey[300]!)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            '${_nodes.length} node${_nodes.length == 1 ? '' : 's'}',
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-          ),
-          const SizedBox(width: 16),
-          if (_selectedNodeIds.isNotEmpty)
-            Text(
-              '${_selectedNodeIds.length} selected',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-          const Spacer(),
-          if (_hasUnsavedChanges)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(Colors.grey[500]),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Saving...',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-              ],
-            )
-          else
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.check_circle, size: 14, color: Colors.green[600]),
-                const SizedBox(width: 4),
-                Text(
-                  'Saved',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
   // ============ Interaction Handlers ============
 
   void _selectNode(CanvasNode node) {
@@ -853,6 +1204,9 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
   }
 
   void _onCanvasTap(TapDownDetails details) {
+    // Request focus for the canvas to receive keyboard events
+    _canvasFocusNode.requestFocus();
+
     setState(() {
       _selectedNodeIds.clear();
       _selectedNodeId = null;
@@ -861,30 +1215,6 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
         _editingNodeId = null;
       }
     });
-  }
-
-  void _onCanvasPanStart(DragStartDetails details) {
-    if (_selectedTool == CanvasTool.pan || _selectedTool == CanvasTool.select) {
-      _dragStartOffset = _viewportOffset;
-    }
-  }
-
-  void _onCanvasPanUpdate(DragUpdateDetails details) {
-    if (_selectedTool == CanvasTool.pan ||
-        (_selectedTool == CanvasTool.select && _selectedNodeIds.isEmpty)) {
-      setState(() {
-        _viewportOffset = _dragStartOffset! + details.localPosition - details.localPosition +
-            Offset(details.delta.dx, details.delta.dy);
-        _viewportOffset = Offset(
-          _viewportOffset.dx + details.delta.dx,
-          _viewportOffset.dy + details.delta.dy,
-        );
-      });
-    }
-  }
-
-  void _onCanvasPanEnd(DragEndDetails details) {
-    _scheduleSave();
   }
 
   void _onNodeDragStart(CanvasNode node, DragStartDetails details) {
@@ -926,10 +1256,24 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
+    // Don't intercept keyboard shortcuts when editing text
+    if (_editingNodeId != null) {
+      // Only handle Escape to exit editing
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        setState(() {
+          _saveEditingNode();
+          _editingNodeId = null;
+        });
+        return KeyEventResult.handled;
+      }
+      // Let all other keys pass through to the text field
+      return KeyEventResult.ignored;
+    }
+
     // Delete key
     if (event.logicalKey == LogicalKeyboardKey.delete ||
         event.logicalKey == LogicalKeyboardKey.backspace) {
-      if (_selectedNodeIds.isNotEmpty && _editingNodeId == null) {
+      if (_selectedNodeIds.isNotEmpty) {
         _deleteSelectedNodes();
         return KeyEventResult.handled;
       }
@@ -951,15 +1295,18 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
       setState(() {
         _selectedNodeIds.clear();
         _selectedNodeId = null;
-        if (_editingNodeId != null) {
-          _saveEditingNode();
-          _editingNodeId = null;
-        }
+        _isFullscreen = false;
       });
       return KeyEventResult.handled;
     }
 
-    // Tool shortcuts
+    // F key - Toggle fullscreen
+    if (event.logicalKey == LogicalKeyboardKey.keyF) {
+      setState(() => _isFullscreen = !_isFullscreen);
+      return KeyEventResult.handled;
+    }
+
+    // Tool shortcuts (only when not editing)
     if (event.logicalKey == LogicalKeyboardKey.keyV) {
       setState(() => _selectedTool = CanvasTool.select);
       return KeyEventResult.handled;
@@ -970,6 +1317,26 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
     }
     if (event.logicalKey == LogicalKeyboardKey.keyD) {
       setState(() => _selectedTool = CanvasTool.draw);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyA) {
+      setState(() => _selectedTool = CanvasTool.arrow);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyL) {
+      setState(() => _selectedTool = CanvasTool.line);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyR) {
+      setState(() => _selectedTool = CanvasTool.rectangle);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyO) {
+      setState(() => _selectedTool = CanvasTool.circle);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyT) {
+      setState(() => _selectedTool = CanvasTool.text);
       return KeyEventResult.handled;
     }
     if (event.logicalKey == LogicalKeyboardKey.keyN) {
@@ -1178,5 +1545,150 @@ class _ConnectionPainter extends CustomPainter {
         oldDelegate.to != to ||
         oldDelegate.type != type ||
         oldDelegate.color != color;
+  }
+}
+
+/// Painter for live drawing preview
+class _DrawingPainter extends CustomPainter {
+  final CanvasTool tool;
+  final List<Offset> points;
+  final Offset? startPoint;
+  final Color color;
+  final double strokeWidth;
+  final double zoom;
+  final Offset offset;
+
+  _DrawingPainter({
+    required this.tool,
+    required this.points,
+    this.startPoint,
+    required this.color,
+    required this.strokeWidth,
+    required this.zoom,
+    required this.offset,
+  });
+
+  Offset _canvasToScreen(Offset canvasPoint) {
+    return Offset(
+      canvasPoint.dx * zoom + offset.dx,
+      canvasPoint.dy * zoom + offset.dy,
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.isEmpty) return;
+
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth * zoom
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    switch (tool) {
+      case CanvasTool.draw:
+        _drawFreehand(canvas, paint);
+        break;
+      case CanvasTool.line:
+        _drawLine(canvas, paint);
+        break;
+      case CanvasTool.arrow:
+        _drawArrow(canvas, paint);
+        break;
+      case CanvasTool.rectangle:
+        _drawRectangle(canvas, paint);
+        break;
+      case CanvasTool.circle:
+        _drawEllipse(canvas, paint);
+        break;
+      default:
+        break;
+    }
+  }
+
+  void _drawFreehand(Canvas canvas, Paint paint) {
+    if (points.length < 2) return;
+
+    final path = Path();
+    final screenPoints = points.map(_canvasToScreen).toList();
+
+    path.moveTo(screenPoints.first.dx, screenPoints.first.dy);
+    for (int i = 1; i < screenPoints.length; i++) {
+      path.lineTo(screenPoints[i].dx, screenPoints[i].dy);
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  void _drawLine(Canvas canvas, Paint paint) {
+    if (points.length < 2) return;
+
+    final start = _canvasToScreen(points.first);
+    final end = _canvasToScreen(points.last);
+    canvas.drawLine(start, end, paint);
+  }
+
+  void _drawArrow(Canvas canvas, Paint paint) {
+    if (points.length < 2) return;
+
+    final start = _canvasToScreen(points.first);
+    final end = _canvasToScreen(points.last);
+
+    // Draw the line
+    canvas.drawLine(start, end, paint);
+
+    // Draw arrow head
+    const arrowSize = 12.0;
+    final angle = (end - start).direction;
+
+    final point1 = Offset(
+      end.dx - arrowSize * math.cos(angle - math.pi / 6),
+      end.dy - arrowSize * math.sin(angle - math.pi / 6),
+    );
+    final point2 = Offset(
+      end.dx - arrowSize * math.cos(angle + math.pi / 6),
+      end.dy - arrowSize * math.sin(angle + math.pi / 6),
+    );
+
+    final arrowPath = Path()
+      ..moveTo(end.dx, end.dy)
+      ..lineTo(point1.dx, point1.dy)
+      ..lineTo(point2.dx, point2.dy)
+      ..close();
+
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(arrowPath, fillPaint);
+  }
+
+  void _drawRectangle(Canvas canvas, Paint paint) {
+    if (points.length < 2) return;
+
+    final start = _canvasToScreen(points.first);
+    final end = _canvasToScreen(points.last);
+
+    final rect = Rect.fromPoints(start, end);
+    canvas.drawRect(rect, paint);
+  }
+
+  void _drawEllipse(Canvas canvas, Paint paint) {
+    if (points.length < 2) return;
+
+    final start = _canvasToScreen(points.first);
+    final end = _canvasToScreen(points.last);
+
+    final rect = Rect.fromPoints(start, end);
+    canvas.drawOval(rect, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrawingPainter oldDelegate) {
+    return oldDelegate.points.length != points.length ||
+        oldDelegate.tool != tool ||
+        oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }

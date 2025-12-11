@@ -29,6 +29,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
 
   List<Member> _members = [];
   List<Member> _filteredMembers = [];
+  List<String> _allSchools = []; // All schools from the database for this committee type
   bool _loading = true;
   String? _error;
   String? _selectedSchoolFilter;
@@ -37,18 +38,6 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
 
   bool get _isSchoolCommittee =>
       committee.id == 'College Democrats' || committee.id == 'High School Democrats';
-
-  /// Get unique schools from members for the filter dropdown
-  List<String> get _uniqueSchools {
-    final schools = <String>{};
-    for (final member in _members) {
-      final school = _getSchoolDisplayName(member);
-      if (school != null && school.isNotEmpty) {
-        schools.add(school);
-      }
-    }
-    return schools.toList()..sort();
-  }
 
   @override
   void initState() {
@@ -84,19 +73,53 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
     });
 
     try {
-      final members = await _repository.getMembersForCommittee(committee.name);
+      // Load members and all schools in parallel
+      final results = await Future.wait([
+        _repository.getMembersForCommittee(committee.name),
+        _loadAllSchools(),
+      ]);
+
       if (!mounted) return;
+
+      final members = results[0] as List<Member>;
+      final allSchools = results[1] as List<String>;
+
       setState(() {
         _members = members;
         _filteredMembers = members;
+        _allSchools = allSchools;
         _loading = false;
       });
+
+      // Apply initial filter if provided
+      if (_selectedSchoolFilter != null) {
+        _filterMembers();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = 'Failed to load members: $e';
         _loading = false;
       });
+    }
+  }
+
+  /// Load all schools from the database (not just from committee members)
+  Future<List<String>> _loadAllSchools() async {
+    if (!_isSchoolCommittee) return [];
+
+    try {
+      Map<String, int> distribution;
+      if (committee.id == 'College Democrats') {
+        distribution = await _repository.getCollegeDistribution();
+      } else {
+        distribution = await _repository.getHighSchoolDistribution();
+      }
+      final schools = distribution.keys.toList()..sort();
+      return schools;
+    } catch (e) {
+      print('Error loading schools: $e');
+      return [];
     }
   }
 
@@ -215,7 +238,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
             ),
 
             // School filter dropdown (only for College/HS Democrats)
-            if (_isSchoolCommittee && _uniqueSchools.isNotEmpty)
+            if (_isSchoolCommittee && _allSchools.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
@@ -240,7 +263,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String?>(
-                            value: _selectedSchoolFilter,
+                            value: _allSchools.contains(_selectedSchoolFilter) ? _selectedSchoolFilter : null,
                             isExpanded: true,
                             hint: Text('All ${schoolLabel.toLowerCase()}s'),
                             onChanged: _setSchoolFilter,
@@ -249,7 +272,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
                                 value: null,
                                 child: Text('All ${schoolLabel.toLowerCase()}s'),
                               ),
-                              ..._uniqueSchools.map(
+                              ..._allSchools.map(
                                 (school) => DropdownMenuItem<String?>(
                                   value: school,
                                   child: Text(
@@ -277,7 +300,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
                 ),
               ),
 
-            if (_isSchoolCommittee && _uniqueSchools.isNotEmpty)
+            if (_isSchoolCommittee && _allSchools.isNotEmpty)
               const SizedBox(height: 12),
 
             // Member count
