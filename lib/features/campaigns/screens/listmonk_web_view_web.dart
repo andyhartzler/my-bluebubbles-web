@@ -3,9 +3,15 @@ import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'dart:async';
 
-/// Web-specific iframe widget for Listmonk with automatic postMessage-based login
-/// Uses postMessage API to send credentials to Listmonk which has been configured
-/// to receive and process login credentials automatically.
+import '../../../services/credential_storage_service.dart';
+
+/// Web-specific iframe widget for Listmonk with robust authentication handling
+///
+/// Multi-layer authentication strategy:
+/// 1. Tries HTTP Basic Auth in URL (works in Safari)
+/// 2. Detects browser type and shows credentials proactively for Chrome
+/// 3. Provides always-visible "Show Login Help" button as ultimate fallback
+/// 4. Multiple detection methods with timeouts
 class Iframe extends StatefulWidget {
   final String src;
 
@@ -29,7 +35,12 @@ class _IframeState extends State<Iframe> {
   bool _credentialsSent = false;
   String _statusMessage = 'Loading Listmonk...';
   String? _errorMessage;
-  StreamSubscription<html.MessageEvent>? _messageSubscription;
+  bool _showLoginHelp = false;
+  bool _helpDismissed = false;
+  Timer? _loginCheckTimer;
+  Timer? _fallbackTimer;
+  String _username = 'admin';
+  String _password = 'fucktrump67';
 
   @override
   void initState() {
@@ -40,21 +51,38 @@ class _IframeState extends State<Iframe> {
 
   @override
   void dispose() {
-    _messageSubscription?.cancel();
+    _loginCheckTimer?.cancel();
+    _fallbackTimer?.cancel();
     super.dispose();
   }
 
-  void _setupMessageListener() {
-    _messageSubscription = html.window.onMessage.listen((event) {
-      // Verify origin
-      if (event.origin != _listmonkOrigin) {
-        return;
-      }
+  /// Detect if this is Safari (which supports Basic Auth in iframes)
+  bool get _isSafari {
+    final userAgent = html.window.navigator.userAgent.toLowerCase();
+    return userAgent.contains('safari') && !userAgent.contains('chrome');
+  }
+
+  Future<void> _registerIframe() async {
+    debugPrint('📧 Listmonk: Initializing with multi-layer auth strategy');
+
+    try {
+      // Get credentials from secure storage
+      _username = await CredentialStorageService.getListmonkUsername() ?? 'admin';
+      _password = await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
 
       final data = event.data;
       if (data is! Map) return;
 
-      final messageType = data['type'];
+      // Build URL with Basic Auth embedded
+      final authenticatedUrl = 'https://$_username:$_password@$baseHost$path';
+
+      debugPrint('📧 Listmonk: Browser detection - Safari: $_isSafari');
+
+      // For non-Safari browsers, proactively show help after loading
+      // (Chrome/Firefox/Edge block Basic Auth in iframes)
+      if (!_isSafari) {
+        debugPrint('⚠️ Listmonk: Non-Safari browser detected, will show credentials proactively');
+      }
 
       switch (messageType) {
         case 'MOYD_LOGIN_PAGE_READY':
@@ -62,25 +90,30 @@ class _IframeState extends State<Iframe> {
           _sendCredentials();
           break;
 
-        case 'MOYD_LOGIN_RESULT':
-          final success = data['success'] == true;
-          final reason = data['reason'] as String?;
+      // Register the view factory
+      // ignore: undefined_prefixed_name
+      ui.platformViewRegistry.registerViewFactory(
+        iframeId,
+        (int viewId) {
+          final iframe = html.IFrameElement()
+            ..src = authenticatedUrl
+            ..style.border = 'none'
+            ..style.width = '100%'
+            ..style.height = '100%'
+            ..allow = 'clipboard-read; clipboard-write'
+            ..setAttribute('loading', 'eager')
+            ..setAttribute('referrerpolicy', 'no-referrer');
 
-          if (success) {
-            debugPrint('[MOYD Flutter] Login successful');
+          iframe.onLoad.listen((_) {
             if (mounted) {
               setState(() {
                 _statusMessage = 'Logged in successfully';
                 _isLoading = false;
               });
-            }
-          } else if (reason == 'already_logged_in') {
-            debugPrint('[MOYD Flutter] Already logged in');
-            if (mounted) {
-              setState(() {
-                _statusMessage = 'Already logged in';
-                _isLoading = false;
-              });
+              debugPrint('📧 Listmonk: Iframe loaded');
+
+              // Multi-layer detection strategy
+              _startLoginDetection();
             }
           } else {
             debugPrint('[MOYD Flutter] Login failed: $reason');
@@ -150,7 +183,7 @@ class _IframeState extends State<Iframe> {
         (int viewId) => iframe,
       );
 
-      debugPrint('[MOYD Flutter] Iframe registered with postMessage auth');
+      debugPrint('📧 Listmonk: Iframe registered');
 
       if (mounted) {
         setState(() {
@@ -169,50 +202,47 @@ class _IframeState extends State<Iframe> {
     }
   }
 
-  void _sendCredentials() {
-    if (_iframe?.contentWindow == null) {
-      debugPrint('[MOYD Flutter] No iframe content window available');
-      return;
-    }
-
-    debugPrint('[MOYD Flutter] Sending credentials via postMessage...');
-
-    _iframe!.contentWindow!.postMessage({
-      'type': 'MOYD_LOGIN_CREDENTIALS',
-      'username': _username,
-      'password': _password,
-    }, _listmonkOrigin);
-
-    _credentialsSent = true;
-
-    if (mounted) {
-      setState(() {
-        _statusMessage = 'Authenticating...';
+  void _startLoginDetection() {
+    // Strategy 1: For non-Safari browsers, show credentials immediately
+    // (we know Basic Auth won't work)
+    if (!_isSafari && !_helpDismissed) {
+      _loginCheckTimer = Timer(const Duration(seconds: 1), () {
+        debugPrint('📧 Listmonk: Showing credentials for non-Safari browser');
+        if (mounted && !_helpDismissed) {
+          setState(() {
+            _showLoginHelp = true;
+          });
+        }
       });
     }
 
-    // Set a timeout - if no response, hide loading anyway
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _isLoading) {
+    // Strategy 2: Ultimate fallback - always show after 5 seconds if not dismissed
+    // This ensures help is NEVER silently hidden when user needs it
+    _fallbackTimer = Timer(const Duration(seconds: 5), () {
+      debugPrint('📧 Listmonk: Fallback timer - ensuring credentials are available');
+      if (mounted && !_showLoginHelp && !_helpDismissed) {
+        debugPrint('⚠️ Listmonk: Auto-showing credentials banner (fallback)');
         setState(() {
-          _isLoading = false;
+          _showLoginHelp = true;
         });
       }
     });
   }
 
-  void _refresh() {
+  void _dismissHelp() {
     setState(() {
-      _isLoading = true;
-      _credentialsSent = false;
-      _statusMessage = 'Refreshing...';
+      _showLoginHelp = false;
+      _helpDismissed = true;
     });
-
-    _iframe?.src = '${widget.src}?t=${DateTime.now().millisecondsSinceEpoch}';
+    debugPrint('📧 Listmonk: User dismissed credentials banner');
   }
 
-  void _openInNewTab() {
-    html.window.open(widget.src, '_blank');
+  void _showHelp() {
+    setState(() {
+      _showLoginHelp = true;
+      _helpDismissed = false;
+    });
+    debugPrint('📧 Listmonk: User requested credentials banner');
   }
 
   @override
@@ -269,7 +299,7 @@ class _IframeState extends State<Iframe> {
       );
     }
 
-    // Show iframe with loading overlay
+    // Show iframe with loading overlay, credentials banner, and help button
     return Stack(
       children: [
         // Iframe
@@ -297,22 +327,113 @@ class _IframeState extends State<Iframe> {
             ),
           ),
 
-        // Action buttons in top-right corner (only show when not loading)
-        if (!_isLoading)
+        // Login credentials banner
+        if (_showLoginHelp && !_isLoading)
           Positioned(
-            top: 8,
-            right: 8,
-            child: Row(
-              children: [
-                Material(
-                  color: Colors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(4),
-                  child: IconButton(
-                    icon: const Icon(Icons.refresh, size: 20),
-                    onPressed: _refresh,
-                    tooltip: 'Refresh',
-                    color: Colors.grey[700],
-                  ),
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Material(
+              elevation: 4,
+              color: Colors.blue[50],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.key, color: Colors.blue[700], size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Please use these credentials to login below',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.blue[900],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.blue.shade200),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        'Username:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: SelectableText(
+                                        _username,
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 13,
+                                          color: Colors.blue[900],
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        'Password:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: SelectableText(
+                                        _password,
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 13,
+                                          color: Colors.blue[900],
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: _dismissHelp,
+                      color: Colors.blue[700],
+                      tooltip: 'Dismiss',
+                    ),
+                  ],
                 ),
                 const SizedBox(width: 4),
                 Material(
@@ -326,6 +447,40 @@ class _IframeState extends State<Iframe> {
                   ),
                 ),
               ],
+            ),
+          ),
+
+        // Always-visible "Show Login Help" button when banner is dismissed
+        if (!_showLoginHelp && !_isLoading)
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Material(
+              elevation: 2,
+              borderRadius: BorderRadius.circular(20),
+              color: Colors.blue[700],
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: _showHelp,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.help_outline, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Show Login Credentials',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
       ],
