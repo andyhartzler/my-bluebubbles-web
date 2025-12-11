@@ -474,11 +474,18 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
               }
             }
 
+            final screenWidth = MediaQuery.of(context).size.width;
+            final screenHeight = MediaQuery.of(context).size.height;
+            final isMobile = screenWidth < 600;
+
             return AlertDialog(
-              title: Text('Add Member to ${committee.displayName}'),
+              title: Text(
+                'Add Member to ${committee.displayName}',
+                style: TextStyle(fontSize: isMobile ? 16 : 20),
+              ),
               content: SizedBox(
-                width: 400,
-                height: 400,
+                width: isMobile ? screenWidth * 0.85 : 400,
+                height: isMobile ? screenHeight * 0.5 : 400,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

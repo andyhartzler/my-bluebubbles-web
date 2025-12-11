@@ -527,15 +527,22 @@ class CommitteeRepository {
   }
 
   /// Get distribution of colleges with member counts
-  Future<Map<String, int>> getCollegeDistribution() async {
+  /// If committeeName is provided, only includes members in that committee
+  Future<Map<String, int>> getCollegeDistribution({String? committeeName}) async {
     if (!isReady) return {};
 
     try {
-      // Get all members with a college field
-      final collegeData = await _readClient
+      // Get members with a college field, optionally filtered by committee
+      var query = _readClient
           .from('members')
           .select('college')
           .not('college', 'is', null);
+
+      if (committeeName != null) {
+        query = query.contains('committee', [committeeName]);
+      }
+
+      final collegeData = await query;
 
       final distribution = <String, int>{};
       for (final item in collegeData as List<dynamic>) {
@@ -554,15 +561,22 @@ class CommitteeRepository {
   }
 
   /// Get distribution of high schools with member counts
-  Future<Map<String, int>> getHighSchoolDistribution() async {
+  /// If committeeName is provided, only includes members in that committee
+  Future<Map<String, int>> getHighSchoolDistribution({String? committeeName}) async {
     if (!isReady) return {};
 
     try {
-      // Get all members with a high_school field
-      final hsData = await _readClient
+      // Get members with a high_school field, optionally filtered by committee
+      var query = _readClient
           .from('members')
           .select('high_school')
           .not('high_school', 'is', null);
+
+      if (committeeName != null) {
+        query = query.contains('committee', [committeeName]);
+      }
+
+      final hsData = await query;
 
       final distribution = <String, int>{};
       for (final item in hsData as List<dynamic>) {

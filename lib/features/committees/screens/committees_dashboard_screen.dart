@@ -180,10 +180,12 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
     final sortedCommittees = _sortedCommittees;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 400;
 
     return SelectionArea(
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
         children: [
           // Header
           Row(
@@ -248,6 +250,7 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final isVeryNarrow = constraints.maxWidth < 400;
         final isNarrow = constraints.maxWidth < 600;
 
         final cards = [
@@ -277,6 +280,17 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
           ),
         ];
 
+        // Very narrow: horizontal thin tiles stacked vertically
+        if (isVeryNarrow) {
+          return Column(
+            children: cards.map((card) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildMobileStatTile(card, theme),
+            )).toList(),
+          );
+        }
+
+        // Narrow: 2x2 grid
         if (isNarrow) {
           return Column(
             children: [
@@ -299,6 +313,7 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
           );
         }
 
+        // Wide: 4 columns
         return Row(
           children: cards.map((card) => Expanded(
             child: Padding(
@@ -308,6 +323,54 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
           )).toList(),
         );
       },
+    );
+  }
+
+  Widget _buildMobileStatTile(_StatCard card, ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: card.iconColor.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: card.iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(card.icon, color: card.iconColor, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            card.value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              card.label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -350,11 +413,13 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
 
   Widget _buildCommitteeTile(BuildContext context, Committee committee, CommitteeStats? stats) {
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 400;
 
     return Card(
       elevation: 2,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isMobile ? 12 : 16)),
       child: InkWell(
         onTap: () => _openCommitteeWorkspace(committee),
         child: Container(
@@ -365,47 +430,36 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
               end: Alignment.centerRight,
             ),
           ),
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isMobile ? 14 : 20),
           child: Row(
             children: [
               // Committee icon
               CircleAvatar(
-                radius: 28,
+                radius: isMobile ? 20 : 28,
                 backgroundColor: Colors.white.withOpacity(0.2),
-                child: Icon(committee.icon, color: Colors.white, size: 28),
+                child: Icon(committee.icon, color: Colors.white, size: isMobile ? 20 : 28),
               ),
-              const SizedBox(width: 20),
+              SizedBox(width: isMobile ? 12 : 20),
 
-              // Committee name and description
+              // Committee name
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      committee.displayName,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      committee.description,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withOpacity(0.8),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                child: Text(
+                  committee.displayName,
+                  style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: isMobile ? 8 : 16),
 
               // Member count badge
               if (stats != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 10 : 16,
+                    vertical: isMobile ? 6 : 10,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(999),
@@ -413,32 +467,32 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.people, size: 18, color: Colors.white),
-                      const SizedBox(width: 6),
+                      Icon(Icons.people, size: isMobile ? 14 : 18, color: Colors.white),
+                      SizedBox(width: isMobile ? 4 : 6),
                       Text(
                         '${stats.memberCount}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          fontSize: isMobile ? 13 : 16,
                         ),
                       ),
                     ],
                   ),
                 ),
-              const SizedBox(width: 12),
+              SizedBox(width: isMobile ? 8 : 12),
 
               // Arrow indicator
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.all(isMobile ? 6 : 10),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.arrow_forward,
                   color: Colors.white,
-                  size: 20,
+                  size: isMobile ? 16 : 20,
                 ),
               ),
             ],

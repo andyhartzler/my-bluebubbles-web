@@ -431,19 +431,24 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
                         ),
                       ),
                       const SizedBox(height: 12),
-                      TextField(
-                        controller: _messageController,
-                        maxLines: 6,
-                        maxLength: 500,
-                        decoration: InputDecoration(
-                          hintText: 'Type your message here...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          filled: true,
-                        ),
-                        enabled: !_sending && recipients.isNotEmpty,
-                        onChanged: (_) => setState(() {}),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isMobile = constraints.maxWidth < 500;
+                          return TextField(
+                            controller: _messageController,
+                            maxLines: isMobile ? 3 : 6,
+                            maxLength: 500,
+                            decoration: InputDecoration(
+                              hintText: 'Type your message here...',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              filled: true,
+                            ),
+                            enabled: !_sending && recipients.isNotEmpty,
+                            onChanged: (_) => setState(() {}),
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
 

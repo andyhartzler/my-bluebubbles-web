@@ -441,24 +441,32 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
                         ),
                       const SizedBox(height: 8),
 
-                      // Editor
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        height: 200,
-                        child: quill.QuillEditor(
-                          focusNode: _bodyFocusNode,
-                          scrollController: _bodyScrollController,
-                          configurations: quill.QuillEditorConfigurations(
-                            controller: _bodyController,
-                            padding: const EdgeInsets.all(12),
-                            placeholder: 'Compose your email message...',
-                          ),
-                        ),
+                      // Editor - responsive height
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final screenHeight = MediaQuery.of(context).size.height;
+                          final isMobile = constraints.maxWidth < 500;
+                          final editorHeight = isMobile ? (screenHeight * 0.25).clamp(120.0, 180.0) : 200.0;
+
+                          return Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: Theme.of(context).dividerColor,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            height: editorHeight,
+                            child: quill.QuillEditor(
+                              focusNode: _bodyFocusNode,
+                              scrollController: _bodyScrollController,
+                              configurations: quill.QuillEditorConfigurations(
+                                controller: _bodyController,
+                                padding: const EdgeInsets.all(12),
+                                placeholder: 'Compose your email message...',
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
