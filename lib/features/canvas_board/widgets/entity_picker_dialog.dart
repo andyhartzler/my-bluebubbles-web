@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/event.dart' show Event;
@@ -54,17 +55,18 @@ class EntityPickerDialog<T> extends StatefulWidget {
   static Future<Event?> showEventPicker(
     BuildContext context, {
     required Future<List<Event>> Function(String query) searchFunction,
+    VoidCallback? onCreateNew,
   }) async {
     Event? selectedEvent;
     await showDialog(
       context: context,
-      builder: (context) => EntityPickerDialog<Event>(
-        type: EntityPickerType.event,
+      builder: (context) => _EventPickerDialog(
         searchFunction: searchFunction,
         onEntitySelected: (event) {
           selectedEvent = event;
           Navigator.pop(context);
         },
+        onCreateNew: onCreateNew,
       ),
     );
     return selectedEvent;
@@ -380,6 +382,366 @@ class _EntityPickerDialogState<T> extends State<EntityPickerDialog<T>> {
             )
           : null,
       onTap: () => widget.onEntitySelected(donor as T),
+    );
+  }
+}
+
+/// Specialized dialog for picking events with better display
+class _EventPickerDialog extends StatefulWidget {
+  final Future<List<Event>> Function(String query) searchFunction;
+  final void Function(Event event) onEntitySelected;
+  final VoidCallback? onCreateNew;
+
+  const _EventPickerDialog({
+    required this.searchFunction,
+    required this.onEntitySelected,
+    this.onCreateNew,
+  });
+
+  @override
+  State<_EventPickerDialog> createState() => _EventPickerDialogState();
+}
+
+class _EventPickerDialogState extends State<_EventPickerDialog> {
+  final _searchController = TextEditingController();
+  List<Event> _results = [];
+  bool _isSearching = false;
+  bool _hasSearched = false;
+  bool _showUpcoming = true;
+
+  static const _eventColor = Color(0xFFFF9800);
+
+  @override
+  void initState() {
+    super.initState();
+    // Load initial events (upcoming by default)
+    _loadInitialEvents();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadInitialEvents() async {
+    setState(() => _isSearching = true);
+
+    try {
+      // Load with empty query to get all/recent events
+      final results = await widget.searchFunction('');
+      if (mounted) {
+        setState(() {
+          _results = results;
+          _isSearching = false;
+          _hasSearched = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _results = [];
+          _isSearching = false;
+          _hasSearched = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _performSearch(String query) async {
+    setState(() => _isSearching = true);
+
+    try {
+      final results = await widget.searchFunction(query);
+      if (mounted) {
+        setState(() {
+          _results = results;
+          _isSearching = false;
+          _hasSearched = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _results = [];
+          _isSearching = false;
+          _hasSearched = true;
+        });
+      }
+    }
+  }
+
+  List<Event> get _filteredResults {
+    if (!_showUpcoming) return _results;
+    final now = DateTime.now();
+    return _results.where((e) => e.eventDate.isAfter(now)).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.event, color: _eventColor),
+          const SizedBox(width: 12),
+          const Expanded(child: Text('Select Event')),
+          if (widget.onCreateNew != null)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                widget.onCreateNew!();
+              },
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('New'),
+            ),
+        ],
+      ),
+      content: SizedBox(
+        width: 500,
+        height: 500,
+        child: Column(
+          children: [
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by event title...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+              ),
+              onChanged: _performSearch,
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                FilterChip(
+                  label: const Text('Upcoming only'),
+                  selected: _showUpcoming,
+                  onSelected: (value) => setState(() => _showUpcoming = value),
+                  selectedColor: _eventColor.withOpacity(0.2),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _buildResultsList(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResultsList() {
+    if (_isSearching) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final events = _filteredResults;
+
+    if (!_hasSearched) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.event, size: 48, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              'Loading events...',
+              style: TextStyle(color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (events.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.event_busy, size: 48, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              _showUpcoming ? 'No upcoming events found' : 'No events found',
+              style: TextStyle(color: Colors.grey[500]),
+            ),
+            if (_showUpcoming) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => setState(() => _showUpcoming = false),
+                child: const Text('Show all events'),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: events.length,
+      itemBuilder: (context, index) {
+        final event = events[index];
+        return _buildEventTile(event);
+      },
+    );
+  }
+
+  Widget _buildEventTile(Event event) {
+    final dateFormat = DateFormat.MMMd().add_jm();
+    final now = DateTime.now();
+    final isUpcoming = event.eventDate.isAfter(now);
+    final isPast = event.eventDate.isBefore(now);
+
+    Color statusColor;
+    String statusText;
+    switch (event.status) {
+      case 'published':
+        statusColor = Colors.green;
+        statusText = 'Published';
+        break;
+      case 'cancelled':
+        statusColor = Colors.red;
+        statusText = 'Cancelled';
+        break;
+      default:
+        statusColor = Colors.orange;
+        statusText = 'Draft';
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: InkWell(
+        onTap: () => widget.onEntitySelected(event),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Event image or icon
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: _eventColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  image: event.websiteImages.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(event.websiteImages.first.url),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: event.websiteImages.isEmpty
+                    ? Icon(Icons.event, color: _eventColor, size: 28)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              // Event details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.schedule,
+                          size: 14,
+                          color: isPast ? Colors.grey : _eventColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          dateFormat.format(event.eventDate),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isPast ? Colors.grey : Colors.black87,
+                          ),
+                        ),
+                        if (isPast) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'PAST',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (event.location != null && event.location!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.place, size: 14, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              event.location!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              // Status badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
