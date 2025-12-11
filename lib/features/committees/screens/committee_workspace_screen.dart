@@ -12,6 +12,7 @@ import 'package:bluebubbles/features/committees/screens/tabs/committee_chapters_
 import 'package:bluebubbles/features/committees/screens/tabs/committee_campaigns_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_meetings_tab.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/canvas_board/screens/committee_canvas_tab.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
   final Committee committee;
@@ -67,6 +68,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         label: 'Meetings',
         icon: Icons.video_camera_front_outlined,
         builder: () => CommitteeMeetingsTab(committee: committee),
+      ),
+      _TabDefinition(
+        label: 'Board',
+        icon: Icons.space_dashboard_outlined,
+        builder: () => CommitteeCanvasTab(committee: committee),
       ),
     ];
 
