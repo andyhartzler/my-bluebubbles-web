@@ -54,13 +54,9 @@ class _IframeState extends State<Iframe> {
     return userAgent.contains('safari') && !userAgent.contains('chrome');
   }
 
-  Future<void> _registerIframe() async {
-    debugPrint('📧 Listmonk: Initializing with multi-layer auth strategy');
-
-    try {
-      // Get credentials from secure storage
-      _username = await CredentialStorageService.getListmonkUsername() ?? 'admin';
-      _password = await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
+  void _setupMessageListener() {
+    html.window.onMessage.listen((event) {
+      if (event.origin != _listmonkOrigin) return;
 
       // Create unique iframe ID
       final iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
@@ -73,11 +69,7 @@ class _IframeState extends State<Iframe> {
 
       debugPrint('📧 Listmonk: Browser detection - Safari: $_isSafari');
 
-      // For non-Safari browsers, proactively show help after loading
-      // (Chrome/Firefox/Edge block Basic Auth in iframes)
-      if (!_isSafari) {
-        debugPrint('⚠️ Listmonk: Non-Safari browser detected, will show credentials proactively');
-      }
+      debugPrint('[MOYD Flutter] Received message: $messageType');
 
       final iframe = html.IFrameElement()
         ..src = authenticatedUrl

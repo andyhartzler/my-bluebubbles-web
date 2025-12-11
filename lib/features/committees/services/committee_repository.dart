@@ -423,7 +423,7 @@ class CommitteeRepository {
           .eq('is_active', true)
           .maybeSingle();
 
-      if (data is Map) {
+      if (data is Map<String, dynamic>) {
         return data['slack_channel_id']?.toString();
       }
       return null;
