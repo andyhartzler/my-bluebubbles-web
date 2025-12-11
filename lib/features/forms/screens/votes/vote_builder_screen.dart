@@ -60,14 +60,16 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   String? _restrictToCommittee;
 
   // Available committees for restriction dropdown
+  // Note: These names must match the values stored in the members.committee array
   static const List<String> _availableCommittees = [
     'High School Democrats',
-    'Membership & Outreach Committee',
-    'Communications Committee',
+    'Membership & Outreach',
+    'Communications',
     'College Democrats',
-    'Fundraising Committee',
-    'Policy & Advocacy Committee',
-    'Political Affairs Committee',
+    'Fundraising',
+    'Policy & Advocacy',
+    'Political Affairs',
+    'Executive Committee',
   ];
 
   @override
@@ -1293,6 +1295,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
     final type = question['question_type'] as String?;
     final text = question['text'] as String? ?? '';
     final options = question['options'] as List<dynamic>? ?? [];
+    final isRequired = question['required'] as bool? ?? true;
     final hasOptions = _questionTypeHasOptions(type);
 
     return Card(
@@ -1314,7 +1317,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          _getQuestionTypeLabel(type) + (hasOptions ? ' • ${options.length} options' : ''),
+          _getQuestionTypeLabel(type) + (hasOptions ? ' • ${options.length} options' : '') + (isRequired ? ' • Required' : ' • Optional'),
           style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
         ),
         trailing: IconButton(
@@ -1340,7 +1343,25 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
                     _questions[index]['text'] = value;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
+                // Required toggle
+                SwitchListTile(
+                  title: const Text('Required'),
+                  subtitle: Text(
+                    isRequired ? 'Voters must answer this question' : 'This question is optional',
+                    style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: isRequired,
+                  onChanged: (value) {
+                    setState(() {
+                      _questions[index]['required'] = value;
+                    });
+                  },
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+                const SizedBox(height: 8),
 
                 // Options section (for types that need options)
                 if (hasOptions) ...[

@@ -677,12 +677,33 @@ class VotesService {
       // Check for committee restriction - first in eligibleMembers, then fall back to vote.committee
       final restrictToCommittee = eligibleMembers?['restrict_to_committee'] as String? ?? committee;
       if (restrictToCommittee != null && restrictToCommittee.isNotEmpty) {
-        // For committee-restricted votes, count members of that committee
-        final response = await _readClient
+        // Normalize the committee name - the database stores names without "Committee" suffix
+        // e.g., "Policy & Advocacy Committee" -> "Policy & Advocacy"
+        // But we should also check with the suffix in case some entries have it
+        final normalizedName = restrictToCommittee.endsWith(' Committee')
+            ? restrictToCommittee.substring(0, restrictToCommittee.length - 10)
+            : restrictToCommittee;
+
+        // Try with normalized name first (without "Committee" suffix)
+        var response = await _readClient
             .from('members')
             .select('id')
-            .contains('committee', [restrictToCommittee]);
-        return (response as List).length;
+            .contains('committee', [normalizedName]);
+
+        if ((response as List).isNotEmpty) {
+          return response.length;
+        }
+
+        // If no results, try with the original name (in case some have "Committee" suffix)
+        if (normalizedName != restrictToCommittee) {
+          response = await _readClient
+              .from('members')
+              .select('id')
+              .contains('committee', [restrictToCommittee]);
+          return (response as List).length;
+        }
+
+        return 0;
       }
 
       // Calculate the cutoff date for age 36 (members must be 36 or younger)
