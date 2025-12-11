@@ -24,10 +24,6 @@ class Iframe extends StatefulWidget {
 class _IframeState extends State<Iframe> {
   static const String _listmonkOrigin = 'https://mail.moyd.app';
 
-  // Listmonk credentials
-  static const String _username = 'admin';
-  static const String _password = 'fucktrump67';
-
   String? _iframeId;
   html.IFrameElement? _iframe;
   bool _isLoading = true;
@@ -62,77 +58,80 @@ class _IframeState extends State<Iframe> {
     return userAgent.contains('safari') && !userAgent.contains('chrome');
   }
 
-  Future<void> _registerIframe() async {
-    debugPrint('📧 Listmonk: Initializing with multi-layer auth strategy');
-
-    try {
-      // Get credentials from secure storage
-      _username = await CredentialStorageService.getListmonkUsername() ?? 'admin';
-      _password = await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
+  void _setupMessageListener() {
+    html.window.onMessage.listen((event) {
+      if (event.origin != _listmonkOrigin) return;
 
       final data = event.data;
       if (data is! Map) return;
 
-      // Build URL with Basic Auth embedded
-      final authenticatedUrl = 'https://$_username:$_password@$baseHost$path';
+      final messageType = data['type'] as String?;
+      if (messageType == null) return;
 
-      debugPrint('📧 Listmonk: Browser detection - Safari: $_isSafari');
-
-      // For non-Safari browsers, proactively show help after loading
-      // (Chrome/Firefox/Edge block Basic Auth in iframes)
-      if (!_isSafari) {
-        debugPrint('⚠️ Listmonk: Non-Safari browser detected, will show credentials proactively');
-      }
+      debugPrint('[MOYD Flutter] Received message: $messageType');
 
       switch (messageType) {
         case 'MOYD_LOGIN_PAGE_READY':
           debugPrint('[MOYD Flutter] Login page ready, sending credentials...');
           _sendCredentials();
           break;
-
-      // Register the view factory
-      // ignore: undefined_prefixed_name
-      ui.platformViewRegistry.registerViewFactory(
-        iframeId,
-        (int viewId) {
-          final iframe = html.IFrameElement()
-            ..src = authenticatedUrl
-            ..style.border = 'none'
-            ..style.width = '100%'
-            ..style.height = '100%'
-            ..allow = 'clipboard-read; clipboard-write'
-            ..setAttribute('loading', 'eager')
-            ..setAttribute('referrerpolicy', 'no-referrer');
-
-          iframe.onLoad.listen((_) {
-            if (mounted) {
-              setState(() {
-                _statusMessage = 'Logged in successfully';
-                _isLoading = false;
-              });
-              debugPrint('📧 Listmonk: Iframe loaded');
-
-              // Multi-layer detection strategy
-              _startLoginDetection();
-            }
-          } else {
-            debugPrint('[MOYD Flutter] Login failed: $reason');
-            if (mounted) {
-              setState(() {
-                _statusMessage = 'Login failed - please try manually';
-                _isLoading = false;
-              });
-            }
+        case 'MOYD_LOGIN_SUCCESS':
+          debugPrint('[MOYD Flutter] Login successful!');
+          if (mounted) {
+            setState(() {
+              _statusMessage = 'Logged in successfully';
+              _isLoading = false;
+              _showLoginHelp = false;
+            });
+          }
+          break;
+        case 'MOYD_LOGIN_FAILED':
+          final reason = data['reason'] ?? 'Unknown error';
+          debugPrint('[MOYD Flutter] Login failed: $reason');
+          if (mounted) {
+            setState(() {
+              _statusMessage = 'Login failed - please try manually';
+              _isLoading = false;
+              _showLoginHelp = true;
+            });
           }
           break;
       }
     });
   }
 
+  void _sendCredentials() {
+    if (_credentialsSent || _iframe == null) return;
+
+    try {
+      final message = {
+        'type': 'MOYD_CREDENTIALS',
+        'username': _username,
+        'password': _password,
+      };
+
+      _iframe!.contentWindow?.postMessage(message, _listmonkOrigin);
+      _credentialsSent = true;
+      debugPrint('[MOYD Flutter] Credentials sent via postMessage');
+
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Authenticating...';
+        });
+      }
+    } catch (e) {
+      debugPrint('[MOYD Flutter] Error sending credentials: $e');
+    }
+  }
+
   Future<void> _registerIframe() async {
     debugPrint('[MOYD Flutter] Initializing Listmonk iframe with postMessage auth');
 
     try {
+      // Get credentials from secure storage
+      _username = await CredentialStorageService.getListmonkUsername() ?? 'admin';
+      _password = await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
+
       // Create unique iframe ID
       final iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -151,6 +150,13 @@ class _IframeState extends State<Iframe> {
       iframe.onLoad.listen((_) {
         debugPrint('[MOYD Flutter] Iframe loaded');
 
+        if (mounted) {
+          setState(() {
+            _statusMessage = 'Page loaded';
+            _isLoading = false;
+          });
+        }
+
         // Give the page a moment to initialize its JS
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted && !_credentialsSent) {
@@ -165,6 +171,9 @@ class _IframeState extends State<Iframe> {
             _sendCredentials();
           }
         });
+
+        // Multi-layer detection strategy
+        _startLoginDetection();
       });
 
       iframe.onError.listen((event) {
@@ -243,6 +252,10 @@ class _IframeState extends State<Iframe> {
       _helpDismissed = false;
     });
     debugPrint('📧 Listmonk: User requested credentials banner');
+  }
+
+  void _openInNewTab() {
+    html.window.open(widget.src, '_blank');
   }
 
   @override
@@ -426,7 +439,13 @@ class _IframeState extends State<Iframe> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.open_in_new, size: 20),
+                      onPressed: _openInNewTab,
+                      color: Colors.blue[700],
+                      tooltip: 'Open in new tab',
+                    ),
                     IconButton(
                       icon: const Icon(Icons.close, size: 20),
                       onPressed: _dismissHelp,
@@ -435,18 +454,7 @@ class _IframeState extends State<Iframe> {
                     ),
                   ],
                 ),
-                const SizedBox(width: 4),
-                Material(
-                  color: Colors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(4),
-                  child: IconButton(
-                    icon: const Icon(Icons.open_in_new, size: 20),
-                    onPressed: _openInNewTab,
-                    tooltip: 'Open in new tab',
-                    color: Colors.grey[700],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
 
@@ -464,11 +472,11 @@ class _IframeState extends State<Iframe> {
                 onTap: _showHelp,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.help_outline, color: Colors.white, size: 18),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(
                         'Show Login Credentials',
                         style: TextStyle(
