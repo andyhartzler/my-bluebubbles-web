@@ -56,10 +56,28 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   bool _showSettings = false;
   bool _executiveOnly = false; // Restrict voting to executive committee members
 
+  // Committee restriction - restricts voting to members of a specific committee
+  String? _restrictToCommittee;
+
+  // Available committees for restriction dropdown
+  static const List<String> _availableCommittees = [
+    'High School Democrats',
+    'Membership & Outreach Committee',
+    'Communications Committee',
+    'College Democrats',
+    'Fundraising Committee',
+    'Policy & Advocacy Committee',
+    'Political Affairs Committee',
+  ];
+
   @override
   void initState() {
     super.initState();
     _descriptionController = quill.QuillController.basic();
+    // If coming from a committee page, default to restricting votes to that committee
+    if (widget.committee != null) {
+      _restrictToCommittee = widget.committee;
+    }
     if (widget.voteId != null) {
       _loadVote();
     }
@@ -121,6 +139,15 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
         _requireLogin = vote.requireLogin;
         _oneSubmissionPerUser = vote.oneSubmissionPerUser;
         _executiveOnly = vote.executiveOnly;
+
+        // Load committee restriction from eligible_members
+        final eligibleMembers = vote.eligibleMembers;
+        if (eligibleMembers != null) {
+          _restrictToCommittee = eligibleMembers['restrict_to_committee'] as String?;
+        } else if (widget.committee != null) {
+          // If editing from committee page and no restriction set, default to committee
+          _restrictToCommittee = widget.committee;
+        }
 
         // Load SMS confirmation message from settings
         _confirmationSmsController.text =
@@ -313,13 +340,75 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
                             onChanged: (value) => setState(() => _oneSubmissionPerUser = value),
                             contentPadding: EdgeInsets.zero,
                           ),
-                          SwitchListTile(
-                            title: const Text('Executive Committee Only'),
-                            subtitle: const Text('Only executive committee members can vote'),
-                            value: _executiveOnly,
-                            onChanged: (value) => setState(() => _executiveOnly = value),
-                            contentPadding: EdgeInsets.zero,
-                          ),
+                          // Committee restriction option
+                          // If coming from committee page, show dropdown only (pre-selected)
+                          // If from main forms page, show toggle + dropdown
+                          if (widget.committee != null) ...[
+                            // From committee page - just show dropdown (enabled by default)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String?>(
+                                    decoration: const InputDecoration(
+                                      labelText: 'Restrict Voting To',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.group),
+                                    ),
+                                    value: _restrictToCommittee,
+                                    items: [
+                                      const DropdownMenuItem<String?>(
+                                        value: null,
+                                        child: Text('All Members (No Restriction)'),
+                                      ),
+                                      ..._availableCommittees.map((committee) {
+                                        return DropdownMenuItem<String?>(
+                                          value: committee,
+                                          child: Text('$committee Members'),
+                                        );
+                                      }),
+                                    ],
+                                    onChanged: (value) => setState(() => _restrictToCommittee = value),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else ...[
+                            // From main forms page - show toggle + dropdown
+                            SwitchListTile(
+                              title: const Text('Restrict to Committee Members'),
+                              subtitle: const Text('Only allow specific committee members to vote'),
+                              value: _restrictToCommittee != null,
+                              onChanged: (value) {
+                                setState(() {
+                                  if (value) {
+                                    // Enable with first committee selected
+                                    _restrictToCommittee = _availableCommittees.first;
+                                  } else {
+                                    _restrictToCommittee = null;
+                                  }
+                                });
+                              },
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            if (_restrictToCommittee != null) ...[
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                decoration: const InputDecoration(
+                                  labelText: 'Select Committee',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.group),
+                                ),
+                                value: _restrictToCommittee,
+                                items: _availableCommittees.map((committee) {
+                                  return DropdownMenuItem<String>(
+                                    value: committee,
+                                    child: Text('$committee Members'),
+                                  );
+                                }).toList(),
+                                onChanged: (value) => setState(() => _restrictToCommittee = value),
+                              ),
+                            ],
+                          ],
                           const SizedBox(height: 8),
                           TextField(
                             controller: _maxSubmissionsController,
@@ -1474,6 +1563,12 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           : QuillHtmlConverter.generateHtml(deltaJson, plainText);
 
       if (widget.voteId == null) {
+        // Build eligible_members with committee restriction if set
+        Map<String, dynamic>? eligibleMembers;
+        if (_restrictToCommittee != null) {
+          eligibleMembers = {'restrict_to_committee': _restrictToCommittee};
+        }
+
         await _votesService.createVote(
           title: _titleController.text,
           description: descriptionHtml,
@@ -1485,6 +1580,7 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           requireLogin: _requireLogin,
           oneSubmissionPerUser: _oneSubmissionPerUser,
           executiveOnly: _executiveOnly,
+          eligibleMembers: eligibleMembers,
           maxSubmissions: maxSubmissions,
           slug: slug,
           confirmationEmailTemplate: confirmationEmail,
@@ -1494,6 +1590,15 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           committee: widget.committee,
         );
       } else {
+        // Build eligible_members with committee restriction if set
+        Map<String, dynamic>? eligibleMembersUpdate;
+        bool clearEligibleMembers = false;
+        if (_restrictToCommittee != null) {
+          eligibleMembersUpdate = {'restrict_to_committee': _restrictToCommittee};
+        } else {
+          clearEligibleMembers = true;
+        }
+
         await _votesService.updateVote(
           widget.voteId!,
           title: _titleController.text,
@@ -1506,6 +1611,8 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           requireLogin: _requireLogin,
           oneSubmissionPerUser: _oneSubmissionPerUser,
           executiveOnly: _executiveOnly,
+          eligibleMembers: eligibleMembersUpdate,
+          clearEligibleMembers: clearEligibleMembers,
           maxSubmissions: maxSubmissions,
           slug: slug,
           confirmationEmailTemplate: confirmationEmail,
