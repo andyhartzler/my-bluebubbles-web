@@ -568,6 +568,177 @@ class CommitteeRepository {
     }
   }
 
+  /// Get enriched campaign data with member/subscriber lookups for detailed view
+  Future<Map<String, dynamic>> getEnrichedCampaignData() async {
+    if (!isReady) {
+      return _emptyEnrichedData();
+    }
+
+    try {
+      // Fetch all campaign tracking records
+      final data = await _readClient
+          .from('hanaway_campaign_tracking')
+          .select()
+          .order('created_at', ascending: false);
+
+      final records = (data as List<dynamic>).cast<Map<String, dynamic>>();
+
+      // Collect unique emails for batch lookup
+      final uniqueEmails = <String>{};
+      for (final record in records) {
+        final email = record['user_email']?.toString()?.toLowerCase();
+        if (email != null && email.isNotEmpty) {
+          uniqueEmails.add(email);
+        }
+      }
+
+      // Batch fetch members and subscribers by email
+      final membersByEmail = await _fetchMembersByEmails(uniqueEmails.toList());
+      final subscribersByEmail = await _fetchSubscribersByEmails(uniqueEmails.toList());
+
+      // Process records with enriched data
+      int totalGenerated = records.length;
+      int totalSent = 0;
+      final sendMethodBreakdown = <String, int>{};
+      final participantsByZip = <String, int>{};
+      final participantsByCounty = <String, int>{};
+      final enrichedParticipants = <Map<String, dynamic>>[];
+
+      for (final record in records) {
+        // Count sent
+        if (record['sent_at'] != null) {
+          totalSent++;
+        }
+
+        // Send method breakdown
+        final method = record['send_method']?.toString() ?? 'unknown';
+        sendMethodBreakdown[method] = (sendMethodBreakdown[method] ?? 0) + 1;
+
+        // By zip code
+        final zip = record['user_zip_code']?.toString();
+        if (zip != null && zip.isNotEmpty) {
+          participantsByZip[zip] = (participantsByZip[zip] ?? 0) + 1;
+        }
+
+        // Look up member/subscriber
+        final email = record['user_email']?.toString()?.toLowerCase() ?? '';
+        final member = membersByEmail[email];
+        final subscriber = subscribersByEmail[email];
+
+        // Get county from member/subscriber if not in record
+        String? county = member?.county ?? subscriber?.county;
+        if (county != null && county.isNotEmpty) {
+          // Normalize county name
+          county = county.replaceFirst(RegExp(r'\s*county\$', caseSensitive: false), '').trim();
+          if (county.isNotEmpty) {
+            participantsByCounty[county] = (participantsByCounty[county] ?? 0) + 1;
+          }
+        }
+
+        // Build enriched participant record
+        enrichedParticipants.add({
+          ...record,
+          'linked_member': member?.toJson(),
+          'linked_subscriber': subscriber != null ? _subscriberToJson(subscriber) : null,
+          'profile_photo_url': member?.primaryProfilePhotoUrl,
+          'county': county,
+        });
+      }
+
+      return {
+        'totalGenerated': totalGenerated,
+        'totalSent': totalSent,
+        'uniqueParticipants': uniqueEmails.length,
+        'sendMethodBreakdown': sendMethodBreakdown,
+        'participantsByZip': participantsByZip,
+        'participantsByCounty': participantsByCounty,
+        'participants': enrichedParticipants,
+      };
+    } catch (e) {
+      print('Error getting enriched campaign data: $e');
+      return _emptyEnrichedData();
+    }
+  }
+
+  Map<String, dynamic> _emptyEnrichedData() {
+    return {
+      'totalGenerated': 0,
+      'totalSent': 0,
+      'uniqueParticipants': 0,
+      'sendMethodBreakdown': <String, int>{},
+      'participantsByZip': <String, int>{},
+      'participantsByCounty': <String, int>{},
+      'participants': <Map<String, dynamic>>[],
+    };
+  }
+
+  /// Fetch members by email addresses in batch
+  Future<Map<String, Member>> _fetchMembersByEmails(List<String> emails) async {
+    if (emails.isEmpty) return {};
+
+    try {
+      final data = await _readClient
+          .from('members')
+          .select()
+          .inFilter('email', emails);
+
+      final members = <String, Member>{};
+      for (final item in data as List<dynamic>) {
+        if (item is Map<String, dynamic>) {
+          final member = Member.fromJson(item);
+          final email = member.email?.toLowerCase();
+          if (email != null) {
+            members[email] = member;
+          }
+        }
+      }
+      return members;
+    } catch (e) {
+      print('Error fetching members by email: $e');
+      return {};
+    }
+  }
+
+  /// Fetch subscribers by email addresses in batch
+  Future<Map<String, _SimpleSubscriber>> _fetchSubscribersByEmails(List<String> emails) async {
+    if (emails.isEmpty) return {};
+
+    try {
+      final data = await _readClient
+          .from('subscribers')
+          .select()
+          .inFilter('email', emails);
+
+      final subscribers = <String, _SimpleSubscriber>{};
+      for (final item in data as List<dynamic>) {
+        if (item is Map<String, dynamic>) {
+          final email = (item['email'] as String?)?.toLowerCase();
+          if (email != null) {
+            subscribers[email] = _SimpleSubscriber.fromJson(item);
+          }
+        }
+      }
+      return subscribers;
+    } catch (e) {
+      print('Error fetching subscribers by email: $e');
+      return {};
+    }
+  }
+
+  Map<String, dynamic> _subscriberToJson(_SimpleSubscriber subscriber) {
+    return {
+      'id': subscriber.id,
+      'email': subscriber.email,
+      'name': subscriber.name,
+      'phone': subscriber.phone,
+      'zip_code': subscriber.zipCode,
+      'county': subscriber.county,
+      'state': subscriber.state,
+      'source': subscriber.source,
+      'tags': subscriber.tags,
+    };
+  }
+
   /// Get overall stats for the committees dashboard
   Future<Map<String, int>> getOverallStats() async {
     if (!isReady) {
@@ -647,5 +818,44 @@ class CommitteeRepository {
       }
     }
     return members;
+  }
+}
+
+/// Simple subscriber model for campaign participant lookups
+class _SimpleSubscriber {
+  final String id;
+  final String email;
+  final String name;
+  final String? phone;
+  final String? zipCode;
+  final String? county;
+  final String? state;
+  final String? source;
+  final String? tags;
+
+  const _SimpleSubscriber({
+    required this.id,
+    required this.email,
+    required this.name,
+    this.phone,
+    this.zipCode,
+    this.county,
+    this.state,
+    this.source,
+    this.tags,
+  });
+
+  factory _SimpleSubscriber.fromJson(Map<String, dynamic> json) {
+    return _SimpleSubscriber(
+      id: json['id'] as String,
+      email: json['email'] as String,
+      name: (json['name'] as String?)?.trim() ?? 'N/A',
+      phone: json['phone'] as String?,
+      zipCode: json['zip_code'] as String?,
+      county: json['county'] as String?,
+      state: json['state'] as String?,
+      source: json['source'] as String?,
+      tags: json['tags'] as String?,
+    );
   }
 }

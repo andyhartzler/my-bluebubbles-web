@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/campaign_detail_screen.dart';
+import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/subscriber.dart';
 
 /// Campaigns tab for the Policy & Advocacy committee
-/// Displays advocacy campaign data from hanaway_campaign_tracking
+/// Displays an overview of all advocacy campaigns with drill-down to detailed views
 class CommitteeCampaignsTab extends StatefulWidget {
   const CommitteeCampaignsTab({super.key});
 
@@ -14,7 +17,7 @@ class CommitteeCampaignsTab extends StatefulWidget {
 
 class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
   final CommitteeRepository _repository = CommitteeRepository();
-  Map<String, dynamic>? _campaignData;
+  List<CampaignData> _campaigns = [];
   bool _loading = true;
   String? _error;
 
@@ -31,10 +34,25 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
     });
 
     try {
-      final data = await _repository.getAdvocacyCampaignData();
+      // Load enriched campaign data
+      final data = await _repository.getEnrichedCampaignData();
       if (!mounted) return;
+
+      // Currently we only have one campaign (Hanaway), but this supports multiple
+      final campaigns = <CampaignData>[];
+
+      // Build Hanaway campaign data
+      final hanaway = _buildCampaignData(
+        id: 'hanaway',
+        name: 'Hanaway Campaign',
+        description: 'Email advocacy campaign supporting the Hanaway initiative. '
+            'Participants generate and send personalized emails to their representatives.',
+        data: data,
+      );
+      campaigns.add(hanaway);
+
       setState(() {
-        _campaignData = data;
+        _campaigns = campaigns;
         _loading = false;
       });
     } catch (e) {
@@ -43,6 +61,83 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
         _error = 'Failed to load campaign data: $e';
         _loading = false;
       });
+    }
+  }
+
+  CampaignData _buildCampaignData({
+    required String id,
+    required String name,
+    required String description,
+    required Map<String, dynamic> data,
+  }) {
+    final participantsRaw = data['participants'] as List<Map<String, dynamic>>? ?? [];
+
+    // Build participant models
+    final participants = participantsRaw.map((record) {
+      Member? linkedMember;
+      Subscriber? linkedSubscriber;
+
+      // Parse linked member if present
+      final memberJson = record['linked_member'] as Map<String, dynamic>?;
+      if (memberJson != null) {
+        linkedMember = Member.fromJson(memberJson);
+      }
+
+      // Parse linked subscriber if present
+      final subscriberJson = record['linked_subscriber'] as Map<String, dynamic>?;
+      if (subscriberJson != null) {
+        linkedSubscriber = _parseSubscriber(subscriberJson);
+      }
+
+      return CampaignParticipant(
+        name: record['user_name']?.toString() ?? 'Unknown',
+        email: record['user_email']?.toString() ?? '',
+        zipCode: record['user_zip_code']?.toString(),
+        county: record['county']?.toString(),
+        sentAt: _parseDateTime(record['sent_at']),
+        sendMethod: record['send_method']?.toString(),
+        createdAt: _parseDateTime(record['created_at']) ?? DateTime.now(),
+        profilePhotoUrl: record['profile_photo_url']?.toString(),
+        linkedMember: linkedMember,
+        linkedSubscriber: linkedSubscriber,
+      );
+    }).toList();
+
+    return CampaignData(
+      id: id,
+      name: name,
+      description: description,
+      totalGenerated: data['totalGenerated'] as int? ?? 0,
+      totalSent: data['totalSent'] as int? ?? 0,
+      uniqueParticipants: data['uniqueParticipants'] as int? ?? 0,
+      sendMethodBreakdown: (data['sendMethodBreakdown'] as Map<String, int>?) ?? {},
+      participantsByZip: (data['participantsByZip'] as Map<String, int>?) ?? {},
+      participantsByCounty: (data['participantsByCounty'] as Map<String, int>?) ?? {},
+      participants: participants,
+    );
+  }
+
+  Subscriber _parseSubscriber(Map<String, dynamic> json) {
+    return Subscriber(
+      id: json['id'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      name: json['name'] as String? ?? 'N/A',
+      phone: json['phone'] as String?,
+      zipCode: json['zip_code'] as String?,
+      county: json['county'] as String?,
+      state: json['state'] as String?,
+      source: json['source'] as String?,
+      tags: json['tags'] as String?,
+    );
+  }
+
+  DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    try {
+      return DateTime.parse(value.toString());
+    } catch (_) {
+      return null;
     }
   }
 
@@ -79,140 +174,142 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          _buildOverviewSection(),
+          _buildOverviewHeader(),
           const SizedBox(height: 24),
-          _buildSendMethodSection(),
-          const SizedBox(height: 24),
-          _buildGeographicSection(),
-          const SizedBox(height: 24),
-          _buildParticipantsSection(),
+          _buildCampaignsList(),
         ],
       ),
     );
   }
 
-  Widget _buildOverviewSection() {
+  Widget _buildOverviewHeader() {
     final theme = Theme.of(context);
-    final data = _campaignData!;
-    final totalGenerated = data['totalGenerated'] as int? ?? 0;
-    final totalSent = data['totalSent'] as int? ?? 0;
-    final uniqueParticipants = data['uniqueParticipants'] as int? ?? 0;
-    final sendRate = totalGenerated > 0 ? (totalSent / totalGenerated * 100) : 0.0;
+
+    // Calculate totals across all campaigns
+    int totalGenerated = 0;
+    int totalSent = 0;
+    int totalParticipants = 0;
+    int totalCampaigns = _campaigns.length;
+
+    for (final campaign in _campaigns) {
+      totalGenerated += campaign.totalGenerated;
+      totalSent += campaign.totalSent;
+      totalParticipants += campaign.uniqueParticipants;
+    }
+
+    final overallSendRate = totalGenerated > 0 ? (totalSent / totalGenerated * 100) : 0.0;
 
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.campaign, color: Colors.purple),
-                const SizedBox(width: 8),
-                Text(
-                  'Hanaway Campaign Overview',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Advocacy email campaign results and participation metrics',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [Colors.purple.shade700, Colors.purple.shade900],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.campaign, color: Colors.white, size: 32),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Advocacy Campaigns',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 20),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 400;
-                final cards = [
-                  _buildStatCard(
-                    icon: Icons.edit_note,
-                    label: 'Emails Generated',
-                    value: '$totalGenerated',
-                    color: Colors.blue,
-                  ),
-                  _buildStatCard(
-                    icon: Icons.send,
-                    label: 'Emails Sent',
-                    value: '$totalSent',
-                    color: Colors.green,
-                  ),
-                  _buildStatCard(
-                    icon: Icons.people,
-                    label: 'Participants',
-                    value: '$uniqueParticipants',
-                    color: Colors.purple,
-                  ),
-                  _buildStatCard(
-                    icon: Icons.percent,
-                    label: 'Send Rate',
-                    value: '${sendRate.toStringAsFixed(1)}%',
-                    color: Colors.orange,
-                  ),
-                ];
+              const SizedBox(height: 8),
+              Text(
+                'Overview of all Policy & Advocacy email campaigns',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white70,
+                ),
+              ),
+              const SizedBox(height: 24),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth > 400;
+                  final cards = [
+                    _buildOverviewStat(
+                      icon: Icons.folder_open,
+                      label: 'Campaigns',
+                      value: '$totalCampaigns',
+                    ),
+                    _buildOverviewStat(
+                      icon: Icons.edit_note,
+                      label: 'Generated',
+                      value: '$totalGenerated',
+                    ),
+                    _buildOverviewStat(
+                      icon: Icons.send,
+                      label: 'Sent',
+                      value: '$totalSent',
+                    ),
+                    _buildOverviewStat(
+                      icon: Icons.people,
+                      label: 'Participants',
+                      value: '$totalParticipants',
+                    ),
+                  ];
 
-                if (isWide) {
+                  if (isWide) {
+                    return Row(
+                      children: cards.map((card) => Expanded(child: card)).toList(),
+                    );
+                  }
+
                   return Wrap(
                     spacing: 12,
                     runSpacing: 12,
                     children: cards.map((card) => SizedBox(
-                      width: (constraints.maxWidth - 36) / 4,
+                      width: (constraints.maxWidth - 12) / 2,
                       child: card,
                     )).toList(),
                   );
-                }
-
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: cards.map((card) => SizedBox(
-                    width: (constraints.maxWidth - 12) / 2,
-                    child: card,
-                  )).toList(),
-                );
-              },
-            ),
-          ],
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStatCard({
+  Widget _buildOverviewStat({
     required IconData icon,
     required String label,
     required String value,
-    required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 20),
+          Icon(icon, color: Colors.white70, size: 20),
           const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 20,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: color,
             ),
           ),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 11,
-              color: color.withOpacity(0.8),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
             ),
           ),
         ],
@@ -220,209 +317,21 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
     );
   }
 
-  Widget _buildSendMethodSection() {
+  Widget _buildCampaignsList() {
     final theme = Theme.of(context);
-    final data = _campaignData!;
-    final sendMethodBreakdown = data['sendMethodBreakdown'] as Map<String, int>? ?? {};
-    final totalSent = data['totalSent'] as int? ?? 0;
 
-    if (sendMethodBreakdown.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final methodColors = {
-      'mail_app': Colors.blue,
-      'gmail': Colors.red,
-      'outlook': Colors.indigo,
-      'copy_paste': Colors.orange,
-      'auto_shortcut': Colors.green,
-      'unknown': Colors.grey,
-    };
-
-    final methodLabels = {
-      'mail_app': 'Mail App',
-      'gmail': 'Gmail',
-      'outlook': 'Outlook',
-      'copy_paste': 'Copy & Paste',
-      'auto_shortcut': 'Auto Shortcut',
-      'unknown': 'Unknown',
-    };
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.pie_chart, color: Colors.teal),
-                const SizedBox(width: 8),
-                Text(
-                  'Send Method Analysis',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...sendMethodBreakdown.entries.map((entry) {
-              final method = entry.key;
-              final count = entry.value;
-              final percentage = totalSent > 0 ? (count / totalSent * 100) : 0.0;
-              final color = methodColors[method] ?? Colors.grey;
-              final label = methodLabels[method] ?? method;
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(label, style: theme.textTheme.bodyMedium),
-                        Text(
-                          '$count (${percentage.toStringAsFixed(1)}%)',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: percentage / 100,
-                        backgroundColor: color.withOpacity(0.2),
-                        valueColor: AlwaysStoppedAnimation<Color>(color),
-                        minHeight: 8,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGeographicSection() {
-    final theme = Theme.of(context);
-    final data = _campaignData!;
-    final participantsByZip = data['participantsByZip'] as Map<String, int>? ?? {};
-
-    if (participantsByZip.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    // Sort by count descending
-    final sortedZips = participantsByZip.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.location_on, color: Colors.red),
-                const SizedBox(width: 8),
-                Text(
-                  'Geographic Distribution',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Participation by ZIP code',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: sortedZips.take(15).map((entry) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        entry.key,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${entry.value}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-            if (sortedZips.length > 15)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text(
-                  '... and ${sortedZips.length - 15} more ZIP codes',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildParticipantsSection() {
-    final theme = Theme.of(context);
-    final data = _campaignData!;
-    final participants = data['participants'] as List<Map<String, dynamic>>? ?? [];
-    final dateFormat = DateFormat('MMM d, y h:mm a');
-
-    if (participants.isEmpty) {
+    if (_campaigns.isEmpty) {
       return Card(
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(32),
           child: Column(
             children: [
-              Icon(Icons.people_outline, size: 48, color: theme.disabledColor),
+              Icon(Icons.folder_off, size: 48, color: theme.disabledColor),
               const SizedBox(height: 16),
               Text(
-                'No participants yet',
+                'No campaigns yet',
                 style: theme.textTheme.titleMedium,
               ),
             ],
@@ -431,149 +340,280 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
       );
     }
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Text(
+            'All Campaigns',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        ..._campaigns.map((campaign) => _buildCampaignCard(campaign)),
+      ],
+    );
+  }
+
+  Widget _buildCampaignCard(CampaignData campaign) {
+    final theme = Theme.of(context);
+    final dateFormat = DateFormat('MMM d, y');
+
+    // Get some recent participants for preview
+    final recentParticipants = campaign.participants.take(5).toList();
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.people, color: Colors.purple),
-                const SizedBox(width: 8),
-                Text(
-                  'Recent Participants',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...participants.take(10).map((participant) {
-              final name = participant['user_name']?.toString() ?? 'Unknown';
-              final email = participant['user_email']?.toString() ?? '';
-              final zip = participant['user_zip_code']?.toString() ?? '';
-              final sentAtStr = participant['sent_at']?.toString();
-              final sentAt = sentAtStr != null ? DateTime.tryParse(sentAtStr) : null;
-              final sendMethod = participant['send_method']?.toString() ?? '';
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: () => _openCampaignDetail(campaign),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header row
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.campaign, color: Colors.purple),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: Colors.purple.withOpacity(0.2),
-                          child: Text(
-                            name.isNotEmpty ? name[0].toUpperCase() : '?',
-                            style: const TextStyle(
-                              color: Colors.purple,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        Text(
+                          campaign.name,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              if (email.isNotEmpty)
-                                Text(
-                                  email,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-                                  ),
-                                ),
-                            ],
+                        const SizedBox(height: 4),
+                        Text(
+                          campaign.description,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        if (sentAt != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Icon(Icons.check, size: 16, color: Colors.green),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Icon(Icons.pending, size: 16, color: Colors.orange),
-                          ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        if (zip.isNotEmpty)
-                          _buildSmallChip(Icons.location_on, zip, Colors.red),
-                        if (sendMethod.isNotEmpty)
-                          _buildSmallChip(Icons.send, sendMethod.replaceAll('_', ' '), Colors.blue),
-                        if (sentAt != null)
-                          _buildSmallChip(Icons.schedule, dateFormat.format(sentAt), Colors.grey),
-                      ],
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Stats row
+              Row(
+                children: [
+                  _buildCampaignStat(
+                    icon: Icons.edit_note,
+                    label: 'Generated',
+                    value: '${campaign.totalGenerated}',
+                    color: Colors.blue,
+                  ),
+                  const SizedBox(width: 16),
+                  _buildCampaignStat(
+                    icon: Icons.send,
+                    label: 'Sent',
+                    value: '${campaign.totalSent}',
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 16),
+                  _buildCampaignStat(
+                    icon: Icons.people,
+                    label: 'Participants',
+                    value: '${campaign.uniqueParticipants}',
+                    color: Colors.purple,
+                  ),
+                  const SizedBox(width: 16),
+                  _buildCampaignStat(
+                    icon: Icons.percent,
+                    label: 'Send Rate',
+                    value: '${campaign.sendRate.toStringAsFixed(1)}%',
+                    color: Colors.orange,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Recent participants preview
+              if (recentParticipants.isNotEmpty) ...[
+                const Divider(),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.people_outline, size: 18, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Recent Participants',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
-              );
-            }),
-            if (participants.length > 10)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '... and ${participants.length - 10} more participants',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    // Avatar stack
+                    SizedBox(
+                      width: 120,
+                      height: 40,
+                      child: Stack(
+                        children: recentParticipants.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final participant = entry.value;
+                          return Positioned(
+                            left: index * 24.0,
+                            child: _buildParticipantAvatar(participant),
+                          );
+                        }).toList(),
+                      ),
                     ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        campaign.participants.length > 5
+                            ? '${recentParticipants.first.name} and ${campaign.participants.length - 1} more'
+                            : recentParticipants.map((p) => p.name.split(' ').first).join(', '),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: 16),
+              // View details button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _openCampaignDetail(campaign),
+                  icon: const Icon(Icons.analytics),
+                  label: const Text('View Detailed Analytics'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.purple,
+                    side: const BorderSide(color: Colors.purple),
                   ),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCampaignStat({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: color.withOpacity(0.8),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSmallChip(IconData icon, String label, Color color) {
+  Widget _buildParticipantAvatar(CampaignParticipant participant) {
+    final photoUrl = participant.profilePhotoUrl ??
+        participant.linkedMember?.primaryProfilePhotoUrl;
+
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+        child: CircleAvatar(
+          radius: 18,
+          backgroundImage: NetworkImage(photoUrl),
+          onBackgroundImageError: (_, __) {},
+        ),
+      );
+    }
+
+    // Fallback to initials
+    final initials = participant.name.isNotEmpty
+        ? participant.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+        : '?';
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(fontSize: 10, color: color),
+      child: CircleAvatar(
+        radius: 18,
+        backgroundColor: participant.isMember
+            ? Colors.blue.withOpacity(0.2)
+            : participant.isSubscriber
+                ? Colors.orange.withOpacity(0.2)
+                : Colors.purple.withOpacity(0.2),
+        child: Text(
+          initials,
+          style: TextStyle(
+            color: participant.isMember
+                ? Colors.blue
+                : participant.isSubscriber
+                    ? Colors.orange
+                    : Colors.purple,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  void _openCampaignDetail(CampaignData campaign) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CampaignDetailScreen(campaign: campaign),
       ),
     );
   }
