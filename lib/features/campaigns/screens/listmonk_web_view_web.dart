@@ -3,8 +3,6 @@ import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'dart:async';
 
-import '../../../services/credential_storage_service.dart';
-
 /// Web-specific iframe widget for Listmonk with robust authentication handling
 ///
 /// Multi-layer authentication strategy:
@@ -54,10 +52,8 @@ class _IframeState extends State<Iframe> {
     return userAgent.contains('safari') && !userAgent.contains('chrome');
   }
 
-  void _setupMessageListener() {
-    html.window.onMessage.listen((event) {
-      if (event.origin != _listmonkOrigin) return;
-
+  void _registerIframe() {
+    try {
       // Create unique iframe ID
       final iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -68,8 +64,6 @@ class _IframeState extends State<Iframe> {
       final authenticatedUrl = 'https://$_username:$_password@$baseHost$path';
 
       debugPrint('📧 Listmonk: Browser detection - Safari: $_isSafari');
-
-      debugPrint('[MOYD Flutter] Received message: $messageType');
 
       final iframe = html.IFrameElement()
         ..src = authenticatedUrl
