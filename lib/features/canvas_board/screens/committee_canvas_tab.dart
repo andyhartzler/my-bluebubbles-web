@@ -106,7 +106,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> {
 
     try {
       // Get or create board for this committee
-      final board = await _canvasBoardService.getOrCreateBoard(committee.name);
+      final board = await _canvasBoardService.getOrCreateBoard(committee.id);
 
       // Load nodes and connections
       final nodes = await _canvasBoardService.getNodes(board.id);
