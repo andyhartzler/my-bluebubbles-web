@@ -898,7 +898,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
         break;
       case CanvasTool.circle:
         if ((endPoint - startPoint).distance > 10) {
-          await _addShapeNode(startPoint, endPoint, 'ellipse');
+          await _addShapeNode(startPoint, endPoint, 'circle');
         }
         break;
       case CanvasTool.text:
@@ -935,10 +935,12 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       offsetY: minY,
       width: maxX - minX + _strokeWidth * 2,
       height: maxY - minY + _strokeWidth * 2,
-      nodeType: CanvasNodeType.freehand,
+      nodeType: CanvasNodeType.shape, // Use 'shape' type (DB doesn't allow 'freehand')
+      shapeType: 'line', // Store as line type with path data for freehand
       shapeColor: '#${_selectedColor.value.toRadixString(16).substring(2)}',
       strokeWidth: _strokeWidth,
       pathData: pathPoints,
+      metadata: {'is_freehand': true}, // Mark as freehand in metadata
     ));
   }
 
@@ -963,10 +965,11 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       width: width,
       height: height,
       nodeType: CanvasNodeType.shape,
-      shapeType: isArrow ? 'arrow' : 'line',
+      shapeType: 'line', // Use 'line' for both line and arrow (DB constraint)
       shapeColor: '#${_selectedColor.value.toRadixString(16).substring(2)}',
       strokeWidth: _strokeWidth,
       pathData: '${relStart.dx},${relStart.dy};${relEnd.dx},${relEnd.dy}',
+      metadata: isArrow ? {'has_arrow': true} : null, // Store arrow flag in metadata
     ));
   }
 
