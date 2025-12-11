@@ -30,8 +30,15 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
   List<CommitteeLeader> _leaders = [];
   bool _loadingLeaders = true;
   String? _schoolFilter;
+  bool _isCanvasFullscreen = false;
 
   Committee get committee => widget.committee;
+
+  void _setCanvasFullscreen(bool fullscreen) {
+    setState(() {
+      _isCanvasFullscreen = fullscreen;
+    });
+  }
 
   void _navigateToTab(int index) {
     if (index >= 0 && index < _tabs.length) {
@@ -97,7 +104,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
       _TabDefinition(
         label: 'Board',
         icon: Icons.space_dashboard_outlined,
-        builder: () => CommitteeCanvasTab(committee: committee),
+        builder: () => CommitteeCanvasTab(
+          committee: committee,
+          isFullscreen: _isCanvasFullscreen,
+          onFullscreenChanged: _setCanvasFullscreen,
+        ),
       ),
     ];
 
@@ -162,6 +173,17 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
 
   @override
   Widget build(BuildContext context) {
+    // When canvas is fullscreen, only show the canvas tab
+    if (_isCanvasFullscreen) {
+      return Scaffold(
+        body: CommitteeCanvasTab(
+          committee: committee,
+          isFullscreen: true,
+          onFullscreenChanged: _setCanvasFullscreen,
+        ),
+      );
+    }
+
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {

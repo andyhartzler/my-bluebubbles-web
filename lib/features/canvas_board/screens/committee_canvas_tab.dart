@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
@@ -29,12 +28,20 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/event.dart' show Event;
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
+import 'package:bluebubbles/services/crm/event_repository.dart';
 
 /// The main canvas tab for committee workspaces
 class CommitteeCanvasTab extends StatefulWidget {
   final Committee committee;
+  final bool isFullscreen;
+  final ValueChanged<bool>? onFullscreenChanged;
 
-  const CommitteeCanvasTab({super.key, required this.committee});
+  const CommitteeCanvasTab({
+    super.key,
+    required this.committee,
+    this.isFullscreen = false,
+    this.onFullscreenChanged,
+  });
 
   @override
   State<CommitteeCanvasTab> createState() => _CommitteeCanvasTabState();
@@ -44,6 +51,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
   final _canvasBoardService = CanvasBoardService();
   final _canvasFileService = CanvasFileService();
   final _committeeRepository = CommitteeRepository();
+  final _eventRepository = EventRepository();
   final _uuid = const Uuid();
 
   // Board state
@@ -96,10 +104,14 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
   List<Offset> _currentDrawingPoints = [];
   bool _isDrawing = false;
 
-  // Fullscreen mode
-  bool _isFullscreen = false;
-
   Committee get committee => widget.committee;
+  bool get _isFullscreen => widget.isFullscreen;
+
+  void _toggleFullscreen(bool value) {
+    if (widget.onFullscreenChanged != null) {
+      widget.onFullscreenChanged!(value);
+    }
+  }
 
   @override
   void initState() {
@@ -200,7 +212,19 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
 
   Future<void> _fetchEvent(String eventId) async {
     if (_eventCache.containsKey(eventId)) return;
-    // TODO: Implement event fetching when EventRepository is available
+    try {
+      // Fetch event by ID - we fetch all and filter since there's no getById method
+      final events = await _eventRepository.fetchEvents();
+      final event = events.firstWhere(
+        (e) => e.id == eventId,
+        orElse: () => throw Exception('Event not found'),
+      );
+      if (mounted) {
+        setState(() => _eventCache[eventId] = event);
+      }
+    } catch (e) {
+      // Silently fail - will show error state in node
+    }
   }
 
   Future<void> _fetchChapter(String chapterId) async {
@@ -376,8 +400,25 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
   }
 
   Future<void> _addEventNode() async {
-    // TODO: Implement event picker when event search is available
-    _showError('Event picker not yet implemented');
+    final event = await EntityPickerDialog.showEventPicker(
+      context,
+      searchFunction: (query) => _eventRepository.fetchEvents(searchQuery: query),
+    );
+
+    if (event != null && event.id != null && mounted) {
+      _eventCache[event.id!] = event;
+
+      await _addNode(CanvasNode(
+        id: '',
+        boardId: _board?.id ?? '',
+        offsetX: _getViewportCenter().dx,
+        offsetY: _getViewportCenter().dy,
+        width: 280,
+        height: 120,
+        nodeType: CanvasNodeType.event,
+        entityId: event.id,
+      ));
+    }
   }
 
   Future<void> _addChapterNode() async {
@@ -634,7 +675,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
                         onZoomOut: _zoomOut,
                         onFitView: _fitView,
                         onResetView: _resetView,
-                        onToggleFullscreen: () => setState(() => _isFullscreen = true),
+                        onToggleFullscreen: () => _toggleFullscreen(true),
                         zoomLevel: _zoomLevel,
                         showDonors: committee.hasDonorsTab,
                         showChapters: committee.hasChaptersTab,
@@ -706,7 +747,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
                 borderRadius: BorderRadius.circular(8),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(8),
-                  onTap: () => setState(() => _isFullscreen = false),
+                  onTap: () => _toggleFullscreen(false),
                   child: const Padding(
                     padding: EdgeInsets.all(8),
                     child: Icon(Icons.fullscreen_exit, color: Colors.white, size: 24),
@@ -720,70 +761,42 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
   }
 
   Widget _buildCanvas() {
-    return Listener(
-      // Handle mouse scroll for zoom
-      onPointerSignal: (event) {
-        if (event is PointerScrollEvent) {
-          _handleScroll(event);
-        }
-      },
-      child: GestureDetector(
-        // Handle pinch to zoom
-        onScaleStart: _onScaleStart,
-        onScaleUpdate: _onScaleUpdate,
-        onScaleEnd: _onScaleEnd,
-        onTapDown: _onCanvasTap,
-        onDoubleTap: _onCanvasDoubleTap,
-        child: Container(
-          color: Colors.grey[100],
-          child: ClipRect(
-            child: CustomPaint(
-              painter: _GridPainter(
-                offset: _viewportOffset,
-                zoom: _zoomLevel,
-              ),
-              foregroundPainter: _isDrawing ? _DrawingPainter(
-                tool: _selectedTool,
-                points: _currentDrawingPoints,
-                startPoint: _drawStartPoint,
-                color: _selectedColor,
-                strokeWidth: _strokeWidth,
-                zoom: _zoomLevel,
-                offset: _viewportOffset,
-              ) : null,
-              child: Stack(
-                children: [
-                  // Nodes
-                  ..._nodes.map((node) => _buildPositionedNode(node)),
-                  // Connections (draw on top for visibility)
-                  ..._buildConnections(),
-                ],
-              ),
+    return GestureDetector(
+      // Handle pinch to zoom on trackpad
+      onScaleStart: _onScaleStart,
+      onScaleUpdate: _onScaleUpdate,
+      onScaleEnd: _onScaleEnd,
+      onTapDown: _onCanvasTap,
+      onDoubleTap: _onCanvasDoubleTap,
+      child: Container(
+        color: Colors.grey[100],
+        child: ClipRect(
+          child: CustomPaint(
+            painter: _GridPainter(
+              offset: _viewportOffset,
+              zoom: _zoomLevel,
+            ),
+            foregroundPainter: _isDrawing ? _DrawingPainter(
+              tool: _selectedTool,
+              points: _currentDrawingPoints,
+              startPoint: _drawStartPoint,
+              color: _selectedColor,
+              strokeWidth: _strokeWidth,
+              zoom: _zoomLevel,
+              offset: _viewportOffset,
+            ) : null,
+            child: Stack(
+              children: [
+                // Nodes
+                ..._nodes.map((node) => _buildPositionedNode(node)),
+                // Connections (draw on top for visibility)
+                ..._buildConnections(),
+              ],
             ),
           ),
         ),
       ),
     );
-  }
-
-  void _handleScroll(PointerScrollEvent event) {
-    // Mouse wheel zoom
-    final zoomDelta = event.scrollDelta.dy > 0 ? 0.9 : 1.1;
-    final newZoom = (_zoomLevel * zoomDelta).clamp(0.1, 5.0);
-
-    // Zoom towards mouse position
-    final mousePos = event.localPosition;
-    final beforeZoomX = (mousePos.dx - _viewportOffset.dx) / _zoomLevel;
-    final beforeZoomY = (mousePos.dy - _viewportOffset.dy) / _zoomLevel;
-
-    setState(() {
-      _zoomLevel = newZoom;
-      _viewportOffset = Offset(
-        mousePos.dx - beforeZoomX * _zoomLevel,
-        mousePos.dy - beforeZoomY * _zoomLevel,
-      );
-    });
-    _scheduleSave();
   }
 
   double _baseZoom = 1.0;
@@ -1023,9 +1036,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
 
   void _onCanvasDoubleTap() {
     // Toggle fullscreen on double tap
-    setState(() {
-      _isFullscreen = !_isFullscreen;
-    });
+    _toggleFullscreen(!_isFullscreen);
   }
 
   Widget _buildPositionedNode(CanvasNode node) {
@@ -1290,19 +1301,22 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       return KeyEventResult.handled;
     }
 
-    // Escape - Deselect
+    // Escape - Deselect or exit fullscreen
     if (event.logicalKey == LogicalKeyboardKey.escape) {
-      setState(() {
-        _selectedNodeIds.clear();
-        _selectedNodeId = null;
-        _isFullscreen = false;
-      });
+      if (_isFullscreen) {
+        _toggleFullscreen(false);
+      } else {
+        setState(() {
+          _selectedNodeIds.clear();
+          _selectedNodeId = null;
+        });
+      }
       return KeyEventResult.handled;
     }
 
     // F key - Toggle fullscreen
     if (event.logicalKey == LogicalKeyboardKey.keyF) {
-      setState(() => _isFullscreen = !_isFullscreen);
+      _toggleFullscreen(!_isFullscreen);
       return KeyEventResult.handled;
     }
 

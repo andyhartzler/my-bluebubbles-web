@@ -159,8 +159,16 @@ class CanvasFileService {
 
       if (pickedFile == null) return null;
 
-      final file = File(pickedFile.path);
-      return uploadImage(boardId, file);
+      // Read bytes for web compatibility
+      final bytes = await pickedFile.readAsBytes();
+      final extension = pickedFile.path.split('.').last.toLowerCase();
+
+      return uploadImageFromBytes(
+        boardId,
+        bytes,
+        extension: extension.isNotEmpty ? extension : 'png',
+        originalFileName: pickedFile.name,
+      );
     } catch (e) {
       print('Error picking image from gallery: $e');
       rethrow;
@@ -179,8 +187,16 @@ class CanvasFileService {
 
       if (pickedFile == null) return null;
 
-      final file = File(pickedFile.path);
-      return uploadImage(boardId, file);
+      // Read bytes for web compatibility
+      final bytes = await pickedFile.readAsBytes();
+      final extension = pickedFile.path.split('.').last.toLowerCase();
+
+      return uploadImageFromBytes(
+        boardId,
+        bytes,
+        extension: extension.isNotEmpty ? extension : 'png',
+        originalFileName: pickedFile.name,
+      );
     } catch (e) {
       print('Error picking image from camera: $e');
       rethrow;
@@ -243,23 +259,30 @@ class CanvasFileService {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: [...supportedImageTypes, ...supportedFileTypes],
-        withData: false,
+        withData: true, // Use bytes for web compatibility
         withReadStream: false,
       );
 
       if (result == null || result.files.isEmpty) return null;
 
       final pickedFile = result.files.first;
-      if (pickedFile.path == null) {
-        throw Exception('Could not access file path');
+      final bytes = pickedFile.bytes;
+
+      if (bytes == null) {
+        throw Exception('Could not read file data');
       }
 
-      final file = File(pickedFile.path!);
+      final extension = pickedFile.extension?.toLowerCase() ?? '';
+      final originalFileName = pickedFile.name;
 
       // Check if it's an image or a file
-      final extension = pickedFile.extension?.toLowerCase() ?? '';
       if (supportedImageTypes.contains(extension)) {
-        final imageResult = await uploadImage(boardId, file);
+        final imageResult = await uploadImageFromBytes(
+          boardId,
+          bytes,
+          extension: extension,
+          originalFileName: originalFileName,
+        );
         return FileUploadResult(
           fileUrl: imageResult.imageUrl,
           fileName: imageResult.fileName,
@@ -267,10 +290,46 @@ class CanvasFileService {
           fileSize: imageResult.fileSize,
         );
       } else {
-        return uploadFile(boardId, file);
+        return uploadFileFromBytes(boardId, bytes, extension, originalFileName);
       }
     } catch (e) {
       print('Error picking and uploading file: $e');
+      rethrow;
+    }
+  }
+
+  /// Upload a file from bytes (for web compatibility)
+  Future<FileUploadResult> uploadFileFromBytes(
+    String boardId,
+    Uint8List bytes,
+    String extension,
+    String originalFileName,
+  ) async {
+    if (bytes.length > maxFileSize) {
+      throw Exception('File size exceeds 50MB limit');
+    }
+
+    final fileName = '${_uuid.v4()}.$extension';
+    final storagePath = '$boardId/files/$fileName';
+    final mimeType = _getMimeType(extension);
+
+    try {
+      await _supabase.client.storage
+          .from(_bucketName)
+          .uploadBinary(storagePath, bytes);
+
+      final fileUrl = _supabase.client.storage
+          .from(_bucketName)
+          .getPublicUrl(storagePath);
+
+      return FileUploadResult(
+        fileUrl: fileUrl,
+        fileName: originalFileName,
+        mimeType: mimeType,
+        fileSize: bytes.length,
+      );
+    } catch (e) {
+      print('Error uploading file from bytes: $e');
       rethrow;
     }
   }

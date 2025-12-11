@@ -74,6 +74,16 @@ class CanvasNode {
   });
 
   factory CanvasNode.fromJson(Map<String, dynamic> json) {
+    // Try to get stroke_width and path_data from metadata if not directly available
+    final metadata = json['metadata'] as Map<String, dynamic>?;
+    double? strokeWidth = (json['stroke_width'] as num?)?.toDouble();
+    String? pathData = json['path_data'] as String?;
+
+    if (metadata != null) {
+      strokeWidth ??= (metadata['stroke_width'] as num?)?.toDouble();
+      pathData ??= metadata['path_data'] as String?;
+    }
+
     return CanvasNode(
       id: json['id'] as String,
       boardId: json['board_id'] as String,
@@ -88,8 +98,8 @@ class CanvasNode {
       textContent: json['text_content'] as String?,
       shapeType: json['shape_type'] as String?,
       shapeColor: json['shape_color'] as String?,
-      strokeWidth: (json['stroke_width'] as num?)?.toDouble(),
-      pathData: json['path_data'] as String?,
+      strokeWidth: strokeWidth,
+      pathData: pathData,
       fileUrl: json['file_url'] as String?,
       fileName: json['file_name'] as String?,
       fileType: json['file_type'] as String?,
@@ -99,7 +109,7 @@ class CanvasNode {
       zIndex: json['z_index'] as int? ?? 0,
       isLocked: json['is_locked'] as bool? ?? false,
       label: json['label'] as String?,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      metadata: metadata,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -110,6 +120,15 @@ class CanvasNode {
   }
 
   Map<String, dynamic> toJson() {
+    // Store stroke_width and path_data in metadata since they may not exist as columns
+    final extendedMetadata = Map<String, dynamic>.from(metadata ?? {});
+    if (strokeWidth != null) {
+      extendedMetadata['stroke_width'] = strokeWidth;
+    }
+    if (pathData != null) {
+      extendedMetadata['path_data'] = pathData;
+    }
+
     return {
       'id': id,
       'board_id': boardId,
@@ -124,8 +143,6 @@ class CanvasNode {
       'text_content': textContent,
       'shape_type': shapeType,
       'shape_color': shapeColor,
-      'stroke_width': strokeWidth,
-      'path_data': pathData,
       'file_url': fileUrl,
       'file_name': fileName,
       'file_type': fileType,
@@ -135,7 +152,7 @@ class CanvasNode {
       'z_index': zIndex,
       'is_locked': isLocked,
       'label': label,
-      'metadata': metadata,
+      'metadata': extendedMetadata.isNotEmpty ? extendedMetadata : null,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     };
