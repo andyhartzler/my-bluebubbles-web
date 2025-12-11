@@ -59,6 +59,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
   final _eventRepository = EventRepository();
   final _chapterRepository = ChapterRepository();
   final _uuid = const Uuid();
+  final _canvasKey = GlobalKey();
 
   // Board state
   CanvasBoard? _board;
@@ -810,6 +811,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
 
   Widget _buildCanvas() {
     return GestureDetector(
+      key: _canvasKey,
       // Handle pinch to zoom on trackpad
       onScaleStart: _onScaleStart,
       onScaleUpdate: _onScaleUpdate,
@@ -926,10 +928,21 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
            tool == CanvasTool.text;
   }
 
+  /// Convert global screen coordinates to local canvas widget coordinates
+  Offset _globalToLocal(Offset globalPoint) {
+    final RenderBox? renderBox = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return globalPoint;
+    return renderBox.globalToLocal(globalPoint);
+  }
+
+  /// Convert screen point (global) to canvas coordinates
   Offset _screenToCanvas(Offset screenPoint) {
+    // First convert global coordinates to local (relative to canvas widget)
+    final localPoint = _globalToLocal(screenPoint);
+    // Then apply viewport transformation
     return Offset(
-      (screenPoint.dx - _viewportOffset.dx) / _zoomLevel,
-      (screenPoint.dy - _viewportOffset.dy) / _zoomLevel,
+      (localPoint.dx - _viewportOffset.dx) / _zoomLevel,
+      (localPoint.dy - _viewportOffset.dy) / _zoomLevel,
     );
   }
 
@@ -1294,6 +1307,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
           onTap: () => _selectNode(node),
           onDoubleTap: () => _openNodeDetail(node),
           onDelete: () => _deleteSelectedNodes(),
+          onConfigureFields: () => _configureMemberFields(node),
         );
       case CanvasNodeType.event:
         return EventCanvasNode(
@@ -1615,6 +1629,33 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       _updateNode(node.copyWith(noteContent: _noteTextController.text));
     } else if (node.nodeType == CanvasNodeType.text) {
       _updateNode(node.copyWith(textContent: _noteTextController.text));
+    }
+  }
+
+  Future<void> _configureMemberFields(CanvasNode node) async {
+    // Get current display fields from node metadata
+    final currentFieldNames = node.metadata?['display_fields'] as List<dynamic>?;
+    final currentFields = currentFieldNames != null
+        ? currentFieldNames
+            .map((name) => MemberDisplayField.values.firstWhere(
+                  (f) => f.name == name,
+                  orElse: () => MemberDisplayField.name,
+                ))
+            .toList()
+        : MemberCanvasNode.defaultDisplayFields;
+
+    final selectedFields = await MemberFieldSelectionDialog.show(
+      context,
+      initialFields: currentFields,
+    );
+
+    if (selectedFields != null && mounted) {
+      // Update node with new display fields
+      final updatedMetadata = Map<String, dynamic>.from(node.metadata ?? {});
+      updatedMetadata['display_fields'] = selectedFields.map((f) => f.name).toList();
+
+      final updatedNode = node.copyWith(metadata: updatedMetadata);
+      _updateNode(updatedNode);
     }
   }
 
