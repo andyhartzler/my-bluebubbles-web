@@ -13,16 +13,6 @@ enum CanvasNodeType {
   freehand,
 }
 
-/// Types of shapes that can be drawn
-enum CanvasShapeType {
-  rectangle,
-  circle,
-  triangle,
-  diamond,
-  line,
-  arrow,
-}
-
 /// Represents a node on the canvas board
 class CanvasNode {
   final String id;
@@ -36,8 +26,10 @@ class CanvasNode {
   final String? noteContent;
   final String? noteColor;
   final String? textContent;
-  final CanvasShapeType? shapeType;
+  final String? shapeType; // Can be 'rectangle', 'ellipse', 'line', 'arrow', etc.
   final String? shapeColor;
+  final double? strokeWidth;
+  final String? pathData; // For freehand and line shapes: "x1,y1;x2,y2;..."
   final String? fileUrl;
   final String? fileName;
   final String? fileType;
@@ -65,6 +57,8 @@ class CanvasNode {
     this.textContent,
     this.shapeType,
     this.shapeColor,
+    this.strokeWidth,
+    this.pathData,
     this.fileUrl,
     this.fileName,
     this.fileType,
@@ -92,8 +86,10 @@ class CanvasNode {
       noteContent: json['note_content'] as String?,
       noteColor: json['note_color'] as String?,
       textContent: json['text_content'] as String?,
-      shapeType: _parseShapeType(json['shape_type'] as String?),
+      shapeType: json['shape_type'] as String?,
       shapeColor: json['shape_color'] as String?,
+      strokeWidth: (json['stroke_width'] as num?)?.toDouble(),
+      pathData: json['path_data'] as String?,
       fileUrl: json['file_url'] as String?,
       fileName: json['file_name'] as String?,
       fileType: json['file_type'] as String?,
@@ -126,8 +122,10 @@ class CanvasNode {
       'note_content': noteContent,
       'note_color': noteColor,
       'text_content': textContent,
-      'shape_type': shapeType?.name,
+      'shape_type': shapeType,
       'shape_color': shapeColor,
+      'stroke_width': strokeWidth,
+      'path_data': pathData,
       'file_url': fileUrl,
       'file_name': fileName,
       'file_type': fileType,
@@ -155,8 +153,10 @@ class CanvasNode {
     String? noteContent,
     String? noteColor,
     String? textContent,
-    CanvasShapeType? shapeType,
+    String? shapeType,
     String? shapeColor,
+    double? strokeWidth,
+    String? pathData,
     String? fileUrl,
     String? fileName,
     String? fileType,
@@ -184,6 +184,8 @@ class CanvasNode {
       textContent: textContent ?? this.textContent,
       shapeType: shapeType ?? this.shapeType,
       shapeColor: shapeColor ?? this.shapeColor,
+      strokeWidth: strokeWidth ?? this.strokeWidth,
+      pathData: pathData ?? this.pathData,
       fileUrl: fileUrl ?? this.fileUrl,
       fileName: fileName ?? this.fileName,
       fileType: fileType ?? this.fileType,
@@ -203,14 +205,6 @@ class CanvasNode {
     return CanvasNodeType.values.firstWhere(
       (e) => e.name == type,
       orElse: () => CanvasNodeType.note,
-    );
-  }
-
-  static CanvasShapeType? _parseShapeType(String? type) {
-    if (type == null) return null;
-    return CanvasShapeType.values.firstWhere(
-      (e) => e.name == type,
-      orElse: () => CanvasShapeType.rectangle,
     );
   }
 

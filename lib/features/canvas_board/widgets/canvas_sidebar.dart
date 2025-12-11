@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:bluebubbles/features/canvas_board/models/canvas_node.dart';
-
 /// Sidebar for the canvas board with entity addition and zoom controls
 class CanvasSidebar extends StatelessWidget {
   final VoidCallback onAddMember;
@@ -15,6 +13,7 @@ class CanvasSidebar extends StatelessWidget {
   final VoidCallback onZoomOut;
   final VoidCallback onFitView;
   final VoidCallback onResetView;
+  final VoidCallback? onToggleFullscreen;
   final double zoomLevel;
   final bool showDonors;
   final bool showChapters;
@@ -32,6 +31,7 @@ class CanvasSidebar extends StatelessWidget {
     required this.onZoomOut,
     required this.onFitView,
     required this.onResetView,
+    this.onToggleFullscreen,
     required this.zoomLevel,
     this.showDonors = false,
     this.showChapters = false,
@@ -103,6 +103,20 @@ class CanvasSidebar extends StatelessWidget {
           const Divider(),
           _buildSectionHeader('View'),
           _buildZoomControls(context),
+          if (onToggleFullscreen != null) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: _buildZoomButton(
+                  icon: Icons.fullscreen,
+                  tooltip: 'Fullscreen (F)',
+                  onTap: onToggleFullscreen!,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
         ],
       ),

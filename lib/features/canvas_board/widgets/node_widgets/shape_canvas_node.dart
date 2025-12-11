@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/canvas_board/models/canvas_node.dart';
@@ -44,8 +46,10 @@ class ShapeCanvasNode extends StatelessWidget {
             CustomPaint(
               size: Size(node.width, node.height),
               painter: _ShapePainter(
-                shapeType: node.shapeType ?? CanvasShapeType.rectangle,
+                shapeType: node.shapeType ?? 'rectangle',
                 color: shapeColor,
+                strokeWidth: node.strokeWidth ?? 2.0,
+                pathData: node.pathData,
                 isSelected: isSelected,
                 selectedColor: theme.colorScheme.primary,
               ),
@@ -75,72 +79,87 @@ class ShapeCanvasNode extends StatelessWidget {
 }
 
 class _ShapePainter extends CustomPainter {
-  final CanvasShapeType shapeType;
+  final String shapeType;
   final Color color;
+  final double strokeWidth;
+  final String? pathData;
   final bool isSelected;
   final Color selectedColor;
 
   _ShapePainter({
     required this.shapeType,
     required this.color,
+    required this.strokeWidth,
+    this.pathData,
     required this.isSelected,
     required this.selectedColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
+    final fillPaint = Paint()
+      ..color = color.withOpacity(0.1)
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
-      ..color = isSelected ? selectedColor : color.withOpacity(0.8)
+      ..color = isSelected ? selectedColor : color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isSelected ? 3 : 2;
+      ..strokeWidth = isSelected ? strokeWidth + 1 : strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
 
     switch (shapeType) {
-      case CanvasShapeType.rectangle:
-        _drawRectangle(canvas, size, paint, strokePaint);
+      case 'rectangle':
+        _drawRectangle(canvas, size, fillPaint, strokePaint);
         break;
-      case CanvasShapeType.circle:
-        _drawCircle(canvas, size, paint, strokePaint);
+      case 'ellipse':
+      case 'circle':
+        _drawEllipse(canvas, size, fillPaint, strokePaint);
         break;
-      case CanvasShapeType.triangle:
-        _drawTriangle(canvas, size, paint, strokePaint);
+      case 'triangle':
+        _drawTriangle(canvas, size, fillPaint, strokePaint);
         break;
-      case CanvasShapeType.diamond:
-        _drawDiamond(canvas, size, paint, strokePaint);
+      case 'diamond':
+        _drawDiamond(canvas, size, fillPaint, strokePaint);
         break;
-      case CanvasShapeType.line:
+      case 'line':
         _drawLine(canvas, size, strokePaint);
         break;
-      case CanvasShapeType.arrow:
+      case 'arrow':
         _drawArrow(canvas, size, strokePaint);
         break;
+      default:
+        _drawRectangle(canvas, size, fillPaint, strokePaint);
     }
   }
 
   void _drawRectangle(Canvas canvas, Size size, Paint fill, Paint stroke) {
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(4, 4, size.width - 8, size.height - 8),
-      const Radius.circular(8),
+    final rect = Rect.fromLTWH(
+      strokeWidth,
+      strokeWidth,
+      size.width - strokeWidth * 2,
+      size.height - strokeWidth * 2,
     );
-    canvas.drawRRect(rect, fill);
-    canvas.drawRRect(rect, stroke);
+    canvas.drawRect(rect, fill);
+    canvas.drawRect(rect, stroke);
   }
 
-  void _drawCircle(Canvas canvas, Size size, Paint fill, Paint stroke) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width < size.height ? size.width : size.height) / 2 - 4;
-    canvas.drawCircle(center, radius, fill);
-    canvas.drawCircle(center, radius, stroke);
+  void _drawEllipse(Canvas canvas, Size size, Paint fill, Paint stroke) {
+    final rect = Rect.fromLTWH(
+      strokeWidth,
+      strokeWidth,
+      size.width - strokeWidth * 2,
+      size.height - strokeWidth * 2,
+    );
+    canvas.drawOval(rect, fill);
+    canvas.drawOval(rect, stroke);
   }
 
   void _drawTriangle(Canvas canvas, Size size, Paint fill, Paint stroke) {
     final path = Path()
-      ..moveTo(size.width / 2, 8)
-      ..lineTo(size.width - 8, size.height - 8)
-      ..lineTo(8, size.height - 8)
+      ..moveTo(size.width / 2, strokeWidth)
+      ..lineTo(size.width - strokeWidth, size.height - strokeWidth)
+      ..lineTo(strokeWidth, size.height - strokeWidth)
       ..close();
     canvas.drawPath(path, fill);
     canvas.drawPath(path, stroke);
@@ -148,36 +167,71 @@ class _ShapePainter extends CustomPainter {
 
   void _drawDiamond(Canvas canvas, Size size, Paint fill, Paint stroke) {
     final path = Path()
-      ..moveTo(size.width / 2, 8)
-      ..lineTo(size.width - 8, size.height / 2)
-      ..lineTo(size.width / 2, size.height - 8)
-      ..lineTo(8, size.height / 2)
+      ..moveTo(size.width / 2, strokeWidth)
+      ..lineTo(size.width - strokeWidth, size.height / 2)
+      ..lineTo(size.width / 2, size.height - strokeWidth)
+      ..lineTo(strokeWidth, size.height / 2)
       ..close();
     canvas.drawPath(path, fill);
     canvas.drawPath(path, stroke);
   }
 
   void _drawLine(Canvas canvas, Size size, Paint stroke) {
+    // Parse path data for line endpoints
+    if (pathData != null) {
+      final points = _parsePathData(pathData!);
+      if (points.length >= 2) {
+        canvas.drawLine(points[0], points[1], stroke);
+        return;
+      }
+    }
+    // Default diagonal line
     canvas.drawLine(
-      const Offset(4, 4),
-      Offset(size.width - 4, size.height - 4),
+      Offset(strokeWidth, strokeWidth),
+      Offset(size.width - strokeWidth, size.height - strokeWidth),
       stroke,
     );
   }
 
   void _drawArrow(Canvas canvas, Size size, Paint stroke) {
-    final endPoint = Offset(size.width - 8, size.height / 2);
-    final startPoint = Offset(8, size.height / 2);
+    Offset startPoint;
+    Offset endPoint;
+
+    // Parse path data for arrow endpoints
+    if (pathData != null) {
+      final points = _parsePathData(pathData!);
+      if (points.length >= 2) {
+        startPoint = points[0];
+        endPoint = points[1];
+      } else {
+        startPoint = Offset(strokeWidth, size.height / 2);
+        endPoint = Offset(size.width - strokeWidth, size.height / 2);
+      }
+    } else {
+      startPoint = Offset(strokeWidth, size.height / 2);
+      endPoint = Offset(size.width - strokeWidth, size.height / 2);
+    }
 
     // Draw line
     canvas.drawLine(startPoint, endPoint, stroke);
 
     // Draw arrowhead
     const arrowSize = 12.0;
+    final angle = (endPoint - startPoint).direction;
+
+    final point1 = Offset(
+      endPoint.dx - arrowSize * math.cos(angle - math.pi / 6),
+      endPoint.dy - arrowSize * math.sin(angle - math.pi / 6),
+    );
+    final point2 = Offset(
+      endPoint.dx - arrowSize * math.cos(angle + math.pi / 6),
+      endPoint.dy - arrowSize * math.sin(angle + math.pi / 6),
+    );
+
     final arrowPath = Path()
       ..moveTo(endPoint.dx, endPoint.dy)
-      ..lineTo(endPoint.dx - arrowSize, endPoint.dy - arrowSize / 2)
-      ..lineTo(endPoint.dx - arrowSize, endPoint.dy + arrowSize / 2)
+      ..lineTo(point1.dx, point1.dy)
+      ..lineTo(point2.dx, point2.dy)
       ..close();
 
     final arrowPaint = Paint()
@@ -186,10 +240,30 @@ class _ShapePainter extends CustomPainter {
     canvas.drawPath(arrowPath, arrowPaint);
   }
 
+  List<Offset> _parsePathData(String data) {
+    final points = <Offset>[];
+    final segments = data.split(';');
+    for (final segment in segments) {
+      final coords = segment.split(',');
+      if (coords.length >= 2) {
+        try {
+          final x = double.parse(coords[0].trim());
+          final y = double.parse(coords[1].trim());
+          points.add(Offset(x, y));
+        } catch (_) {
+          // Skip invalid coordinates
+        }
+      }
+    }
+    return points;
+  }
+
   @override
   bool shouldRepaint(covariant _ShapePainter oldDelegate) {
     return oldDelegate.shapeType != shapeType ||
         oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.pathData != pathData ||
         oldDelegate.isSelected != isSelected;
   }
 }
