@@ -1,8 +1,13 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 
 class CommitteeSlackTab extends StatefulWidget {
   final Committee committee;
@@ -15,9 +20,11 @@ class CommitteeSlackTab extends StatefulWidget {
 
 class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
   final CommitteeRepository _repository = CommitteeRepository();
+  final MemberRepository _memberRepository = MemberRepository();
   final DateFormat _timestampFormat = DateFormat('MMM d, y • h:mm a');
 
   List<Map<String, dynamic>> _messages = [];
+  Map<String, Map<String, String>> _slackUserMappings = {};
   String? _channelId;
   bool _loading = true;
   bool _loadingMore = false;
@@ -25,6 +32,9 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
   int _offset = 0;
   static const int _pageSize = 50;
   bool _hasMore = true;
+
+  // Regex to match Slack user mentions like <@U0A2FQDCGMP>
+  static final RegExp _mentionRegex = RegExp(r'<@([A-Z0-9]+)>');
 
   Committee get committee => widget.committee;
 
@@ -43,18 +53,27 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
     });
 
     try {
-      final channelId = await _repository.getSlackChannelId(committee.name);
-      final messages = await _repository.getSlackMessages(
-        committee.name,
-        limit: _pageSize,
-        offset: 0,
-      );
+      // Load channel ID, messages, and user mappings in parallel
+      final results = await Future.wait([
+        _repository.getSlackChannelId(committee.name),
+        _repository.getSlackMessages(
+          committee.name,
+          limit: _pageSize,
+          offset: 0,
+        ),
+        _repository.getSlackUserMappings(),
+      ]);
+
+      final channelId = results[0] as String?;
+      final messages = results[1] as List<Map<String, dynamic>>;
+      final userMappings = results[2] as Map<String, Map<String, String>>;
 
       if (!mounted) return;
 
       setState(() {
         _channelId = channelId;
         _messages = messages;
+        _slackUserMappings = userMappings;
         _offset = messages.length;
         _hasMore = messages.length >= _pageSize;
         _loading = false;
@@ -311,14 +330,137 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
             ),
             const SizedBox(height: 12),
 
-            // Message text
+            // Message text with parsed mentions
+            _buildMessageText(messageText, theme),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build message text with clickable user mentions
+  Widget _buildMessageText(String messageText, ThemeData theme) {
+    if (messageText.isEmpty) {
+      return Text(
+        '[No text content]',
+        style: theme.textTheme.bodyMedium,
+      );
+    }
+
+    // Parse mentions and build rich text
+    final spans = <InlineSpan>[];
+    int lastMatchEnd = 0;
+
+    for (final match in _mentionRegex.allMatches(messageText)) {
+      // Add text before this match
+      if (match.start > lastMatchEnd) {
+        spans.add(TextSpan(
+          text: messageText.substring(lastMatchEnd, match.start),
+          style: theme.textTheme.bodyMedium,
+        ));
+      }
+
+      // Get the Slack user ID from the match
+      final slackUserId = match.group(1);
+      final userInfo = slackUserId != null ? _slackUserMappings[slackUserId] : null;
+      final displayName = userInfo?['real_name']?.isNotEmpty == true
+          ? userInfo!['real_name']!
+          : (userInfo?['display_name']?.isNotEmpty == true
+              ? userInfo!['display_name']!
+              : '@$slackUserId');
+      final memberId = userInfo?['member_id'];
+
+      // Add clickable mention span
+      spans.add(WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: _buildMentionChip(displayName, memberId, userInfo?['avatar_url']),
+      ));
+
+      lastMatchEnd = match.end;
+    }
+
+    // Add any remaining text after the last match
+    if (lastMatchEnd < messageText.length) {
+      spans.add(TextSpan(
+        text: messageText.substring(lastMatchEnd),
+        style: theme.textTheme.bodyMedium,
+      ));
+    }
+
+    // If no mentions found, just return plain text
+    if (spans.isEmpty) {
+      return Text(
+        messageText,
+        style: theme.textTheme.bodyMedium,
+      );
+    }
+
+    return RichText(
+      text: TextSpan(children: spans),
+    );
+  }
+
+  /// Build a clickable chip for a user mention
+  Widget _buildMentionChip(String displayName, String? memberId, String? avatarUrl) {
+    final hasValidMemberId = memberId != null && memberId.isNotEmpty;
+
+    return GestureDetector(
+      onTap: hasValidMemberId ? () => _navigateToMemberProfile(memberId) : null,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: committee.primaryColor.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (avatarUrl != null && avatarUrl.isNotEmpty) ...[
+              CircleAvatar(
+                radius: 8,
+                backgroundImage: NetworkImage(avatarUrl),
+              ),
+              const SizedBox(width: 4),
+            ],
             Text(
-              messageText.isNotEmpty ? messageText : '[No text content]',
-              style: theme.textTheme.bodyMedium,
+              '@$displayName',
+              style: TextStyle(
+                color: committee.primaryColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                decoration: hasValidMemberId ? TextDecoration.underline : null,
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Navigate to member profile screen
+  Future<void> _navigateToMemberProfile(String memberId) async {
+    try {
+      final member = await _memberRepository.getMemberById(memberId);
+      if (member != null && mounted) {
+        Navigator.of(context).push(
+          ThemeSwitcher.buildPageRoute(
+            builder: (context) => TitleBarWrapper(
+              child: MemberDetailScreen(member: member),
+            ),
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Member not found')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading member: $e')),
+        );
+      }
+    }
   }
 }

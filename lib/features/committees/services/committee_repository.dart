@@ -59,15 +59,17 @@ class CommitteeRepository {
   }
 
   /// Get committee leadership (executive committee members for this committee)
+  /// Looks at executive_committee = TRUE and executive_role column for committee name
   Future<List<CommitteeLeader>> getCommitteeLeadership(String committeeName) async {
     if (!isReady) return [];
 
     try {
+      // Use ilike to handle variations like "Communications" matching "Communications Committee"
       final data = await _readClient
           .from('members')
-          .select('id, name, executive_title, profile_pictures, email, phone')
+          .select('id, name, executive_title, executive_role, profile_pictures, email, phone')
           .eq('executive_committee', true)
-          .contains('committee', [committeeName]);
+          .ilike('executive_role', '%$committeeName%');
 
       final leaders = <CommitteeLeader>[];
       for (final item in data as List<dynamic>) {
@@ -409,14 +411,16 @@ class CommitteeRepository {
   }
 
   /// Get Slack channel ID for a committee
+  /// Uses ilike to handle variations like "Communications" matching "Communications Committee"
   Future<String?> getSlackChannelId(String committeeName) async {
     if (!isReady) return null;
 
     try {
+      // Use ilike to handle name variations in the mapping table
       final data = await _readClient
           .from('slack_channel_committee_mapping')
           .select('slack_channel_id')
-          .eq('committee_name', committeeName)
+          .ilike('committee_name', '%$committeeName%')
           .eq('is_active', true)
           .maybeSingle();
 
@@ -427,6 +431,36 @@ class CommitteeRepository {
     } catch (e) {
       print('Error getting Slack channel ID: $e');
       return null;
+    }
+  }
+
+  /// Get Slack user mapping for parsing mentions
+  Future<Map<String, Map<String, String>>> getSlackUserMappings() async {
+    if (!isReady) return {};
+
+    try {
+      final data = await _readClient
+          .from('slack_user_mapping')
+          .select('slack_user_id, real_name, display_name, avatar_url, member_id');
+
+      final mappings = <String, Map<String, String>>{};
+      for (final item in data as List<dynamic>) {
+        if (item is Map) {
+          final slackUserId = item['slack_user_id']?.toString();
+          if (slackUserId != null) {
+            mappings[slackUserId] = {
+              'real_name': item['real_name']?.toString() ?? '',
+              'display_name': item['display_name']?.toString() ?? '',
+              'avatar_url': item['avatar_url']?.toString() ?? '',
+              'member_id': item['member_id']?.toString() ?? '',
+            };
+          }
+        }
+      }
+      return mappings;
+    } catch (e) {
+      print('Error getting Slack user mappings: $e');
+      return {};
     }
   }
 
