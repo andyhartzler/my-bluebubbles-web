@@ -364,6 +364,9 @@ class MeetingRepository {
     required String meetingId,
     required String memberId,
     String? zoomDisplayName,
+    DateTime? firstJoinTime,
+    DateTime? lastLeaveTime,
+    int? totalDurationMinutes,
   }) async {
     if (!_isReady) return null;
 
@@ -375,6 +378,15 @@ class MeetingRepository {
 
     if (zoomDisplayName != null && zoomDisplayName.trim().isNotEmpty) {
       payload['zoom_display_name'] = zoomDisplayName.trim();
+    }
+    if (firstJoinTime != null) {
+      payload['first_join_time'] = firstJoinTime.toUtc().toIso8601String();
+    }
+    if (lastLeaveTime != null) {
+      payload['last_leave_time'] = lastLeaveTime.toUtc().toIso8601String();
+    }
+    if (totalDurationMinutes != null) {
+      payload['total_duration_minutes'] = totalDurationMinutes;
     }
 
     try {
@@ -409,6 +421,28 @@ class MeetingRepository {
           .eq('id', attendanceId);
     } catch (e) {
       print('❌ Error deleting meeting attendance: $e');
+      rethrow;
+    }
+  }
+
+  /// Update the committee assignment for a meeting
+  Future<Meeting?> updateMeetingCommittee(String meetingId, String? committee) async {
+    if (!_isReady) return null;
+
+    try {
+      final response = await _supabase.privilegedClient
+          .from('meetings')
+          .update({'committee': committee})
+          .eq('id', meetingId)
+          .select()
+          .maybeSingle();
+
+      if (response == null) return null;
+      final json = _coerceJsonMap(response);
+      if (json == null) return null;
+      return Meeting.fromJson(json, includeAttendance: false);
+    } catch (e) {
+      print('❌ Error updating meeting committee: $e');
       rethrow;
     }
   }
