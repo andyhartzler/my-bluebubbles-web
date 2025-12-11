@@ -67,6 +67,18 @@ class Meeting {
   final Member? host;
   final List<MeetingAttendance> attendance;
   final List<NonMemberAttendee> nonMemberAttendees;
+  final String? committee;
+
+  /// Available committee options for assignment
+  static const List<String> committeeOptions = [
+    'College Democrats',
+    'High School Democrats',
+    'Membership & Outreach Committee',
+    'Communications Committee',
+    'Fundraising Committee',
+    'Policy & Advocacy Committee',
+    'Political Affairs Committee',
+  ];
 
   const Meeting({
     required this.id,
@@ -93,6 +105,7 @@ class Meeting {
     this.host,
     this.attendance = const [],
     this.nonMemberAttendees = const [],
+    this.committee,
   });
 
   Meeting copyWith({
@@ -120,6 +133,7 @@ class Meeting {
     Member? host,
     List<MeetingAttendance>? attendance,
     List<NonMemberAttendee>? nonMemberAttendees,
+    String? committee,
   }) {
     return Meeting(
       id: id ?? this.id,
@@ -146,6 +160,7 @@ class Meeting {
       host: host ?? this.host,
       attendance: attendance ?? this.attendance,
       nonMemberAttendees: nonMemberAttendees ?? this.nonMemberAttendees,
+      committee: committee ?? this.committee,
     );
   }
 
@@ -172,6 +187,7 @@ class Meeting {
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'meeting_host': meetingHostId,
+      'committee': committee,
       if (host != null) 'host': host!.toJson(),
       if (includeAttendance)
         'attendance': attendance.map((record) => record.toJson(includeMeeting: false)).toList(),
@@ -213,6 +229,7 @@ class Meeting {
       host: host,
       attendance: const [],
       nonMemberAttendees: const [],
+      committee: json['committee'] as String?,
     );
 
     if (!includeAttendance) {

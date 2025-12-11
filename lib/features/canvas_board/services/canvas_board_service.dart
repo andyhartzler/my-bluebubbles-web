@@ -14,21 +14,33 @@ class CanvasBoardService {
   final _supabase = CRMSupabaseService();
   final _uuid = const Uuid();
 
+  // UUID v5 namespace for generating deterministic committee UUIDs
+  static const _committeeNamespace = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
   // Table names
   static const _boardsTable = 'canvas_boards';
   static const _nodesTable = 'canvas_nodes';
   static const _connectionsTable = 'canvas_connections';
 
+  /// Generate a deterministic UUID from committee name/id
+  /// This ensures the same committee always gets the same UUID
+  String _committeeNameToUuid(String committeeName) {
+    return _uuid.v5(_committeeNamespace, committeeName);
+  }
+
   // ============ Board Operations ============
 
   /// Get or create a canvas board for a committee
   Future<CanvasBoard> getOrCreateBoard(String committeeId) async {
+    // Convert committee string ID to a deterministic UUID
+    final committeeUuid = _committeeNameToUuid(committeeId);
+
     try {
       // First, try to get existing board
       final response = await _supabase.client
           .from(_boardsTable)
           .select()
-          .eq('committee_id', committeeId)
+          .eq('committee_id', committeeUuid)
           .maybeSingle();
 
       if (response != null) {
@@ -39,7 +51,7 @@ class CanvasBoardService {
       final now = DateTime.now().toUtc();
       final newBoard = {
         'id': _uuid.v4(),
-        'committee_id': committeeId,
+        'committee_id': committeeUuid,
         'name': 'Committee Board',
         'viewport_x': 0.0,
         'viewport_y': 0.0,

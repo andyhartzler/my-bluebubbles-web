@@ -453,19 +453,17 @@ class CommitteeRepository {
           .count(CountOption.exact);
       stats['charteredCollegeChapters'] = charteredResponse.count ?? 0;
 
-      // Unique colleges represented (Missouri only)
+      // Unique colleges represented (from members table)
       final collegeData = await _readClient
           .from('members')
-          .select('college, state')
+          .select('college')
           .not('college', 'is', null);
 
       final uniqueColleges = <String>{};
       for (final item in collegeData as List<dynamic>) {
         if (item is Map) {
           final college = item['college']?.toString().trim();
-          final state = item['state']?.toString().trim().toLowerCase();
-          final isMissouri = state == 'missouri' || state == 'mo';
-          if (college != null && college.isNotEmpty && isMissouri) {
+          if (college != null && college.isNotEmpty) {
             uniqueColleges.add(college);
           }
         }
@@ -502,19 +500,17 @@ class CommitteeRepository {
           .count(CountOption.exact);
       stats['charteredHSChapters'] = charteredResponse.count ?? 0;
 
-      // Unique high schools represented (Missouri only)
+      // Unique high schools represented (from members table)
       final hsData = await _readClient
           .from('members')
-          .select('high_school, state')
+          .select('high_school')
           .not('high_school', 'is', null);
 
       final uniqueHS = <String>{};
       for (final item in hsData as List<dynamic>) {
         if (item is Map) {
           final hs = item['high_school']?.toString().trim();
-          final state = item['state']?.toString().trim().toLowerCase();
-          final isMissouri = state == 'missouri' || state == 'mo';
-          if (hs != null && hs.isNotEmpty && isMissouri) {
+          if (hs != null && hs.isNotEmpty) {
             uniqueHS.add(hs);
           }
         }
@@ -530,25 +526,22 @@ class CommitteeRepository {
     return stats;
   }
 
-  /// Get distribution of colleges with member counts (Missouri only)
+  /// Get distribution of colleges with member counts
   Future<Map<String, int>> getCollegeDistribution() async {
     if (!isReady) return {};
 
     try {
-      // Get all members with a college field, filtering by Missouri state
+      // Get all members with a college field
       final collegeData = await _readClient
           .from('members')
-          .select('college, state')
+          .select('college')
           .not('college', 'is', null);
 
       final distribution = <String, int>{};
       for (final item in collegeData as List<dynamic>) {
         if (item is Map) {
           final college = item['college']?.toString().trim();
-          final state = item['state']?.toString().trim().toLowerCase();
-          // Only include if the state is Missouri (or MO)
-          final isMissouri = state == 'missouri' || state == 'mo';
-          if (college != null && college.isNotEmpty && isMissouri) {
+          if (college != null && college.isNotEmpty) {
             distribution[college] = (distribution[college] ?? 0) + 1;
           }
         }
@@ -560,25 +553,22 @@ class CommitteeRepository {
     }
   }
 
-  /// Get distribution of high schools with member counts (Missouri only)
+  /// Get distribution of high schools with member counts
   Future<Map<String, int>> getHighSchoolDistribution() async {
     if (!isReady) return {};
 
     try {
-      // Get all members with a high_school field, filtering by Missouri state
+      // Get all members with a high_school field
       final hsData = await _readClient
           .from('members')
-          .select('high_school, state')
+          .select('high_school')
           .not('high_school', 'is', null);
 
       final distribution = <String, int>{};
       for (final item in hsData as List<dynamic>) {
         if (item is Map) {
           final hs = item['high_school']?.toString().trim();
-          final state = item['state']?.toString().trim().toLowerCase();
-          // Only include if the state is Missouri (or MO)
-          final isMissouri = state == 'missouri' || state == 'mo';
-          if (hs != null && hs.isNotEmpty && isMissouri) {
+          if (hs != null && hs.isNotEmpty) {
             distribution[hs] = (distribution[hs] ?? 0) + 1;
           }
         }

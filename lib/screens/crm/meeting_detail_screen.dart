@@ -96,10 +96,21 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
     if (member == null) return;
 
     try {
+      // Calculate meeting duration and times
+      final meetingStart = meeting.meetingDate;
+      final durationMinutes = meeting.durationMinutes;
+      DateTime? meetingEnd;
+      if (meetingStart != null && durationMinutes != null) {
+        meetingEnd = meetingStart.add(Duration(minutes: durationMinutes));
+      }
+
       final created = await _meetingRepository.upsertAttendance(
         meetingId: meeting.id,
         memberId: member.id,
         zoomDisplayName: member.name,
+        firstJoinTime: meetingStart,
+        lastLeaveTime: meetingEnd,
+        totalDurationMinutes: durationMinutes,
       );
 
       if (!mounted || created == null) return;
@@ -357,6 +368,72 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
     }
   }
 
+  Future<void> _assignCommittee(Meeting meeting) async {
+    final selected = await showDialog<String?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Assign Committee'),
+        content: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('No Committee'),
+                leading: Radio<String?>(
+                  value: null,
+                  groupValue: meeting.committee,
+                  onChanged: (value) => Navigator.pop(context, ''),
+                ),
+                onTap: () => Navigator.pop(context, ''),
+              ),
+              ...Meeting.committeeOptions.map((option) => ListTile(
+                title: Text(option),
+                leading: Radio<String?>(
+                  value: option,
+                  groupValue: meeting.committee,
+                  onChanged: (value) => Navigator.pop(context, value),
+                ),
+                onTap: () => Navigator.pop(context, option),
+              )),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (selected == null) return; // User cancelled
+
+    try {
+      final newCommittee = selected.isEmpty ? null : selected;
+      final updated = await _meetingRepository.updateMeetingCommittee(meeting.id, newCommittee);
+      if (!mounted || updated == null) return;
+
+      setState(() {
+        _meeting = _meeting.copyWith(committee: newCommittee);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(newCommittee == null
+              ? 'Committee assignment removed'
+              : 'Meeting assigned to $newCommittee'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update committee: $e')),
+      );
+    }
+  }
+
   Widget _buildSummaryHeader(Meeting meeting, {required bool isMobile}) {
     final theme = Theme.of(context);
     final hostName = meeting.host?.name ?? 'Host TBD';
@@ -370,6 +447,8 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
       _buildSummaryChip(Icons.person_outline, 'Host: $hostName'),
       _buildSummaryChip(Icons.groups_outlined, '$totalGuests attendees'),
       _buildSummaryChip(Icons.auto_awesome, 'Status: $statusLabel'),
+      // Committee assignment chip
+      _buildCommitteeChip(meeting),
     ];
 
     return Container(
@@ -422,6 +501,40 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
             children: chips,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCommitteeChip(Meeting meeting) {
+    final hasCommittee = meeting.committee != null && meeting.committee!.isNotEmpty;
+    return InkWell(
+      onTap: _isCrmReady ? () => _assignCommittee(meeting) : null,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: hasCommittee ? _momentumBlue.withOpacity(0.3) : Colors.white.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(999),
+          border: hasCommittee ? Border.all(color: _momentumBlue, width: 1) : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.group_work_outlined, size: 18, color: Colors.white),
+            const SizedBox(width: 8),
+            Text(
+              hasCommittee ? meeting.committee! : 'Assign Committee',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (_isCrmReady) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_drop_down, size: 18, color: Colors.white70),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -828,9 +941,15 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
     subtitleParts.add(attendance.durationSummary);
     final joinWindow = attendance.joinWindow;
     if (joinWindow != null) subtitleParts.add(joinWindow);
-    if (attendance.zoomEmail != null && attendance.zoomEmail!.isNotEmpty) {
+    // Don't show "NO_EMAIL" or empty emails
+    if (attendance.zoomEmail != null &&
+        attendance.zoomEmail!.isNotEmpty &&
+        attendance.zoomEmail!.toUpperCase() != 'NO_EMAIL') {
       subtitleParts.add(attendance.zoomEmail!);
     }
+
+    // Get profile photo URL from member if available
+    final profilePhotoUrl = attendance.member?.primaryProfilePhotoUrl;
 
     return Card(
       color: highlight ? theme.colorScheme.primary.withOpacity(0.12) : null,
@@ -839,9 +958,12 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
         leading: CircleAvatar(
           backgroundColor: highlight ? theme.colorScheme.primary : theme.colorScheme.primary.withOpacity(0.2),
           foregroundColor: highlight ? theme.colorScheme.onPrimary : theme.colorScheme.primary,
-          child: Text(attendance.participantName.isNotEmpty
-              ? attendance.participantName.substring(0, 1).toUpperCase()
-              : '?'),
+          backgroundImage: profilePhotoUrl != null ? NetworkImage(profilePhotoUrl) : null,
+          child: profilePhotoUrl == null
+              ? Text(attendance.participantName.isNotEmpty
+                  ? attendance.participantName.substring(0, 1).toUpperCase()
+                  : '?')
+              : null,
         ),
         title: Text(attendance.participantName),
         subtitle: Text(subtitleParts.join(' • ')),
