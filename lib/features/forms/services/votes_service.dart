@@ -569,7 +569,11 @@ class VotesService {
   Future<VoteResultsSummary> getVoteResultsSummary(String voteId) async {
     final vote = await getVote(voteId);
     final voters = await getVoters(voteId);
-    final eligibleCount = await getEligibleVotersCount(voteId, vote.eligibleMembers);
+    final eligibleCount = await getEligibleVotersCount(
+      voteId,
+      vote.eligibleMembers,
+      committee: vote.committee,
+    );
 
     // Calculate results per question
     final questionResults = <QuestionResultData>[];
@@ -656,6 +660,7 @@ class VotesService {
     String voteId,
     Map<String, dynamic>? eligibleMembers, {
     bool? executiveOnly,
+    String? committee,
   }) async {
     try {
       // If executiveOnly is not provided, fetch the vote to check
@@ -669,8 +674,8 @@ class VotesService {
         }
       }
 
-      // Check for committee restriction in eligibleMembers
-      final restrictToCommittee = eligibleMembers?['restrict_to_committee'] as String?;
+      // Check for committee restriction - first in eligibleMembers, then fall back to vote.committee
+      final restrictToCommittee = eligibleMembers?['restrict_to_committee'] as String? ?? committee;
       if (restrictToCommittee != null && restrictToCommittee.isNotEmpty) {
         // For committee-restricted votes, count members of that committee
         final response = await _readClient
