@@ -102,6 +102,8 @@ class _VotesListScreenState extends State<VotesListScreen>
                       return VoteCard(
                         vote: vote,
                         onTap: () => _viewVote(vote),
+                        onEdit: () => _editVote(vote),
+                        onDelete: () => _confirmDeleteVote(vote),
                       );
                     },
                   ),
@@ -146,6 +148,58 @@ class _VotesListScreenState extends State<VotesListScreen>
       context,
       MaterialPageRoute(
         builder: (_) => VoteDetailScreen(voteId: vote.id),
+      ),
+    );
+  }
+
+  void _editVote(VotingForm vote) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VoteBuilderScreen(voteId: vote.id),
+      ),
+    );
+  }
+
+  void _confirmDeleteVote(VotingForm vote) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Vote'),
+        content: Text('Are you sure you want to delete "${vote.title}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _votesService.deleteVote(vote.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Vote deleted'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete vote: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }

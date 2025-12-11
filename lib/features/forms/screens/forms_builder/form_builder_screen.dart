@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/form_schema.dart';
 import '../../models/form_field_config.dart';
 import '../../models/form_field_types.dart';
+import '../../models/identity_config.dart';
 import '../../services/forms_service.dart';
 import '../../widgets/field_config_dialog.dart';
 
@@ -152,9 +153,17 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 DropdownMenuItem(value: 'survey', child: Text('Survey')),
                 DropdownMenuItem(value: 'registration', child: Text('Registration')),
                 DropdownMenuItem(value: 'feedback', child: Text('Feedback')),
+                DropdownMenuItem(value: 'vote', child: Text('Vote')),
               ],
               onChanged: (value) {
-                setState(() => _formType = value!);
+                setState(() {
+                  _formType = value!;
+                  // Auto-enable require_login for vote forms
+                  if (value == 'vote') {
+                    _requireLogin = true;
+                    _oneSubmissionPerUser = true;
+                  }
+                });
               },
             ),
             const SizedBox(height: 16),
@@ -252,16 +261,28 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                           const SizedBox(height: 8),
                           SwitchListTile(
                             title: const Text('Require Login'),
-                            subtitle: const Text('Users must be logged in to submit'),
+                            subtitle: Text(
+                              _formType == 'vote'
+                                  ? 'Required for vote forms (locked)'
+                                  : 'Users must be logged in to submit',
+                            ),
                             value: _requireLogin,
-                            onChanged: (value) => setState(() => _requireLogin = value),
+                            onChanged: _formType == 'vote'
+                                ? null // Locked for vote forms
+                                : (value) => setState(() => _requireLogin = value),
                             contentPadding: EdgeInsets.zero,
                           ),
                           SwitchListTile(
                             title: const Text('One Submission Per User'),
-                            subtitle: const Text('Each user can only submit once'),
+                            subtitle: Text(
+                              _formType == 'vote'
+                                  ? 'Required for vote forms (locked)'
+                                  : 'Each user can only submit once',
+                            ),
                             value: _oneSubmissionPerUser,
-                            onChanged: (value) => setState(() => _oneSubmissionPerUser = value),
+                            onChanged: _formType == 'vote'
+                                ? null // Locked for vote forms
+                                : (value) => setState(() => _oneSubmissionPerUser = value),
                             contentPadding: EdgeInsets.zero,
                           ),
                           const SizedBox(height: 8),
@@ -328,6 +349,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+
+            // Identity Fields Notice - conditional based on require_login
+            _buildIdentityFieldsSection(isMobile: isMobile),
+
             const SizedBox(height: 24),
 
             // Add Field Button - responsive layout
@@ -442,6 +468,124 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Builds the identity fields section - shows different content based on require_login
+  Widget _buildIdentityFieldsSection({bool isMobile = false}) {
+    if (_requireLogin) {
+      // Member portal form - identity auto-captured from profile
+      return _buildMemberIdentityNotice(isMobile: isMobile);
+    } else {
+      // Public form - identity fields required
+      return _buildIdentityFieldsNotice(isMobile: isMobile);
+    }
+  }
+
+  /// Notice shown when require_login = true (member portal forms)
+  Widget _buildMemberIdentityNotice({bool isMobile = false}) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.verified_user, color: Colors.green.shade700, size: isMobile ? 18 : 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Member Identity Auto-Captured',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade900,
+                    fontSize: isMobile ? 14 : 16,
+                  ),
+                ),
+                SizedBox(height: isMobile ? 4 : 6),
+                Text(
+                  'Since login is required, submitter identity will be automatically captured from their member profile. No need to add identity fields.',
+                  style: TextStyle(
+                    color: Colors.green.shade700,
+                    fontSize: isMobile ? 12 : 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdentityFieldsNotice({bool isMobile = false}) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lock_outline, color: Colors.blue.shade700, size: isMobile ? 18 : 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Identity Fields (Always Included)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade900,
+                    fontSize: isMobile ? 14 : 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: isMobile ? 6 : 8),
+          Text(
+            'Every form automatically includes Phone → Name → Email → Zip Code at the start. '
+            'These fields enable person lookup and analytics tracking.',
+            style: TextStyle(
+              color: Colors.blue.shade700,
+              fontSize: isMobile ? 12 : 14,
+            ),
+          ),
+          SizedBox(height: isMobile ? 10 : 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildIdentityFieldChip('Phone Number', Icons.phone, isMobile: isMobile),
+              _buildIdentityFieldChip('Full Name', Icons.person, isMobile: isMobile),
+              _buildIdentityFieldChip('Email', Icons.email, isMobile: isMobile),
+              _buildIdentityFieldChip('Zip Code', Icons.location_on, isMobile: isMobile),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdentityFieldChip(String label, IconData icon, {bool isMobile = false}) {
+    return Chip(
+      avatar: Icon(icon, size: isMobile ? 14 : 16, color: Colors.blue.shade700),
+      label: Text(
+        label,
+        style: TextStyle(fontSize: isMobile ? 11 : 12),
+      ),
+      backgroundColor: Colors.white,
+      padding: isMobile ? EdgeInsets.zero : null,
+      visualDensity: isMobile ? VisualDensity.compact : null,
     );
   }
 

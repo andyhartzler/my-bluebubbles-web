@@ -68,11 +68,12 @@ class CupertinoConversationListState extends OptimizedState<CupertinoConversatio
           ScrollbarWrapper(
             showScrollbar: true,
             controller: controller.iosScrollController,
-            child: Obx(() => CustomScrollView(
-                  controller: controller.iosScrollController,
-                  physics: ts.scrollPhysics,
-                  slivers: <Widget>[
-                    if (!showArchived && !showUnknown) CupertinoHeader(controller: controller),
+            child: Obx(() => SelectionArea(
+                  child: CustomScrollView(
+                    controller: controller.iosScrollController,
+                    physics: ts.scrollPhysics,
+                    slivers: <Widget>[
+                      if (!showArchived && !showUnknown) CupertinoHeader(controller: controller),
                     Obx(() {
                       ns.listener.value;
                       final _chats = chats.chats.archivedHelper(showArchived).unknownSendersHelper(showUnknown).bigPinHelper(true);
@@ -261,6 +262,7 @@ class CupertinoConversationListState extends OptimizedState<CupertinoConversatio
                       );
                     }),
                   ],
+                  ),
                 )),
           ),
           if (!showArchived && !showUnknown) CupertinoMiniHeader(controller: controller),

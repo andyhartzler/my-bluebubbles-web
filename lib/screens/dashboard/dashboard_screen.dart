@@ -320,20 +320,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ? EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.1, vertical: 32)
               : const EdgeInsets.fromLTRB(24, 24, 24, 32);
 
-          return ListView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            padding: padding,
-            children: [
-              _buildHeader(context, theme, data),
-              const SizedBox(height: 24),
-              _buildStatsGrid(context, data),
-              const SizedBox(height: 32),
-              _buildInteractiveChart(context, data),
-              const SizedBox(height: 32),
-              _buildBreakdownRow(context, data),
-              const SizedBox(height: 32),
-              _buildRecentMembers(context, data.recentMembers),
-            ],
+          return SelectionArea(
+            child: ListView(
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              padding: padding,
+              children: [
+                _buildHeader(context, theme, data),
+                const SizedBox(height: 24),
+                _buildStatsGrid(context, data),
+                const SizedBox(height: 32),
+                _buildInteractiveChart(context, data),
+                const SizedBox(height: 32),
+                _buildBreakdownRow(context, data),
+                const SizedBox(height: 32),
+                _buildRecentMembers(context, data.recentMembers),
+              ],
+            ),
           );
         },
       ),

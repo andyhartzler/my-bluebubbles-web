@@ -353,7 +353,7 @@ class _MessageHolderState extends CustomState<MessageHolder, void, MessageWidget
                                     context: context,
                                   ) : const BoxDecoration(),
                                   child: Obx(() => GestureDetector(
-                                    behavior: HitTestBehavior.translucent,
+                                    behavior: HitTestBehavior.deferToChild,
                                     onTap: widget.cvController.inSelectMode.value ? () {
                                       if (widget.cvController.isSelected(message.guid!)) {
                                         widget.cvController.selected.remove(message);

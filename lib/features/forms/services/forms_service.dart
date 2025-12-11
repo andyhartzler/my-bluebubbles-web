@@ -2,17 +2,29 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/form_schema.dart';
 import '../models/form_submission.dart';
 import 'form_confirmation_service.dart';
+import '../../../services/crm/supabase_service.dart';
 
 class FormsService {
   final _supabase = Supabase.instance.client;
+  final _crmService = CRMSupabaseService();
+
+  /// Get privileged client for bypassing RLS when reading submissions
+  SupabaseClient get _readClient =>
+      _crmService.isInitialized && _crmService.hasServiceRole
+          ? _crmService.privilegedClient
+          : _supabase;
 
   Stream<List<FormSchema>> watchForms(String typeFilter) {
     if (typeFilter == 'all') {
+      // When showing 'all' forms, exclude votes since they have their own management screen
       return _supabase
           .from('form_schemas')
           .stream(primaryKey: ['id'])
           .order('created_at', ascending: false)
-          .map((data) => data.map((json) => FormSchema.fromJson(json)).toList());
+          .map((data) => data
+              .where((json) => json['form_type'] != 'vote')
+              .map((json) => FormSchema.fromJson(json))
+              .toList());
     } else {
       return _supabase
           .from('form_schemas')
@@ -182,16 +194,104 @@ class FormsService {
         .eq('id', id);
   }
 
-  Future<List<FormSubmission>> getSubmissions(String formId) async {
-    final response = await _supabase
-        .from('form_submissions')
-        .select('*, members(*)')
-        .eq('form_id', formId)
-        .order('created_at', ascending: false);
+  /// Get a single submission by ID
+  Future<FormSubmission?> getSubmission(String submissionId) async {
+    try {
+      final response = await _readClient
+          .from('form_submissions')
+          .select()
+          .eq('id', submissionId)
+          .maybeSingle();
 
-    return (response as List)
-        .map((json) => FormSubmission.fromJson(json))
-        .toList();
+      if (response == null) return null;
+      return FormSubmission.fromJson(response);
+    } catch (e) {
+      print('FormsService.getSubmission: Error fetching submission: $e');
+      return null;
+    }
+  }
+
+  Future<List<FormSubmission>> getSubmissions(String formId) async {
+    try {
+      // Use privileged client to bypass RLS for reading submissions
+      // Join with members table to get member details for display
+      final response = await _readClient
+          .from('form_submissions')
+          .select('''
+            *,
+            members:member_id (
+              id,
+              name,
+              email,
+              phone,
+              phone_e164,
+              profile_pictures
+            ),
+            subscribers:subscriber_id (
+              id,
+              name,
+              email,
+              phone,
+              phone_e164
+            )
+          ''')
+          .eq('form_id', formId)
+          .order('created_at', ascending: false);
+
+      final data = response as List;
+      print('FormsService.getSubmissions: Found ${data.length} submissions for form $formId (using ${_crmService.hasServiceRole ? "service role" : "anon"} client)');
+
+      return data.map((json) {
+        try {
+          return FormSubmission.fromJson(json as Map<String, dynamic>);
+        } catch (e) {
+          print('FormsService.getSubmissions: Error parsing submission: $e');
+          print('FormsService.getSubmissions: Raw JSON: $json');
+          rethrow;
+        }
+      }).toList();
+    } catch (e) {
+      print('FormsService.getSubmissions: Error fetching submissions: $e');
+      rethrow;
+    }
+  }
+
+  /// Get all submissions by a specific subscriber
+  Future<List<FormSubmission>> getSubmissionsBySubscriberId(String subscriberId) async {
+    try {
+      final response = await _readClient
+          .from('form_submissions')
+          .select()
+          .eq('subscriber_id', subscriberId)
+          .order('created_at', ascending: false);
+
+      final data = response as List;
+      return data.map((json) {
+        return FormSubmission.fromJson(json as Map<String, dynamic>);
+      }).toList();
+    } catch (e) {
+      print('FormsService.getSubmissionsBySubscriberId: Error fetching submissions: $e');
+      return [];
+    }
+  }
+
+  /// Get all submissions by a specific member
+  Future<List<FormSubmission>> getSubmissionsByMemberId(String memberId) async {
+    try {
+      final response = await _readClient
+          .from('form_submissions')
+          .select()
+          .eq('member_id', memberId)
+          .order('created_at', ascending: false);
+
+      final data = response as List;
+      return data.map((json) {
+        return FormSubmission.fromJson(json as Map<String, dynamic>);
+      }).toList();
+    } catch (e) {
+      print('FormsService.getSubmissionsByMemberId: Error fetching submissions: $e');
+      return [];
+    }
   }
 
   Future<String> createSubmission({

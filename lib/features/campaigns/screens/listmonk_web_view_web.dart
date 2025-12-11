@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:html' as html;
-import 'dart:ui' as ui;
+import 'dart:ui_web' as ui_web;
 import 'dart:async';
 
 import '../../../services/credential_storage_service.dart';
@@ -22,9 +22,18 @@ class Iframe extends StatefulWidget {
 }
 
 class _IframeState extends State<Iframe> {
+  static const String _listmonkOrigin = 'https://mail.moyd.app';
+
+  // Listmonk credentials
+  static const String _username = 'admin';
+  static const String _password = 'fucktrump67';
+
   String? _iframeId;
+  html.IFrameElement? _iframe;
   bool _isLoading = true;
   bool _isRegistered = false;
+  bool _credentialsSent = false;
+  String _statusMessage = 'Loading Listmonk...';
   String? _errorMessage;
   bool _showLoginHelp = false;
   bool _helpDismissed = false;
@@ -36,6 +45,7 @@ class _IframeState extends State<Iframe> {
   @override
   void initState() {
     super.initState();
+    _setupMessageListener();
     _registerIframe();
   }
 
@@ -60,10 +70,8 @@ class _IframeState extends State<Iframe> {
       _username = await CredentialStorageService.getListmonkUsername() ?? 'admin';
       _password = await CredentialStorageService.getListmonkPassword() ?? 'fucktrump67';
 
-      // Extract the base host from the source URL
-      final uri = Uri.parse(widget.src);
-      final baseHost = uri.host;
-      final path = uri.path;
+      final data = event.data;
+      if (data is! Map) return;
 
       // Build URL with Basic Auth embedded
       final authenticatedUrl = 'https://$_username:$_password@$baseHost$path';
@@ -76,8 +84,11 @@ class _IframeState extends State<Iframe> {
         debugPrint('⚠️ Listmonk: Non-Safari browser detected, will show credentials proactively');
       }
 
-      // Create unique iframe ID
-      final iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
+      switch (messageType) {
+        case 'MOYD_LOGIN_PAGE_READY':
+          debugPrint('[MOYD Flutter] Login page ready, sending credentials...');
+          _sendCredentials();
+          break;
 
       // Register the view factory
       // ignore: undefined_prefixed_name
@@ -96,6 +107,7 @@ class _IframeState extends State<Iframe> {
           iframe.onLoad.listen((_) {
             if (mounted) {
               setState(() {
+                _statusMessage = 'Logged in successfully';
                 _isLoading = false;
               });
               debugPrint('📧 Listmonk: Iframe loaded');
@@ -103,20 +115,72 @@ class _IframeState extends State<Iframe> {
               // Multi-layer detection strategy
               _startLoginDetection();
             }
-          });
-
-          iframe.onError.listen((event) {
+          } else {
+            debugPrint('[MOYD Flutter] Login failed: $reason');
             if (mounted) {
-              debugPrint('❌ Listmonk: Load error: $event');
               setState(() {
+                _statusMessage = 'Login failed - please try manually';
                 _isLoading = false;
-                _errorMessage = 'Failed to load Email Campaigns';
               });
             }
-          });
+          }
+          break;
+      }
+    });
+  }
 
-          return iframe;
-        },
+  Future<void> _registerIframe() async {
+    debugPrint('[MOYD Flutter] Initializing Listmonk iframe with postMessage auth');
+
+    try {
+      // Create unique iframe ID
+      final iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
+
+      final iframe = html.IFrameElement()
+        ..src = widget.src
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..allow = 'clipboard-read; clipboard-write'
+        ..setAttribute('allowfullscreen', 'true')
+        ..setAttribute('loading', 'eager');
+
+      _iframe = iframe;
+
+      // Handle iframe load event
+      iframe.onLoad.listen((_) {
+        debugPrint('[MOYD Flutter] Iframe loaded');
+
+        // Give the page a moment to initialize its JS
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && !_credentialsSent) {
+            _sendCredentials();
+          }
+        });
+
+        // Also try after a longer delay in case page is slow
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted && _isLoading && !_credentialsSent) {
+            debugPrint('[MOYD Flutter] Retry sending credentials...');
+            _sendCredentials();
+          }
+        });
+      });
+
+      iframe.onError.listen((event) {
+        if (mounted) {
+          debugPrint('[MOYD Flutter] Load error: $event');
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Failed to load Email Campaigns';
+          });
+        }
+      });
+
+      // Register the view factory
+      ui_web.platformViewRegistry.registerViewFactory(
+        iframeId,
+        (int viewId) => iframe,
       );
 
       debugPrint('📧 Listmonk: Iframe registered');
@@ -128,7 +192,7 @@ class _IframeState extends State<Iframe> {
         });
       }
     } catch (e) {
-      debugPrint('❌ Listmonk: Error registering iframe: $e');
+      debugPrint('[MOYD Flutter] Error registering iframe: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -199,6 +263,20 @@ class _IframeState extends State<Iframe> {
               _errorMessage!,
               style: const TextStyle(fontSize: 16),
             ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _errorMessage = null;
+                  _isLoading = true;
+                  _credentialsSent = false;
+                  _statusMessage = 'Loading Listmonk...';
+                });
+                _registerIframe();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
           ],
         ),
       );
@@ -224,19 +302,26 @@ class _IframeState extends State<Iframe> {
     // Show iframe with loading overlay, credentials banner, and help button
     return Stack(
       children: [
+        // Iframe
         HtmlElementView(viewType: _iframeId!),
 
         // Loading overlay
         if (_isLoading)
           Container(
-            color: Colors.white,
-            child: const Center(
+            color: Colors.white.withOpacity(0.9),
+            child: Center(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Loading Email Campaigns...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    _statusMessage,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -350,7 +435,18 @@ class _IframeState extends State<Iframe> {
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(width: 4),
+                Material(
+                  color: Colors.white.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(4),
+                  child: IconButton(
+                    icon: const Icon(Icons.open_in_new, size: 20),
+                    onPressed: _openInNewTab,
+                    tooltip: 'Open in new tab',
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
             ),
           ),
 

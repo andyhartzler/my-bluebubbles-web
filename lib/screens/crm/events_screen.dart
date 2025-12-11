@@ -375,11 +375,12 @@ class _EventsScreenState extends State<EventsScreen> {
     return Container(
       color: Colors.black,
       child: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          slivers: <Widget>[
+        child: SelectionArea(
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            slivers: <Widget>[
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               sliver: SliverToBoxAdapter(
@@ -474,6 +475,7 @@ class _EventsScreenState extends State<EventsScreen> {
                     ),
             ),
           ],
+          ),
         ),
       ),
     );

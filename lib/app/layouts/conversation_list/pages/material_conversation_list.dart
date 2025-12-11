@@ -111,24 +111,26 @@ class _MaterialConversationListState extends OptimizedState<MaterialConversation
               child: ScrollbarWrapper(
                 showScrollbar: true,
                 controller: controller.materialScrollController,
-                child: Obx(() => ListView.builder(
-                      controller: controller.materialScrollController,
-                      physics: ThemeSwitcher.getScrollPhysics(),
-                      findChildIndexCallback: (key) => findChildIndexByKey(_chats, key, (item) => item.guid),
-                      itemBuilder: (context, index) {
-                        final chat = _chats[index];
-                        return Container(
-                          key: ValueKey(chat.guid),
-                          child: ListItem(
-                            chat: chat,
-                            controller: controller,
-                            update: () {
-                              setState(() {});
-                            }
-                          )
-                        );
-                      },
-                      itemCount: _chats.length,
+                child: Obx(() => SelectionArea(
+                      child: ListView.builder(
+                        controller: controller.materialScrollController,
+                        physics: ThemeSwitcher.getScrollPhysics(),
+                        findChildIndexCallback: (key) => findChildIndexByKey(_chats, key, (item) => item.guid),
+                        itemBuilder: (context, index) {
+                          final chat = _chats[index];
+                          return Container(
+                            key: ValueKey(chat.guid),
+                            child: ListItem(
+                              chat: chat,
+                              controller: controller,
+                              update: () {
+                                setState(() {});
+                              }
+                            )
+                          );
+                        },
+                        itemCount: _chats.length,
+                      ),
                     )),
               ),
             );

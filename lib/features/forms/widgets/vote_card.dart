@@ -1,18 +1,40 @@
 import 'package:flutter/material.dart';
 import '../models/voting_form.dart';
 
+/// Strip HTML tags from a string for plain text display
+String _stripHtmlTags(String htmlString) {
+  // Remove HTML tags
+  final withoutTags = htmlString.replaceAll(RegExp(r'<[^>]*>'), ' ');
+  // Decode common HTML entities
+  return withoutTags
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
 class VoteCard extends StatelessWidget {
   final VotingForm vote;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const VoteCard({
     Key? key,
     required this.vote,
     required this.onTap,
+    this.onEdit,
+    this.onDelete,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -34,12 +56,57 @@ class VoteCard extends StatelessWidget {
                     ),
                   ),
                   _buildStatusChip(vote.status),
+                  if (onEdit != null || onDelete != null) ...[
+                    const SizedBox(width: 8),
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      onSelected: (value) {
+                        switch (value) {
+                          case 'edit':
+                            onEdit?.call();
+                            break;
+                          case 'delete':
+                            onDelete?.call();
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        if (onEdit != null)
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_outlined),
+                                SizedBox(width: 12),
+                                Text('Edit'),
+                              ],
+                            ),
+                          ),
+                        if (onDelete != null) ...[
+                          if (onEdit != null) const PopupMenuDivider(),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline, color: Colors.red),
+                                SizedBox(width: 12),
+                                Text('Delete', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ],
               ),
-              if (vote.description != null) ...[
+              if (vote.description != null && vote.description!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
-                  vote.description!,
+                  _stripHtmlTags(vote.description!),
                   style: const TextStyle(color: Colors.grey),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -50,7 +117,9 @@ class VoteCard extends StatelessWidget {
                 spacing: 8,
                 children: [
                   Chip(
-                    label: Text('${vote.optionCount} options'),
+                    label: Text(vote.questionCount == 1
+                      ? '${vote.totalOptionCount} options'
+                      : '${vote.questionCount} questions'),
                     visualDensity: VisualDensity.compact,
                   ),
                   if (vote.isVotingActive)

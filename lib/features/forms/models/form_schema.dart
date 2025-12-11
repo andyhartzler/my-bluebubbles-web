@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'form_field_config.dart';
+import 'identity_config.dart';
 
 part 'form_schema.freezed.dart';
 part 'form_schema.g.dart';
@@ -59,6 +60,9 @@ class FormSchema with _$FormSchema {
     // Email settings
     @JsonKey(name: 'confirmation_email_template') String? confirmationEmailTemplate,
     @JsonKey(name: 'notification_emails') List<String>? notificationEmails,
+
+    // Supporting documents (list of document metadata objects)
+    @JsonKey(name: 'supporting_documents') List<Map<String, dynamic>>? supportingDocuments,
   }) = _FormSchema;
 
   factory FormSchema.fromJson(Map<String, dynamic> json) =>
@@ -67,12 +71,24 @@ class FormSchema with _$FormSchema {
 
 @freezed
 class FormSchemaData with _$FormSchemaData {
+  const FormSchemaData._();
+
   const factory FormSchemaData({
     required List<FormFieldConfig> fields,
     @Default({}) Map<String, dynamic> styling,
     @Default({}) Map<String, dynamic> confirmation,
+    /// Identity configuration for automatic person tracking
+    /// If null, defaults to standard identity config
+    @JsonKey(name: 'identity_config') IdentityConfig? identityConfig,
   }) = _FormSchemaData;
 
   factory FormSchemaData.fromJson(Map<String, dynamic> json) =>
       _$FormSchemaDataFromJson(json);
+
+  /// Get the effective identity config (defaults to standard if not set)
+  IdentityConfig get effectiveIdentityConfig =>
+      identityConfig ?? IdentityConfig.standard();
+
+  /// Check if a field key conflicts with identity field keys
+  bool isKeyReserved(String key) => ReservedFieldKeys.isReserved(key);
 }

@@ -384,7 +384,8 @@ class Main extends StatelessWidget {
                     }
                   }
                 return TitleBarWrapper(
-                  child: SecureGate(
+                  child: SelectionArea(
+                    child: SecureGate(
                     blurr: 5,
                     opacity: 0,
                     lockedBuilder: (context, controller) {
@@ -455,6 +456,7 @@ class Main extends StatelessWidget {
                       );
                     },
                     child: child ?? Container(),
+                  ),
                   ),
                 );
               },
