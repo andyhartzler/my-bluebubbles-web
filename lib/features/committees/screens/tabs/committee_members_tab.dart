@@ -197,7 +197,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
 
   Widget _buildMemberCard(Member member) {
     final theme = Theme.of(context);
-    final photoUrl = member.primaryPhotoUrl;
+    final photoUrl = member.primaryProfilePhotoUrl;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
