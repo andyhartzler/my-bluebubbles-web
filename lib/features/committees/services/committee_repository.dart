@@ -990,6 +990,47 @@ class CommitteeRepository {
     }
     return members;
   }
+
+  /// Search for members by name or email (for canvas board entity picker)
+  Future<List<Member>> searchMembers(String query, {int limit = 20}) async {
+    if (!isReady || query.length < 2) return [];
+
+    try {
+      final searchQuery = query.toLowerCase();
+
+      // Search by name (using ilike for case-insensitive partial matching)
+      final data = await _readClient
+          .from('members')
+          .select()
+          .or('name.ilike.%$searchQuery%,email.ilike.%$searchQuery%')
+          .order('name', ascending: true)
+          .limit(limit);
+
+      return _mapMembers(data as List<dynamic>);
+    } catch (e) {
+      print('Error searching members: $e');
+      return [];
+    }
+  }
+
+  /// Get a member by ID (for canvas board entity loading)
+  Future<Member?> getMemberById(String memberId) async {
+    if (!isReady) return null;
+
+    try {
+      final data = await _readClient
+          .from('members')
+          .select()
+          .eq('id', memberId)
+          .maybeSingle();
+
+      if (data == null) return null;
+      return Member.fromJson(data);
+    } catch (e) {
+      print('Error fetching member by ID: $e');
+      return null;
+    }
+  }
 }
 
 /// Simple subscriber model for campaign participant lookups

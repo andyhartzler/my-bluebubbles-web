@@ -225,6 +225,8 @@ dependencies:
   pull_down_button: ^0.10.1
   app_install_date:
     path: packages/app_install_date_stub
+  # Canvas Board dependencies
+  perfect_freehand: ^3.0.0  # For smooth freehand drawing
 
 dependency_overrides:
   # overrides for packages stuck on outdated versions
