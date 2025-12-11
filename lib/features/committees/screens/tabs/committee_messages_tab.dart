@@ -362,11 +362,11 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundImage: member.primaryPhotoUrl != null
-                    ? NetworkImage(member.primaryPhotoUrl!)
+                backgroundImage: member.primaryProfilePhotoUrl != null
+                    ? NetworkImage(member.primaryProfilePhotoUrl!)
                     : null,
                 backgroundColor: committee.primaryColor.withOpacity(0.2),
-                child: member.primaryPhotoUrl == null
+                child: member.primaryProfilePhotoUrl == null
                     ? Text(
                         member.name.isNotEmpty ? member.name[0] : '?',
                         style: TextStyle(color: committee.primaryColor),
