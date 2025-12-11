@@ -17,6 +17,7 @@ class CanvasSidebar extends StatelessWidget {
   final double zoomLevel;
   final bool showDonors;
   final bool showChapters;
+  final bool isFullscreen;
 
   const CanvasSidebar({
     super.key,
@@ -35,6 +36,7 @@ class CanvasSidebar extends StatelessWidget {
     required this.zoomLevel,
     this.showDonors = false,
     this.showChapters = false,
+    this.isFullscreen = false,
   });
 
   @override
@@ -110,8 +112,8 @@ class CanvasSidebar extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 child: _buildZoomButton(
-                  icon: Icons.fullscreen,
-                  tooltip: 'Fullscreen (F)',
+                  icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  tooltip: isFullscreen ? 'Exit Fullscreen (F)' : 'Fullscreen (F)',
                   onTap: onToggleFullscreen!,
                 ),
               ),
