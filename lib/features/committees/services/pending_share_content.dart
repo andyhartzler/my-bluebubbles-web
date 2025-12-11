@@ -8,12 +8,13 @@ class PendingShareContent {
   /// Pending email content
   String? pendingEmailSubject;
   String? pendingEmailBody;
+  String? pendingEmailBodyPlainText;
 
   /// Pending message content
   String? pendingMessageBody;
 
   /// Check if there's pending email content
-  bool get hasPendingEmail => pendingEmailSubject != null || pendingEmailBody != null;
+  bool get hasPendingEmail => pendingEmailSubject != null || pendingEmailBodyPlainText != null;
 
   /// Check if there's pending message content
   bool get hasPendingMessage => pendingMessageBody != null;
@@ -31,6 +32,12 @@ class PendingShareContent {
 ${voteDescription != null && voteDescription.isNotEmpty ? '<p>$voteDescription</p>' : ''}
 <p>Cast your vote here: <a href="$voteUrl">$voteUrl</a></p>
 ''';
+    // Also store plain text for Quill editor initialization
+    pendingEmailBodyPlainText = '''You are invited to participate in a vote:
+
+$voteTitle
+${voteDescription != null && voteDescription.isNotEmpty ? '\n$voteDescription' : ''}
+Cast your vote here: $voteUrl''';
   }
 
   /// Set pending message content for a vote share
@@ -45,6 +52,7 @@ ${voteDescription != null && voteDescription.isNotEmpty ? '<p>$voteDescription</
   void clearPendingEmail() {
     pendingEmailSubject = null;
     pendingEmailBody = null;
+    pendingEmailBodyPlainText = null;
   }
 
   /// Clear pending message content after consuming

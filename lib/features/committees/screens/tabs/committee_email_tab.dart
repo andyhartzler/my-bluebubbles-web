@@ -77,18 +77,13 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
       if (pending.pendingEmailSubject != null) {
         _subjectController.text = pending.pendingEmailSubject!;
       }
-      // Set body using HTML converter
-      if (pending.pendingEmailBody != null) {
-        try {
-          final document = QuillHtmlConverter.htmlToQuillDocument(pending.pendingEmailBody!);
-          _bodyController = quill.QuillController(
-            document: document,
-            selection: const TextSelection.collapsed(offset: 0),
-          );
-        } catch (e) {
-          // If HTML conversion fails, just use plain text
-          debugPrint('Failed to convert HTML to Quill: $e');
-        }
+      // Set body using plain text (Quill will format it when user edits)
+      if (pending.pendingEmailBodyPlainText != null) {
+        final doc = quill.Document()..insert(0, pending.pendingEmailBodyPlainText!);
+        _bodyController = quill.QuillController(
+          document: doc,
+          selection: const TextSelection.collapsed(offset: 0),
+        );
       }
       // Clear the pending content
       pending.clearPendingEmail();
