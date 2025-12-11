@@ -27,6 +27,8 @@ class SamsungConversationList extends StatefulWidget {
 class _SamsungConversationListState extends OptimizedState<SamsungConversationList> {
   bool get showArchived => widget.parentController.showArchivedChats;
   bool get showUnknown => widget.parentController.showUnknownSenders;
+  Set<String>? get filterPhoneNumbers => widget.parentController.filterPhoneNumbers;
+  bool get isEmbedded => widget.parentController.isEmbedded;
   Color get backgroundColor =>
       ss.settings.windowEffect.value == WindowEffect.disabled ? headerColor : Colors.transparent;
   Color get _tileColor => ss.settings.windowEffect.value == WindowEffect.disabled ? tileColor : Colors.transparent;
@@ -62,7 +64,7 @@ class _SamsungConversationListState extends OptimizedState<SamsungConversationLi
       },
       child: Scaffold(
         backgroundColor: backgroundColor,
-        floatingActionButton: !showArchived && !showUnknown
+        floatingActionButton: !showArchived && !showUnknown && !isEmbedded && filterPhoneNumbers == null
             ? ConversationListFAB(parentController: controller)
             : const SizedBox.shrink(),
         body: SafeArea(
@@ -88,7 +90,8 @@ class _SamsungConversationListState extends OptimizedState<SamsungConversationLi
               child: Obx(() {
                 final _chats = chats.chats
                     .archivedHelper(controller.showArchivedChats)
-                    .unknownSendersHelper(controller.showUnknownSenders);
+                    .unknownSendersHelper(controller.showUnknownSenders)
+                    .phoneNumbersHelper(filterPhoneNumbers);
 
                 return SelectionArea(
                   child: CustomScrollView(
@@ -108,11 +111,13 @@ class _SamsungConversationListState extends OptimizedState<SamsungConversationLi
                                   child: Text(
                                     !chats.loadedChatBatch.value
                                         ? "Loading chats..."
-                                        : showArchived
-                                            ? "You have no archived chats"
-                                            : showUnknown
-                                                ? "You have no messages from unknown senders :)"
-                                                : "You have no chats :(",
+                                        : filterPhoneNumbers != null
+                                            ? "No conversations with committee members"
+                                            : showArchived
+                                                ? "You have no archived chats"
+                                                : showUnknown
+                                                    ? "You have no messages from unknown senders :)"
+                                                    : "You have no chats :(",
                                     style: context.theme.textTheme.labelLarge,
                                     textAlign: TextAlign.center,
                                   ),

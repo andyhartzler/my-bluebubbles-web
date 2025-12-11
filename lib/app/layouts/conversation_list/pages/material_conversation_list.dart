@@ -24,6 +24,8 @@ class MaterialConversationList extends StatefulWidget {
 class _MaterialConversationListState extends OptimizedState<MaterialConversationList> {
   bool get showArchived => widget.parentController.showArchivedChats;
   bool get showUnknown => widget.parentController.showUnknownSenders;
+  Set<String>? get filterPhoneNumbers => widget.parentController.filterPhoneNumbers;
+  bool get isEmbedded => widget.parentController.isEmbedded;
   Color get backgroundColor => ss.settings.windowEffect.value == WindowEffect.disabled
       ? context.theme.colorScheme.background
       : Colors.transparent;
@@ -68,11 +70,14 @@ class _MaterialConversationListState extends OptimizedState<MaterialConversation
           backgroundColor: backgroundColor,
           extendBodyBehindAppBar: true,
           floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-          floatingActionButton: !showArchived && !showUnknown
+          floatingActionButton: !showArchived && !showUnknown && !isEmbedded && filterPhoneNumbers == null
               ? ConversationListFAB(parentController: controller)
               : const SizedBox.shrink(),
           body: Obx(() {
-            final _chats = chats.chats.archivedHelper(showArchived).unknownSendersHelper(showUnknown);
+            final _chats = chats.chats
+                .archivedHelper(showArchived)
+                .unknownSendersHelper(showUnknown)
+                .phoneNumbersHelper(filterPhoneNumbers);
 
             if (!chats.loadedChatBatch.value || _chats.isEmpty) {
               return Center(
@@ -85,11 +90,13 @@ class _MaterialConversationListState extends OptimizedState<MaterialConversation
                         child: Text(
                           !chats.loadedChatBatch.value
                               ? "Loading chats..."
-                              : showArchived
-                                  ? "You have no archived chats"
-                                  : showUnknown
-                                      ? "You have no messages from unknown senders :)"
-                                      : "You have no chats :(",
+                              : filterPhoneNumbers != null
+                                  ? "No conversations with committee members"
+                                  : showArchived
+                                      ? "You have no archived chats"
+                                      : showUnknown
+                                          ? "You have no messages from unknown senders :)"
+                                          : "You have no chats :(",
                           style: context.theme.textTheme.labelLarge,
                           textAlign: TextAlign.center,
                         ),
