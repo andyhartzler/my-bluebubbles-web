@@ -1,0 +1,542 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
+
+import 'package:bluebubbles/features/committees/models/committee.dart';
+import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/services/crm/supabase_service.dart';
+
+/// Repository for committee-related data operations
+class CommitteeRepository {
+  static final CommitteeRepository _instance = CommitteeRepository._internal();
+  factory CommitteeRepository() => _instance;
+  CommitteeRepository._internal();
+
+  final CRMSupabaseService _supabase = CRMSupabaseService();
+
+  bool get isReady => _supabase.isInitialized;
+
+  SupabaseClient get _readClient =>
+      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+
+  /// Get all members belonging to a committee
+  Future<List<Member>> getMembersForCommittee(String committeeName, {int? limit}) async {
+    if (!isReady) return [];
+
+    try {
+      var query = _readClient
+          .from('members')
+          .select()
+          .contains('committee', [committeeName])
+          .order('name', ascending: true);
+
+      if (limit != null && limit > 0) {
+        query = query.limit(limit);
+      }
+
+      final data = await query;
+      return _mapMembers(data as List<dynamic>);
+    } catch (e) {
+      print('Error fetching committee members: $e');
+      return [];
+    }
+  }
+
+  /// Get member count for a committee
+  Future<int> getMemberCountForCommittee(String committeeName) async {
+    if (!isReady) return 0;
+
+    try {
+      final PostgrestResponse response = await _readClient
+          .from('members')
+          .select('id')
+          .contains('committee', [committeeName])
+          .count(CountOption.exact);
+      return response.count ?? 0;
+    } catch (e) {
+      print('Error counting committee members: $e');
+      return 0;
+    }
+  }
+
+  /// Get committee leadership (executive committee members for this committee)
+  Future<List<CommitteeLeader>> getCommitteeLeadership(String committeeName) async {
+    if (!isReady) return [];
+
+    try {
+      final data = await _readClient
+          .from('members')
+          .select('id, name, executive_title, profile_pictures, email, phone')
+          .eq('executive_committee', true)
+          .contains('committee', [committeeName]);
+
+      final leaders = <CommitteeLeader>[];
+      for (final item in data as List<dynamic>) {
+        if (item is! Map<String, dynamic>) continue;
+        final member = Member.fromJson(item);
+        leaders.add(CommitteeLeader(
+          memberId: member.id,
+          name: member.name,
+          title: member.executiveTitle,
+          photoUrl: member.primaryPhotoUrl,
+          email: member.preferredEmail,
+          phone: member.primaryPhone,
+        ));
+      }
+      return leaders;
+    } catch (e) {
+      print('Error fetching committee leadership: $e');
+      return [];
+    }
+  }
+
+  /// Get statistics for a specific committee
+  Future<CommitteeStats> getCommitteeStats(Committee committee) async {
+    if (!isReady) {
+      return const CommitteeStats();
+    }
+
+    try {
+      final results = await Future.wait([
+        getMemberCountForCommittee(committee.name),
+        getCommitteeLeadership(committee.name),
+        _getCommitteeSpecificStats(committee),
+      ]);
+
+      final memberCount = results[0] as int;
+      final leaders = results[1] as List<CommitteeLeader>;
+      final specificStats = results[2] as Map<String, dynamic>;
+
+      CommitteeLeader? chair;
+      CommitteeLeader? coChair;
+
+      for (final leader in leaders) {
+        final title = leader.title?.toLowerCase() ?? '';
+        if (title.contains('chair') && !title.contains('co-chair') && !title.contains('vice')) {
+          chair ??= leader;
+        } else if (title.contains('co-chair') || title.contains('vice')) {
+          coChair ??= leader;
+        }
+      }
+
+      return CommitteeStats(
+        memberCount: memberCount,
+        chairName: chair?.name,
+        coChairName: coChair?.name,
+        chairPhotoUrl: chair?.photoUrl,
+        coChairPhotoUrl: coChair?.photoUrl,
+        specificStats: specificStats,
+      );
+    } catch (e) {
+      print('Error getting committee stats: $e');
+      return const CommitteeStats();
+    }
+  }
+
+  /// Get committee-specific statistics
+  Future<Map<String, dynamic>> _getCommitteeSpecificStats(Committee committee) async {
+    final stats = <String, dynamic>{};
+
+    try {
+      switch (committee.id) {
+        case 'Communications':
+          stats.addAll(await _getCommunicationsStats());
+          break;
+        case 'Political Affairs':
+          stats.addAll(await _getPoliticalAffairsStats());
+          break;
+        case 'Policy & Advocacy':
+          stats.addAll(await _getPolicyAdvocacyStats());
+          break;
+        case 'Membership & Outreach':
+          stats.addAll(await _getMembershipOutreachStats());
+          break;
+        case 'Fundraising':
+          stats.addAll(await _getFundraisingStats());
+          break;
+        case 'College Democrats':
+          stats.addAll(await _getCollegeDemocratsStats());
+          break;
+        case 'High School Democrats':
+          stats.addAll(await _getHighSchoolDemocratsStats());
+          break;
+      }
+    } catch (e) {
+      print('Error getting specific stats for ${committee.name}: $e');
+    }
+
+    return stats;
+  }
+
+  Future<Map<String, dynamic>> _getCommunicationsStats() async {
+    final stats = <String, dynamic>{};
+
+    try {
+      // Total email campaigns sent
+      final PostgrestResponse campaignResponse = await _readClient
+          .from('campaigns')
+          .select('id')
+          .eq('status', 'sent')
+          .count(CountOption.exact);
+      stats['totalCampaignsSent'] = campaignResponse.count ?? 0;
+
+      // Total emails delivered (sum of total_sent from campaigns)
+      final campaignData = await _readClient
+          .from('campaigns')
+          .select('total_sent')
+          .eq('status', 'sent');
+
+      int totalDelivered = 0;
+      for (final item in campaignData as List<dynamic>) {
+        if (item is Map && item['total_sent'] != null) {
+          totalDelivered += (item['total_sent'] as num).toInt();
+        }
+      }
+      stats['totalEmailsDelivered'] = totalDelivered;
+    } catch (e) {
+      print('Error getting communications stats: $e');
+      stats['totalCampaignsSent'] = 0;
+      stats['totalEmailsDelivered'] = 0;
+    }
+
+    return stats;
+  }
+
+  Future<Map<String, dynamic>> _getPoliticalAffairsStats() async {
+    final stats = <String, dynamic>{};
+
+    try {
+      // Total events count
+      final PostgrestResponse totalResponse = await _readClient
+          .from('events')
+          .select('id')
+          .count(CountOption.exact);
+      stats['totalEvents'] = totalResponse.count ?? 0;
+
+      // Upcoming events count
+      final PostgrestResponse upcomingResponse = await _readClient
+          .from('events')
+          .select('id')
+          .gte('event_date', DateTime.now().toIso8601String())
+          .count(CountOption.exact);
+      stats['upcomingEvents'] = upcomingResponse.count ?? 0;
+    } catch (e) {
+      print('Error getting political affairs stats: $e');
+      stats['totalEvents'] = 0;
+      stats['upcomingEvents'] = 0;
+    }
+
+    return stats;
+  }
+
+  Future<Map<String, dynamic>> _getPolicyAdvocacyStats() async {
+    final stats = <String, dynamic>{};
+
+    try {
+      // Total advocacy emails generated
+      final PostgrestResponse generatedResponse = await _readClient
+          .from('hanaway_campaign_tracking')
+          .select('id')
+          .count(CountOption.exact);
+      stats['totalAdvocacyEmailsGenerated'] = generatedResponse.count ?? 0;
+
+      // Total advocacy emails sent
+      final PostgrestResponse sentResponse = await _readClient
+          .from('hanaway_campaign_tracking')
+          .select('id')
+          .not('sent_at', 'is', null)
+          .count(CountOption.exact);
+      stats['totalAdvocacyEmailsSent'] = sentResponse.count ?? 0;
+    } catch (e) {
+      print('Error getting policy & advocacy stats: $e');
+      stats['totalAdvocacyEmailsGenerated'] = 0;
+      stats['totalAdvocacyEmailsSent'] = 0;
+    }
+
+    return stats;
+  }
+
+  Future<Map<String, dynamic>> _getMembershipOutreachStats() async {
+    final stats = <String, dynamic>{};
+
+    try {
+      // Total member count
+      final PostgrestResponse totalResponse = await _readClient
+          .from('members')
+          .select('id')
+          .count(CountOption.exact);
+      stats['totalMembers'] = totalResponse.count ?? 0;
+
+      // Active members count
+      final PostgrestResponse activeResponse = await _readClient
+          .from('members')
+          .select('id')
+          .eq('current_chapter_member', 'Yes')
+          .count(CountOption.exact);
+      stats['activeMembers'] = activeResponse.count ?? 0;
+    } catch (e) {
+      print('Error getting membership & outreach stats: $e');
+      stats['totalMembers'] = 0;
+      stats['activeMembers'] = 0;
+    }
+
+    return stats;
+  }
+
+  Future<Map<String, dynamic>> _getFundraisingStats() async {
+    final stats = <String, dynamic>{};
+
+    try {
+      // Total donors count
+      final PostgrestResponse donorResponse = await _readClient
+          .from('donors')
+          .select('id')
+          .count(CountOption.exact);
+      stats['totalDonors'] = donorResponse.count ?? 0;
+
+      // Total amount raised
+      final donorData = await _readClient
+          .from('donors')
+          .select('total_donated');
+
+      double totalRaised = 0;
+      for (final item in donorData as List<dynamic>) {
+        if (item is Map && item['total_donated'] != null) {
+          totalRaised += (item['total_donated'] as num).toDouble();
+        }
+      }
+      stats['totalRaised'] = totalRaised;
+    } catch (e) {
+      print('Error getting fundraising stats: $e');
+      stats['totalDonors'] = 0;
+      stats['totalRaised'] = 0.0;
+    }
+
+    return stats;
+  }
+
+  Future<Map<String, dynamic>> _getCollegeDemocratsStats() async {
+    final stats = <String, dynamic>{};
+
+    try {
+      // Total college chapters
+      final PostgrestResponse totalResponse = await _readClient
+          .from('chapters')
+          .select('chapter_name')
+          .eq('chapter_type', 'college')
+          .count(CountOption.exact);
+      stats['totalCollegeChapters'] = totalResponse.count ?? 0;
+
+      // Chartered college chapters
+      final PostgrestResponse charteredResponse = await _readClient
+          .from('chapters')
+          .select('chapter_name')
+          .eq('chapter_type', 'college')
+          .eq('is_chartered', true)
+          .count(CountOption.exact);
+      stats['charteredCollegeChapters'] = charteredResponse.count ?? 0;
+
+      // Unique colleges represented
+      final collegeData = await _readClient
+          .from('members')
+          .select('college')
+          .not('college', 'is', null);
+
+      final uniqueColleges = <String>{};
+      for (final item in collegeData as List<dynamic>) {
+        if (item is Map) {
+          final college = item['college']?.toString().trim();
+          if (college != null && college.isNotEmpty) {
+            uniqueColleges.add(college);
+          }
+        }
+      }
+      stats['uniqueColleges'] = uniqueColleges.length;
+    } catch (e) {
+      print('Error getting college democrats stats: $e');
+      stats['totalCollegeChapters'] = 0;
+      stats['charteredCollegeChapters'] = 0;
+      stats['uniqueColleges'] = 0;
+    }
+
+    return stats;
+  }
+
+  Future<Map<String, dynamic>> _getHighSchoolDemocratsStats() async {
+    final stats = <String, dynamic>{};
+
+    try {
+      // Total high school chapters
+      final PostgrestResponse totalResponse = await _readClient
+          .from('chapters')
+          .select('chapter_name')
+          .eq('chapter_type', 'highschool')
+          .count(CountOption.exact);
+      stats['totalHSChapters'] = totalResponse.count ?? 0;
+
+      // Chartered high school chapters
+      final PostgrestResponse charteredResponse = await _readClient
+          .from('chapters')
+          .select('chapter_name')
+          .eq('chapter_type', 'highschool')
+          .eq('is_chartered', true)
+          .count(CountOption.exact);
+      stats['charteredHSChapters'] = charteredResponse.count ?? 0;
+
+      // Unique high schools represented
+      final hsData = await _readClient
+          .from('members')
+          .select('high_school')
+          .not('high_school', 'is', null);
+
+      final uniqueHS = <String>{};
+      for (final item in hsData as List<dynamic>) {
+        if (item is Map) {
+          final hs = item['high_school']?.toString().trim();
+          if (hs != null && hs.isNotEmpty) {
+            uniqueHS.add(hs);
+          }
+        }
+      }
+      stats['uniqueHighSchools'] = uniqueHS.length;
+    } catch (e) {
+      print('Error getting high school democrats stats: $e');
+      stats['totalHSChapters'] = 0;
+      stats['charteredHSChapters'] = 0;
+      stats['uniqueHighSchools'] = 0;
+    }
+
+    return stats;
+  }
+
+  /// Get Slack channel ID for a committee
+  Future<String?> getSlackChannelId(String committeeName) async {
+    if (!isReady) return null;
+
+    try {
+      final data = await _readClient
+          .from('slack_channel_committee_mapping')
+          .select('slack_channel_id')
+          .eq('committee_name', committeeName)
+          .eq('is_active', true)
+          .maybeSingle();
+
+      if (data is Map) {
+        return data['slack_channel_id']?.toString();
+      }
+      return null;
+    } catch (e) {
+      print('Error getting Slack channel ID: $e');
+      return null;
+    }
+  }
+
+  /// Get Slack messages for a committee
+  Future<List<Map<String, dynamic>>> getSlackMessages(
+    String committeeName, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    if (!isReady) return [];
+
+    try {
+      final channelId = await getSlackChannelId(committeeName);
+      if (channelId == null) return [];
+
+      final data = await _readClient
+          .from('slack_messages')
+          .select('*, slack_user_mapping(*)')
+          .eq('slack_channel_id', channelId)
+          .order('posted_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      return (data as List<dynamic>).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('Error getting Slack messages: $e');
+      return [];
+    }
+  }
+
+  /// Get advocacy campaign data for Policy & Advocacy
+  Future<Map<String, dynamic>> getAdvocacyCampaignData() async {
+    if (!isReady) {
+      return {
+        'totalGenerated': 0,
+        'totalSent': 0,
+        'uniqueParticipants': 0,
+        'sendMethodBreakdown': <String, int>{},
+        'participantsByZip': <String, int>{},
+        'participants': <Map<String, dynamic>>[],
+      };
+    }
+
+    try {
+      final data = await _readClient
+          .from('hanaway_campaign_tracking')
+          .select()
+          .order('created_at', ascending: false);
+
+      final records = (data as List<dynamic>).cast<Map<String, dynamic>>();
+
+      int totalGenerated = records.length;
+      int totalSent = 0;
+      final uniqueEmails = <String>{};
+      final sendMethodBreakdown = <String, int>{};
+      final participantsByZip = <String, int>{};
+
+      for (final record in records) {
+        // Count sent
+        if (record['sent_at'] != null) {
+          totalSent++;
+        }
+
+        // Unique participants
+        final email = record['user_email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          uniqueEmails.add(email.toLowerCase());
+        }
+
+        // Send method breakdown
+        final method = record['send_method']?.toString() ?? 'unknown';
+        sendMethodBreakdown[method] = (sendMethodBreakdown[method] ?? 0) + 1;
+
+        // By zip code
+        final zip = record['user_zip_code']?.toString();
+        if (zip != null && zip.isNotEmpty) {
+          participantsByZip[zip] = (participantsByZip[zip] ?? 0) + 1;
+        }
+      }
+
+      return {
+        'totalGenerated': totalGenerated,
+        'totalSent': totalSent,
+        'uniqueParticipants': uniqueEmails.length,
+        'sendMethodBreakdown': sendMethodBreakdown,
+        'participantsByZip': participantsByZip,
+        'participants': records.take(100).toList(),
+      };
+    } catch (e) {
+      print('Error getting advocacy campaign data: $e');
+      return {
+        'totalGenerated': 0,
+        'totalSent': 0,
+        'uniqueParticipants': 0,
+        'sendMethodBreakdown': <String, int>{},
+        'participantsByZip': <String, int>{},
+        'participants': <Map<String, dynamic>>[],
+      };
+    }
+  }
+
+  List<Member> _mapMembers(List<dynamic> data) {
+    final members = <Member>[];
+    for (final item in data) {
+      if (item is Map<String, dynamic>) {
+        members.add(Member.fromJson(item));
+      } else if (item is Map) {
+        final mapped = item.map((key, dynamic value) => MapEntry(key.toString(), value));
+        members.add(Member.fromJson(mapped));
+      }
+    }
+    return members;
+  }
+}
