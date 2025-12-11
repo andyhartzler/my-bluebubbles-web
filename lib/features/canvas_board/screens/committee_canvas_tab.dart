@@ -29,6 +29,11 @@ import 'package:bluebubbles/models/crm/event.dart' show Event;
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
+import 'package:bluebubbles/services/crm/chapter_repository.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/event_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/chapter_detail_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// The main canvas tab for committee workspaces
 class CommitteeCanvasTab extends StatefulWidget {
@@ -52,7 +57,9 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
   final _canvasFileService = CanvasFileService();
   final _committeeRepository = CommitteeRepository();
   final _eventRepository = EventRepository();
+  final _chapterRepository = ChapterRepository();
   final _uuid = const Uuid();
+  final _canvasKey = GlobalKey();
 
   // Board state
   CanvasBoard? _board;
@@ -235,7 +242,16 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
 
   Future<void> _fetchChapter(String chapterId) async {
     if (_chapterCache.containsKey(chapterId)) return;
-    // TODO: Implement chapter fetching when ChapterRepository is available
+
+    try {
+      final chapters = await _chapterRepository.getAllChapters();
+      final chapter = chapters.where((c) => c.id == chapterId).firstOrNull;
+      if (chapter != null && mounted) {
+        setState(() => _chapterCache[chapterId] = chapter);
+      }
+    } catch (e) {
+      // Silently fail - will show error state in node
+    }
   }
 
   Future<void> _fetchDonor(String donorId) async {
@@ -428,8 +444,33 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
   }
 
   Future<void> _addChapterNode() async {
-    // TODO: Implement chapter picker when chapter search is available
-    _showError('Chapter picker not yet implemented');
+    final chapter = await EntityPickerDialog.showChapterPicker(
+      context,
+      searchFunction: (query) async {
+        final allChapters = await _chapterRepository.getAllChapters();
+        if (query.isEmpty) return allChapters;
+        final lowerQuery = query.toLowerCase();
+        return allChapters.where((c) =>
+          c.chapterName.toLowerCase().contains(lowerQuery) ||
+          c.schoolName.toLowerCase().contains(lowerQuery)
+        ).toList();
+      },
+    );
+
+    if (chapter != null && mounted) {
+      _chapterCache[chapter.id] = chapter;
+
+      await _addNode(CanvasNode(
+        id: '',
+        boardId: _board?.id ?? '',
+        offsetX: _getViewportCenter().dx,
+        offsetY: _getViewportCenter().dy,
+        width: 260,
+        height: 100,
+        nodeType: CanvasNodeType.chapter,
+        entityId: chapter.id,
+      ));
+    }
   }
 
   Future<void> _addDonorNode() async {
@@ -770,6 +811,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
 
   Widget _buildCanvas() {
     return GestureDetector(
+      key: _canvasKey,
       // Handle pinch to zoom on trackpad
       onScaleStart: _onScaleStart,
       onScaleUpdate: _onScaleUpdate,
@@ -886,10 +928,21 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
            tool == CanvasTool.text;
   }
 
+  /// Convert global screen coordinates to local canvas widget coordinates
+  Offset _globalToLocal(Offset globalPoint) {
+    final RenderBox? renderBox = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return globalPoint;
+    return renderBox.globalToLocal(globalPoint);
+  }
+
+  /// Convert screen point (global) to canvas coordinates
   Offset _screenToCanvas(Offset screenPoint) {
+    // First convert global coordinates to local (relative to canvas widget)
+    final localPoint = _globalToLocal(screenPoint);
+    // Then apply viewport transformation
     return Offset(
-      (screenPoint.dx - _viewportOffset.dx) / _zoomLevel,
-      (screenPoint.dy - _viewportOffset.dy) / _zoomLevel,
+      (localPoint.dx - _viewportOffset.dx) / _zoomLevel,
+      (localPoint.dy - _viewportOffset.dy) / _zoomLevel,
     );
   }
 
@@ -1254,6 +1307,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
           onTap: () => _selectNode(node),
           onDoubleTap: () => _openNodeDetail(node),
           onDelete: () => _deleteSelectedNodes(),
+          onConfigureFields: () => _configureMemberFields(node),
         );
       case CanvasNodeType.event:
         return EventCanvasNode(
@@ -1578,16 +1632,162 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
     }
   }
 
+  Future<void> _configureMemberFields(CanvasNode node) async {
+    // Get current display fields from node metadata
+    final currentFieldNames = node.metadata?['display_fields'] as List<dynamic>?;
+    final currentFields = currentFieldNames != null
+        ? currentFieldNames
+            .map((name) => MemberDisplayField.values.firstWhere(
+                  (f) => f.name == name,
+                  orElse: () => MemberDisplayField.name,
+                ))
+            .toList()
+        : MemberCanvasNode.defaultDisplayFields;
+
+    final selectedFields = await MemberFieldSelectionDialog.show(
+      context,
+      initialFields: currentFields,
+    );
+
+    if (selectedFields != null && mounted) {
+      // Update node with new display fields
+      final updatedMetadata = Map<String, dynamic>.from(node.metadata ?? {});
+      updatedMetadata['display_fields'] = selectedFields.map((f) => f.name).toList();
+
+      final updatedNode = node.copyWith(metadata: updatedMetadata);
+      _updateNode(updatedNode);
+    }
+  }
+
   void _openNodeDetail(CanvasNode node) {
-    // TODO: Navigate to entity detail screen based on node type
+    switch (node.nodeType) {
+      case CanvasNodeType.member:
+        final member = _memberCache[node.entityId];
+        if (member != null) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MemberDetailScreen(member: member),
+            ),
+          );
+        }
+        break;
+      case CanvasNodeType.event:
+        final event = _eventCache[node.entityId];
+        if (event != null) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EventDetailScreen(event: event),
+            ),
+          );
+        }
+        break;
+      case CanvasNodeType.chapter:
+        final chapter = _chapterCache[node.entityId];
+        if (chapter != null) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ChapterDetailScreen(chapter: chapter),
+            ),
+          );
+        }
+        break;
+      case CanvasNodeType.image:
+        _openImageViewer(node);
+        break;
+      case CanvasNodeType.file:
+        _downloadFile(node);
+        break;
+      default:
+        break;
+    }
   }
 
   void _openImageViewer(CanvasNode node) {
-    // TODO: Open full screen image viewer
+    final imageUrl = node.imageUrl;
+    if (imageUrl == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(24),
+        child: Stack(
+          children: [
+            // Image
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.black54,
+                      padding: const EdgeInsets.all(48),
+                      child: const CircularProgressIndicator(color: Colors.white),
+                    );
+                  },
+                ),
+              ),
+            ),
+            // Close button
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Material(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  onTap: () => Navigator.of(context).pop(),
+                  borderRadius: BorderRadius.circular(20),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.close, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+            // Download button
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Material(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  onTap: () => _downloadFile(node),
+                  borderRadius: BorderRadius.circular(20),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.download, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  void _downloadFile(CanvasNode node) {
-    // TODO: Download file
+  Future<void> _downloadFile(CanvasNode node) async {
+    final fileUrl = node.fileUrl ?? node.imageUrl;
+    if (fileUrl == null) {
+      _showError('No file URL available');
+      return;
+    }
+
+    try {
+      final uri = Uri.parse(fileUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _showError('Could not open file');
+      }
+    } catch (e) {
+      _showError('Failed to download file: $e');
+    }
   }
 
   Color _parseColor(String colorString) {

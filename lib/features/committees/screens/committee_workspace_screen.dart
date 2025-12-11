@@ -14,6 +14,7 @@ import 'package:bluebubbles/features/committees/screens/tabs/committee_meetings_
 import 'package:bluebubbles/features/committees/screens/tabs/committee_votes_tab.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/canvas_board/screens/committee_canvas_tab.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
   final Committee committee;
@@ -428,52 +429,70 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
   }
 
   Widget _buildLeaderChip(CommitteeLeader leader) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _navigateToMemberProfile(leader.memberId),
         borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundImage: leader.photoUrl != null ? NetworkImage(leader.photoUrl!) : null,
-            backgroundColor: Colors.white.withOpacity(0.3),
-            child: leader.photoUrl == null
-                ? Text(
-                    leader.name.isNotEmpty ? leader.name[0].toUpperCase() : '?',
-                    style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
-                  )
-                : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(999),
           ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                leader.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
+              CircleAvatar(
+                radius: 14,
+                backgroundImage: leader.photoUrl != null ? NetworkImage(leader.photoUrl!) : null,
+                backgroundColor: Colors.white.withOpacity(0.3),
+                child: leader.photoUrl == null
+                    ? Text(
+                        leader.name.isNotEmpty ? leader.name[0].toUpperCase() : '?',
+                        style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
+                      )
+                    : null,
               ),
-              if (leader.title != null)
-                Text(
-                  leader.title!,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 11,
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    leader.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
-                ),
+                  if (leader.title != null)
+                    Text(
+                      leader.title!,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 11,
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  Future<void> _navigateToMemberProfile(String memberId) async {
+    final member = await _repository.getMemberById(memberId);
+    if (member != null && mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MemberDetailScreen(member: member),
+        ),
+      );
+    }
   }
 }
 

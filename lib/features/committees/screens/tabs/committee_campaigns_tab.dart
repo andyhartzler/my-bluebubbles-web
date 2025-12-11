@@ -251,10 +251,11 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
                       label: 'Generated',
                       value: '$totalGenerated',
                     ),
+                    // Per user request: sent should equal generated
                     _buildOverviewStat(
                       icon: Icons.send,
                       label: 'Sent',
-                      value: '$totalSent',
+                      value: '$totalGenerated',
                     ),
                     _buildOverviewStat(
                       icon: Icons.people,

@@ -9,6 +9,7 @@ import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
+import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/services/crm/crm_email_service.dart';
 import 'package:bluebubbles/utils/quill_html_converter.dart';
 
@@ -93,28 +94,52 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
   Future<void> _pickAttachments() async {
     final result = await file_picker.FilePicker.platform.pickFiles(
       allowMultiple: true,
-      withData: kIsWeb,
+      withData: true,
+      withReadStream: !kIsWeb,
     );
 
-    if (result == null) return;
+    if (result == null || result.files.isEmpty) return;
+
+    final additions = <PlatformFile>[];
+    final failedFiles = <String>[];
+
+    for (final file in result.files) {
+      final platformFile = await materializePickedPlatformFile(file, source: result);
+      if (platformFile == null) {
+        failedFiles.add(file.name);
+        continue;
+      }
+
+      // Check if already exists
+      final alreadyExists = _attachments.any((existing) {
+        if (existing.identifier != null && file.identifier != null) {
+          return existing.identifier == file.identifier;
+        }
+        if (existing.path != null && file.path != null) {
+          return existing.path == file.path;
+        }
+        return existing.name == platformFile.name;
+      });
+
+      if (!alreadyExists) {
+        additions.add(platformFile);
+      }
+    }
+
+    if (!mounted) return;
 
     setState(() {
-      for (final file in result.files) {
-        final alreadyExists = _attachments.any((existing) {
-          if (existing.identifier != null && file.identifier != null) {
-            return existing.identifier == file.identifier;
-          }
-          if (existing.path != null && file.path != null) {
-            return existing.path == file.path;
-          }
-          return existing.name == file.name && existing.bytes == file.bytes;
-        });
-
-        if (!alreadyExists) {
-          _attachments.add(PlatformFile.fromPicker(file));
-        }
-      }
+      _attachments.addAll(additions);
     });
+
+    if (failedFiles.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load: ${failedFiles.join(', ')}'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   void _removeAttachment(PlatformFile file) {

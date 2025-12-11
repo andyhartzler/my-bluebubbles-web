@@ -669,6 +669,17 @@ class VotesService {
         }
       }
 
+      // Check for committee restriction in eligibleMembers
+      final restrictToCommittee = eligibleMembers?['restrict_to_committee'] as String?;
+      if (restrictToCommittee != null && restrictToCommittee.isNotEmpty) {
+        // For committee-restricted votes, count members of that committee
+        final response = await _readClient
+            .from('members')
+            .select('id')
+            .contains('committee', [restrictToCommittee]);
+        return (response as List).length;
+      }
+
       // Calculate the cutoff date for age 36 (members must be 36 or younger)
       final now = DateTime.now();
       final cutoffDate = DateTime(now.year - 36, now.month, now.day);

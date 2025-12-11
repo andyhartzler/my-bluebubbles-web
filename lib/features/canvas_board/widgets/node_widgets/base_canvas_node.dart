@@ -65,6 +65,7 @@ class NodeTypeHeader extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback? onMorePressed;
+  final Widget? trailing;
 
   const NodeTypeHeader({
     super.key,
@@ -72,6 +73,7 @@ class NodeTypeHeader extends StatelessWidget {
     required this.icon,
     required this.color,
     this.onMorePressed,
+    this.trailing,
   });
 
   @override
@@ -97,7 +99,9 @@ class NodeTypeHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          if (onMorePressed != null)
+          if (trailing != null)
+            trailing!
+          else if (onMorePressed != null)
             GestureDetector(
               onTap: onMorePressed,
               child: Icon(

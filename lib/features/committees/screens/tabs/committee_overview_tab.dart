@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 
 class CommitteeOverviewTab extends StatefulWidget {
   final Committee committee;
@@ -26,6 +27,7 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
   Map<String, int> _schoolDistribution = {};
   bool _loading = true;
   String? _error;
+  bool _schoolsExpanded = false; // Collapsed by default
 
   Committee get committee => widget.committee;
 
@@ -353,32 +355,42 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(schoolIcon, color: committee.primaryColor),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '$schoolLabel Represented',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: committee.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${sortedSchools.length} ${schoolLabel.toLowerCase()}',
-                    style: TextStyle(
-                      color: committee.primaryColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
+            // Header row - always visible, tappable to expand/collapse
+            InkWell(
+              onTap: () => setState(() => _schoolsExpanded = !_schoolsExpanded),
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Icon(schoolIcon, color: committee.primaryColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '$schoolLabel Represented',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ),
-                ),
-              ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: committee.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${sortedSchools.length} ${schoolLabel.toLowerCase()}',
+                      style: TextStyle(
+                        color: committee.primaryColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    _schoolsExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: committee.primaryColor,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -387,22 +399,32 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
                 color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
               ),
             ),
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: sortedSchools.map((entry) {
-                final school = entry.key;
-                final count = entry.value;
-                final percentage = (count / totalMembers * 100).round();
+            // Expandable content
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: Padding(
+                padding: const EdgeInsets.only(top: 20),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: sortedSchools.map((entry) {
+                    final school = entry.key;
+                    final count = entry.value;
+                    final percentage = (count / totalMembers * 100).round();
 
-                return _buildSchoolChip(
-                  school: school,
-                  count: count,
-                  percentage: percentage,
-                  isCollege: isCollege,
-                );
-              }).toList(),
+                    return _buildSchoolChip(
+                      school: school,
+                      count: count,
+                      percentage: percentage,
+                      isCollege: isCollege,
+                    );
+                  }).toList(),
+                ),
+              ),
+              crossFadeState: _schoolsExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
             ),
           ],
         ),
@@ -592,14 +614,12 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
               // Show all chairs
               ..._stats!.chairs.map((chair) => _buildLeaderRow(
                 _stats!.chairs.length > 1 ? 'Co-Chair' : 'Chair',
-                chair.name,
-                chair.photoUrl,
+                chair,
               )),
               // Show all co-chairs
               ..._stats!.coChairs.map((coChair) => _buildLeaderRow(
                 'Co-Chair',
-                coChair.name,
-                coChair.photoUrl,
+                coChair,
               )),
             ],
           ],
@@ -608,28 +628,49 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     );
   }
 
-  Widget _buildLeaderRow(String role, String name, String? photoUrl) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-            child: photoUrl == null
-                ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?')
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildLeaderRow(String role, CommitteeLeader leader) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _navigateToMemberProfile(leader.memberId),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          child: Row(
             children: [
-              Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-              Text(role, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              CircleAvatar(
+                radius: 20,
+                backgroundImage: leader.photoUrl != null ? NetworkImage(leader.photoUrl!) : null,
+                child: leader.photoUrl == null
+                    ? Text(leader.name.isNotEmpty ? leader.name[0].toUpperCase() : '?')
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(leader.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(role, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
             ],
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  Future<void> _navigateToMemberProfile(String memberId) async {
+    final member = await _repository.getMemberById(memberId);
+    if (member != null && mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MemberDetailScreen(member: member),
+        ),
+      );
+    }
   }
 }
