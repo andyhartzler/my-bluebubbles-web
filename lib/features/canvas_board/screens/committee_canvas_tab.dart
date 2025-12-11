@@ -935,12 +935,12 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       offsetY: minY,
       width: maxX - minX + _strokeWidth * 2,
       height: maxY - minY + _strokeWidth * 2,
-      nodeType: CanvasNodeType.shape, // Use 'shape' type (DB doesn't allow 'freehand')
-      shapeType: 'line', // Store as line type with path data for freehand
+      nodeType: CanvasNodeType.shape,
+      shapeType: 'rectangle', // Use 'rectangle' to pass DB constraint
       shapeColor: '#${_selectedColor.value.toRadixString(16).substring(2)}',
       strokeWidth: _strokeWidth,
       pathData: pathPoints,
-      metadata: {'is_freehand': true}, // Mark as freehand in metadata
+      metadata: {'render_as': 'freehand'}, // Actual render type in metadata
     ));
   }
 
@@ -965,11 +965,11 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       width: width,
       height: height,
       nodeType: CanvasNodeType.shape,
-      shapeType: 'line', // Use 'line' for both line and arrow (DB constraint)
+      shapeType: 'rectangle', // Use 'rectangle' to pass DB constraint
       shapeColor: '#${_selectedColor.value.toRadixString(16).substring(2)}',
       strokeWidth: _strokeWidth,
       pathData: '${relStart.dx},${relStart.dy};${relEnd.dx},${relEnd.dy}',
-      metadata: isArrow ? {'has_arrow': true} : null, // Store arrow flag in metadata
+      metadata: {'render_as': isArrow ? 'arrow' : 'line'}, // Actual render type in metadata
     ));
   }
 
