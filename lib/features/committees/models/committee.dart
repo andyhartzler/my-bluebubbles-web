@@ -157,20 +157,25 @@ class CommitteeDefinitions {
 /// Committee statistics for the dashboard
 class CommitteeStats {
   final int memberCount;
-  final String? chairName;
-  final String? coChairName;
-  final String? chairPhotoUrl;
-  final String? coChairPhotoUrl;
+  final List<CommitteeLeader> chairs;
+  final List<CommitteeLeader> coChairs;
   final Map<String, dynamic> specificStats;
 
   const CommitteeStats({
     this.memberCount = 0,
-    this.chairName,
-    this.coChairName,
-    this.chairPhotoUrl,
-    this.coChairPhotoUrl,
+    this.chairs = const [],
+    this.coChairs = const [],
     this.specificStats = const {},
   });
+
+  /// Get chair name for backward compatibility
+  String? get chairName => chairs.isNotEmpty ? chairs.first.name : null;
+  String? get chairPhotoUrl => chairs.isNotEmpty ? chairs.first.photoUrl : null;
+  String? get coChairName => coChairs.isNotEmpty ? coChairs.first.name : null;
+  String? get coChairPhotoUrl => coChairs.isNotEmpty ? coChairs.first.photoUrl : null;
+
+  /// Get all leaders (chairs and co-chairs)
+  List<CommitteeLeader> get allLeaders => [...chairs, ...coChairs];
 }
 
 /// Committee leadership member

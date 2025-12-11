@@ -165,53 +165,56 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(72, 16, 24, 60),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Committee icon and name
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    child: Icon(
-                      committee.icon,
-                      color: Colors.white,
-                      size: 28,
+              // Left side: Committee icon and name
+              Expanded(
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      child: Icon(
+                        committee.icon,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          committee.displayName,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            committee.displayName,
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          committee.description,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withOpacity(0.9),
+                          const SizedBox(height: 4),
+                          Text(
+                            committee.description,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(width: 16),
 
-              // Leadership section
+              // Right side: Leadership section
               _buildLeadershipSection(context),
             ],
           ),
@@ -222,36 +225,29 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
 
   Widget _buildLeadershipSection(BuildContext context) {
     if (_loadingLeaders) {
-      return Row(
-        children: [
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.7)),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'Loading leadership...',
-            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
-          ),
-        ],
+      return SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.7)),
+        ),
       );
     }
 
     if (_leaders.isEmpty) {
-      return Text(
-        'No committee leadership assigned',
-        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
-      );
+      return const SizedBox.shrink();
     }
 
-    return Wrap(
-      spacing: 12,
-      runSpacing: 8,
-      children: _leaders.map((leader) => _buildLeaderChip(leader)).toList(),
+    // Display leaders in a vertical column on the right
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: _leaders.map((leader) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: _buildLeaderChip(leader),
+      )).toList(),
     );
   }
 

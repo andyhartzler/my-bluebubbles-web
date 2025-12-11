@@ -108,24 +108,23 @@ class CommitteeRepository {
       final leaders = results[1] as List<CommitteeLeader>;
       final specificStats = results[2] as Map<String, dynamic>;
 
-      CommitteeLeader? chair;
-      CommitteeLeader? coChair;
+      // Separate chairs and co-chairs (supports multiple of each)
+      final chairs = <CommitteeLeader>[];
+      final coChairs = <CommitteeLeader>[];
 
       for (final leader in leaders) {
         final title = leader.title?.toLowerCase() ?? '';
-        if (title.contains('chair') && !title.contains('co-chair') && !title.contains('vice')) {
-          chair ??= leader;
-        } else if (title.contains('co-chair') || title.contains('vice')) {
-          coChair ??= leader;
+        if (title.contains('co-chair') || title.contains('vice')) {
+          coChairs.add(leader);
+        } else if (title.contains('chair')) {
+          chairs.add(leader);
         }
       }
 
       return CommitteeStats(
         memberCount: memberCount,
-        chairName: chair?.name,
-        coChairName: coChair?.name,
-        chairPhotoUrl: chair?.photoUrl,
-        coChairPhotoUrl: coChair?.photoUrl,
+        chairs: chairs,
+        coChairs: coChairs,
         specificStats: specificStats,
       );
     } catch (e) {
@@ -439,9 +438,10 @@ class CommitteeRepository {
     if (!isReady) return {};
 
     try {
+      // Use correct column names from slack_user_mapping table
       final data = await _readClient
           .from('slack_user_mapping')
-          .select('slack_user_id, real_name, display_name, avatar_url, member_id');
+          .select('slack_user_id, slack_real_name, slack_display_name, slack_avatar_url, member_id');
 
       final mappings = <String, Map<String, String>>{};
       for (final item in data as List<dynamic>) {
@@ -449,9 +449,9 @@ class CommitteeRepository {
           final slackUserId = item['slack_user_id']?.toString();
           if (slackUserId != null) {
             mappings[slackUserId] = {
-              'real_name': item['real_name']?.toString() ?? '',
-              'display_name': item['display_name']?.toString() ?? '',
-              'avatar_url': item['avatar_url']?.toString() ?? '',
+              'real_name': item['slack_real_name']?.toString() ?? '',
+              'display_name': item['slack_display_name']?.toString() ?? '',
+              'avatar_url': item['slack_avatar_url']?.toString() ?? '',
               'member_id': item['member_id']?.toString() ?? '',
             };
           }
@@ -474,15 +474,22 @@ class CommitteeRepository {
 
     try {
       final channelId = await getSlackChannelId(committeeName);
-      if (channelId == null) return [];
+      if (channelId == null) {
+        print('No channel ID found for committee: $committeeName');
+        return [];
+      }
 
+      print('Fetching messages for channel: $channelId (committee: $committeeName)');
+
+      // Query messages without join - user info will be matched via getSlackUserMappings
       final data = await _readClient
           .from('slack_messages')
-          .select('*, slack_user_mapping(*)')
+          .select('id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, reactions')
           .eq('slack_channel_id', channelId)
           .order('posted_at', ascending: false)
           .range(offset, offset + limit - 1);
 
+      print('Found ${(data as List).length} messages');
       return (data as List<dynamic>).cast<Map<String, dynamic>>();
     } catch (e) {
       print('Error getting Slack messages: $e');
