@@ -199,14 +199,18 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
 
     final overallSendRate = totalGenerated > 0 ? (totalSent / totalGenerated * 100) : 0.0;
 
+    // Blue gradient colors matching Policy & Advocacy committee
+    const primaryBlue = Color(0xFF2B4B8C);  // royalBlue
+    const secondaryBlue = Color(0xFF5A7FA3);  // slateBlue
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: [Colors.purple.shade700, Colors.purple.shade900],
+          gradient: const LinearGradient(
+            colors: [primaryBlue, secondaryBlue],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -383,10 +387,10 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withOpacity(0.1),
+                      color: const Color(0xFF2B4B8C).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.campaign, color: Colors.purple),
+                    child: const Icon(Icons.campaign, color: Color(0xFF2B4B8C)),
                   ),
                   const SizedBox(width: 16),
                   Expanded(

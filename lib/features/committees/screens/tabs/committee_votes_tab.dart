@@ -8,8 +8,17 @@ import 'package:bluebubbles/features/forms/screens/votes/vote_detail_screen.dart
 
 class CommitteeVotesTab extends StatefulWidget {
   final Committee committee;
+  /// Callback to navigate to the email tab
+  final VoidCallback? onNavigateToEmail;
+  /// Callback to navigate to the messages tab
+  final VoidCallback? onNavigateToMessages;
 
-  const CommitteeVotesTab({Key? key, required this.committee}) : super(key: key);
+  const CommitteeVotesTab({
+    Key? key,
+    required this.committee,
+    this.onNavigateToEmail,
+    this.onNavigateToMessages,
+  }) : super(key: key);
 
   @override
   State<CommitteeVotesTab> createState() => _CommitteeVotesTabState();
@@ -168,7 +177,11 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => VoteDetailScreen(voteId: vote.id),
+        builder: (_) => VoteDetailScreen(
+          voteId: vote.id,
+          onSendAsEmail: widget.onNavigateToEmail,
+          onSendAsMessage: widget.onNavigateToMessages,
+        ),
       ),
     );
   }

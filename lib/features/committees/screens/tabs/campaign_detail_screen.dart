@@ -87,25 +87,29 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
   late TabController _tabController;
   final ScrollController _scrollController = ScrollController();
 
+  // Blue gradient colors matching Policy & Advocacy committee
+  static const _primaryBlue = Color(0xFF2B4B8C);  // royalBlue
+  static const _secondaryBlue = Color(0xFF5A7FA3);  // slateBlue
+
   static const List<Color> _chartColors = [
-    Color(0xFF6366F1), // Indigo
-    Color(0xFF8B5CF6), // Violet
+    Color(0xFF2B4B8C), // Royal Blue
+    Color(0xFF5A7FA3), // Slate Blue
+    Color(0xFF32A6DE), // Momentum Blue
+    Color(0xFF273351), // Unity Blue
+    Color(0xFF4682B4), // Steel Blue
+    Color(0xFF1E3A5F), // Navy Blue
     Color(0xFF10B981), // Emerald
     Color(0xFFF59E0B), // Amber
-    Color(0xFFEC4899), // Pink
     Color(0xFF3B82F6), // Blue
-    Color(0xFFEF4444), // Red
     Color(0xFF14B8A6), // Teal
-    Color(0xFFF97316), // Orange
-    Color(0xFF84CC16), // Lime
   ];
 
   static const _methodColors = {
-    'mail_app': Colors.blue,
-    'gmail': Colors.red,
-    'outlook': Colors.indigo,
-    'copy_paste': Colors.orange,
-    'auto_shortcut': Colors.green,
+    'mail_app': Color(0xFF2B4B8C),
+    'gmail': Color(0xFFEA4335),
+    'outlook': Color(0xFF0078D4),
+    'copy_paste': Color(0xFF5A7FA3),
+    'auto_shortcut': Color(0xFF32A6DE),
     'unknown': Colors.grey,
   };
 
@@ -135,38 +139,103 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.campaign.name),
-        backgroundColor: Colors.purple.shade700,
-        foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(text: 'Overview', icon: Icon(Icons.dashboard)),
-            Tab(text: 'Geography', icon: Icon(Icons.map)),
-            Tab(text: 'Participants', icon: Icon(Icons.people)),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildOverviewTab(theme, colorScheme),
-          _buildGeographyTab(theme, colorScheme),
-          _buildParticipantsTab(theme, colorScheme),
+          // Custom AppBar with gradient
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [_primaryBlue, _secondaryBlue],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header row
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(isMobile ? 4 : 16, 8, 16, 8),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.campaign.name,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Tab bar
+                  TabBar(
+                    controller: _tabController,
+                    indicatorColor: Colors.white,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white70,
+                    labelPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
+                    tabs: [
+                      Tab(
+                        icon: const Icon(Icons.dashboard, size: 20),
+                        text: isMobile ? null : 'Overview',
+                        iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
+                      ),
+                      Tab(
+                        icon: const Icon(Icons.map, size: 20),
+                        text: isMobile ? null : 'Geography',
+                        iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
+                      ),
+                      Tab(
+                        icon: const Icon(Icons.people, size: 20),
+                        text: isMobile ? null : 'Participants',
+                        iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Tab content - no swiping between tabs
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildOverviewTab(theme, colorScheme),
+                _buildGeographyTab(theme, colorScheme),
+                _buildParticipantsTab(theme, colorScheme),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildOverviewTab(ThemeData theme, ColorScheme colorScheme) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final padding = isMobile ? 16.0 : 24.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -178,16 +247,16 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: isMobile ? 16 : 24),
           ],
 
           // Key metrics row
           _buildMetricsRow(theme, colorScheme),
-          const SizedBox(height: 32),
+          SizedBox(height: isMobile ? 24 : 32),
 
           // Send method analysis with pie chart
           _buildSendMethodChart(theme, colorScheme),
-          const SizedBox(height: 32),
+          SizedBox(height: isMobile ? 24 : 32),
 
           // Participation timeline (bar chart)
           _buildParticipationTimeline(theme, colorScheme),
@@ -200,6 +269,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth > 600;
+        final isVerySmall = constraints.maxWidth < 360;
         // Per user request: sent should equal generated
         final displaySent = widget.campaign.totalGenerated;
         final displayRate = widget.campaign.totalGenerated > 0 ? 100.0 : 0.0;
@@ -207,27 +277,27 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
         final cards = [
           _buildMetricCard(
             icon: Icons.edit_note,
-            label: 'Emails Generated',
+            label: 'Generated',
             value: '${widget.campaign.totalGenerated}',
-            color: Colors.blue,
+            color: _primaryBlue,
           ),
           _buildMetricCard(
             icon: Icons.send,
-            label: 'Emails Sent',
+            label: 'Sent',
             value: '$displaySent',
-            color: Colors.green,
+            color: const Color(0xFF32A6DE), // momentumBlue
           ),
           _buildMetricCard(
             icon: Icons.people,
-            label: 'Unique Participants',
+            label: 'Participants',
             value: '${widget.campaign.uniqueParticipants}',
-            color: Colors.purple,
+            color: _secondaryBlue,
           ),
           _buildMetricCard(
             icon: Icons.percent,
             label: 'Send Rate',
-            value: '${displayRate.toStringAsFixed(1)}%',
-            color: Colors.orange,
+            value: '${displayRate.toStringAsFixed(0)}%',
+            color: const Color(0xFF4682B4), // steelBlue
           ),
         ];
 
@@ -240,11 +310,12 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           );
         }
 
+        final spacing = isVerySmall ? 8.0 : 12.0;
         return Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: spacing,
+          runSpacing: spacing,
           children: cards.map((card) => SizedBox(
-            width: (constraints.maxWidth - 12) / 2,
+            width: (constraints.maxWidth - spacing) / 2,
             child: card,
           )).toList(),
         );
@@ -258,33 +329,39 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     required String value,
     required Color color,
   }) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isVerySmall = screenWidth < 360;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isVerySmall ? 10 : (isMobile ? 12 : 16)),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 12),
+          Icon(icon, color: color, size: isVerySmall ? 18 : (isMobile ? 20 : 24)),
+          SizedBox(height: isVerySmall ? 6 : (isMobile ? 8 : 12)),
           Text(
             value,
             style: TextStyle(
-              fontSize: 28,
+              fontSize: isVerySmall ? 20 : (isMobile ? 22 : 28),
               fontWeight: FontWeight.bold,
               color: color,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: isVerySmall ? 10 : 12,
               color: color.withOpacity(0.8),
             ),
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -296,108 +373,175 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     if (breakdown.isEmpty) return const SizedBox.shrink();
 
     final total = breakdown.values.fold(0, (sum, count) => sum + count);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isVerySmall = screenWidth < 400;
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.pie_chart, color: Colors.teal),
+                Icon(Icons.pie_chart, color: _primaryBlue, size: isMobile ? 20 : 24),
                 const SizedBox(width: 8),
-                Text(
-                  'Send Method Analysis',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    'Send Method Analysis',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 250,
-              child: Row(
-                children: [
-                  // Pie chart
-                  Expanded(
-                    flex: 2,
-                    child: PieChart(
-                      PieChartData(
-                        sectionsSpace: 2,
-                        centerSpaceRadius: 50,
-                        sections: breakdown.entries.toList().asMap().entries.map((entry) {
-                          final method = entry.value.key;
-                          final count = entry.value.value;
-                          final percentage = total > 0 ? (count / total * 100) : 0.0;
-                          final color = _methodColors[method] ?? _chartColors[entry.key % _chartColors.length];
+            SizedBox(height: isMobile ? 16 : 24),
+            // Stack chart and legend vertically on mobile
+            if (isMobile) ...[
+              SizedBox(
+                height: isVerySmall ? 160 : 200,
+                child: PieChart(
+                  PieChartData(
+                    sectionsSpace: 2,
+                    centerSpaceRadius: isVerySmall ? 30 : 40,
+                    sections: breakdown.entries.toList().asMap().entries.map((entry) {
+                      final method = entry.value.key;
+                      final count = entry.value.value;
+                      final percentage = total > 0 ? (count / total * 100) : 0.0;
+                      final color = _methodColors[method] ?? _chartColors[entry.key % _chartColors.length];
 
-                          return PieChartSectionData(
-                            value: count.toDouble(),
-                            title: '${percentage.toStringAsFixed(0)}%',
-                            color: color,
-                            radius: 80,
-                            titleStyle: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                      return PieChartSectionData(
+                        value: count.toDouble(),
+                        title: '${percentage.toStringAsFixed(0)}%',
+                        color: color,
+                        radius: isVerySmall ? 50 : 60,
+                        titleStyle: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: isVerySmall ? 10 : 11,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Legend as horizontal wrap on mobile
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: breakdown.entries.map((entry) {
+                  final method = entry.key;
+                  final count = entry.value;
+                  final color = _methodColors[method] ?? Colors.grey;
+                  final label = _methodLabels[method] ?? method;
+
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$label ($count)',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ] else ...[
+              SizedBox(
+                height: 250,
+                child: Row(
+                  children: [
+                    // Pie chart
+                    Expanded(
+                      flex: 2,
+                      child: PieChart(
+                        PieChartData(
+                          sectionsSpace: 2,
+                          centerSpaceRadius: 50,
+                          sections: breakdown.entries.toList().asMap().entries.map((entry) {
+                            final method = entry.value.key;
+                            final count = entry.value.value;
+                            final percentage = total > 0 ? (count / total * 100) : 0.0;
+                            final color = _methodColors[method] ?? _chartColors[entry.key % _chartColors.length];
+
+                            return PieChartSectionData(
+                              value: count.toDouble(),
+                              title: '${percentage.toStringAsFixed(0)}%',
+                              color: color,
+                              radius: 80,
+                              titleStyle: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    // Legend
+                    Expanded(
+                      flex: 1,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: breakdown.entries.map((entry) {
+                          final method = entry.key;
+                          final count = entry.value;
+                          final color = _methodColors[method] ?? Colors.grey;
+                          final label = _methodLabels[method] ?? method;
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    label,
+                                    style: theme.textTheme.bodySmall,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  '$count',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
                           );
                         }).toList(),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 24),
-                  // Legend
-                  Expanded(
-                    flex: 1,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: breakdown.entries.map((entry) {
-                        final method = entry.key;
-                        final count = entry.value;
-                        final color = _methodColors[method] ?? Colors.grey;
-                        final label = _methodLabels[method] ?? method;
-
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  label,
-                                  style: theme.textTheme.bodySmall,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Text(
-                                '$count',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

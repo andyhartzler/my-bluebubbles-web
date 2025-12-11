@@ -119,7 +119,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
       _TabDefinition(
         label: 'Votes',
         icon: Icons.how_to_vote_outlined,
-        builder: () => CommitteeVotesTab(committee: committee),
+        builder: () => CommitteeVotesTab(
+          committee: committee,
+          onNavigateToEmail: () => _navigateToTab(3),  // Email tab is at index 3
+          onNavigateToMessages: () => _navigateToTab(4),  // Messages tab is at index 4
+        ),
       ),
     ];
 
@@ -278,12 +282,16 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isVerySmall = screenWidth < 400;
+
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             SliverAppBar(
-              expandedHeight: 200,
+              expandedHeight: isMobile ? 140 : 200,
               floating: false,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
@@ -292,9 +300,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
               bottom: TabBar(
                 controller: _tabController,
                 isScrollable: true,
+                labelPadding: EdgeInsets.symmetric(horizontal: isVerySmall ? 8 : (isMobile ? 12 : 16)),
                 tabs: _tabs.map((tab) => Tab(
-                  icon: tab.iconWidget ?? Icon(tab.icon),
-                  text: tab.label,
+                  icon: tab.iconWidget ?? Icon(tab.icon, size: isMobile ? 20 : 24),
+                  text: isVerySmall ? null : tab.label,
+                  iconMargin: EdgeInsets.only(bottom: isVerySmall ? 0 : 4),
                 )).toList(),
               ),
             ),
@@ -311,6 +321,9 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
 
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isVerySmall = screenWidth < 400;
 
     return Container(
       decoration: BoxDecoration(
@@ -323,7 +336,12 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(72, 16, 24, 60),
+          padding: EdgeInsets.fromLTRB(
+            isMobile ? 56 : 72,
+            isMobile ? 8 : 16,
+            isMobile ? 16 : 24,
+            isMobile ? 40 : 60,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -332,15 +350,15 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                 child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 28,
+                      radius: isMobile ? 20 : 28,
                       backgroundColor: Colors.white.withOpacity(0.2),
                       child: Icon(
                         committee.icon,
                         color: Colors.white,
-                        size: 28,
+                        size: isMobile ? 20 : 28,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: isMobile ? 12 : 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,29 +367,31 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                         children: [
                           Text(
                             committee.displayName,
-                            style: theme.textTheme.headlineSmall?.copyWith(
+                            style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.headlineSmall)?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            committee.description,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withOpacity(0.9),
+                          if (!isVerySmall) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              committee.description,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white.withOpacity(0.9),
+                              ),
+                              maxLines: isMobile ? 1 : 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          ],
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              if (!isMobile) const SizedBox(width: 16),
 
               // Right side: Leadership section
               _buildLeadershipSection(context),
@@ -383,6 +403,14 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
   }
 
   Widget _buildLeadershipSection(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    // Hide leadership section on mobile - shown elsewhere
+    if (isMobile) {
+      return const SizedBox.shrink();
+    }
+
     if (_loadingLeaders) {
       return SizedBox(
         width: 16,

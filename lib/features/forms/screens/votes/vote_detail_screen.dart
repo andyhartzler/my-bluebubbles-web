@@ -7,6 +7,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/features/committees/services/pending_share_content.dart';
 import '../../models/voting_form.dart';
 import '../../models/vote_analytics.dart';
 import '../../services/votes_service.dart';
@@ -17,8 +18,17 @@ import 'vote_builder_screen.dart';
 
 class VoteDetailScreen extends StatefulWidget {
   final String voteId;
+  /// Optional callback to navigate to the email tab (when opened from committee context)
+  final VoidCallback? onSendAsEmail;
+  /// Optional callback to navigate to the messages tab (when opened from committee context)
+  final VoidCallback? onSendAsMessage;
 
-  const VoteDetailScreen({Key? key, required this.voteId}) : super(key: key);
+  const VoteDetailScreen({
+    Key? key,
+    required this.voteId,
+    this.onSendAsEmail,
+    this.onSendAsMessage,
+  }) : super(key: key);
 
   @override
   State<VoteDetailScreen> createState() => _VoteDetailScreenState();
@@ -573,9 +583,82 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
               ),
             ),
           ),
+          // Committee-specific share options
+          if (widget.onSendAsEmail != null || widget.onSendAsMessage != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (widget.onSendAsEmail != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _sendAsEmail(vote),
+                      icon: const Icon(Icons.email_outlined, size: 18),
+                      label: const Text('Send as Email'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                if (widget.onSendAsEmail != null && widget.onSendAsMessage != null)
+                  const SizedBox(width: 8),
+                if (widget.onSendAsMessage != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _sendAsMessage(vote),
+                      icon: const Icon(Icons.message_outlined, size: 18),
+                      label: const Text('Send as Message'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  void _sendAsEmail(VotingForm vote) {
+    final shareUrl = _getShareUrl();
+    if (shareUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to get vote link')),
+      );
+      return;
+    }
+
+    // Set pending email content
+    PendingShareContent().setVoteEmailContent(
+      voteTitle: vote.title,
+      voteUrl: shareUrl,
+      voteDescription: vote.description,
+    );
+
+    // Navigate back and trigger callback
+    Navigator.pop(context);
+    widget.onSendAsEmail?.call();
+  }
+
+  void _sendAsMessage(VotingForm vote) {
+    final shareUrl = _getShareUrl();
+    if (shareUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to get vote link')),
+      );
+      return;
+    }
+
+    // Set pending message content
+    PendingShareContent().setVoteMessageContent(
+      voteTitle: vote.title,
+      voteUrl: shareUrl,
+    );
+
+    // Navigate back and trigger callback
+    Navigator.pop(context);
+    widget.onSendAsMessage?.call();
   }
 
   Widget _buildStatusChip(ThemeData theme, VotingForm vote) {

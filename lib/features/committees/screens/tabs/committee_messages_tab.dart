@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/services/pending_share_content.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
@@ -44,7 +45,22 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+
+    // Check for pending message content (e.g., from vote share)
+    _checkPendingMessageContent();
+
     _loadMembers();
+  }
+
+  void _checkPendingMessageContent() {
+    final pending = PendingShareContent();
+    if (pending.hasPendingMessage) {
+      if (pending.pendingMessageBody != null) {
+        _messageController.text = pending.pendingMessageBody!;
+      }
+      // Clear the pending content
+      pending.clearPendingMessage();
+    }
   }
 
   @override
