@@ -104,6 +104,12 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
   List<Offset> _currentDrawingPoints = [];
   bool _isDrawing = false;
 
+  // Resize state
+  String? _resizingNodeId;
+  _ResizeHandle? _activeResizeHandle;
+  Size? _resizeStartSize;
+  Offset? _resizeStartPosition;
+
   Committee get committee => widget.committee;
   bool get _isFullscreen => widget.isFullscreen;
 
@@ -452,13 +458,34 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       final result = await _canvasFileService.uploadImageFromGallery(_board!.id);
       if (result == null) return;
 
+      // Calculate node size based on actual image dimensions
+      // Max size is 600px on the longest side, maintaining aspect ratio
+      const maxSize = 600.0;
+      const minSize = 100.0;
+      double nodeWidth = result.width?.toDouble() ?? 300;
+      double nodeHeight = result.height?.toDouble() ?? 200;
+
+      // Scale down if larger than max size
+      if (nodeWidth > maxSize || nodeHeight > maxSize) {
+        final scale = maxSize / math.max(nodeWidth, nodeHeight);
+        nodeWidth *= scale;
+        nodeHeight *= scale;
+      }
+
+      // Ensure minimum size
+      if (nodeWidth < minSize && nodeHeight < minSize) {
+        final scale = minSize / math.min(nodeWidth, nodeHeight);
+        nodeWidth *= scale;
+        nodeHeight *= scale;
+      }
+
       await _addNode(CanvasNode(
         id: '',
         boardId: _board!.id,
-        offsetX: _getViewportCenter().dx,
-        offsetY: _getViewportCenter().dy,
-        width: 250,
-        height: 200,
+        offsetX: _getViewportCenter().dx - nodeWidth / 2,
+        offsetY: _getViewportCenter().dy - nodeHeight / 2,
+        width: nodeWidth,
+        height: nodeHeight,
         nodeType: CanvasNodeType.image,
         imageUrl: result.imageUrl,
         imageThumbnailUrl: result.thumbnailUrl,
@@ -1032,20 +1059,184 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       node.offsetY * _zoomLevel + _viewportOffset.dy,
     );
 
+    final scaledWidth = node.width * _zoomLevel;
+    final scaledHeight = node.height * _zoomLevel;
+
     return Positioned(
       left: position.dx,
       top: position.dy,
-      child: Transform.scale(
-        scale: _zoomLevel,
-        alignment: Alignment.topLeft,
-        child: GestureDetector(
-          onPanStart: (details) => _onNodeDragStart(node, details),
-          onPanUpdate: (details) => _onNodeDragUpdate(node, details),
-          onPanEnd: (details) => _onNodeDragEnd(node),
-          child: _buildNodeWidget(node, isSelected, isEditing),
+      child: SizedBox(
+        width: scaledWidth,
+        height: scaledHeight,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Main node content
+            Transform.scale(
+              scale: _zoomLevel,
+              alignment: Alignment.topLeft,
+              child: GestureDetector(
+                onPanStart: (details) => _onNodeDragStart(node, details),
+                onPanUpdate: (details) => _onNodeDragUpdate(node, details),
+                onPanEnd: (details) => _onNodeDragEnd(node),
+                child: _buildNodeWidget(node, isSelected, isEditing),
+              ),
+            ),
+            // Resize handles (only show when selected)
+            if (isSelected && !isEditing) ...[
+              _buildResizeHandle(node, _ResizeHandle.topLeft),
+              _buildResizeHandle(node, _ResizeHandle.topRight),
+              _buildResizeHandle(node, _ResizeHandle.bottomLeft),
+              _buildResizeHandle(node, _ResizeHandle.bottomRight),
+            ],
+          ],
         ),
       ),
     );
+  }
+
+  Widget _buildResizeHandle(CanvasNode node, _ResizeHandle handle) {
+    const handleSize = 12.0;
+    const hitAreaSize = 24.0;
+
+    double? left, right, top, bottom;
+    switch (handle) {
+      case _ResizeHandle.topLeft:
+        left = -handleSize / 2;
+        top = -handleSize / 2;
+        break;
+      case _ResizeHandle.topRight:
+        right = -handleSize / 2;
+        top = -handleSize / 2;
+        break;
+      case _ResizeHandle.bottomLeft:
+        left = -handleSize / 2;
+        bottom = -handleSize / 2;
+        break;
+      case _ResizeHandle.bottomRight:
+        right = -handleSize / 2;
+        bottom = -handleSize / 2;
+        break;
+    }
+
+    return Positioned(
+      left: left,
+      right: right,
+      top: top,
+      bottom: bottom,
+      child: GestureDetector(
+        onPanStart: (details) => _onResizeStart(node, handle, details),
+        onPanUpdate: (details) => _onResizeUpdate(node, handle, details),
+        onPanEnd: (details) => _onResizeEnd(node),
+        child: MouseRegion(
+          cursor: _getResizeCursor(handle),
+          child: Container(
+            width: hitAreaSize,
+            height: hitAreaSize,
+            alignment: Alignment.center,
+            child: Container(
+              width: handleSize,
+              height: handleSize,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
+                borderRadius: BorderRadius.circular(3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  MouseCursor _getResizeCursor(_ResizeHandle handle) {
+    switch (handle) {
+      case _ResizeHandle.topLeft:
+      case _ResizeHandle.bottomRight:
+        return SystemMouseCursors.resizeUpLeftDownRight;
+      case _ResizeHandle.topRight:
+      case _ResizeHandle.bottomLeft:
+        return SystemMouseCursors.resizeUpRightDownLeft;
+    }
+  }
+
+  void _onResizeStart(CanvasNode node, _ResizeHandle handle, DragStartDetails details) {
+    setState(() {
+      _resizingNodeId = node.id;
+      _activeResizeHandle = handle;
+      _resizeStartSize = Size(node.width, node.height);
+      _resizeStartPosition = Offset(node.offsetX, node.offsetY);
+    });
+  }
+
+  void _onResizeUpdate(CanvasNode node, _ResizeHandle handle, DragUpdateDetails details) {
+    if (_resizingNodeId != node.id || _resizeStartSize == null || _resizeStartPosition == null) return;
+
+    final delta = details.delta / _zoomLevel;
+    final index = _nodes.indexWhere((n) => n.id == node.id);
+    if (index == -1) return;
+
+    double newWidth = node.width;
+    double newHeight = node.height;
+    double newOffsetX = node.offsetX;
+    double newOffsetY = node.offsetY;
+
+    // Minimum size constraints
+    const minWidth = 50.0;
+    const minHeight = 50.0;
+
+    switch (handle) {
+      case _ResizeHandle.topLeft:
+        newWidth = math.max(minWidth, node.width - delta.dx);
+        newHeight = math.max(minHeight, node.height - delta.dy);
+        if (node.width - delta.dx >= minWidth) newOffsetX = node.offsetX + delta.dx;
+        if (node.height - delta.dy >= minHeight) newOffsetY = node.offsetY + delta.dy;
+        break;
+      case _ResizeHandle.topRight:
+        newWidth = math.max(minWidth, node.width + delta.dx);
+        newHeight = math.max(minHeight, node.height - delta.dy);
+        if (node.height - delta.dy >= minHeight) newOffsetY = node.offsetY + delta.dy;
+        break;
+      case _ResizeHandle.bottomLeft:
+        newWidth = math.max(minWidth, node.width - delta.dx);
+        newHeight = math.max(minHeight, node.height + delta.dy);
+        if (node.width - delta.dx >= minWidth) newOffsetX = node.offsetX + delta.dx;
+        break;
+      case _ResizeHandle.bottomRight:
+        newWidth = math.max(minWidth, node.width + delta.dx);
+        newHeight = math.max(minHeight, node.height + delta.dy);
+        break;
+    }
+
+    setState(() {
+      _nodes[index] = node.copyWith(
+        width: newWidth,
+        height: newHeight,
+        offsetX: newOffsetX,
+        offsetY: newOffsetY,
+      );
+    });
+    _debounceSave();
+  }
+
+  void _onResizeEnd(CanvasNode node) {
+    if (_resizingNodeId == node.id) {
+      // Save the final size
+      _saveNodes();
+    }
+    setState(() {
+      _resizingNodeId = null;
+      _activeResizeHandle = null;
+      _resizeStartSize = null;
+      _resizeStartPosition = null;
+    });
   }
 
   Widget _buildNodeWidget(CanvasNode node, bool isSelected, bool isEditing) {
@@ -1689,4 +1880,12 @@ class _DrawingPainter extends CustomPainter {
         oldDelegate.color != color ||
         oldDelegate.strokeWidth != strokeWidth;
   }
+}
+
+/// Resize handle positions
+enum _ResizeHandle {
+  topLeft,
+  topRight,
+  bottomLeft,
+  bottomRight,
 }
