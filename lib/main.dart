@@ -35,6 +35,7 @@ import 'package:bluebubbles/screens/crm/donors_list_screen.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
 import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
+import 'package:bluebubbles/features/committees/screens/committees_dashboard_screen.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/listmonk_webview_screen.dart';
 import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
@@ -483,6 +484,7 @@ enum _HomeSection {
   donors,
   subscribers,
   chapters,
+  committees,
   meetings,
   events,
   memberPortal,
@@ -768,6 +770,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                         embed: true,
                         showChaptersOnly: true,
                       ),
+                      const CommitteesDashboardScreen(key: PageStorageKey('committees-view'), embed: true),
                       const MeetingsScreen(key: PageStorageKey('meetings-view')),
                       const EventsScreen(key: PageStorageKey('events-view')),
                       const MemberPortalManagementScreen(
@@ -917,6 +920,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             _buildNavButton(context, _HomeSection.donors, 'Donors', Icons.volunteer_activism_outlined, enabled: crmReady, hideIcon: hideIcons),
             _buildNavButton(context, _HomeSection.subscribers, 'Subscribers', Icons.mark_email_unread_outlined, enabled: crmReady, hideIcon: hideIcons),
             _buildNavButton(context, _HomeSection.chapters, 'Chapters', Icons.account_tree_outlined, enabled: crmReady, hideIcon: hideIcons),
+            _buildNavButton(context, _HomeSection.committees, 'Committees', Icons.groups_3_outlined, enabled: crmReady, hideIcon: hideIcons),
             _buildNavButton(context, _HomeSection.meetings, 'Meetings', Icons.video_camera_front_outlined, enabled: crmReady, hideIcon: hideIcons),
             _buildNavButton(context, _HomeSection.events, 'Events', Icons.event_available_outlined, enabled: crmReady, hideIcon: hideIcons),
             _buildNavButton(context, _HomeSection.memberPortal, 'Member Portal', Icons.admin_panel_settings_outlined, enabled: crmReady, hideIcon: hideIcons),
@@ -1154,6 +1158,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   ),
                   buildItem(
                     order: 5,
+                    icon: Icons.groups_3_outlined,
+                    label: 'Committees',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady ? () => _setSection(_HomeSection.committees) : null,
+                  ),
+                  buildItem(
+                    order: 6,
                     icon: Icons.video_camera_front_outlined,
                     label: 'Meetings',
                     enabled: crmReady,
@@ -1161,7 +1173,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.meetings) : null,
                   ),
                   buildItem(
-                    order: 6,
+                    order: 7,
                     icon: Icons.event_available_outlined,
                     label: 'Events',
                     enabled: crmReady,
@@ -1169,7 +1181,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.events) : null,
                   ),
                   buildItem(
-                    order: 7,
+                    order: 8,
                     icon: Icons.admin_panel_settings_outlined,
                     label: 'Member Portal',
                     enabled: crmReady,
@@ -1177,7 +1189,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.memberPortal) : null,
                   ),
                   buildItem(
-                    order: 8,
+                    order: 9,
                     icon: Icons.notifications_active_outlined,
                     label: 'Wallet Notifications',
                     enabled: crmReady,
@@ -1185,7 +1197,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.walletNotifications) : null,
                   ),
                   buildItem(
-                    order: 9,
+                    order: 10,
                     icon: Icons.campaign_outlined,
                     label: 'Campaigns',
                     enabled: crmReady,
@@ -1193,7 +1205,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.campaigns) : null,
                   ),
                   buildItem(
-                    order: 10,
+                    order: 11,
                     icon: Icons.dynamic_form_outlined,
                     label: 'Forms',
                     enabled: crmReady,
@@ -1201,14 +1213,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.forms) : null,
                   ),
                   buildItem(
-                    order: 11,
+                    order: 12,
                     icon: Icons.chat_bubble_outline,
                     label: 'Conversations',
                     onActivate: () => _setSection(_HomeSection.conversations),
                   ),
                   const Divider(),
                   buildItem(
-                    order: 12,
+                    order: 13,
                     icon: Icons.search,
                     label: 'Search CRM',
                     enabled: crmReady,
@@ -1216,19 +1228,19 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _openGlobalSearch(parentContext) : null,
                   ),
                   buildItem(
-                    order: 13,
+                    order: 14,
                     icon: Icons.add_comment,
                     label: 'New Message',
                     onActivate: () => _openNewMessage(parentContext),
                   ),
                   buildItem(
-                    order: 14,
+                    order: 15,
                     icon: Icons.email_outlined,
                     label: 'New Email',
                     onActivate: () => _openNewEmail(parentContext),
                   ),
                   buildItem(
-                    order: 15,
+                    order: 16,
                     icon: Icons.settings_outlined,
                     label: 'Settings',
                     onActivate: () => Actions.invoke(parentContext, const OpenSettingsIntent()),

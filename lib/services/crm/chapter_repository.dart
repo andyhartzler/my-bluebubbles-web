@@ -20,14 +20,19 @@ class ChapterRepository {
 
   SupabaseClient get _writeClient => _supabase.privilegedClient;
 
-  Future<List<Chapter>> getAllChapters() async {
+  Future<List<Chapter>> getAllChapters({String? chapterType}) async {
     if (!_isReady) return [];
 
     try {
-      final response = await _readClient
+      var query = _readClient
           .from('chapters')
-          .select()
-          .order('standardized_name', ascending: true);
+          .select();
+
+      if (chapterType != null && chapterType.isNotEmpty) {
+        query = query.eq('chapter_type', chapterType);
+      }
+
+      final response = await query.order('standardized_name', ascending: true);
 
       return (response as List<dynamic>)
           .map((json) => Chapter.fromJson(json as Map<String, dynamic>))
