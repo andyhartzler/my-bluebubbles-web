@@ -453,11 +453,12 @@ class CommitteeRepository {
           .count(CountOption.exact);
       stats['charteredCollegeChapters'] = charteredResponse.count ?? 0;
 
-      // Unique colleges represented (from members table)
+      // Unique colleges represented (from members in this committee only)
       final collegeData = await _readClient
           .from('members')
           .select('college')
-          .not('college', 'is', null);
+          .not('college', 'is', null)
+          .contains('committee', ['College Democrats']);
 
       final uniqueColleges = <String>{};
       for (final item in collegeData as List<dynamic>) {
@@ -500,11 +501,12 @@ class CommitteeRepository {
           .count(CountOption.exact);
       stats['charteredHSChapters'] = charteredResponse.count ?? 0;
 
-      // Unique high schools represented (from members table)
+      // Unique high schools represented (from members in this committee only)
       final hsData = await _readClient
           .from('members')
           .select('high_school')
-          .not('high_school', 'is', null);
+          .not('high_school', 'is', null)
+          .contains('committee', ['High School Democrats']);
 
       final uniqueHS = <String>{};
       for (final item in hsData as List<dynamic>) {
