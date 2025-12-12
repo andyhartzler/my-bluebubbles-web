@@ -351,7 +351,9 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
           prefixIcon: const Icon(Icons.pin_outlined),
           counterText: '',
         ),
+        autofillHints: const [AutofillHints.oneTimeCode],
         keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         maxLength: 6,
         textInputAction: TextInputAction.done,
         enabled: !_isVerifyingCode,
@@ -453,133 +455,145 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
               ),
             ),
           ),
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Card(
-                      elevation: 8,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Sign in to Missouri Young Democrats',
-                              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 20),
-                            TextField(
-                              controller: _emailController,
-                              focusNode: _emailFocusNode,
-                              decoration: InputDecoration(
-                                labelText: 'Email address',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                prefixIcon: const Icon(Icons.mail_outline),
-                              ),
-                              autofillHints: const [AutofillHints.email],
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.send,
-                              enabled: !_showCodeInput,
-                              onSubmitted: (_) => _sendMagicLink(),
-                              onChanged: (_) {
-                                if (_errorMessage != null) {
-                                  setState(() {
-                                    _errorMessage = null;
-                                  });
-                                }
-                              },
-                            ),
-                            if (_showCodeInput) ..._buildCodeEntrySection(theme),
-                            const SizedBox(height: 16),
-                            if (_errorMessage != null)
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE63946).withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFE63946).withOpacity(0.6)),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(Icons.error_outline, color: Color(0xFFE63946)),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        _errorMessage!,
-                                        style: textTheme.bodyMedium?.copyWith(color: const Color(0xFFE63946)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            if (_successMessage != null)
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF43A047).withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFF43A047).withOpacity(0.6)),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(Icons.check_circle_outline, color: Color(0xFF43A047)),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        _successMessage!,
-                                        style: textTheme.bodyMedium?.copyWith(color: const Color(0xFF43A047)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            if (!_showCodeInput) ...[
-                              const SizedBox(height: 16),
-                              FilledButton.icon(
-                                onPressed: _isSending
-                                    ? null
-                                    : () {
-                                        FocusScope.of(context).unfocus();
-                                        _sendMagicLink();
-                                      },
-                                icon: _isSending
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                                      )
-                                    : const Icon(Icons.arrow_forward),
-                                label: Text(_isSending ? 'Sending...' : 'Send magic link'),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF32A6DE),
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 12),
-                            Text(
-                              'We\'ll email you a secure sign-in link. Access is limited to the executive leadership team.',
-                              textAlign: TextAlign.center,
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: textTheme.bodySmall?.color?.withOpacity(0.7)),
-                            ),
-                          ],
-                        ),
-                      ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: constraints.maxHeight > 600 ? 24.0 : 16.0,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: 420,
+                      minHeight: constraints.maxHeight - 48,
                     ),
-                  ],
-                ),
-              ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AutofillGroup(
+                          child: Card(
+                            elevation: 8,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    'Sign in to Missouri Young Democrats',
+                                    style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  TextField(
+                                    controller: _emailController,
+                                    focusNode: _emailFocusNode,
+                                    decoration: InputDecoration(
+                                      labelText: 'Email address',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                      prefixIcon: const Icon(Icons.mail_outline),
+                                    ),
+                                    autofillHints: const [AutofillHints.email],
+                                    keyboardType: TextInputType.emailAddress,
+                                    textInputAction: TextInputAction.send,
+                                    enabled: !_showCodeInput,
+                                    onSubmitted: (_) => _sendMagicLink(),
+                                    onChanged: (_) {
+                                      if (_errorMessage != null) {
+                                        setState(() {
+                                          _errorMessage = null;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                  if (_showCodeInput) ..._buildCodeEntrySection(theme),
+                                  const SizedBox(height: 16),
+                                  if (_errorMessage != null)
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE63946).withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: const Color(0xFFE63946).withOpacity(0.6)),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Icon(Icons.error_outline, color: Color(0xFFE63946)),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              _errorMessage!,
+                                              style: textTheme.bodyMedium?.copyWith(color: const Color(0xFFE63946)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  if (_successMessage != null)
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF43A047).withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: const Color(0xFF43A047).withOpacity(0.6)),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Icon(Icons.check_circle_outline, color: Color(0xFF43A047)),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              _successMessage!,
+                                              style: textTheme.bodyMedium?.copyWith(color: const Color(0xFF43A047)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  if (!_showCodeInput) ...[
+                                    const SizedBox(height: 16),
+                                    FilledButton.icon(
+                                      onPressed: _isSending
+                                          ? null
+                                          : () {
+                                              FocusScope.of(context).unfocus();
+                                              _sendMagicLink();
+                                            },
+                                      icon: _isSending
+                                          ? const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(strokeWidth: 2.5),
+                                            )
+                                          : const Icon(Icons.arrow_forward),
+                                      label: Text(_isSending ? 'Sending...' : 'Send magic link'),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: const Color(0xFF32A6DE),
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'We\'ll email you a secure sign-in link. Access is limited to the executive leadership team.',
+                                    textAlign: TextAlign.center,
+                                    style: textTheme.bodySmall
+                                        ?.copyWith(color: textTheme.bodySmall?.color?.withOpacity(0.7)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
