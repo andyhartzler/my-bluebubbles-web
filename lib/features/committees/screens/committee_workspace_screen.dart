@@ -300,6 +300,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
               expandedHeight: 200,
               floating: false,
               pinned: true,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Back to committees',
+              ),
               flexibleSpace: FlexibleSpaceBar(
                 background: _buildHeader(context),
               ),

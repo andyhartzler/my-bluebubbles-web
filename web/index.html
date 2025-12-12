@@ -1,37 +1,50 @@
 <!DOCTYPE html><html><head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="/">
+  <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Send iMessages on Web using BlueBubbles!">
+
+  <!-- CRITICAL: Viewport for fullscreen PWA -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <!-- CRITICAL: App name for iOS home screen -->
+  <meta name="apple-mobile-web-app-title" content="MOYD App">
+  <meta name="application-name" content="MOYD App">
+
+  <!-- iOS PWA Configuration -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Android PWA Configuration -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1a1a2e">
+
+  <!-- Prevent auto-detection -->
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- Description -->
+  <meta name="description" content="Missouri Young Democrats CRM">
+
+  <!-- SEO robots -->
   <meta name="robots" content="noindex, nofollow">
   <meta name="googlebot" content="noindex, nofollow">
   <meta http-equiv="X-Robots-Tag" content="noindex, nofollow">
 
-  <!-- iOS meta tags & icons -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="BlueBubbles">
+  <!-- Apple Touch Icon -->
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png">
+
+  <!-- Manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- CRITICAL: Page title (shows in browser tab and as fallback name) -->
+  <title>MOYD App</title>
 
   <!-- Google auth details -->
   <meta name="google-signin-client_id" content="500464701389-8trcdkcj7ni5l4dn6n7l795rhb1asnh3.apps.googleusercontent.com">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/x-icon" href="icons/favicon.ico">
 
   <!-- Apple MapKit JS Library -->
   <script
@@ -73,28 +86,20 @@
     };
   </script>
 
-  <title>BlueBubbles</title>
-  <link rel="manifest" href="manifest.json">
-
   <script>
     // The value below is injected by flutter build, do not touch.
     const serviceWorkerVersion = '{{flutter_service_worker_version}}';
   </script>
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer=""></script>
-  
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  
-  <style id="splash-screen-style">
-    html {
-      height: 100%
-    }
 
-    body {
+  <style>
+    html, body {
+      height: 100%;
       margin: 0;
-      min-height: 100%;
-      background-color: #FFFFFF;
-          background-size: 100% 100%;
+      padding: 0;
+      overflow: hidden;
+      background-color: #0d0d1a;
     }
 
     .center {
@@ -145,8 +150,8 @@
 
     @media (prefers-color-scheme: dark) {
       body {
-        background-color: #000000;
-          }
+        background-color: #0d0d1a;
+      }
     }
   </style>
   <script id="splash-screen-script">
@@ -163,7 +168,7 @@
       <source srcset="splash/img/dark-1x.png 1x, splash/img/dark-2x.png 2x, splash/img/dark-3x.png 3x, splash/img/dark-4x.png 4x" media="(prefers-color-scheme: dark)">
       <img class="center" aria-hidden="true" src="splash/img/light-1x.png" alt="">
   </picture>
-  
+
   <script>
     function showInitializationError(message) {
       removeSplashFromWeb();
@@ -197,7 +202,7 @@
         ].join(';');
 
         const title = document.createElement('h2');
-        title.textContent = 'BlueBubbles failed to load';
+        title.textContent = 'MOYD App failed to load';
         title.style.margin = '0 0 12px 0';
 
         const body = document.createElement('p');
@@ -220,7 +225,7 @@
       const loader = window._flutter?.loader;
       if (!loader) {
         console.error('Flutter loader not found. Ensure flutter.js is loaded.');
-        showInitializationError('BlueBubbles could not start because a required file failed to load. Please refresh the page or try a different browser.');
+        showInitializationError('MOYD App could not start because a required file failed to load. Please refresh the page or try a different browser.');
         return;
       }
 
@@ -257,13 +262,13 @@
               })
               .catch(function (err) {
                 console.error('Failed to initialize Flutter engine', err);
-                showInitializationError('BlueBubbles could not start because your browser is missing required capabilities. Please refresh the page or try a different device or browser.');
+                showInitializationError('MOYD App could not start because your browser is missing required capabilities. Please refresh the page or try a different device or browser.');
               });
           },
         })
         .catch(function (err) {
           console.error('Failed to load Flutter entrypoint', err);
-          showInitializationError('BlueBubbles could not start because critical resources failed to load. Please refresh the page and try again.');
+          showInitializationError('MOYD App could not start because critical resources failed to load. Please refresh the page and try again.');
         });
     });
   </script>

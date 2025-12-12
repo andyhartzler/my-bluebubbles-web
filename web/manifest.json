@@ -1,23 +1,39 @@
 {
-  "name": "BlueBubbles",
-  "short_name": "BlueBubbles",
-  "start_url": ".",
+  "name": "MOYD App",
+  "short_name": "MOYD App",
+  "description": "Missouri Young Democrats CRM - Member management and communications platform",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#4990de",
-  "theme_color": "#4990de",
-  "description": "Send iMessages on Web using BlueBubbles!",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
+  "theme_color": "#1a1a2e",
+  "background_color": "#0d0d1a",
+  "scope": "/",
   "prefer_related_applications": false,
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "icons/Icon-128.png",
-      "sizes": "128x128",
-      "type": "image/png"
+      "src": "icons/Icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "icons/Icon-256.png",
-      "sizes": "256x256",
-      "type": "image/png"
+      "src": "icons/Icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/Icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/Icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
