@@ -93,6 +93,25 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
 
+      // Configure for fullscreen PWA experience
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.edgeToEdge,
+        overlays: [SystemUiOverlay.top],
+      );
+
+      SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Color(0xFF0d0d1a),
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarDividerColor: Colors.transparent,
+      ));
+
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+
       await dotenv.load(fileName: '.env', isOptional: true);
 
       if (CRMConfig.crmEnabled) {
