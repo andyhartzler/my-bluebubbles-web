@@ -49,12 +49,12 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     try {
       final stats = await _repository.getCommitteeStats(committee);
 
-      // Load school distribution for College/HS Democrats
+      // Load school distribution for College/HS Democrats (filtered by committee membership)
       Map<String, int> distribution = {};
       if (committee.id == 'College Democrats') {
-        distribution = await _repository.getCollegeDistribution();
+        distribution = await _repository.getCollegeDistribution(committeeName: committee.name);
       } else if (committee.id == 'High School Democrats') {
-        distribution = await _repository.getHighSchoolDistribution();
+        distribution = await _repository.getHighSchoolDistribution(committeeName: committee.name);
       }
 
       if (!mounted) return;
@@ -147,9 +147,10 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth > 500;
-                final statCards = _buildStatCards(specific, currency);
+                final isMobile = constraints.maxWidth < 400;
 
                 if (isWide) {
+                  final statCards = _buildStatCards(specific, currency, compact: false);
                   return Wrap(
                     spacing: 16,
                     runSpacing: 16,
@@ -160,10 +161,17 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
                   );
                 }
 
+                // Mobile: horizontal thin tiles spanning full width
+                final statData = _getStatData(specific, currency);
                 return Column(
-                  children: statCards.map((card) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: card,
+                  children: statData.map((data) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildMobileStatTile(
+                      icon: data['icon'] as IconData,
+                      label: data['label'] as String,
+                      value: data['value'] as String,
+                      color: data['color'] as Color,
+                    ),
                   )).toList(),
                 );
               },
@@ -174,126 +182,185 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     );
   }
 
-  List<Widget> _buildStatCards(Map<String, dynamic> specific, NumberFormat currency) {
-    final cards = <Widget>[];
+  List<Map<String, dynamic>> _getStatData(Map<String, dynamic> specific, NumberFormat currency) {
+    final data = <Map<String, dynamic>>[];
 
     // Member count is common to all
-    cards.add(_buildStatCard(
-      icon: Icons.people,
-      label: 'Members',
-      value: '${_stats?.memberCount ?? 0}',
-      color: committee.primaryColor,
-    ));
+    data.add({
+      'icon': Icons.people,
+      'label': 'Members',
+      'value': '${_stats?.memberCount ?? 0}',
+      'color': committee.primaryColor,
+    });
 
     // Committee-specific stats
     switch (committee.id) {
       case 'Communications':
-        cards.add(_buildStatCard(
-          icon: Icons.send,
-          label: 'Campaigns Sent',
-          value: '${specific['totalCampaignsSent'] ?? 0}',
-          color: Colors.blue,
-        ));
-        cards.add(_buildStatCard(
-          icon: Icons.email,
-          label: 'Emails Delivered',
-          value: '${specific['totalEmailsDelivered'] ?? 0}',
-          color: Colors.green,
-        ));
+        data.add({
+          'icon': Icons.send,
+          'label': 'Campaigns Sent',
+          'value': '${specific['totalCampaignsSent'] ?? 0}',
+          'color': Colors.blue,
+        });
+        data.add({
+          'icon': Icons.email,
+          'label': 'Emails Delivered',
+          'value': '${specific['totalEmailsDelivered'] ?? 0}',
+          'color': Colors.green,
+        });
         break;
 
       case 'Political Affairs':
-        cards.add(_buildStatCard(
-          icon: Icons.event,
-          label: 'Total Events',
-          value: '${specific['totalEvents'] ?? 0}',
-          color: Colors.blue,
-        ));
-        cards.add(_buildStatCard(
-          icon: Icons.upcoming,
-          label: 'Upcoming Events',
-          value: '${specific['upcomingEvents'] ?? 0}',
-          color: Colors.orange,
-        ));
+        data.add({
+          'icon': Icons.event,
+          'label': 'Total Events',
+          'value': '${specific['totalEvents'] ?? 0}',
+          'color': Colors.blue,
+        });
+        data.add({
+          'icon': Icons.upcoming,
+          'label': 'Upcoming Events',
+          'value': '${specific['upcomingEvents'] ?? 0}',
+          'color': Colors.orange,
+        });
         break;
 
       case 'Policy & Advocacy':
-        cards.add(_buildStatCard(
-          icon: Icons.edit_note,
-          label: 'Emails Generated',
-          value: '${specific['totalAdvocacyEmailsGenerated'] ?? 0}',
-          color: Colors.purple,
-        ));
-        cards.add(_buildStatCard(
-          icon: Icons.send,
-          label: 'Emails Sent',
-          value: '${specific['totalAdvocacyEmailsSent'] ?? 0}',
-          color: Colors.green,
-        ));
+        data.add({
+          'icon': Icons.edit_note,
+          'label': 'Emails Generated',
+          'value': '${specific['totalAdvocacyEmailsGenerated'] ?? 0}',
+          'color': Colors.purple,
+        });
+        data.add({
+          'icon': Icons.send,
+          'label': 'Emails Sent',
+          'value': '${specific['totalAdvocacyEmailsSent'] ?? 0}',
+          'color': Colors.green,
+        });
         break;
 
       case 'Membership & Outreach':
-        cards.add(_buildStatCard(
-          icon: Icons.group_add,
-          label: 'Total Members',
-          value: '${specific['totalMembers'] ?? 0}',
-          color: Colors.teal,
-        ));
-        cards.add(_buildStatCard(
-          icon: Icons.verified_user,
-          label: 'Active Members',
-          value: '${specific['activeMembers'] ?? 0}',
-          color: Colors.green,
-        ));
+        data.add({
+          'icon': Icons.group_add,
+          'label': 'Total Members',
+          'value': '${specific['totalMembers'] ?? 0}',
+          'color': Colors.teal,
+        });
+        data.add({
+          'icon': Icons.verified_user,
+          'label': 'Active Members',
+          'value': '${specific['activeMembers'] ?? 0}',
+          'color': Colors.green,
+        });
         break;
 
       case 'Fundraising':
-        cards.add(_buildStatCard(
-          icon: Icons.volunteer_activism,
-          label: 'Total Donors',
-          value: '${specific['totalDonors'] ?? 0}',
-          color: Colors.orange,
-        ));
-        cards.add(_buildStatCard(
-          icon: Icons.attach_money,
-          label: 'Total Raised',
-          value: currency.format(specific['totalRaised'] ?? 0.0),
-          color: Colors.green,
-        ));
+        data.add({
+          'icon': Icons.volunteer_activism,
+          'label': 'Total Donors',
+          'value': '${specific['totalDonors'] ?? 0}',
+          'color': Colors.orange,
+        });
+        data.add({
+          'icon': Icons.attach_money,
+          'label': 'Total Raised',
+          'value': currency.format(specific['totalRaised'] ?? 0.0),
+          'color': Colors.green,
+        });
         break;
 
       case 'College Democrats':
-        cards.add(_buildStatCard(
-          icon: Icons.school,
-          label: 'Total Chapters',
-          value: '${specific['totalCollegeChapters'] ?? 0}',
-          color: Colors.blue,
-        ));
-        cards.add(_buildStatCard(
-          icon: Icons.account_balance,
-          label: 'Unique Colleges',
-          value: '${specific['uniqueColleges'] ?? 0}',
-          color: Colors.purple,
-        ));
+        data.add({
+          'icon': Icons.school,
+          'label': 'Total Chapters',
+          'value': '${specific['totalCollegeChapters'] ?? 0}',
+          'color': Colors.blue,
+        });
+        data.add({
+          'icon': Icons.account_balance,
+          'label': 'Unique Colleges',
+          'value': '${specific['uniqueColleges'] ?? 0}',
+          'color': Colors.purple,
+        });
         break;
 
       case 'High School Democrats':
-        cards.add(_buildStatCard(
-          icon: Icons.school,
-          label: 'Total Chapters',
-          value: '${specific['totalHSChapters'] ?? 0}',
-          color: Colors.green,
-        ));
-        cards.add(_buildStatCard(
-          icon: Icons.domain,
-          label: 'Unique Schools',
-          value: '${specific['uniqueHighSchools'] ?? 0}',
-          color: Colors.teal,
-        ));
+        data.add({
+          'icon': Icons.school,
+          'label': 'Total Chapters',
+          'value': '${specific['totalHSChapters'] ?? 0}',
+          'color': Colors.green,
+        });
+        data.add({
+          'icon': Icons.domain,
+          'label': 'Unique Schools',
+          'value': '${specific['uniqueHighSchools'] ?? 0}',
+          'color': Colors.teal,
+        });
         break;
     }
 
-    return cards;
+    return data;
+  }
+
+  List<Widget> _buildStatCards(Map<String, dynamic> specific, NumberFormat currency, {bool compact = false}) {
+    final data = _getStatData(specific, currency);
+    return data.map((d) => _buildStatCard(
+      icon: d['icon'] as IconData,
+      label: d['label'] as String,
+      value: d['value'] as String,
+      color: d['color'] as Color,
+    )).toList();
+  }
+
+  Widget _buildMobileStatTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: color.withOpacity(0.8),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildStatCard({
@@ -524,35 +591,61 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
               ],
             ),
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _buildActionButton(
-                  icon: Icons.email_outlined,
-                  label: 'Email Committee',
-                  onPressed: () {
-                    // Navigate to email tab (index 3)
-                    widget.onNavigateToTab?.call(3);
-                  },
-                ),
-                _buildActionButton(
-                  icon: Icons.message_outlined,
-                  label: 'Message Committee',
-                  onPressed: () {
-                    // Navigate to messages tab (index 4)
-                    widget.onNavigateToTab?.call(4);
-                  },
-                ),
-                _buildActionButton(
-                  icon: Icons.people_outline,
-                  label: 'View Members',
-                  onPressed: () {
-                    // Navigate to members tab (index 1)
-                    widget.onNavigateToTab?.call(1);
-                  },
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 400;
+
+                if (isMobile) {
+                  // Stack buttons vertically on mobile
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildActionButton(
+                        icon: Icons.email_outlined,
+                        label: 'Email Committee',
+                        onPressed: () => widget.onNavigateToTab?.call(3),
+                        fullWidth: true,
+                      ),
+                      const SizedBox(height: 10),
+                      _buildActionButton(
+                        icon: Icons.message_outlined,
+                        label: 'Message Committee',
+                        onPressed: () => widget.onNavigateToTab?.call(4),
+                        fullWidth: true,
+                      ),
+                      const SizedBox(height: 10),
+                      _buildActionButton(
+                        icon: Icons.people_outline,
+                        label: 'View Members',
+                        onPressed: () => widget.onNavigateToTab?.call(1),
+                        fullWidth: true,
+                      ),
+                    ],
+                  );
+                }
+
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _buildActionButton(
+                      icon: Icons.email_outlined,
+                      label: 'Email Committee',
+                      onPressed: () => widget.onNavigateToTab?.call(3),
+                    ),
+                    _buildActionButton(
+                      icon: Icons.message_outlined,
+                      label: 'Message Committee',
+                      onPressed: () => widget.onNavigateToTab?.call(4),
+                    ),
+                    _buildActionButton(
+                      icon: Icons.people_outline,
+                      label: 'View Members',
+                      onPressed: () => widget.onNavigateToTab?.call(1),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -564,16 +657,23 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
+    bool fullWidth = false,
   }) {
-    return ElevatedButton.icon(
+    final button = ElevatedButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon),
+      icon: Icon(icon, size: 18),
       label: Text(label),
       style: ElevatedButton.styleFrom(
         backgroundColor: committee.primaryColor,
         foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
     );
+
+    if (fullWidth) {
+      return SizedBox(width: double.infinity, child: button);
+    }
+    return button;
   }
 
   Widget _buildCommitteeInfoSection(BuildContext context) {

@@ -29,11 +29,17 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
     with SingleTickerProviderStateMixin {
   final CommitteeRepository _repository = CommitteeRepository();
   late TabController _tabController;
+  late ScrollController _scrollController;
   List<CommitteeLeader> _leaders = [];
   bool _loadingLeaders = true;
   String? _schoolFilter;
   bool _isCanvasFullscreen = false;
   int _currentTabIndex = 0;
+
+  // Mobile header visibility state
+  bool _isHeaderVisible = true;
+  double _lastScrollPosition = 0;
+  static const double _scrollThreshold = 10.0;
 
   Committee get committee => widget.committee;
 
@@ -162,6 +168,8 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(_onTabChanged);
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
     _loadLeaders();
   }
 
@@ -169,13 +177,44 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
     if (_tabController.indexIsChanging) return;
     setState(() {
       _currentTabIndex = _tabController.index;
+      // Reset header visibility when changing tabs
+      _isHeaderVisible = true;
+      _lastScrollPosition = 0;
     });
+  }
+
+  void _onScroll() {
+    final currentPosition = _scrollController.position.pixels;
+    final delta = currentPosition - _lastScrollPosition;
+
+    // Only update if scroll delta exceeds threshold (prevents jitter)
+    if (delta.abs() > _scrollThreshold) {
+      final scrollingDown = delta > 0;
+      final atTop = currentPosition <= 0;
+
+      if (atTop) {
+        // Always show header when at top
+        if (!_isHeaderVisible) {
+          setState(() => _isHeaderVisible = true);
+        }
+      } else if (scrollingDown && _isHeaderVisible) {
+        // Hide header when scrolling down
+        setState(() => _isHeaderVisible = false);
+      } else if (!scrollingDown && !_isHeaderVisible) {
+        // Show header when scrolling up
+        setState(() => _isHeaderVisible = true);
+      }
+
+      _lastScrollPosition = currentPosition;
+    }
   }
 
   @override
   void dispose() {
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -286,12 +325,18 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
     final isMobile = screenWidth < 600;
     final isVerySmall = screenWidth < 400;
 
+    // Mobile: use scroll-aware collapsing header
+    if (isMobile) {
+      return _buildMobileLayout(context, isVerySmall);
+    }
+
+    // Desktop: use standard NestedScrollView
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             SliverAppBar(
-              expandedHeight: isMobile ? 140 : 200,
+              expandedHeight: 200,
               floating: false,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
@@ -300,11 +345,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
               bottom: TabBar(
                 controller: _tabController,
                 isScrollable: true,
-                labelPadding: EdgeInsets.symmetric(horizontal: isVerySmall ? 8 : (isMobile ? 12 : 16)),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 16),
                 tabs: _tabs.map((tab) => Tab(
-                  icon: tab.iconWidget ?? Icon(tab.icon, size: isMobile ? 20 : 24),
-                  text: isVerySmall ? null : tab.label,
-                  iconMargin: EdgeInsets.only(bottom: isVerySmall ? 0 : 4),
+                  icon: tab.iconWidget ?? Icon(tab.icon, size: 24),
+                  text: tab.label,
+                  iconMargin: const EdgeInsets.only(bottom: 4),
                 )).toList(),
               ),
             ),
@@ -315,6 +360,144 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
           physics: const NeverScrollableScrollPhysics(),
           children: _tabs.map((tab) => tab.builder()).toList(),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context, bool isVerySmall) {
+    final theme = Theme.of(context);
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    // Calculate header height - includes SafeArea top padding when visible
+    final headerContentHeight = 56.0; // Compact header row
+    final tabBarHeight = 48.0;
+    final totalHeaderHeight = topPadding + headerContentHeight + tabBarHeight;
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          // Main content - takes full screen
+          Positioned.fill(
+            child: Column(
+              children: [
+                // Spacer that animates with header
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  height: _isHeaderVisible ? totalHeaderHeight : 0,
+                ),
+                // Tab content
+                Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification is ScrollUpdateNotification) {
+                        final currentPosition = notification.metrics.pixels;
+                        final delta = currentPosition - _lastScrollPosition;
+
+                        if (delta.abs() > _scrollThreshold) {
+                          final scrollingDown = delta > 0;
+                          final atTop = currentPosition <= 0;
+
+                          if (atTop && !_isHeaderVisible) {
+                            setState(() => _isHeaderVisible = true);
+                          } else if (scrollingDown && _isHeaderVisible && currentPosition > 50) {
+                            setState(() => _isHeaderVisible = false);
+                          } else if (!scrollingDown && !_isHeaderVisible) {
+                            setState(() => _isHeaderVisible = true);
+                          }
+
+                          _lastScrollPosition = currentPosition;
+                        }
+                      }
+                      return false;
+                    },
+                    child: TabBarView(
+                      controller: _tabController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: _tabs.map((tab) => tab.builder()).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Animated header overlay
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            top: _isHeaderVisible ? 0 : -totalHeaderHeight,
+            left: 0,
+            right: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [committee.primaryColor, committee.secondaryColor],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Compact header row
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 4, 16, 4),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            onPressed: () => Navigator.of(context).pop(),
+                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(),
+                          ),
+                          const SizedBox(width: 8),
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            child: Icon(committee.icon, color: Colors.white, size: 16),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              committee.displayName,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Tab bar
+                    TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      labelPadding: EdgeInsets.symmetric(horizontal: isVerySmall ? 6 : 10),
+                      indicatorWeight: 3,
+                      tabs: _tabs.map((tab) => Tab(
+                        icon: tab.iconWidget ?? Icon(tab.icon, size: 18),
+                        text: isVerySmall ? null : tab.label,
+                        iconMargin: EdgeInsets.only(bottom: isVerySmall ? 0 : 2),
+                      )).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -360,32 +543,14 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                     ),
                     SizedBox(width: isMobile ? 12 : 16),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            committee.displayName,
-                            style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.headlineSmall)?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (!isVerySmall) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              committee.description,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.white.withOpacity(0.9),
-                              ),
-                              maxLines: isMobile ? 1 : 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ],
+                      child: Text(
+                        committee.displayName,
+                        style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.headlineSmall)?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
