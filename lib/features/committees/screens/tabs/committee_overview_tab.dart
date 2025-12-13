@@ -217,15 +217,15 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     switch (committee.id) {
       case 'Communications':
         data.add({
-          'icon': Icons.send,
-          'label': 'Campaigns Sent',
-          'value': '${specific['totalCampaignsSent'] ?? 0}',
+          'icon': Icons.visibility,
+          'label': 'Total Impressions',
+          'value': _formatNumber(specific['totalImpressions'] ?? 0),
           'color': Colors.blue,
         });
         data.add({
-          'icon': Icons.email,
-          'label': 'Emails Delivered',
-          'value': '${specific['totalEmailsDelivered'] ?? 0}',
+          'icon': Icons.people_alt,
+          'label': 'Total Followers',
+          'value': _formatNumber(specific['totalFollowers'] ?? 0),
           'color': Colors.green,
         });
         break;
@@ -322,6 +322,16 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     }
 
     return data;
+  }
+
+  String _formatNumber(dynamic number) {
+    final n = (number is int) ? number : int.tryParse(number.toString()) ?? 0;
+    if (n >= 1000000) {
+      return '${(n / 1000000).toStringAsFixed(1)}M';
+    } else if (n >= 1000) {
+      return '${(n / 1000).toStringAsFixed(1)}K';
+    }
+    return n.toString();
   }
 
   List<Widget> _buildStatCards(Map<String, dynamic> specific, NumberFormat currency, {bool compact = false}) {

@@ -172,20 +172,10 @@ class _PlatformCard extends StatelessWidget {
           // Platform header
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: platformColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: Icon(
-                    _getPlatformIcon(account.platform),
-                    color: platformColor,
-                    size: 24,
-                  ),
-                ),
+              _PlatformIcon(
+                platform: account.platform,
+                size: 44,
+                borderRadius: 10,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -482,6 +472,75 @@ class _EngagementBar extends StatelessWidget {
       return '${(number / 1000).toStringAsFixed(1)}K';
     }
     return number.toString();
+  }
+}
+
+/// Widget to display platform icon from assets
+class _PlatformIcon extends StatelessWidget {
+  final String platform;
+  final double size;
+  final double borderRadius;
+
+  const _PlatformIcon({
+    required this.platform,
+    this.size = 40,
+    this.borderRadius = 8,
+  });
+
+  String? _getIconAsset() {
+    switch (platform.toLowerCase()) {
+      case 'facebook':
+        return 'assets/icon/facebook-icon.png';
+      case 'instagram':
+        return 'assets/icon/instagram-icon.png';
+      case 'threads':
+        return 'assets/icon/threads-icon.png';
+      case 'youtube':
+        return 'assets/icon/youtube-icon.png';
+      case 'reddit':
+        return 'assets/icon/reddit-icon.png';
+      case 'tiktok':
+        return 'assets/icon/tiktok-icon.png';
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final assetPath = _getIconAsset();
+
+    if (assetPath != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: Image.asset(
+          assetPath,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackIcon(),
+        ),
+      );
+    }
+
+    return _buildFallbackIcon();
+  }
+
+  Widget _buildFallbackIcon() {
+    final platformColor = CommunicationsCommitteeTheme.getPlatformColor(platform);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: platformColor.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+      child: Icon(
+        Icons.share,
+        color: platformColor,
+        size: size * 0.5,
+      ),
+    );
   }
 }
 
