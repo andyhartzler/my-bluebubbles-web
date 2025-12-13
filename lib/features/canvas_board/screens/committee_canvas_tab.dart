@@ -117,6 +117,12 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
   Size? _resizeStartSize;
   Offset? _resizeStartPosition;
 
+  // Clipboard state for copy/cut/paste
+  List<CanvasNode> _clipboard = [];
+
+  // Modifier keys state (for perfect shapes with Shift)
+  bool _isShiftPressed = false;
+
   Committee get committee => widget.committee;
   bool get _isFullscreen => widget.isFullscreen;
 
@@ -653,6 +659,76 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
     setState(() {});
   }
 
+  // ============ Clipboard Operations ============
+
+  void _copySelectedNodes() {
+    if (_selectedNodeIds.isEmpty) return;
+    _clipboard = _nodes
+        .where((n) => _selectedNodeIds.contains(n.id))
+        .map((n) => n.copyWith())
+        .toList();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Copied ${_clipboard.length} item(s)'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  void _cutSelectedNodes() {
+    if (_selectedNodeIds.isEmpty) return;
+    _clipboard = _nodes
+        .where((n) => _selectedNodeIds.contains(n.id))
+        .map((n) => n.copyWith())
+        .toList();
+    _deleteSelectedNodes();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cut ${_clipboard.length} item(s)'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  Future<void> _pasteClipboard() async {
+    if (_clipboard.isEmpty || _board == null) return;
+
+    final center = _getViewportCenter();
+    final offset = const Offset(20, 20); // Slight offset for pasted items
+
+    for (int i = 0; i < _clipboard.length; i++) {
+      final original = _clipboard[i];
+      final newNode = original.copyWith(
+        id: _uuid.v4(),
+        boardId: _board!.id,
+        offsetX: center.dx + (i * offset.dx),
+        offsetY: center.dy + (i * offset.dy),
+      );
+
+      try {
+        final createdNode = await _canvasBoardService.createNode(newNode);
+        setState(() {
+          _nodes.add(createdNode);
+        });
+      } catch (e) {
+        _showError('Failed to paste: $e');
+      }
+    }
+
+    // Select pasted items
+    setState(() {
+      _selectedNodeIds = _nodes
+          .where((n) => n.offsetX >= center.dx && n.offsetY >= center.dy)
+          .take(_clipboard.length)
+          .map((n) => n.id)
+          .toSet();
+    });
+  }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -720,9 +796,13 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
                 onUndo: _undo,
                 onRedo: _redo,
                 onDelete: _deleteSelectedNodes,
+                onCopy: _copySelectedNodes,
+                onCut: _cutSelectedNodes,
+                onPaste: _pasteClipboard,
                 canUndo: _undoStack.isNotEmpty,
                 canRedo: _redoStack.isNotEmpty,
                 hasSelection: _selectedNodeIds.isNotEmpty,
+                canPaste: _clipboard.isNotEmpty,
               ),
               // Main content
               Expanded(
@@ -925,7 +1005,10 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
            tool == CanvasTool.line ||
            tool == CanvasTool.rectangle ||
            tool == CanvasTool.circle ||
-           tool == CanvasTool.text;
+           tool == CanvasTool.text ||
+           tool == CanvasTool.note ||
+           tool == CanvasTool.figure ||
+           tool == CanvasTool.comment;
   }
 
   /// Convert global screen coordinates to local canvas widget coordinates
@@ -950,13 +1033,42 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
     if (!_isDrawing || _drawStartPoint == null) return;
 
     final startPoint = _drawStartPoint!;
-    final endPoint = _currentDrawingPoints.length > 1
+    var endPoint = _currentDrawingPoints.length > 1
         ? _currentDrawingPoints.last
         : startPoint;
 
     setState(() {
       _isDrawing = false;
     });
+
+    // Apply Shift modifier for perfect shapes (fldraw feature)
+    if (_isShiftPressed && (_selectedTool == CanvasTool.rectangle ||
+        _selectedTool == CanvasTool.circle ||
+        _selectedTool == CanvasTool.figure)) {
+      // Make perfect square/circle by using the larger dimension
+      final width = (endPoint.dx - startPoint.dx).abs();
+      final height = (endPoint.dy - startPoint.dy).abs();
+      final size = math.max(width, height);
+      endPoint = Offset(
+        startPoint.dx + (endPoint.dx >= startPoint.dx ? size : -size),
+        startPoint.dy + (endPoint.dy >= startPoint.dy ? size : -size),
+      );
+    }
+
+    // Apply Shift modifier for locked-angle lines/arrows (fldraw feature)
+    if (_isShiftPressed && (_selectedTool == CanvasTool.line ||
+        _selectedTool == CanvasTool.arrow)) {
+      // Snap to 45-degree angles
+      final dx = endPoint.dx - startPoint.dx;
+      final dy = endPoint.dy - startPoint.dy;
+      final angle = math.atan2(dy, dx);
+      final snappedAngle = (angle / (math.pi / 4)).round() * (math.pi / 4);
+      final distance = math.sqrt(dx * dx + dy * dy);
+      endPoint = Offset(
+        startPoint.dx + distance * math.cos(snappedAngle),
+        startPoint.dy + distance * math.sin(snappedAngle),
+      );
+    }
 
     // Create the appropriate node based on tool
     switch (_selectedTool) {
@@ -983,6 +1095,17 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
         break;
       case CanvasTool.text:
         await _addTextNodeAt(startPoint);
+        break;
+      case CanvasTool.note:
+        await _addNoteNodeAt(startPoint);
+        break;
+      case CanvasTool.figure:
+        if ((endPoint - startPoint).distance > 10) {
+          await _addFigureNode(startPoint, endPoint);
+        }
+        break;
+      case CanvasTool.comment:
+        await _addCommentNodeAt(startPoint);
         break;
       default:
         break;
@@ -1093,6 +1216,88 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
         final newNode = _nodes.last;
         if (newNode.nodeType == CanvasNodeType.text) {
           _startEditingText(newNode);
+        }
+      }
+    });
+  }
+
+  /// Add a note at a specific position (for note tool click)
+  Future<void> _addNoteNodeAt(Offset position) async {
+    await _addNode(CanvasNode(
+      id: '',
+      boardId: _board?.id ?? '',
+      offsetX: position.dx,
+      offsetY: position.dy,
+      width: 200,
+      height: 150,
+      nodeType: CanvasNodeType.note,
+      noteColor: '#FFF59D',
+      noteContent: '',
+    ));
+
+    // Start editing the new note after a small delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_nodes.isNotEmpty) {
+        final newNode = _nodes.last;
+        if (newNode.nodeType == CanvasNodeType.note) {
+          _startEditingNote(newNode);
+        }
+      }
+    });
+  }
+
+  /// Add a Figure (dashed group container) - fldraw parity
+  Future<void> _addFigureNode(Offset start, Offset end) async {
+    if (_board == null) return;
+
+    final minX = math.min(start.dx, end.dx);
+    final minY = math.min(start.dy, end.dy);
+    final width = (end.dx - start.dx).abs();
+    final height = (end.dy - start.dy).abs();
+
+    await _addNode(CanvasNode(
+      id: '',
+      boardId: _board!.id,
+      offsetX: minX,
+      offsetY: minY,
+      width: width,
+      height: height,
+      nodeType: CanvasNodeType.shape,
+      shapeType: 'rectangle',
+      shapeColor: '#${_selectedColor.value.toRadixString(16).substring(2)}',
+      strokeWidth: _strokeWidth,
+      metadata: {
+        'render_as': 'figure',
+        'label': 'Figure',
+        'stroke_style': 'dashed',
+      },
+    ));
+  }
+
+  /// Add a Comment annotation - fldraw parity
+  Future<void> _addCommentNodeAt(Offset position) async {
+    await _addNode(CanvasNode(
+      id: '',
+      boardId: _board?.id ?? '',
+      offsetX: position.dx,
+      offsetY: position.dy,
+      width: 240,
+      height: 100,
+      nodeType: CanvasNodeType.note,
+      noteColor: '#E3F2FD', // Light blue for comments
+      noteContent: '',
+      metadata: {
+        'render_as': 'comment',
+        'is_comment': true,
+      },
+    ));
+
+    // Start editing the new comment after a small delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_nodes.isNotEmpty) {
+        final newNode = _nodes.last;
+        if (newNode.nodeType == CanvasNodeType.note) {
+          _startEditingNote(newNode);
         }
       }
     });
@@ -1498,6 +1703,16 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    // Track shift key state for perfect shapes
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.shiftLeft ||
+        event.logicalKey == LogicalKeyboardKey.shiftRight) {
+      setState(() => _isShiftPressed = true);
+    }
+    if (event is KeyUpEvent && (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
+        event.logicalKey == LogicalKeyboardKey.shiftRight)) {
+      setState(() => _isShiftPressed = false);
+    }
+
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     // Don't intercept keyboard shortcuts when editing text
@@ -1514,6 +1729,9 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       return KeyEventResult.ignored;
     }
 
+    final isCtrl = HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
+
     // Delete key
     if (event.logicalKey == LogicalKeyboardKey.delete ||
         event.logicalKey == LogicalKeyboardKey.backspace) {
@@ -1523,14 +1741,37 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       }
     }
 
-    // Ctrl+Z - Undo
-    if (HardwareKeyboard.instance.isControlPressed &&
-        event.logicalKey == LogicalKeyboardKey.keyZ) {
+    // Ctrl+C - Copy
+    if (isCtrl && event.logicalKey == LogicalKeyboardKey.keyC) {
+      _copySelectedNodes();
+      return KeyEventResult.handled;
+    }
+
+    // Ctrl+X - Cut
+    if (isCtrl && event.logicalKey == LogicalKeyboardKey.keyX) {
+      _cutSelectedNodes();
+      return KeyEventResult.handled;
+    }
+
+    // Ctrl+V - Paste
+    if (isCtrl && event.logicalKey == LogicalKeyboardKey.keyV) {
+      _pasteClipboard();
+      return KeyEventResult.handled;
+    }
+
+    // Ctrl+Z - Undo / Ctrl+Shift+Z - Redo
+    if (isCtrl && event.logicalKey == LogicalKeyboardKey.keyZ) {
       if (HardwareKeyboard.instance.isShiftPressed) {
         _redo();
       } else {
         _undo();
       }
+      return KeyEventResult.handled;
+    }
+
+    // Ctrl+Y - Redo (alternative)
+    if (isCtrl && event.logicalKey == LogicalKeyboardKey.keyY) {
+      _redo();
       return KeyEventResult.handled;
     }
 
@@ -1547,47 +1788,9 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       return KeyEventResult.handled;
     }
 
-    // F key - Toggle fullscreen
-    if (event.logicalKey == LogicalKeyboardKey.keyF) {
+    // Ctrl+F - Toggle fullscreen
+    if (isCtrl && event.logicalKey == LogicalKeyboardKey.keyF) {
       _toggleFullscreen(!_isFullscreen);
-      return KeyEventResult.handled;
-    }
-
-    // Tool shortcuts (only when not editing)
-    if (event.logicalKey == LogicalKeyboardKey.keyV) {
-      setState(() => _selectedTool = CanvasTool.select);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyH) {
-      setState(() => _selectedTool = CanvasTool.pan);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyD) {
-      setState(() => _selectedTool = CanvasTool.draw);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyA) {
-      setState(() => _selectedTool = CanvasTool.arrow);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyL) {
-      setState(() => _selectedTool = CanvasTool.line);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyR) {
-      setState(() => _selectedTool = CanvasTool.rectangle);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyO) {
-      setState(() => _selectedTool = CanvasTool.circle);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyT) {
-      setState(() => _selectedTool = CanvasTool.text);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyN) {
-      _addNoteNode();
       return KeyEventResult.handled;
     }
 
