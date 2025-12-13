@@ -14,11 +14,15 @@ import 'package:bluebubbles/models/crm/member.dart';
 class UpcomingMeetingsWidget extends StatefulWidget {
   final Committee committee;
   final Color? accentColor;
+  final VoidCallback? onNavigateToEmail;
+  final VoidCallback? onNavigateToMessages;
 
   const UpcomingMeetingsWidget({
     super.key,
     required this.committee,
     this.accentColor,
+    this.onNavigateToEmail,
+    this.onNavigateToMessages,
   });
 
   @override
@@ -224,6 +228,8 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
         context,
         meeting: meeting,
         members: _members,
+        onNavigateToEmail: widget.onNavigateToEmail,
+        onNavigateToMessages: widget.onNavigateToMessages,
       );
 
       // Reload meetings list
@@ -267,6 +273,8 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
           context,
           meeting: updatedMeeting,
           members: _members,
+          onNavigateToEmail: widget.onNavigateToEmail,
+          onNavigateToMessages: widget.onNavigateToMessages,
         );
       }
 
@@ -326,6 +334,8 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
       context,
       meeting: meeting,
       members: _members,
+      onNavigateToEmail: widget.onNavigateToEmail,
+      onNavigateToMessages: widget.onNavigateToMessages,
     );
 
     // Reload to update notification status
