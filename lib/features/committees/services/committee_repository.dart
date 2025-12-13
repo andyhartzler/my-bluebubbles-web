@@ -296,7 +296,7 @@ class CommitteeRepository {
       final statsResponse = await _readClient
           .from('social_media_stats')
           .select('account_id, platform, impressions, followers_count, platform_metrics')
-          .order('collection_date', ascending: false);
+          .order('metric_date', ascending: false);
 
       final allStats = statsResponse as List<dynamic>;
 
