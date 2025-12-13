@@ -13,6 +13,8 @@ import '../widgets/sponsor_list.dart';
 import '../widgets/bill_notes_panel.dart';
 import '../widgets/bill_documents_panel.dart';
 import '../utils/bill_helpers.dart';
+import '../models/legislator.dart';
+import 'legislator_detail_screen.dart';
 
 /// Detail screen for a tracked bill
 class BillDetailScreen extends StatefulWidget {
@@ -304,7 +306,10 @@ class _BillDetailScreenState extends State<BillDetailScreen>
                       ],
                       // Sponsors
                       if (provider.selectedBillSponsors.isNotEmpty) ...[
-                        SponsorList(sponsors: provider.selectedBillSponsors),
+                        SponsorList(
+                          sponsors: provider.selectedBillSponsors,
+                          onLegislatorTap: _navigateToLegislatorDetail,
+                        ),
                       ],
                     ],
                   ),
@@ -455,7 +460,10 @@ class _BillDetailScreenState extends State<BillDetailScreen>
                       ),
                     ),
                     const Divider(),
-                    SponsorList(sponsors: provider.selectedBillSponsors),
+                    SponsorList(
+                      sponsors: provider.selectedBillSponsors,
+                      onLegislatorTap: _navigateToLegislatorDetail,
+                    ),
                   ],
                 ),
               ),
@@ -695,6 +703,22 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     if (pdfUrl != null) {
       launchUrl(Uri.parse(pdfUrl));
     }
+  }
+
+  void _navigateToLegislatorDetail(Legislator legislator) {
+    final provider = context.read<LegislationProvider>();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChangeNotifierProvider.value(
+          value: provider,
+          child: LegislatorDetailScreen(
+            legislatorId: legislator.id,
+            committeeId: widget.committeeId,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildEmptyState(ThemeData theme, String message, IconData icon) {
