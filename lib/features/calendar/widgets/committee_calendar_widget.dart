@@ -537,21 +537,21 @@ class _CalendarDayCell extends StatelessWidget {
 
   Color _getEventColor(CalendarEvent event) {
     // Check for Zoom meeting
-    if (event.zoomMeetingId != null || event.location?.contains('zoom') == true) {
+    if (event.hasZoomMeeting) {
       return const Color(0xFF2D8CFF);
     }
 
-    // Color by event type
+    // Color by event type string
     switch (event.eventType) {
-      case EventType.committee:
+      case 'committee':
         return const Color(0xFF3B82F6);
-      case EventType.executive:
+      case 'executive':
         return const Color(0xFF8B5CF6);
-      case EventType.social:
+      case 'social':
         return const Color(0xFFF59E0B);
-      case EventType.deadline:
+      case 'deadline':
         return const Color(0xFFEF4444);
-      case EventType.general:
+      default:
         return const Color(0xFF10B981);
     }
   }
@@ -621,8 +621,7 @@ class _EventCard extends StatelessWidget {
     required this.isDark,
   });
 
-  bool get _isZoom =>
-      event.zoomMeetingId != null || event.location?.contains('zoom') == true;
+  bool get _isZoom => event.hasZoomMeeting;
 
   Color get _eventColor => _isZoom ? const Color(0xFF2D8CFF) : const Color(0xFF3B82F6);
 

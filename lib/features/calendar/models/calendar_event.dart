@@ -1,36 +1,3 @@
-/// Event types for categorization
-enum EventType {
-  general,
-  committee,
-  executive,
-  social,
-  deadline;
-
-  static EventType fromString(String? value) {
-    if (value == null) return EventType.general;
-    return EventType.values.firstWhere(
-      (e) => e.name == value,
-      orElse: () => EventType.general,
-    );
-  }
-}
-
-/// Visibility levels for events
-enum EventVisibility {
-  public,
-  organization,
-  committee,
-  private;
-
-  static EventVisibility fromString(String? value) {
-    if (value == null) return EventVisibility.organization;
-    return EventVisibility.values.firstWhere(
-      (e) => e.name == value,
-      orElse: () => EventVisibility.organization,
-    );
-  }
-}
-
 /// Event status
 enum EventStatus {
   confirmed,
@@ -46,177 +13,199 @@ enum EventStatus {
   }
 }
 
-/// Model representing a calendar event
+/// Model representing a calendar event - matches Supabase calendar_events table
 class CalendarEvent {
   final String id;
-  final DateTime createdAt;
-  final DateTime? updatedAt;
-
-  // Event details
+  final String? googleEventId;
+  final String? calendarId;
   final String title;
   final String? description;
-  final String? location;
-
-  // Timing
   final DateTime startTime;
   final DateTime endTime;
-  final bool allDay;
-  final String timezone;
-
-  // Recurrence
-  final String? recurrenceRule;
-  final DateTime? recurrenceEnd;
-  final String? parentEventId;
-
-  // Organization
-  final EventType eventType;
+  final bool isAllDay;
+  final String? location;
+  final String? meetingLink;
+  final String? zoomMeetingId; // text in DB
+  final String? eventType; // 'event' is default
   final String? committeeName;
-
-  // Visibility
-  final bool isPublic;
-  final EventVisibility visibility;
-
-  // Source tracking
-  final String createdBy;
-  final String? googleEventId;
-  final int? zoomMeetingId;
-
-  // Status
+  final String? colorId;
+  final bool isRecurring;
+  final String? recurrenceRule;
+  final String? organizerEmail;
+  final String? organizerName;
+  final List<Map<String, dynamic>>? attendees;
   final EventStatus status;
+  final String? createdBy; // uuid, nullable
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final DateTime? syncedAt;
 
   const CalendarEvent({
     required this.id,
-    required this.createdAt,
-    this.updatedAt,
+    this.googleEventId,
+    this.calendarId,
     required this.title,
     this.description,
-    this.location,
     required this.startTime,
     required this.endTime,
-    this.allDay = false,
-    this.timezone = 'America/Chicago',
-    this.recurrenceRule,
-    this.recurrenceEnd,
-    this.parentEventId,
-    this.eventType = EventType.general,
-    this.committeeName,
-    this.isPublic = true,
-    this.visibility = EventVisibility.organization,
-    required this.createdBy,
-    this.googleEventId,
+    this.isAllDay = false,
+    this.location,
+    this.meetingLink,
     this.zoomMeetingId,
+    this.eventType,
+    this.committeeName,
+    this.colorId,
+    this.isRecurring = false,
+    this.recurrenceRule,
+    this.organizerEmail,
+    this.organizerName,
+    this.attendees,
     this.status = EventStatus.confirmed,
+    this.createdBy,
+    this.createdAt,
+    this.updatedAt,
+    this.syncedAt,
   });
 
-  /// Creates a CalendarEvent from JSON data
+  /// Creates a CalendarEvent from JSON data (Supabase row)
   factory CalendarEvent.fromJson(Map<String, dynamic> json) {
+    // Parse attendees from JSONB
+    List<Map<String, dynamic>>? attendeesList;
+    if (json['attendees'] != null) {
+      if (json['attendees'] is List) {
+        attendeesList = (json['attendees'] as List)
+            .map((e) => e is Map<String, dynamic> ? e : <String, dynamic>{})
+            .toList();
+      } else if (json['attendees'] is String) {
+        // Sometimes JSONB comes as a string
+        try {
+          final parsed = json['attendees'];
+          if (parsed is List) {
+            attendeesList = parsed.cast<Map<String, dynamic>>();
+          }
+        } catch (_) {
+          attendeesList = null;
+        }
+      }
+    }
+
     return CalendarEvent(
       id: json['id'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      googleEventId: json['google_event_id'] as String?,
+      calendarId: json['calendar_id'] as String?,
+      title: json['title'] as String,
+      description: json['description'] as String?,
+      startTime: DateTime.parse(json['start_time'] as String),
+      endTime: DateTime.parse(json['end_time'] as String),
+      isAllDay: json['is_all_day'] as bool? ?? false,
+      location: json['location'] as String?,
+      meetingLink: json['meeting_link'] as String?,
+      zoomMeetingId: json['zoom_meeting_id'] as String?,
+      eventType: json['event_type'] as String?,
+      committeeName: json['committee_name'] as String?,
+      colorId: json['color_id'] as String?,
+      isRecurring: json['is_recurring'] as bool? ?? false,
+      recurrenceRule: json['recurrence_rule'] as String?,
+      organizerEmail: json['organizer_email'] as String?,
+      organizerName: json['organizer_name'] as String?,
+      attendees: attendeesList,
+      status: EventStatus.fromString(json['status'] as String?),
+      createdBy: json['created_by'] as String?,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : null,
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
           : null,
-      title: json['title'] as String,
-      description: json['description'] as String?,
-      location: json['location'] as String?,
-      startTime: DateTime.parse(json['start_time'] as String),
-      endTime: DateTime.parse(json['end_time'] as String),
-      allDay: json['all_day'] as bool? ?? false,
-      timezone: json['timezone'] as String? ?? 'America/Chicago',
-      recurrenceRule: json['recurrence_rule'] as String?,
-      recurrenceEnd: json['recurrence_end'] != null
-          ? DateTime.parse(json['recurrence_end'] as String)
+      syncedAt: json['synced_at'] != null
+          ? DateTime.parse(json['synced_at'] as String)
           : null,
-      parentEventId: json['parent_event_id'] as String?,
-      eventType: EventType.fromString(json['event_type'] as String?),
-      committeeName: json['committee_name'] as String?,
-      isPublic: json['is_public'] as bool? ?? true,
-      visibility: EventVisibility.fromString(json['visibility'] as String?),
-      createdBy: json['created_by'] as String,
-      googleEventId: json['google_event_id'] as String?,
-      zoomMeetingId: json['zoom_meeting_id'] != null
-          ? (json['zoom_meeting_id'] as num).toInt()
-          : null,
-      status: EventStatus.fromString(json['status'] as String?),
     );
   }
 
-  /// Converts the CalendarEvent to JSON
+  /// Converts the CalendarEvent to JSON for database insert/update
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'created_at': createdAt.toUtc().toIso8601String(),
-      if (updatedAt != null) 'updated_at': updatedAt!.toUtc().toIso8601String(),
+      if (googleEventId != null) 'google_event_id': googleEventId,
+      if (calendarId != null) 'calendar_id': calendarId,
       'title': title,
       if (description != null) 'description': description,
-      if (location != null) 'location': location,
       'start_time': startTime.toUtc().toIso8601String(),
       'end_time': endTime.toUtc().toIso8601String(),
-      'all_day': allDay,
-      'timezone': timezone,
-      if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
-      if (recurrenceEnd != null)
-        'recurrence_end': recurrenceEnd!.toUtc().toIso8601String(),
-      if (parentEventId != null) 'parent_event_id': parentEventId,
-      'event_type': eventType.name,
-      if (committeeName != null) 'committee_name': committeeName,
-      'is_public': isPublic,
-      'visibility': visibility.name,
-      'created_by': createdBy,
-      if (googleEventId != null) 'google_event_id': googleEventId,
+      'is_all_day': isAllDay,
+      if (location != null) 'location': location,
+      if (meetingLink != null) 'meeting_link': meetingLink,
       if (zoomMeetingId != null) 'zoom_meeting_id': zoomMeetingId,
+      if (eventType != null) 'event_type': eventType,
+      if (committeeName != null) 'committee_name': committeeName,
+      if (colorId != null) 'color_id': colorId,
+      'is_recurring': isRecurring,
+      if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
+      if (organizerEmail != null) 'organizer_email': organizerEmail,
+      if (organizerName != null) 'organizer_name': organizerName,
+      if (attendees != null) 'attendees': attendees,
       'status': status.name,
+      if (createdBy != null) 'created_by': createdBy,
     };
   }
 
-  /// Creates a copy of this event with the given fields replaced
+  /// Creates a copy with updated fields
   CalendarEvent copyWith({
     String? id,
-    DateTime? createdAt,
-    DateTime? updatedAt,
+    String? googleEventId,
+    String? calendarId,
     String? title,
     String? description,
-    String? location,
     DateTime? startTime,
     DateTime? endTime,
-    bool? allDay,
-    String? timezone,
-    String? recurrenceRule,
-    DateTime? recurrenceEnd,
-    String? parentEventId,
-    EventType? eventType,
+    bool? isAllDay,
+    String? location,
+    String? meetingLink,
+    String? zoomMeetingId,
+    String? eventType,
     String? committeeName,
-    bool? isPublic,
-    EventVisibility? visibility,
-    String? createdBy,
-    String? googleEventId,
-    int? zoomMeetingId,
+    String? colorId,
+    bool? isRecurring,
+    String? recurrenceRule,
+    String? organizerEmail,
+    String? organizerName,
+    List<Map<String, dynamic>>? attendees,
     EventStatus? status,
+    String? createdBy,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? syncedAt,
   }) {
     return CalendarEvent(
       id: id ?? this.id,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
+      googleEventId: googleEventId ?? this.googleEventId,
+      calendarId: calendarId ?? this.calendarId,
       title: title ?? this.title,
       description: description ?? this.description,
-      location: location ?? this.location,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
-      allDay: allDay ?? this.allDay,
-      timezone: timezone ?? this.timezone,
-      recurrenceRule: recurrenceRule ?? this.recurrenceRule,
-      recurrenceEnd: recurrenceEnd ?? this.recurrenceEnd,
-      parentEventId: parentEventId ?? this.parentEventId,
+      isAllDay: isAllDay ?? this.isAllDay,
+      location: location ?? this.location,
+      meetingLink: meetingLink ?? this.meetingLink,
+      zoomMeetingId: zoomMeetingId ?? this.zoomMeetingId,
       eventType: eventType ?? this.eventType,
       committeeName: committeeName ?? this.committeeName,
-      isPublic: isPublic ?? this.isPublic,
-      visibility: visibility ?? this.visibility,
-      createdBy: createdBy ?? this.createdBy,
-      googleEventId: googleEventId ?? this.googleEventId,
-      zoomMeetingId: zoomMeetingId ?? this.zoomMeetingId,
+      colorId: colorId ?? this.colorId,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurrenceRule: recurrenceRule ?? this.recurrenceRule,
+      organizerEmail: organizerEmail ?? this.organizerEmail,
+      organizerName: organizerName ?? this.organizerName,
+      attendees: attendees ?? this.attendees,
       status: status ?? this.status,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      syncedAt: syncedAt ?? this.syncedAt,
     );
   }
+
+  // Convenience getters
 
   /// Gets the duration of the event
   Duration get duration => endTime.difference(startTime);
@@ -249,11 +238,13 @@ class CalendarEvent {
   /// Whether the event is in the future
   bool get isFuture => startTime.isAfter(DateTime.now());
 
-  /// Whether this is a recurring event
-  bool get isRecurring => recurrenceRule != null;
+  /// Whether this event has a Zoom meeting link
+  bool get hasZoomMeeting =>
+      zoomMeetingId != null ||
+      (meetingLink != null && meetingLink!.contains('zoom'));
 
-  /// Whether this is an instance of a recurring event
-  bool get isRecurrenceInstance => parentEventId != null;
+  /// Shorthand for allDay
+  bool get allDay => isAllDay;
 
   @override
   bool operator ==(Object other) =>

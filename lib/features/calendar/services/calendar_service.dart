@@ -54,15 +54,11 @@ class CalendarService {
     String? location,
     required DateTime startTime,
     required DateTime endTime,
-    bool allDay = false,
-    String timezone = 'America/Chicago',
+    bool isAllDay = false,
     String? recurrenceRule,
-    DateTime? recurrenceEnd,
-    EventType eventType = EventType.general,
+    String eventType = 'event', // 'event', 'committee', 'social', etc.
     String? committeeName,
-    bool isPublic = true,
-    EventVisibility visibility = EventVisibility.organization,
-    required String createdBy,
+    String? createdBy,
     bool syncToGoogleCalendar = true,
   }) async {
     await _ensureInitialized();
@@ -77,8 +73,8 @@ class CalendarService {
         location: location,
         startTime: startTime,
         endTime: endTime,
-        allDay: allDay,
-        timezone: timezone,
+        allDay: isAllDay,
+        timezone: 'America/Chicago',
         recurrenceRule: recurrenceRule,
       );
       googleEventId = response.googleEventId;
@@ -96,14 +92,10 @@ class CalendarService {
       location: location,
       startTime: startTime,
       endTime: endTime,
-      allDay: allDay,
-      timezone: timezone,
+      isAllDay: isAllDay,
       recurrenceRule: recurrenceRule,
-      recurrenceEnd: recurrenceEnd,
       eventType: eventType,
       committeeName: committeeName,
-      isPublic: isPublic,
-      visibility: visibility,
       createdBy: createdBy,
       googleEventId: googleEventId,
       status: EventStatus.confirmed,
@@ -134,12 +126,9 @@ class CalendarService {
     String? location,
     DateTime? startTime,
     DateTime? endTime,
-    bool? allDay,
+    bool? isAllDay,
     String? recurrenceRule,
-    DateTime? recurrenceEnd,
-    EventType? eventType,
-    bool? isPublic,
-    EventVisibility? visibility,
+    String? eventType,
   }) async {
     await _ensureInitialized();
 
@@ -148,9 +137,9 @@ class CalendarService {
     final newLocation = location ?? event.location;
     final newStartTime = startTime ?? event.startTime;
     final newEndTime = endTime ?? event.endTime;
-    final newAllDay = allDay ?? event.allDay;
+    final newAllDay = isAllDay ?? event.isAllDay;
     final newRecurrenceRule = recurrenceRule ?? event.recurrenceRule;
-    final newRecurrenceEnd = recurrenceEnd ?? event.recurrenceEnd;
+    final newEventType = eventType ?? event.eventType;
 
     // Update Google Calendar if we have a Google event ID
     if (event.googleEventId != null) {
@@ -162,7 +151,7 @@ class CalendarService {
         startTime: newStartTime,
         endTime: newEndTime,
         allDay: newAllDay,
-        timezone: event.timezone,
+        timezone: 'America/Chicago',
         recurrenceRule: newRecurrenceRule,
       );
     }
@@ -174,12 +163,9 @@ class CalendarService {
       location: newLocation,
       startTime: newStartTime,
       endTime: newEndTime,
-      allDay: newAllDay,
+      isAllDay: newAllDay,
       recurrenceRule: newRecurrenceRule,
-      recurrenceEnd: newRecurrenceEnd,
-      eventType: eventType,
-      isPublic: isPublic,
-      visibility: visibility,
+      eventType: newEventType,
       updatedAt: DateTime.now(),
     );
 
@@ -192,12 +178,9 @@ class CalendarService {
             'location': updatedEvent.location,
             'start_time': updatedEvent.startTime.toUtc().toIso8601String(),
             'end_time': updatedEvent.endTime.toUtc().toIso8601String(),
-            'all_day': updatedEvent.allDay,
+            'is_all_day': updatedEvent.isAllDay,
             'recurrence_rule': updatedEvent.recurrenceRule,
-            'recurrence_end': updatedEvent.recurrenceEnd?.toUtc().toIso8601String(),
-            'event_type': updatedEvent.eventType.name,
-            'is_public': updatedEvent.isPublic,
-            'visibility': updatedEvent.visibility.name,
+            'event_type': updatedEvent.eventType,
             'updated_at': updatedEvent.updatedAt!.toUtc().toIso8601String(),
           })
           .eq('id', event.id);

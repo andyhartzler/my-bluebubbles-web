@@ -495,8 +495,7 @@ class _MobileEventCard extends StatelessWidget {
     required this.isDark,
   });
 
-  bool get _isZoom =>
-      event.zoomMeetingId != null || event.location?.contains('zoom') == true;
+  bool get _isZoom => event.hasZoomMeeting;
 
   Color get _eventColor =>
       _isZoom ? const Color(0xFF2D8CFF) : const Color(0xFF3B82F6);
