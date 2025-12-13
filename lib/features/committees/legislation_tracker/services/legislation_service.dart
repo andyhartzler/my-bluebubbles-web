@@ -25,9 +25,11 @@ class LegislationService {
     String? position,
     String? priority,
     String? category,
+    String? sponsor,
     bool includeArchived = false,
     String? searchQuery,
-    int limit = 100,
+    bool searchBillText = false,
+    int limit = 1000,
   }) async {
     var query = _supabase
         .from('legislation_tracked_bills')
@@ -48,8 +50,17 @@ class LegislationService {
     if (category != null) {
       query = query.contains('categories', [category]);
     }
+    if (sponsor != null) {
+      query = query.eq('primary_sponsor_name', sponsor);
+    }
     if (searchQuery != null && searchQuery.isNotEmpty) {
-      query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%');
+      if (searchBillText) {
+        // Search in title, bill identifier, and bill text
+        query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%,current_bill_text.ilike.%$searchQuery%');
+      } else {
+        // Search in title and bill identifier only
+        query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%');
+      }
     }
 
     final response = await query

@@ -34,8 +34,10 @@ class LegislationProvider extends ChangeNotifier {
   String? _positionFilter;
   String? _priorityFilter;
   String? _categoryFilter;
+  String? _sponsorFilter;
   String _searchQuery = '';
   bool _showArchived = false;
+  bool _searchBillText = false;
 
   // Getters
   List<TrackedBill> get trackedBills => _trackedBills;
@@ -54,8 +56,23 @@ class LegislationProvider extends ChangeNotifier {
   String? get positionFilter => _positionFilter;
   String? get priorityFilter => _priorityFilter;
   String? get categoryFilter => _categoryFilter;
+  String? get sponsorFilter => _sponsorFilter;
   String get searchQuery => _searchQuery;
   bool get showArchived => _showArchived;
+  bool get searchBillText => _searchBillText;
+
+  /// Get unique sponsors from tracked bills for filter dropdown
+  List<String> get uniqueSponsors {
+    final sponsors = <String>{};
+    for (final bill in _trackedBills) {
+      if (bill.primarySponsorName != null && bill.primarySponsorName!.isNotEmpty) {
+        sponsors.add(bill.primarySponsorName!);
+      }
+    }
+    final list = sponsors.toList();
+    list.sort();
+    return list;
+  }
 
   // Filtered bills by position
   List<TrackedBill> get supportedBills =>
@@ -142,8 +159,10 @@ class LegislationProvider extends ChangeNotifier {
         position: _positionFilter,
         priority: _priorityFilter,
         category: _categoryFilter,
+        sponsor: _sponsorFilter,
         includeArchived: _showArchived,
         searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
+        searchBillText: _searchBillText,
       );
     } catch (e) {
       _error = 'Failed to load bills: $e';
@@ -184,9 +203,21 @@ class LegislationProvider extends ChangeNotifier {
     loadTrackedBills();
   }
 
+  void setSponsorFilter(String? sponsor) {
+    _sponsorFilter = sponsor;
+    loadTrackedBills();
+  }
+
   void setSearchQuery(String query) {
     _searchQuery = query;
     loadTrackedBills();
+  }
+
+  void setSearchBillText(bool search) {
+    _searchBillText = search;
+    if (_searchQuery.isNotEmpty) {
+      loadTrackedBills();
+    }
   }
 
   void setShowArchived(bool show) {
@@ -198,8 +229,10 @@ class LegislationProvider extends ChangeNotifier {
     _positionFilter = null;
     _priorityFilter = null;
     _categoryFilter = null;
+    _sponsorFilter = null;
     _searchQuery = '';
     _showArchived = false;
+    _searchBillText = false;
     loadTrackedBills();
   }
 
