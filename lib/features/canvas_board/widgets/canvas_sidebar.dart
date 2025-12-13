@@ -92,7 +92,7 @@ class CanvasSidebar extends StatelessWidget {
           _buildIconButton(
             context,
             icon: Icons.note_add,
-            tooltip: 'Add Note (N)',
+            tooltip: 'Add Note',
             color: const Color(0xFFFFC107),
             onTap: onAddNote,
           ),
@@ -160,7 +160,7 @@ class CanvasSidebar extends StatelessWidget {
             _buildIconButton(
               context,
               icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-              tooltip: isFullscreen ? 'Exit Fullscreen (F)' : 'Fullscreen (F)',
+              tooltip: isFullscreen ? 'Exit Fullscreen' : 'Fullscreen',
               onTap: onToggleFullscreen!,
             ),
           ],

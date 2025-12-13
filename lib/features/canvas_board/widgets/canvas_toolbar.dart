@@ -5,17 +5,17 @@ import 'package:bluebubbles/features/canvas_board/models/canvas_node.dart';
 /// Available tools in the canvas toolbar
 /// Matches fldraw's EditorTool enum for feature parity
 enum CanvasTool {
-  select,    // V - Select/move objects
-  pan,       // H - Pan the canvas
-  draw,      // D - Freehand drawing (pencil)
-  arrow,     // A - Arrow connector
-  line,      // L - Line
-  rectangle, // R - Rectangle shape
-  circle,    // O - Circle/oval shape
-  text,      // T - Text object
-  note,      // N - Sticky note
-  figure,    // F - Figure/group container (dashed border)
-  comment,   // C - Comment annotation
+  select,    // Select/move objects
+  pan,       // Pan the canvas
+  draw,      // Freehand drawing (pencil)
+  arrow,     // Arrow connector
+  line,      // Line
+  rectangle, // Rectangle shape
+  circle,    // Circle/oval shape
+  text,      // Text object
+  note,      // Sticky note
+  figure,    // Figure/group container (dashed border)
+  comment,   // Comment annotation
 }
 
 /// Toolbar for the canvas board with drawing and selection tools
@@ -91,33 +91,33 @@ class CanvasToolbar extends StatelessWidget {
         children: [
           // Selection tools
           _buildToolGroup([
-            _ToolItem(CanvasTool.select, Icons.near_me, 'Select (V)'),
-            _ToolItem(CanvasTool.pan, Icons.pan_tool, 'Pan (H)'),
+            _ToolItem(CanvasTool.select, Icons.near_me, 'Select'),
+            _ToolItem(CanvasTool.pan, Icons.pan_tool, 'Pan'),
           ], isDark),
           _buildDivider(isDark),
           // Drawing tools
           _buildToolGroup([
-            _ToolItem(CanvasTool.draw, Icons.brush, 'Draw (D)'),
-            _ToolItem(CanvasTool.arrow, Icons.north_east, 'Arrow (A)'),
-            _ToolItem(CanvasTool.line, Icons.remove, 'Line (L)'),
+            _ToolItem(CanvasTool.draw, Icons.brush, 'Draw'),
+            _ToolItem(CanvasTool.arrow, Icons.north_east, 'Arrow'),
+            _ToolItem(CanvasTool.line, Icons.remove, 'Line'),
           ], isDark),
           _buildDivider(isDark),
           // Shape tools
           _buildToolGroup([
-            _ToolItem(CanvasTool.rectangle, Icons.crop_square, 'Rectangle (R) - Hold Shift for square'),
-            _ToolItem(CanvasTool.circle, Icons.circle_outlined, 'Circle (O) - Hold Shift for perfect circle'),
+            _ToolItem(CanvasTool.rectangle, Icons.crop_square, 'Rectangle'),
+            _ToolItem(CanvasTool.circle, Icons.circle_outlined, 'Circle'),
           ], isDark),
           _buildDivider(isDark),
           // Text and annotation tools
           _buildToolGroup([
-            _ToolItem(CanvasTool.text, Icons.text_fields, 'Text (T)'),
-            _ToolItem(CanvasTool.note, Icons.note_add, 'Sticky Note (N)'),
+            _ToolItem(CanvasTool.text, Icons.text_fields, 'Text'),
+            _ToolItem(CanvasTool.note, Icons.note_add, 'Sticky Note'),
           ], isDark),
           _buildDivider(isDark),
           // Figure and comment tools (fldraw parity)
           _buildToolGroup([
-            _ToolItem(CanvasTool.figure, Icons.dashboard_outlined, 'Figure/Group (F)'),
-            _ToolItem(CanvasTool.comment, Icons.chat_bubble_outline, 'Comment (C)'),
+            _ToolItem(CanvasTool.figure, Icons.dashboard_outlined, 'Figure/Group'),
+            _ToolItem(CanvasTool.comment, Icons.chat_bubble_outline, 'Comment'),
           ], isDark),
           _buildDivider(isDark),
           // Color picker

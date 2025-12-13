@@ -1788,57 +1788,9 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
       return KeyEventResult.handled;
     }
 
-    // Ctrl+F - Toggle fullscreen (changed from F to match fldraw Figure tool)
+    // Ctrl+F - Toggle fullscreen
     if (isCtrl && event.logicalKey == LogicalKeyboardKey.keyF) {
       _toggleFullscreen(!_isFullscreen);
-      return KeyEventResult.handled;
-    }
-
-    // Tool shortcuts (only when not editing, matches fldraw)
-    if (event.logicalKey == LogicalKeyboardKey.keyV) {
-      setState(() => _selectedTool = CanvasTool.select);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyH) {
-      setState(() => _selectedTool = CanvasTool.pan);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyD) {
-      setState(() => _selectedTool = CanvasTool.draw);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyA) {
-      setState(() => _selectedTool = CanvasTool.arrow);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyL) {
-      setState(() => _selectedTool = CanvasTool.line);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyR) {
-      setState(() => _selectedTool = CanvasTool.rectangle);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyO) {
-      setState(() => _selectedTool = CanvasTool.circle);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyT) {
-      setState(() => _selectedTool = CanvasTool.text);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyN) {
-      setState(() => _selectedTool = CanvasTool.note);
-      return KeyEventResult.handled;
-    }
-    // F - Figure tool (fldraw parity)
-    if (event.logicalKey == LogicalKeyboardKey.keyF) {
-      setState(() => _selectedTool = CanvasTool.figure);
-      return KeyEventResult.handled;
-    }
-    // C - Comment tool (fldraw parity)
-    if (event.logicalKey == LogicalKeyboardKey.keyC) {
-      setState(() => _selectedTool = CanvasTool.comment);
       return KeyEventResult.handled;
     }
 
