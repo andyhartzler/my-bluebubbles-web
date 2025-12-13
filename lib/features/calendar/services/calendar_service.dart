@@ -227,7 +227,7 @@ class CalendarService {
     required DateTime startDate,
     required DateTime endDate,
     String? committeeName,
-    EventType? eventType,
+    String? eventType,
     bool includeAll = false,
     int limit = 100,
   }) async {
@@ -249,7 +249,7 @@ class CalendarService {
       }
 
       if (eventType != null) {
-        query = query.eq('event_type', eventType.name);
+        query = query.eq('event_type', eventType);
       }
 
       final data = await query
@@ -267,7 +267,7 @@ class CalendarService {
   /// Gets upcoming events
   Future<List<CalendarEvent>> getUpcomingEvents({
     String? committeeName,
-    EventType? eventType,
+    String? eventType,
     int limit = 10,
   }) async {
     await _ensureInitialized();
@@ -284,7 +284,7 @@ class CalendarService {
       }
 
       if (eventType != null) {
-        query = query.eq('event_type', eventType.name);
+        query = query.eq('event_type', eventType);
       }
 
       final data = await query
