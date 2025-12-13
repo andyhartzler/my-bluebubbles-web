@@ -266,7 +266,7 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
             unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
             indicatorColor: committee.primaryColor,
             tabs: const [
-              Tab(text: 'General'),
+              Tab(text: 'All High School Democrats'),
               Tab(text: 'MOHSDA Executive Board'),
             ],
           ),
