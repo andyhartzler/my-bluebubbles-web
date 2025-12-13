@@ -263,22 +263,26 @@ class ZoomMeetingService {
     await _ensureInitialized();
 
     try {
+      // Build query with filters first, then transforms
       var query = _client
           .from('scheduled_meetings')
           .select()
           .eq('status', 'scheduled')
-          .gte('meeting_date', _formatDate(DateTime.now()))
-          .order('meeting_date', ascending: true)
-          .order('start_time', ascending: true)
-          .limit(limit);
+          .gte('meeting_date', _formatDate(DateTime.now()));
 
+      // Apply committee filter before transforms
       if (committeeId != null) {
         query = query.eq('committee_id', committeeId);
       } else if (committeeName != null) {
         query = query.eq('committee_name', committeeName);
       }
 
-      final data = await query;
+      // Now apply transforms (order, limit) and execute
+      final data = await query
+          .order('meeting_date', ascending: true)
+          .order('start_time', ascending: true)
+          .limit(limit);
+
       return (data as List<dynamic>)
           .map((item) => ScheduledMeeting.fromJson(item as Map<String, dynamic>))
           .toList();
@@ -296,20 +300,24 @@ class ZoomMeetingService {
     await _ensureInitialized();
 
     try {
+      // Build query with filters first
       var query = _client
           .from('scheduled_meetings')
-          .select()
-          .order('meeting_date', ascending: false)
-          .order('start_time', ascending: false)
-          .limit(limit);
+          .select();
 
+      // Apply committee filter before transforms
       if (committeeId != null) {
         query = query.eq('committee_id', committeeId);
       } else if (committeeName != null) {
         query = query.eq('committee_name', committeeName);
       }
 
-      final data = await query;
+      // Now apply transforms (order, limit) and execute
+      final data = await query
+          .order('meeting_date', ascending: false)
+          .order('start_time', ascending: false)
+          .limit(limit);
+
       return (data as List<dynamic>)
           .map((item) => ScheduledMeeting.fromJson(item as Map<String, dynamic>))
           .toList();
