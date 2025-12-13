@@ -10,6 +10,7 @@ import '../widgets/legislation_stats_card.dart';
 import 'bill_detail_screen.dart';
 import 'bill_search_screen.dart';
 import 'legislation_dashboard_screen.dart';
+import 'legislators_list_screen.dart';
 
 /// Main screen for the Legislation Tracker tab
 class LegislationTrackerScreen extends StatefulWidget {
@@ -32,7 +33,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
 
     // Load data when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -159,6 +160,16 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                       ],
                     ),
                   ),
+                  const Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.people, size: 18),
+                        SizedBox(width: 4),
+                        Text('Legislators'),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -172,6 +183,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               _buildAllBillsTab(context, theme, provider),
               _buildFilteredBillsList(context, provider, provider.supportedBills, 'No bills you support'),
               _buildFilteredBillsList(context, provider, provider.opposedBills, 'No bills you oppose'),
+              LegislatorsListScreen(committeeId: widget.committeeId),
             ],
           ),
         ),

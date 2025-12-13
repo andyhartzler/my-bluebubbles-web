@@ -6,6 +6,7 @@ import '../models/bill_sponsor.dart';
 import '../models/bill_note.dart';
 import '../models/bill_document.dart';
 import '../models/legislation_category.dart';
+import '../models/legislator.dart';
 import 'openstates_service.dart';
 
 /// Service for managing tracked legislation in Supabase
@@ -316,6 +317,167 @@ class LegislationService {
         .order('is_primary', ascending: false);
 
     return (response as List).map((json) => BillSponsor.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  /// Get sponsors for a bill with linked legislator data
+  Future<List<BillSponsor>> getBillSponsorsWithLegislators(String billId) async {
+    final response = await _supabase
+        .from('legislation_bill_sponsors')
+        .select('*, legislator:legislator_id(*)')
+        .eq('bill_id', billId)
+        .order('is_primary', ascending: false);
+
+    return (response as List).map((json) => BillSponsor.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  // ==================== LEGISLATORS ====================
+
+  /// Get all current legislators
+  Future<List<Legislator>> getAllLegislators() async {
+    final response = await _supabase
+        .from('legislation_legislators')
+        .select()
+        .eq('is_current', true)
+        .order('chamber')
+        .order('district');
+
+    return (response as List).map((json) => Legislator.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  /// Get legislators by chamber
+  Future<List<Legislator>> getLegislatorsByChamber(String chamber) async {
+    final response = await _supabase
+        .from('legislation_legislators')
+        .select()
+        .eq('chamber', chamber) // 'upper' or 'lower'
+        .eq('is_current', true)
+        .order('district');
+
+    return (response as List).map((json) => Legislator.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  /// Get a single legislator by ID
+  Future<Legislator?> getLegislator(String id) async {
+    final response = await _supabase
+        .from('legislation_legislators')
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+
+    return response != null ? Legislator.fromJson(response) : null;
+  }
+
+  /// Get legislator by district
+  Future<Legislator?> getLegislatorByDistrict(String chamber, String district) async {
+    final response = await _supabase
+        .from('legislation_legislators')
+        .select()
+        .eq('chamber', chamber)
+        .eq('district', district)
+        .eq('is_current', true)
+        .maybeSingle();
+
+    return response != null ? Legislator.fromJson(response) : null;
+  }
+
+  /// Search legislators by name
+  Future<List<Legislator>> searchLegislators(String query) async {
+    final response = await _supabase
+        .from('legislation_legislators')
+        .select()
+        .eq('is_current', true)
+        .or('name.ilike.%$query%,last_name.ilike.%$query%,first_name.ilike.%$query%')
+        .order('last_name');
+
+    return (response as List).map((json) => Legislator.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  /// Get legislators with filters
+  Future<List<Legislator>> getLegislatorsFiltered({
+    String? chamber,
+    String? party,
+    String? searchQuery,
+    bool? hasLeadershipRole,
+    int limit = 200,
+  }) async {
+    var query = _supabase
+        .from('legislation_legislators')
+        .select()
+        .eq('is_current', true);
+
+    if (chamber != null) {
+      query = query.eq('chamber', chamber);
+    }
+    if (party != null) {
+      query = query.eq('party', party);
+    }
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      query = query.or('name.ilike.%$searchQuery%,last_name.ilike.%$searchQuery%,first_name.ilike.%$searchQuery%');
+    }
+    if (hasLeadershipRole == true) {
+      query = query.not('leadership_role', 'is', null);
+    }
+
+    final response = await query
+        .order('chamber')
+        .order('district')
+        .limit(limit);
+
+    return (response as List).map((json) => Legislator.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  /// Get bills sponsored by a legislator
+  Future<List<TrackedBill>> getBillsBySponsor(String legislatorId) async {
+    // Get bill IDs where this legislator is a sponsor
+    final sponsorships = await _supabase
+        .from('legislation_bill_sponsors')
+        .select('bill_id')
+        .eq('legislator_id', legislatorId);
+
+    if ((sponsorships as List).isEmpty) {
+      return [];
+    }
+
+    final billIds = sponsorships.map((s) => s['bill_id'] as String).toList();
+
+    final response = await _supabase
+        .from('legislation_tracked_bills')
+        .select()
+        .inFilter('id', billIds)
+        .order('latest_action_date', ascending: false);
+
+    return (response as List).map((json) => TrackedBill.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  /// Get legislator statistics
+  Future<LegislatorStats> getLegislatorStats() async {
+    final legislators = await getAllLegislators();
+
+    int senateCount = 0;
+    int houseCount = 0;
+    int republicanCount = 0;
+    int democratCount = 0;
+    int withLeadershipCount = 0;
+    int withPhotosCount = 0;
+
+    for (final leg in legislators) {
+      if (leg.chamber == 'upper') senateCount++;
+      if (leg.chamber == 'lower') houseCount++;
+      if (leg.party == 'Republican') republicanCount++;
+      if (leg.party == 'Democratic') democratCount++;
+      if (leg.leadershipRole != null) withLeadershipCount++;
+      if (leg.photoStoragePath != null) withPhotosCount++;
+    }
+
+    return LegislatorStats(
+      totalLegislators: legislators.length,
+      senateCount: senateCount,
+      houseCount: houseCount,
+      republicanCount: republicanCount,
+      democratCount: democratCount,
+      withLeadershipCount: withLeadershipCount,
+      withPhotosCount: withPhotosCount,
+    );
   }
 
   // ==================== BILL DOCUMENTS ====================
@@ -662,4 +824,35 @@ class SyncLog {
       'duration_ms': durationMs,
     };
   }
+}
+
+/// Legislator statistics
+class LegislatorStats {
+  final int totalLegislators;
+  final int senateCount;
+  final int houseCount;
+  final int republicanCount;
+  final int democratCount;
+  final int withLeadershipCount;
+  final int withPhotosCount;
+
+  LegislatorStats({
+    required this.totalLegislators,
+    required this.senateCount,
+    required this.houseCount,
+    required this.republicanCount,
+    required this.democratCount,
+    required this.withLeadershipCount,
+    required this.withPhotosCount,
+  });
+
+  factory LegislatorStats.empty() => LegislatorStats(
+    totalLegislators: 0,
+    senateCount: 0,
+    houseCount: 0,
+    republicanCount: 0,
+    democratCount: 0,
+    withLeadershipCount: 0,
+    withPhotosCount: 0,
+  );
 }

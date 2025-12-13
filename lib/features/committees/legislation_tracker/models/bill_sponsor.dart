@@ -1,3 +1,5 @@
+import 'legislator.dart';
+
 /// Represents a sponsor of a bill
 /// CAPTURES ALL Open States API v3 BillSponsorship fields
 class BillSponsor {
@@ -35,6 +37,10 @@ class BillSponsor {
   // MOYD Integration
   final String? linkedMemberId; // Link to MOYD members table
 
+  // Legislator link (populated when fetched with join)
+  final String? legislatorId;
+  final Legislator? legislator;
+
   BillSponsor({
     required this.id,
     required this.createdAt,
@@ -55,9 +61,18 @@ class BillSponsor {
     this.organizationName,
     this.organizationClassification,
     this.linkedMemberId,
+    this.legislatorId,
+    this.legislator,
   });
 
   factory BillSponsor.fromJson(Map<String, dynamic> json) {
+    // Parse legislator if included in the join
+    Legislator? legislator;
+    final legislatorData = json['legislator'];
+    if (legislatorData != null && legislatorData is Map<String, dynamic>) {
+      legislator = Legislator.fromJson(legislatorData);
+    }
+
     return BillSponsor(
       id: json['id'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -78,6 +93,8 @@ class BillSponsor {
       organizationName: json['organization_name'] as String?,
       organizationClassification: json['organization_classification'] as String?,
       linkedMemberId: json['linked_member_id'] as String?,
+      legislatorId: json['legislator_id'] as String?,
+      legislator: legislator,
     );
   }
 
@@ -102,6 +119,8 @@ class BillSponsor {
       'organization_name': organizationName,
       'organization_classification': organizationClassification,
       'linked_member_id': linkedMemberId,
+      'legislator_id': legislatorId,
+      if (legislator != null) 'legislator': legislator!.toJson(),
     };
   }
 
@@ -125,6 +144,8 @@ class BillSponsor {
     String? organizationName,
     String? organizationClassification,
     String? linkedMemberId,
+    String? legislatorId,
+    Legislator? legislator,
   }) {
     return BillSponsor(
       id: id ?? this.id,
@@ -146,6 +167,8 @@ class BillSponsor {
       organizationName: organizationName ?? this.organizationName,
       organizationClassification: organizationClassification ?? this.organizationClassification,
       linkedMemberId: linkedMemberId ?? this.linkedMemberId,
+      legislatorId: legislatorId ?? this.legislatorId,
+      legislator: legislator ?? this.legislator,
     );
   }
 
