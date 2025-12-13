@@ -87,7 +87,7 @@ class _ChannelsTabState extends State<ChannelsTab> {
         SlackChannel? channelToSelect;
         if (widget.initialChannelId != null) {
           channelToSelect = channels.firstWhere(
-            (c) => c.channelId == widget.initialChannelId,
+            (c) => c.slackChannelId == widget.initialChannelId,
             orElse: () => channels.first,
           );
         } else {
