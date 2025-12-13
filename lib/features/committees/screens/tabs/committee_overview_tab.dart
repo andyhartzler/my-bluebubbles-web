@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import 'package:bluebubbles/features/calendar/widgets/committee_calendar_widget.dart';
 import 'package:bluebubbles/features/calendar/widgets/event_create_dialog.dart';
+import 'package:bluebubbles/features/calendar/widgets/responsive_calendar_widget.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/meetings/widgets/upcoming_meetings_widget.dart';
@@ -121,7 +121,7 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
                 : null,
           ),
           const SizedBox(height: 24),
-          CommitteeCalendarWidget(
+          ResponsiveCalendarWidget(
             committeeName: committee.name,
             accentColor: committee.primaryColor,
             onAddEvent: () => _showAddEventDialog(context),
