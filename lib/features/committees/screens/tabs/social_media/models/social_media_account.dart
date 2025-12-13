@@ -18,6 +18,14 @@ class SocialMediaAccount {
     this.metadata = const {},
   });
 
+  /// Safely parse a value that should be a Map
+  static Map<String, dynamic> _safeParseMap(dynamic value) {
+    if (value == null) return {};
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return {};
+  }
+
   factory SocialMediaAccount.fromJson(Map<String, dynamic> json) {
     return SocialMediaAccount(
       id: json['id'] as String,
@@ -28,7 +36,7 @@ class SocialMediaAccount {
       lastSyncedAt: json['last_synced_at'] != null
           ? DateTime.parse(json['last_synced_at'] as String)
           : null,
-      metadata: json['metadata'] as Map<String, dynamic>? ?? {},
+      metadata: _safeParseMap(json['metadata']),
     );
   }
 

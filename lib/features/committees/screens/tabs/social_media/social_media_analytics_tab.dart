@@ -216,7 +216,7 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
       );
     }
 
-    // Calculate summary totals
+    // Calculate summary totals from platform metrics (30-day data)
     int totalFollowers = 0;
     int totalEngagement = 0;
     int totalImpressions = 0;
@@ -224,9 +224,17 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
 
     for (var stats in _latestStats.values) {
       totalFollowers += stats.followersCount ?? 0;
-      totalEngagement += stats.totalEngagement;
+      // Prefer 30-day totals from platform metrics
+      final totals = stats.last30DaysTotals;
+      if (totals.isNotEmpty) {
+        totalEngagement += _toInt(totals['total_engagement'] ?? totals['likes']) +
+            _toInt(totals['comments']) +
+            _toInt(totals['shares']);
+      } else {
+        totalEngagement += stats.totalEngagement;
+      }
       totalImpressions += stats.impressions ?? 0;
-      totalPosts += stats.postsCount ?? 0;
+      totalPosts += _toInt(totals['posts']) + (stats.postsCount ?? 0);
     }
 
     return RefreshIndicator(
@@ -298,8 +306,26 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
   }
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            CommunicationsCommitteeTheme.primary.withOpacity(isDark ? 0.25 : 0.12),
+            CommunicationsCommitteeTheme.primaryDark.withOpacity(isDark ? 0.15 : 0.06),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: CommunicationsCommitteeTheme.primary.withOpacity(0.2),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -309,13 +335,39 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
 
               if (isWide) {
                 return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Social Media Analytics',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: CommunicationsCommitteeTheme.primary.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        Icons.analytics_rounded,
+                        color: CommunicationsCommitteeTheme.primary,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Social Media Analytics',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Track performance across all your social platforms',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     _buildRefreshButton(),
                   ],
@@ -325,11 +377,30 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Social Media Analytics',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: CommunicationsCommitteeTheme.primary.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: Icon(
+                          Icons.analytics_rounded,
+                          color: CommunicationsCommitteeTheme.primary,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Social Media Analytics',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   _buildRefreshButton(),
@@ -337,15 +408,28 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
               );
             },
           ),
-          const SizedBox(height: 16),
-          // Filters row
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _buildAccountFilterDropdown(),
-              _buildDateRangePicker(),
-            ],
+          const SizedBox(height: 20),
+          // Filters row with improved styling
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.black.withOpacity(0.2) : Colors.white.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Icon(
+                  Icons.filter_list_rounded,
+                  size: 20,
+                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.5),
+                ),
+                _buildAccountFilterDropdown(),
+                _buildDateRangePicker(),
+              ],
+            ),
           ),
         ],
       ),
@@ -483,5 +567,13 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
 
   String _formatDate(DateTime date) {
     return '${date.month}/${date.day}/${date.year}';
+  }
+
+  int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 }
