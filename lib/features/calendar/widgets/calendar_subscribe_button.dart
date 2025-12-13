@@ -59,14 +59,13 @@ class _CalendarSubscribeButtonState extends State<CalendarSubscribeButton> {
       builder: (context) => _SubscribeDialog(
         subscriptionUrl: _subscriptionUrl!,
         committeeName: widget.committeeName,
-        accentColor: widget.accentColor,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.accentColor ?? Theme.of(context).colorScheme.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return OutlinedButton.icon(
       onPressed: _loading ? null : _showSubscribeDialog,
@@ -76,18 +75,29 @@ class _CalendarSubscribeButtonState extends State<CalendarSubscribeButton> {
               height: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: color,
+                color: isDark ? Colors.white : const Color(0xFF374151),
               ),
             )
-          : Icon(Icons.calendar_month, size: 18, color: color),
+          : Icon(
+              Icons.add_alert_outlined,
+              size: 16,
+              color: isDark ? Colors.white : const Color(0xFF374151),
+            ),
       label: Text(
         'Subscribe',
-        style: TextStyle(color: color),
+        style: TextStyle(
+          fontSize: 13,
+          color: isDark ? Colors.white : const Color(0xFF374151),
+        ),
       ),
       style: OutlinedButton.styleFrom(
-        side: BorderSide(color: color.withOpacity(0.5)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        visualDensity: VisualDensity.compact,
+        side: BorderSide(
+          color: isDark ? const Color(0xFF38383A) : const Color(0xFFD1D5DB),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
     );
   }
@@ -96,17 +106,16 @@ class _CalendarSubscribeButtonState extends State<CalendarSubscribeButton> {
 class _SubscribeDialog extends StatelessWidget {
   final String subscriptionUrl;
   final String? committeeName;
-  final Color? accentColor;
 
   const _SubscribeDialog({
     required this.subscriptionUrl,
     this.committeeName,
-    this.accentColor,
   });
 
   Future<void> _copyUrl(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: subscriptionUrl));
     if (context.mounted) {
+      Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Calendar URL copied to clipboard'),
@@ -117,13 +126,15 @@ class _SubscribeDialog extends StatelessWidget {
   }
 
   Future<void> _openGoogleCalendar(BuildContext context) async {
-    // Create Google Calendar add URL
     final googleCalendarUrl = Uri.parse(
       'https://calendar.google.com/calendar/render?cid=${Uri.encodeComponent(subscriptionUrl)}',
     );
 
     if (await canLaunchUrl(googleCalendarUrl)) {
       await launchUrl(googleCalendarUrl, mode: LaunchMode.externalApplication);
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
     } else {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,13 +146,14 @@ class _SubscribeDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = accentColor ?? theme.colorScheme.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final calendarName = committeeName != null
         ? '$committeeName Calendar'
-        : 'Organization Calendar';
+        : 'MOYD Calendar';
 
     return Dialog(
+      backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 400),
         padding: const EdgeInsets.all(24),
@@ -149,15 +161,20 @@ class _SubscribeDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Header
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: const Color(0xFF3B82F6).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.calendar_month, color: color, size: 28),
+                  child: const Icon(
+                    Icons.calendar_month,
+                    color: Color(0xFF3B82F6),
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -166,15 +183,20 @@ class _SubscribeDialog extends StatelessWidget {
                     children: [
                       Text(
                         'Subscribe to Calendar',
-                        style: theme.textTheme.titleMedium?.copyWith(
+                        style: TextStyle(
+                          fontSize: 17,
                           fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         calendarName,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark
+                              ? const Color(0xFF98989F)
+                              : const Color(0xFF6B7280),
                         ),
                       ),
                     ],
@@ -182,95 +204,114 @@ class _SubscribeDialog extends StatelessWidget {
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
+                  icon: Icon(
+                    Icons.close,
+                    color: isDark
+                        ? const Color(0xFF98989F)
+                        : const Color(0xFF6B7280),
+                  ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             Text(
-              'Add this calendar to your personal calendar app to stay updated with all events.',
-              style: theme.textTheme.bodyMedium,
+              'Add this calendar to your personal calendar app to stay updated with all organization events.',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark
+                    ? const Color(0xFFD1D5DB)
+                    : const Color(0xFF4B5563),
+                height: 1.4,
+              ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             // Google Calendar button
             FilledButton.icon(
               onPressed: () => _openGoogleCalendar(context),
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Add to Google Calendar'),
+              icon: const Icon(Icons.open_in_new, size: 18),
+              label: const Text(
+                'Add to Google Calendar',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               style: FilledButton.styleFrom(
-                backgroundColor: color,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                backgroundColor: const Color(0xFF3B82F6),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
 
             const SizedBox(height: 12),
 
-            // Copy URL section
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
+            // Copy URL button
+            OutlinedButton.icon(
+              onPressed: () => _copyUrl(context),
+              icon: Icon(
+                Icons.copy,
+                size: 18,
+                color: isDark ? Colors.white : const Color(0xFF374151),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Or copy the calendar URL:',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          subscriptionUrl,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontFamily: 'monospace',
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => _copyUrl(context),
-                        icon: Icon(Icons.copy, color: color, size: 20),
-                        tooltip: 'Copy URL',
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-                ],
+              label: Text(
+                'Copy Calendar URL',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.white : const Color(0xFF374151),
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF38383A)
+                      : const Color(0xFFD1D5DB),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-            // Instructions
+            // Info note
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
+                color: isDark
+                    ? const Color(0xFF1E3A5F)
+                    : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF3B82F6).withOpacity(0.3)
+                      : const Color(0xFF3B82F6).withOpacity(0.2),
+                ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 18),
-                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.info_outline,
+                    size: 18,
+                    color: isDark
+                        ? const Color(0xFF93C5FD)
+                        : const Color(0xFF2563EB),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Events will automatically sync to your calendar. Updates may take up to 24 hours to appear.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.blue.shade800,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? const Color(0xFFBFDBFE)
+                            : const Color(0xFF1E40AF),
+                        height: 1.4,
                       ),
                     ),
                   ),

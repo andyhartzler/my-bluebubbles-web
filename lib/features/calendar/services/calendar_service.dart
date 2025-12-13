@@ -316,20 +316,69 @@ class CalendarService {
     }
   }
 
-  /// Gets events for a specific month
+  /// Gets events for a specific month - fetches ALL events by default
   Future<List<CalendarEvent>> getEventsForMonth(
     int year,
     int month, {
+    bool filterByCommittee = false,
     String? committeeName,
   }) async {
-    final startDate = DateTime(year, month, 1);
-    final endDate = DateTime(year, month + 1, 0, 23, 59, 59);
+    final startDate = DateTime.utc(year, month, 1);
+    final endDate = DateTime.utc(year, month + 1, 0, 23, 59, 59);
 
     return getEvents(
       startDate: startDate,
       endDate: endDate,
-      committeeName: committeeName,
+      // Only filter by committee if explicitly requested
+      committeeName: filterByCommittee ? committeeName : null,
     );
+  }
+
+  /// Gets ALL events for a date range (no committee filter)
+  Future<List<CalendarEvent>> getAllEvents({
+    required DateTime startDate,
+    required DateTime endDate,
+    int limit = 100,
+  }) async {
+    await _ensureInitialized();
+
+    try {
+      final data = await _client
+          .from('calendar_events')
+          .select()
+          .gte('start_time', startDate.toUtc().toIso8601String())
+          .lte('start_time', endDate.toUtc().toIso8601String())
+          .neq('status', 'cancelled')
+          .order('start_time', ascending: true)
+          .limit(limit);
+
+      return (data as List<dynamic>)
+          .map((item) => CalendarEvent.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw CalendarException('Failed to fetch events: $e', cause: e);
+    }
+  }
+
+  /// Gets ALL upcoming events (no committee filter)
+  Future<List<CalendarEvent>> getAllUpcomingEvents({int limit = 20}) async {
+    await _ensureInitialized();
+
+    try {
+      final data = await _client
+          .from('calendar_events')
+          .select()
+          .gte('start_time', DateTime.now().toUtc().toIso8601String())
+          .neq('status', 'cancelled')
+          .order('start_time', ascending: true)
+          .limit(limit);
+
+      return (data as List<dynamic>)
+          .map((item) => CalendarEvent.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw CalendarException('Failed to fetch upcoming events: $e', cause: e);
+    }
   }
 
   /// Gets a single event by ID
