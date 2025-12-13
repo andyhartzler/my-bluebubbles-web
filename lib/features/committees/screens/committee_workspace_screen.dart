@@ -343,71 +343,57 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
   Widget _buildMobileLayout(BuildContext context, bool isVerySmall) {
     final theme = Theme.of(context);
 
+    // Use a fixed header layout so back button is always visible
     return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            SliverAppBar(
-              expandedHeight: 90,
-              floating: true,
-              snap: true,
-              pinned: false,
-              automaticallyImplyLeading: false,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [committee.primaryColor, committee.secondaryColor],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: SafeArea(
-                    bottom: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
-                            onPressed: () => Navigator.of(context).pop(),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          const SizedBox(width: 4),
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundColor: Colors.white.withOpacity(0.2),
-                            child: Icon(committee.icon, color: Colors.white, size: 14),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              committee.displayName,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+      body: Column(
+        children: [
+          // Fixed header with back button and tabs - always visible
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [committee.primaryColor, committee.secondaryColor],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(46),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [committee.primaryColor, committee.secondaryColor],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header row with back button, icon, and title
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: () => Navigator.of(context).pop(),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        const SizedBox(width: 4),
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          child: Icon(committee.icon, color: Colors.white, size: 14),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            committee.displayName,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: TabBar(
+                  // Tab bar
+                  TabBar(
                     controller: _tabController,
                     isScrollable: true,
                     labelPadding: EdgeInsets.symmetric(horizontal: isVerySmall ? 6 : 10),
@@ -421,16 +407,19 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                       iconMargin: EdgeInsets.only(bottom: isVerySmall ? 0 : 2),
                     )).toList(),
                   ),
-                ),
+                ],
               ),
             ),
-          ];
-        },
-        body: TabBarView(
-          controller: _tabController,
-          physics: const NeverScrollableScrollPhysics(),
-          children: _tabs.map((tab) => tab.builder()).toList(),
-        ),
+          ),
+          // Tab content - scrollable
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: _tabs.map((tab) => tab.builder()).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }

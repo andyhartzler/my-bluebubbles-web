@@ -124,8 +124,22 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dayEvents = _getEventsForDay(_selectedDate);
+
+    // Calculate dynamic height based on content
+    // Header (~90) + Week strip (90) + divider (1) + day header (~50) + events
+    const baseHeight = 231.0; // Header + week strip + divider + day header
+    const eventCardHeight = 120.0; // Approximate height per event card
+    const emptyStateHeight = 150.0;
+    const maxEventsToShow = 3;
+
+    final eventsHeight = dayEvents.isEmpty
+        ? emptyStateHeight
+        : (dayEvents.length.clamp(1, maxEventsToShow) * eventCardHeight);
+    final totalHeight = baseHeight + eventsHeight;
 
     return Container(
+      height: totalHeight,
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -149,7 +163,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
           ),
 
           // Events list
-          Flexible(
+          Expanded(
             child: _buildEventsList(isDark),
           ),
         ],
@@ -357,65 +371,62 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
             ],
           ),
         ),
-        if (dayEvents.isEmpty)
-          _buildEmptyState(isDark)
-        else
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _loadEvents,
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                itemCount: dayEvents.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _MobileEventCard(
-                      event: dayEvents[index],
-                      isDark: isDark,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
+        Expanded(
+          child: dayEvents.isEmpty
+              ? _buildEmptyState(isDark)
+              : RefreshIndicator(
+                  onRefresh: _loadEvents,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: dayEvents.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _MobileEventCard(
+                          event: dayEvents[index],
+                          isDark: isDark,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+        ),
       ],
     );
   }
 
   Widget _buildEmptyState(bool isDark) {
-    return Expanded(
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.event_note_outlined,
-              size: 56,
-              color: isDark ? const Color(0xFF48484A) : const Color(0xFFD1D5DB),
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.event_note_outlined,
+            size: 56,
+            color: isDark ? const Color(0xFF48484A) : const Color(0xFFD1D5DB),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Events',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w500,
+              color: isDark
+                  ? const Color(0xFF98989F)
+                  : const Color(0xFF6B7280),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'No Events',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w500,
-                color: isDark
-                    ? const Color(0xFF98989F)
-                    : const Color(0xFF6B7280),
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tap + to add an event',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark
+                  ? const Color(0xFF636366)
+                  : const Color(0xFF9CA3AF),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Tap + to add an event',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark
-                    ? const Color(0xFF636366)
-                    : const Color(0xFF9CA3AF),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

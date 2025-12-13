@@ -245,7 +245,7 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
     }
 
     final slackMessages = _overallStats['slackMessages'] ?? 0;
-    final messagesSent = _overallStats['messagesSent'] ?? 0;
+    final totalImpressions = _overallStats['totalImpressions'] ?? 0;
     final countiesRepresented = _overallStats['countiesRepresented'] ?? 0;
 
     return LayoutBuilder(
@@ -267,10 +267,10 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
             value: _formatNumber(totalMembers),
           ),
           _StatCard(
-            icon: Icons.message_outlined,
+            icon: Icons.visibility_outlined,
             iconColor: Colors.green,
-            label: 'Messages Sent',
-            value: _formatNumber(messagesSent),
+            label: 'Impressions',
+            value: _formatNumber(totalImpressions),
           ),
           _StatCard(
             icon: Icons.location_on_outlined,
