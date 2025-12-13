@@ -40,12 +40,76 @@ ${voteDescription != null && voteDescription.isNotEmpty ? '\n$voteDescription' :
 Cast your vote here: $voteUrl''';
   }
 
+  /// Set pending email content for a Zoom meeting invite
+  void setMeetingEmailContent({
+    required String meetingTitle,
+    required String meetingDate,
+    required String meetingTime,
+    required String meetingDuration,
+    required String zoomJoinUrl,
+    String? zoomPassword,
+    String? description,
+  }) {
+    pendingEmailSubject = 'Meeting Invitation: $meetingTitle';
+
+    final passwordLine = zoomPassword != null
+        ? '<p><strong>Password:</strong> $zoomPassword</p>'
+        : '';
+    final passwordLinePlain = zoomPassword != null
+        ? 'Password: $zoomPassword\n'
+        : '';
+    final descriptionLine = description != null && description.isNotEmpty
+        ? '<p>$description</p>'
+        : '';
+    final descriptionLinePlain = description != null && description.isNotEmpty
+        ? '\n$description\n'
+        : '';
+
+    pendingEmailBody = '''
+<p>You are invited to a Zoom meeting:</p>
+<p><strong>$meetingTitle</strong></p>
+$descriptionLine
+<p><strong>Date:</strong> $meetingDate</p>
+<p><strong>Time:</strong> $meetingTime ($meetingDuration)</p>
+<p><strong>Join Zoom Meeting:</strong> <a href="$zoomJoinUrl">$zoomJoinUrl</a></p>
+$passwordLine
+<p>We look forward to seeing you there!</p>
+''';
+
+    pendingEmailBodyPlainText = '''You are invited to a Zoom meeting:
+
+$meetingTitle
+$descriptionLinePlain
+Date: $meetingDate
+Time: $meetingTime ($meetingDuration)
+
+Join Zoom Meeting: $zoomJoinUrl
+$passwordLinePlain
+We look forward to seeing you there!''';
+  }
+
   /// Set pending message content for a vote share
   void setVoteMessageContent({
     required String voteTitle,
     required String voteUrl,
   }) {
     pendingMessageBody = 'Vote: $voteTitle\n\nCast your vote here: $voteUrl';
+  }
+
+  /// Set pending message content for a Zoom meeting invite
+  void setMeetingMessageContent({
+    required String meetingTitle,
+    required String meetingDate,
+    required String meetingTime,
+    required String zoomJoinUrl,
+    String? zoomPassword,
+  }) {
+    final passwordLine = zoomPassword != null ? '\nPassword: $zoomPassword' : '';
+    pendingMessageBody = '''$meetingTitle
+
+📅 $meetingDate at $meetingTime
+
+Join Zoom: $zoomJoinUrl$passwordLine''';
   }
 
   /// Clear pending email content after consuming

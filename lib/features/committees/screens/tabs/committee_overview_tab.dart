@@ -111,6 +111,12 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
           UpcomingMeetingsWidget(
             committee: committee,
             accentColor: committee.primaryColor,
+            onNavigateToEmail: widget.onNavigateToTab != null
+                ? () => widget.onNavigateToTab!(3) // Email tab index
+                : null,
+            onNavigateToMessages: widget.onNavigateToTab != null
+                ? () => widget.onNavigateToTab!(4) // Messages tab index
+                : null,
           ),
           const SizedBox(height: 24),
           if (_isSchoolCommittee && _schoolDistribution.isNotEmpty) ...[
