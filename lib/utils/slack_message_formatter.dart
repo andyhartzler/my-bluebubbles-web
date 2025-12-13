@@ -8,6 +8,7 @@ class SlackMessageFormatter {
 
   // Patterns for Slack formatting
   static final RegExp _linkRegex = RegExp(r'<(https?://[^|>]+)\|?([^>]*)>');
+  static final RegExp _mailtoRegex = RegExp(r'<mailto:([^|>]+)\|?([^>]*)>');
   static final RegExp _boldRegex = RegExp(r'\*([^*]+)\*');
   static final RegExp _channelMentionRegex = RegExp(r'<!channel>|<!here>|<!everyone>');
   static final RegExp _userMentionRegex = RegExp(r'<@([A-Z0-9]+)>|@([A-Z0-9]{9,})');
@@ -34,6 +35,11 @@ class SlackMessageFormatter {
     // Find links
     for (final match in _linkRegex.allMatches(text)) {
       allMatches.add(_Match(match.start, match.end, _MatchType.link, match));
+    }
+
+    // Find mailto links
+    for (final match in _mailtoRegex.allMatches(text)) {
+      allMatches.add(_Match(match.start, match.end, _MatchType.mailto, match));
     }
 
     // Find bold text
@@ -92,6 +98,20 @@ class SlackMessageFormatter {
             text: displayText,
             type: _SegmentType.link,
             url: url,
+          ));
+          break;
+
+        case _MatchType.mailto:
+          final regexMatch = match.match;
+          final email = regexMatch.group(1) ?? '';
+          var displayText = regexMatch.group(2);
+          if (displayText == null || displayText.isEmpty) {
+            displayText = email;
+          }
+          segments.add(_Segment(
+            text: displayText,
+            type: _SegmentType.link,
+            url: 'mailto:$email',
           ));
           break;
 
@@ -246,6 +266,9 @@ class SlackMessageFormatter {
       debugPrint('Error launching URL: $e');
     }
   }
+
+  /// Convert Slack emoji shortcode to Unicode emoji (public method)
+  static String? emojiToUnicode(String name) => _slackEmojiToUnicode(name, null);
 
   /// Convert Slack emoji shortcode to Unicode emoji
   static String? _slackEmojiToUnicode(String name, String? skinTone) {
@@ -987,7 +1010,7 @@ class SlackMessageFormatter {
   }
 }
 
-enum _MatchType { link, bold, channelMention, userMention, emoji }
+enum _MatchType { link, mailto, bold, channelMention, userMention, emoji }
 
 class _Match {
   final int start;

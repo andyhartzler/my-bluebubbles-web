@@ -280,36 +280,149 @@ class SlackMessageBubble extends StatelessWidget {
         children: reactionsList.map<Widget>((reaction) {
           final name = reaction['name']?.toString() ?? '';
           final count = (reaction['count'] as num?)?.toInt() ?? 0;
+          final users = reaction['users'] as List<dynamic>? ?? [];
 
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: theme.colorScheme.outline.withOpacity(0.3),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  ':$name:',
-                  style: theme.textTheme.bodySmall,
+          // Convert emoji name to Unicode emoji
+          final emoji = SlackMessageFormatter.emojiToUnicode(name) ?? ':$name:';
+
+          return GestureDetector(
+            onTap: () => _showReactionDetails(context, name, emoji, users),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.colorScheme.outline.withOpacity(0.3),
                 ),
-                if (count > 1) ...[
-                  const SizedBox(width: 4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    '$count',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    emoji,
+                    style: const TextStyle(fontSize: 16),
                   ),
+                  if (count > 1) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      '$count',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  void _showReactionDetails(
+    BuildContext context,
+    String emojiName,
+    String emoji,
+    List<dynamic> users,
+  ) {
+    final theme = Theme.of(context);
+
+    // Build list of user names who reacted
+    final userNames = <String>[];
+    for (final userId in users) {
+      final userIdStr = userId?.toString() ?? '';
+      if (userIdStr.isNotEmpty) {
+        final userInfo = userMappings[userIdStr];
+        if (userInfo != null) {
+          final name = userInfo['real_name']?.isNotEmpty == true
+              ? userInfo['real_name']!
+              : (userInfo['display_name']?.isNotEmpty == true
+                  ? userInfo['display_name']!
+                  : userIdStr);
+          userNames.add(name);
+        } else {
+          userNames.add(userIdStr);
+        }
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 24)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                ':$emojiName:',
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 300,
+          child: userNames.isEmpty
+              ? Text(
+                  'No reaction details available',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontStyle: FontStyle.italic,
+                  ),
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${userNames.length} ${userNames.length == 1 ? 'person' : 'people'} reacted:',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: userNames
+                              .map((name) => Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.person,
+                                          size: 16,
+                                          color:
+                                              theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            name,
+                                            style: theme.textTheme.bodyMedium,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
