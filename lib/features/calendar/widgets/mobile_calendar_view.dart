@@ -83,13 +83,36 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  /// Check if an event occurs on a given day (handles multi-day events)
+  bool _eventOccursOnDay(CalendarEvent event, DateTime day) {
+    final eventStart = event.startTime.toLocal();
+    final eventEnd = event.endTime.toLocal();
+
+    // Normalize dates to start of day for comparison
+    final dayStart = DateTime(day.year, day.month, day.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    final eventStartDay = DateTime(eventStart.year, eventStart.month, eventStart.day);
+    final eventEndDay = DateTime(eventEnd.year, eventEnd.month, eventEnd.day);
+
+    // For all-day events, check if day falls within the range
+    if (event.allDay) {
+      // All-day events: day is within [eventStartDay, eventEndDay)
+      // Note: end time for all-day events is typically midnight of the day AFTER
+      return !dayStart.isBefore(eventStartDay) && dayStart.isBefore(eventEndDay);
+    }
+
+    // For timed events spanning multiple days
+    // Check if the day overlaps with the event's time range
+    return dayStart.isBefore(eventEnd) && dayEnd.isAfter(eventStart);
+  }
+
   bool _hasEventsOnDay(DateTime day) {
-    return _events.any((e) => _isSameDay(e.startTime.toLocal(), day));
+    return _events.any((e) => _eventOccursOnDay(e, day));
   }
 
   List<CalendarEvent> _getEventsForDay(DateTime day) {
     return _events
-        .where((e) => _isSameDay(e.startTime.toLocal(), day))
+        .where((e) => _eventOccursOnDay(e, day))
         .toList()
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
   }

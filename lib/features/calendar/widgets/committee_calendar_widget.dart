@@ -66,13 +66,31 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
     }
   }
 
+  /// Check if an event occurs on a given day (handles multi-day events)
+  bool _eventOccursOnDay(CalendarEvent event, DateTime day) {
+    final eventStart = event.startTime.toLocal();
+    final eventEnd = event.endTime.toLocal();
+
+    // Normalize dates to start of day for comparison
+    final dayStart = DateTime(day.year, day.month, day.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    final eventStartDay = DateTime(eventStart.year, eventStart.month, eventStart.day);
+    final eventEndDay = DateTime(eventEnd.year, eventEnd.month, eventEnd.day);
+
+    // For all-day events, check if day falls within the range
+    if (event.allDay) {
+      // All-day events: day is within [eventStartDay, eventEndDay)
+      // Note: end time for all-day events is typically midnight of the day AFTER
+      return !dayStart.isBefore(eventStartDay) && dayStart.isBefore(eventEndDay);
+    }
+
+    // For timed events spanning multiple days
+    // Check if the day overlaps with the event's time range
+    return dayStart.isBefore(eventEnd) && dayEnd.isAfter(eventStart);
+  }
+
   List<CalendarEvent> _getEventsForDay(DateTime day) {
-    return _events.where((event) {
-      final eventDate = event.startTime.toLocal();
-      return eventDate.year == day.year &&
-          eventDate.month == day.month &&
-          eventDate.day == day.day;
-    }).toList()
+    return _events.where((event) => _eventOccursOnDay(event, day)).toList()
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
   }
 
