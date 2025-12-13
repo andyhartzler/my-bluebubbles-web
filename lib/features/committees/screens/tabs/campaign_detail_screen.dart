@@ -296,7 +296,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           _buildMetricCard(
             icon: Icons.percent,
             label: 'Send Rate',
-            value: '${displayRate.toStringAsFixed(0)}%',
+            value: displayRate.toStringAsFixed(0),
             color: const Color(0xFF4682B4), // steelBlue
           ),
         ];
@@ -361,6 +361,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
               fontSize: isVerySmall ? 10 : 12,
               color: color.withOpacity(0.8),
             ),
+            maxLines: 1,
+            softWrap: false,
             overflow: TextOverflow.ellipsis,
           ),
         ],

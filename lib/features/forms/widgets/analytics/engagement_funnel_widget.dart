@@ -114,7 +114,7 @@ class _EngagementFunnelWidgetState extends State<EngagementFunnelWidget>
                         Row(
                           children: [
                             SizedBox(
-                              width: 90,
+                              width: 100,
                               child: Row(
                                 children: [
                                   Icon(stage.icon, size: 18, color: stage.color),
@@ -125,6 +125,8 @@ class _EngagementFunnelWidgetState extends State<EngagementFunnelWidget>
                                       style: theme.textTheme.bodyMedium?.copyWith(
                                         fontWeight: FontWeight.w600,
                                       ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
@@ -176,7 +178,7 @@ class _EngagementFunnelWidgetState extends State<EngagementFunnelWidget>
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              const SizedBox(width: 90),
+                              const SizedBox(width: 100),
                               Padding(
                                 padding: const EdgeInsets.only(left: 12),
                                 child: Row(
