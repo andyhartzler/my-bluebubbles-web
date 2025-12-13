@@ -7,7 +7,7 @@ import 'package:bluebubbles/features/slack/widgets/message_bubble.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/slack_activity.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
-import 'package:bluebubbles/app/layouts/titlebar_wrapper.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 
 /// Analytics tab displaying Slack workspace statistics
