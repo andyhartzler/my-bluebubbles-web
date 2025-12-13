@@ -3,10 +3,16 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/slack/models/slack_analytics.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/app/layouts/titlebar_wrapper.dart';
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 
 /// Analytics tab displaying Slack workspace statistics
 class AnalyticsTab extends StatefulWidget {
-  const AnalyticsTab({super.key});
+  const AnalyticsTab({super.key, this.onSwitchToUnmatchedTab});
+
+  /// Callback to switch to the unmatched users tab
+  final VoidCallback? onSwitchToUnmatchedTab;
 
   @override
   State<AnalyticsTab> createState() => _AnalyticsTabState();
@@ -662,38 +668,207 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
             const SizedBox(height: 16),
             ...(_membershipChanges.take(10).map((change) {
               final isJoin = change.action == 'joined' || change.action == 'invited';
-              return ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  isJoin ? Icons.person_add : Icons.person_remove,
-                  color: isJoin ? Colors.green : Colors.red,
-                  size: 20,
-                ),
-                title: Text(
-                  change.action.toUpperCase(),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  'Channel: ${change.slackChannelId}',
-                  style: theme.textTheme.bodySmall,
-                ),
-                trailing: change.createdAt != null
-                    ? Text(
-                        dateFormat.format(change.createdAt!.toLocal()),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      )
-                    : null,
-              );
+              return _buildMembershipChangeItem(change, isJoin, dateFormat);
             })),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildMembershipChangeItem(
+    MembershipChange change,
+    bool isJoin,
+    DateFormat dateFormat,
+  ) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: () => _handleMembershipChangeTap(change),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Row(
+          children: [
+            // Avatar with action indicator
+            Stack(
+              children: [
+                _buildUserAvatar(change),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isJoin ? Colors.green : Colors.red,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: theme.colorScheme.surface,
+                        width: 2,
+                      ),
+                    ),
+                    child: Icon(
+                      isJoin ? Icons.add : Icons.remove,
+                      size: 10,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            // Name and channel info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          change.displayName,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (!change.isLinkedMember)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: Colors.orange.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Text(
+                            'Unmatched',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: Colors.orange[700],
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.tag,
+                        size: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          change.channelDisplayName,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Action and timestamp
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isJoin
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    change.action.toUpperCase(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: isJoin ? Colors.green[700] : Colors.red[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (change.createdAt != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    dateFormat.format(change.createdAt!.toLocal()),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            // Navigation indicator
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserAvatar(MembershipChange change) {
+    final theme = Theme.of(context);
+    final avatarUrl = change.avatarUrl;
+
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: change.isLinkedMember
+          ? theme.colorScheme.primary.withOpacity(0.2)
+          : Colors.orange.withOpacity(0.2),
+      backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+          ? NetworkImage(avatarUrl)
+          : null,
+      child: avatarUrl == null || avatarUrl.isEmpty
+          ? Text(
+              change.displayName.isNotEmpty
+                  ? change.displayName.substring(0, 1).toUpperCase()
+                  : '?',
+              style: TextStyle(
+                color: change.isLinkedMember
+                    ? theme.colorScheme.primary
+                    : Colors.orange[700],
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          : null,
+    );
+  }
+
+  Future<void> _handleMembershipChangeTap(MembershipChange change) async {
+    if (change.isLinkedMember) {
+      // Navigate to member profile
+      final member = await _repository.getMemberById(change.memberId!);
+      if (member != null && mounted) {
+        Navigator.of(context).push(
+          ThemeSwitcher.buildPageRoute(
+            builder: (context) => TitleBarWrapper(
+              child: MemberDetailScreen(member: member),
+            ),
+          ),
+        );
+      }
+    } else if (widget.onSwitchToUnmatchedTab != null) {
+      // Switch to unmatched users tab
+      widget.onSwitchToUnmatchedTab!();
+    }
   }
 
   Widget _buildEmptyCard({
