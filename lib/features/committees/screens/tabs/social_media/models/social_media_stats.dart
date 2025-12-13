@@ -44,11 +44,28 @@ class SocialMediaStats {
     this.platformMetrics = const {},
   });
 
+  /// Safely parse a value that should be a Map
+  static Map<String, dynamic> _safeParseMap(dynamic value) {
+    if (value == null) return {};
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return {};
+  }
+
+  /// Safely parse an int value
+  static int? _safeParseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
   factory SocialMediaStats.fromJson(Map<String, dynamic> json) {
     // Handle nested platform info if present
     String platform = json['platform'] as String? ?? '';
     if (platform.isEmpty && json['social_media_accounts'] != null) {
-      final accountData = json['social_media_accounts'] as Map<String, dynamic>;
+      final accountData = _safeParseMap(json['social_media_accounts']);
       platform = accountData['platform'] as String? ?? '';
     }
 
@@ -57,22 +74,22 @@ class SocialMediaStats {
       accountId: json['account_id'] as String,
       platform: platform,
       metricDate: json['metric_date'] as String,
-      metricHour: json['metric_hour'] as int?,
-      followersCount: json['followers_count'] as int?,
-      followingCount: json['following_count'] as int?,
-      subscriberCount: json['subscriber_count'] as int?,
-      likesCount: json['likes_count'] as int?,
-      commentsCount: json['comments_count'] as int?,
-      sharesCount: json['shares_count'] as int?,
-      savesCount: json['saves_count'] as int?,
-      impressions: json['impressions'] as int?,
-      reach: json['reach'] as int?,
-      profileViews: json['profile_views'] as int?,
-      postsCount: json['posts_count'] as int?,
-      storiesCount: json['stories_count'] as int?,
-      reelsCount: json['reels_count'] as int?,
-      videosCount: json['videos_count'] as int?,
-      platformMetrics: json['platform_metrics'] as Map<String, dynamic>? ?? {},
+      metricHour: _safeParseInt(json['metric_hour']),
+      followersCount: _safeParseInt(json['followers_count']),
+      followingCount: _safeParseInt(json['following_count']),
+      subscriberCount: _safeParseInt(json['subscriber_count']),
+      likesCount: _safeParseInt(json['likes_count']),
+      commentsCount: _safeParseInt(json['comments_count']),
+      sharesCount: _safeParseInt(json['shares_count']),
+      savesCount: _safeParseInt(json['saves_count']),
+      impressions: _safeParseInt(json['impressions']),
+      reach: _safeParseInt(json['reach']),
+      profileViews: _safeParseInt(json['profile_views']),
+      postsCount: _safeParseInt(json['posts_count']),
+      storiesCount: _safeParseInt(json['stories_count']),
+      reelsCount: _safeParseInt(json['reels_count']),
+      videosCount: _safeParseInt(json['videos_count']),
+      platformMetrics: _safeParseMap(json['platform_metrics']),
     );
   }
 
@@ -106,13 +123,33 @@ class SocialMediaStats {
 
   /// Get engagement rate from platform metrics if available
   double get engagementRate {
-    final last30Days = platformMetrics['last_30_days'] as Map<String, dynamic>?;
-    if (last30Days != null) {
-      final rates = last30Days['rates'] as Map<String, dynamic>?;
-      if (rates != null) {
-        return (rates['engagement_rate'] as num?)?.toDouble() ?? 0.0;
+    final last30Days = _safeParseMap(platformMetrics['last_30_days']);
+    if (last30Days.isNotEmpty) {
+      final rates = _safeParseMap(last30Days['rates']);
+      if (rates.isNotEmpty) {
+        final rate = rates['engagement_rate'];
+        if (rate is num) return rate.toDouble();
+        if (rate is String) return double.tryParse(rate) ?? 0.0;
       }
     }
     return 0.0;
+  }
+
+  /// Get 30-day totals from platform metrics
+  Map<String, dynamic> get last30DaysTotals {
+    final last30Days = _safeParseMap(platformMetrics['last_30_days']);
+    return _safeParseMap(last30Days['totals']);
+  }
+
+  /// Get 30-day averages from platform metrics
+  Map<String, dynamic> get last30DaysAverages {
+    final last30Days = _safeParseMap(platformMetrics['last_30_days']);
+    return _safeParseMap(last30Days['averages']);
+  }
+
+  /// Get content breakdown from platform metrics
+  Map<String, dynamic> get contentBreakdown {
+    final last30Days = _safeParseMap(platformMetrics['last_30_days']);
+    return _safeParseMap(last30Days['content_breakdown']);
   }
 }
