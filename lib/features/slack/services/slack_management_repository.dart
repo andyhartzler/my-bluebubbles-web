@@ -190,7 +190,7 @@ class SlackManagementRepository {
       if (filter == 'has_email') {
         query = query.not('slack_email', 'is', null);
       } else if (filter == 'no_email') {
-        query = query.is_('slack_email', null);
+        query = query.filter('slack_email', 'is', null);
       } else if (filter == 'rejected') {
         query = query.eq('manually_rejected', true);
       }
