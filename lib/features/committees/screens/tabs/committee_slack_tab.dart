@@ -5,6 +5,7 @@ import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/slack/widgets/slack_file_attachment.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
@@ -401,8 +402,57 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab> {
 
               // Message text with parsed formatting
               _buildMessageText(messageText, theme),
+
+              // File attachments
+              _buildFileAttachments(message),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFileAttachments(Map<String, dynamic> message) {
+    final hasFiles = message['has_files'] == true;
+    if (!hasFiles) return const SizedBox.shrink();
+
+    // Try to use files_archived (has Supabase URLs)
+    final filesArchived = message['files_archived'];
+    final archivedFiles = parseArchivedFiles(filesArchived);
+
+    if (archivedFiles.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: SlackFileAttachments(files: archivedFiles),
+      );
+    }
+
+    // Fallback to showing a simple indicator if only files is available
+    final theme = Theme.of(context);
+    final files = message['files'] as List<dynamic>?;
+    final fileCount = files?.length ?? 1;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.attach_file,
+                size: 14, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Text(
+              '$fileCount file${fileCount > 1 ? 's' : ''} attached',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -81,7 +81,7 @@ class SlackManagementRepository {
       var query = _readClient
           .from('slack_messages')
           .select(
-              'id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, reactions')
+              'id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, files_archived, reactions')
           .eq('slack_channel_id', channelId);
 
       // Apply full-text search if query provided
