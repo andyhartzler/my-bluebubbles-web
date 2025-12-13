@@ -318,7 +318,10 @@ class OpenStatesBill {
         return sponsor['name'] as String?;
       }
     }
-    return sponsors.isNotEmpty ? (sponsors.first as Map?)?['name'] as String? : null;
+    if (sponsors.isEmpty) return null;
+    final first = sponsors.first;
+    if (first is Map) return first['name'] as String?;
+    return null;
   }
 
   /// Get the primary sponsor party
@@ -328,7 +331,10 @@ class OpenStatesBill {
         return sponsor['party'] as String?;
       }
     }
-    return sponsors.isNotEmpty ? (sponsors.first as Map?)?['party'] as String? : null;
+    if (sponsors.isEmpty) return null;
+    final first = sponsors.first;
+    if (first is Map) return first['party'] as String?;
+    return null;
   }
 }
 
