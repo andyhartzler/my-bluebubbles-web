@@ -1023,7 +1023,7 @@ class CommitteeRepository {
     if (!isReady) {
       return {
         'slackMessages': 0,
-        'messagesSent': 0,
+        'totalImpressions': 0,
         'countiesRepresented': 0,
       };
     }
@@ -1043,16 +1043,69 @@ class CommitteeRepository {
     }
 
     try {
-      // Total messages sent (from messages table or similar)
-      // Using a message log or tracking table if available
-      final PostgrestResponse messagesResponse = await _readClient
-          .from('message_log')
-          .select('id')
-          .count(CountOption.exact);
-      stats['messagesSent'] = messagesResponse.count ?? 0;
+      // Total impressions from social media accounts
+      final statsResponse = await _readClient
+          .from('social_media_stats')
+          .select('account_id, platform, impressions, platform_metrics')
+          .order('metric_date', ascending: false);
+
+      final allStats = statsResponse as List<dynamic>;
+
+      // Deduplicate to get only the latest stat per account_id
+      final latestByAccount = <String, Map<String, dynamic>>{};
+      for (final stat in allStats) {
+        final accountId = stat['account_id'] as String?;
+        if (accountId != null && !latestByAccount.containsKey(accountId)) {
+          latestByAccount[accountId] = stat as Map<String, dynamic>;
+        }
+      }
+
+      int totalImpressions = 0;
+      for (final stat in latestByAccount.values) {
+        final platform = (stat['platform'] as String?)?.toLowerCase() ?? '';
+        int impressions = _toInt(stat['impressions']);
+
+        // If direct value is 0, try to get from platform_metrics
+        if (impressions == 0) {
+          final platformMetrics = stat['platform_metrics'];
+          Map<String, dynamic>? metrics;
+
+          if (platformMetrics is Map<String, dynamic>) {
+            metrics = platformMetrics;
+          } else if (platformMetrics is Map) {
+            metrics = Map<String, dynamic>.from(platformMetrics);
+          } else if (platformMetrics is String && platformMetrics.isNotEmpty) {
+            try {
+              final decoded = jsonDecode(platformMetrics);
+              if (decoded is Map) {
+                metrics = Map<String, dynamic>.from(decoded);
+              }
+            } catch (_) {}
+          }
+
+          if (metrics != null) {
+            final last30Days = metrics['last_30_days'] as Map<String, dynamic>?;
+            final totals = last30Days?['totals'] as Map<String, dynamic>?;
+
+            if (platform == 'facebook') {
+              impressions = _toInt(totals?['media_views']);
+            } else if (platform == 'instagram' || platform == 'threads') {
+              impressions = _toInt(totals?['views']);
+            } else if (platform == 'youtube') {
+              final statistics = metrics['statistics'] as Map<String, dynamic>?;
+              final aggregates = metrics['aggregates'] as Map<String, dynamic>?;
+              impressions = _toInt(statistics?['viewCount'] ?? aggregates?['totalViews']);
+            }
+          }
+        }
+
+        totalImpressions += impressions;
+      }
+
+      stats['totalImpressions'] = totalImpressions;
     } catch (e) {
-      // If message_log doesn't exist, try another approach or return 0
-      stats['messagesSent'] = 0;
+      print('Error getting impressions count: $e');
+      stats['totalImpressions'] = 0;
     }
 
     try {

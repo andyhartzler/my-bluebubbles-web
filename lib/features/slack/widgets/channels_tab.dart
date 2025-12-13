@@ -56,6 +56,68 @@ class _ChannelsTabState extends State<ChannelsTab> {
     super.dispose();
   }
 
+  /// Custom channel sort order - these channels appear first in this order
+  static const List<String> _priorityChannelOrder = [
+    'general',
+    'speak-your-mind',
+    'speak_your_mind',
+    'speakyourmind',
+    'news-channel',
+    'news_channel',
+    'newschannel',
+    'questions-help',
+    'questions_help',
+    'questionshelp',
+    'executive-committee',
+    'executive_committee',
+    'executivecommittee',
+    'mohsda-executive-board',
+    'mohsda_executive_board',
+    'mohsdaexecutiveboard',
+  ];
+
+  /// Sort channels with priority order first, then alphabetically
+  List<SlackChannel> _sortChannels(List<SlackChannel> channels) {
+    return channels..sort((a, b) {
+      final aName = a.slackChannelName.toLowerCase();
+      final bName = b.slackChannelName.toLowerCase();
+
+      // Check priority for each channel
+      int aPriority = -1;
+      int bPriority = -1;
+
+      for (int i = 0; i < _priorityChannelOrder.length; i++) {
+        final priority = _priorityChannelOrder[i];
+        if (aName == priority || aName.replaceAll('-', '').replaceAll('_', '') == priority.replaceAll('-', '').replaceAll('_', '')) {
+          aPriority = i;
+          break;
+        }
+      }
+
+      for (int i = 0; i < _priorityChannelOrder.length; i++) {
+        final priority = _priorityChannelOrder[i];
+        if (bName == priority || bName.replaceAll('-', '').replaceAll('_', '') == priority.replaceAll('-', '').replaceAll('_', '')) {
+          bPriority = i;
+          break;
+        }
+      }
+
+      // If both have priority, sort by priority index
+      if (aPriority >= 0 && bPriority >= 0) {
+        return aPriority.compareTo(bPriority);
+      }
+
+      // If only a has priority, a comes first
+      if (aPriority >= 0) return -1;
+
+      // If only b has priority, b comes first
+      if (bPriority >= 0) return 1;
+
+      // Neither has priority, sort alphabetically
+      return aName.compareTo(bName);
+    });
+  }
+
   Future<void> _loadChannels() async {
     setState(() {
       _loadingChannels = true;
@@ -68,7 +130,7 @@ class _ChannelsTabState extends State<ChannelsTab> {
         _repository.getSlackUserMappings(),
       ]);
 
-      final channels = results[0] as List<SlackChannel>;
+      final channels = _sortChannels(results[0] as List<SlackChannel>);
       final userMappings = results[1] as Map<String, Map<String, String>>;
 
       // Load member data for linked users
