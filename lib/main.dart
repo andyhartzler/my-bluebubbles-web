@@ -48,6 +48,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' hide Priority;
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -884,7 +885,15 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             value: crmReady ? () => _setSection(_HomeSection.slackManagement) : null,
             enabled: crmReady,
             child: ListTile(
-              leading: const Icon(Icons.tag),
+              leading: SvgPicture.asset(
+                'assets/icon/slack-icon.svg',
+                width: 24,
+                height: 24,
+                colorFilter: ColorFilter.mode(
+                  crmReady ? theme.iconTheme.color ?? Colors.white : theme.disabledColor,
+                  BlendMode.srcIn,
+                ),
+              ),
               title: const Text('Slack'),
               subtitle: crmReady ? null : const Text('Available when CRM is connected', style: TextStyle(fontSize: 11)),
               contentPadding: EdgeInsets.zero,
@@ -1086,7 +1095,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       builder: (dialogContext) {
         Widget buildItem({
           required double order,
-          required IconData icon,
+          IconData? icon,
+          Widget? iconWidget,
           required String label,
           String? subtitle,
           bool enabled = true,
@@ -1122,7 +1132,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                 enabled: enabled,
                 label: label,
                 child: ListTile(
-                  leading: Icon(icon),
+                  leading: iconWidget ?? (icon != null ? Icon(icon) : null),
                   title: Text(label),
                   subtitle: subtitle != null ? Text(subtitle) : null,
                   enabled: enabled,
@@ -1233,7 +1243,15 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   ),
                   buildItem(
                     order: 10,
-                    icon: Icons.tag,
+                    iconWidget: SvgPicture.asset(
+                      'assets/icon/slack-icon.svg',
+                      width: 24,
+                      height: 24,
+                      colorFilter: ColorFilter.mode(
+                        crmReady ? theme.iconTheme.color ?? Colors.white : theme.disabledColor,
+                        BlendMode.srcIn,
+                      ),
+                    ),
                     label: 'Slack',
                     enabled: crmReady,
                     subtitle: disabledMessage,

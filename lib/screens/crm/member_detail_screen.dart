@@ -35,6 +35,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
+import 'package:flutter_svg/flutter_svg.dart';
 
 enum _SocialPlatform { instagram, tiktok, x }
 
@@ -2036,10 +2037,21 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                       unselectedLabelColor:
                           Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
                       indicatorColor: Theme.of(context).colorScheme.primary,
-                      tabs: const [
-                        Tab(icon: Icon(Icons.account_circle_outlined), text: 'Overview'),
-                        Tab(icon: Icon(Icons.email_outlined), text: 'Emails'),
-                        Tab(icon: Icon(Icons.chat_bubble_outline), text: 'Slack'),
+                      tabs: [
+                        const Tab(icon: Icon(Icons.account_circle_outlined), text: 'Overview'),
+                        const Tab(icon: Icon(Icons.email_outlined), text: 'Emails'),
+                        Tab(
+                          icon: SvgPicture.asset(
+                            'assets/icon/slack-icon.svg',
+                            width: 24,
+                            height: 24,
+                            colorFilter: ColorFilter.mode(
+                              Theme.of(context).colorScheme.onSurface,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                          text: 'Slack',
+                        ),
                       ],
                     ),
                   ),

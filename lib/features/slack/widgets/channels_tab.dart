@@ -13,7 +13,10 @@ import 'package:bluebubbles/services/crm/member_repository.dart';
 
 /// Channels tab displaying Slack messages across all channels
 class ChannelsTab extends StatefulWidget {
-  const ChannelsTab({super.key});
+  const ChannelsTab({super.key, this.initialChannelId});
+
+  /// Optional channel ID to pre-select when opening
+  final String? initialChannelId;
 
   @override
   State<ChannelsTab> createState() => _ChannelsTabState();
@@ -79,9 +82,18 @@ class _ChannelsTabState extends State<ChannelsTab> {
         _loadingChannels = false;
       });
 
-      // Auto-select first channel if available
+      // Auto-select channel - prefer initialChannelId if provided
       if (channels.isNotEmpty && _selectedChannel == null) {
-        _selectChannel(channels.first);
+        SlackChannel? channelToSelect;
+        if (widget.initialChannelId != null) {
+          channelToSelect = channels.firstWhere(
+            (c) => c.channelId == widget.initialChannelId,
+            orElse: () => channels.first,
+          );
+        } else {
+          channelToSelect = channels.first;
+        }
+        _selectChannel(channelToSelect);
       }
     } catch (e) {
       if (!mounted) return;

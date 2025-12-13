@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/features/slack/widgets/slack_file_attachment.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/utils/slack_message_formatter.dart';
@@ -231,6 +232,15 @@ class SlackMessageBubble extends StatelessWidget {
   }
 
   Widget _buildFileIndicator(BuildContext context) {
+    // First try to use files_archived (has Supabase URLs)
+    final filesArchived = message['files_archived'];
+    final archivedFiles = parseArchivedFiles(filesArchived);
+
+    if (archivedFiles.isNotEmpty) {
+      return SlackFileAttachments(files: archivedFiles);
+    }
+
+    // Fallback to showing a simple indicator if only files is available
     final theme = Theme.of(context);
     final files = message['files'] as List<dynamic>?;
     final fileCount = files?.length ?? 1;

@@ -296,7 +296,7 @@ class CommitteeRepository {
       final statsResponse = await _readClient
           .from('social_media_stats')
           .select('account_id, platform, impressions, followers_count, platform_metrics')
-          .order('collection_date', ascending: false);
+          .order('metric_date', ascending: false);
 
       final allStats = statsResponse as List<dynamic>;
 
@@ -740,7 +740,7 @@ class CommitteeRepository {
       // Query messages without join - user info will be matched via getSlackUserMappings
       final data = await _readClient
           .from('slack_messages')
-          .select('id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, reactions')
+          .select('id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, files_archived, reactions')
           .eq('slack_channel_id', channelId)
           .order('posted_at', ascending: false)
           .range(offset, offset + limit - 1);
@@ -749,6 +749,29 @@ class CommitteeRepository {
       return (data as List<dynamic>).cast<Map<String, dynamic>>();
     } catch (e) {
       print('Error getting Slack messages: $e');
+      return [];
+    }
+  }
+
+  /// Get Slack messages by channel ID directly
+  Future<List<Map<String, dynamic>>> getSlackMessagesByChannelId(
+    String channelId, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    if (!isReady) return [];
+
+    try {
+      final data = await _readClient
+          .from('slack_messages')
+          .select('id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, files_archived, reactions')
+          .eq('slack_channel_id', channelId)
+          .order('posted_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      return (data as List<dynamic>).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('Error getting Slack messages by channel ID: $e');
       return [];
     }
   }

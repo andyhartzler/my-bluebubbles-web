@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
+import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/slack_activity.dart';
 import 'package:bluebubbles/screens/crm/member_detail/slack_user_search_screen.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/slack_activity_service.dart';
+import 'package:bluebubbles/utils/slack_message_formatter.dart';
 
 class SlackActivityTab extends StatefulWidget {
   const SlackActivityTab({
@@ -22,11 +28,14 @@ class SlackActivityTab extends StatefulWidget {
 
 class _SlackActivityTabState extends State<SlackActivityTab> {
   final SlackActivityService _slackService = SlackActivityService.instance;
+  final SlackManagementRepository _slackRepo = SlackManagementRepository();
   final List<SlackMessage> _messages = [];
   final DateFormat _timestampFormat = DateFormat('MMM d, y • h:mm a');
 
   SlackActivityStatistics? _statistics;
   SlackProfile? _profile;
+  Map<String, Map<String, String>> _userMappings = {};
+  Map<String, Member> _memberCache = {};
   bool _isLoading = true;
   bool _isLoadingMore = false;
   String? _error;
@@ -49,18 +58,21 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
 
     try {
       final profileFuture = _slackService.fetchSlackProfile(widget.member.id);
+      final userMappingsFuture = _slackRepo.getSlackUserMappings();
       final activity = await _slackService.fetchMemberMessages(
         memberId: widget.member.id,
         limit: _pageSize,
         offset: 0,
       );
       final profile = await profileFuture;
+      final userMappings = await userMappingsFuture;
 
       if (!mounted) return;
 
       setState(() {
         _profile = profile;
         _statistics = activity.statistics;
+        _userMappings = userMappings;
         _messages
           ..clear()
           ..addAll(activity.messages);
@@ -377,84 +389,242 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
   }
 
   Widget _buildMessageCard(BuildContext context, SlackMessage message) {
+    final theme = Theme.of(context);
     final channelLabel = message.channelInfo?.committeeName?.isNotEmpty == true
         ? message.channelInfo!.committeeName!
         : message.channelInfo?.channelName ?? 'Unknown channel';
+    final hasChannelId = message.slackChannelId != null && message.slackChannelId!.isNotEmpty;
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message.text?.trim().isNotEmpty == true
-                  ? message.text!
-                  : (message.hasFiles
-                      ? 'Shared files in Slack'
-                      : 'No message text provided'),
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 12,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.forum_outlined, size: 16),
-                    const SizedBox(width: 4),
-                    Text(channelLabel),
-                  ],
-                ),
-                if (message.postedAt != null)
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: hasChannelId
+            ? () => _navigateToChannel(message.slackChannelId!)
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildFormattedMessageText(context, message.text, theme),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.schedule, size: 16),
+                      const Icon(Icons.forum_outlined, size: 16),
                       const SizedBox(width: 4),
-                      Text(_formatTimestamp(message.postedAt!)),
+                      Text(
+                        channelLabel,
+                        style: hasChannelId
+                            ? TextStyle(
+                                color: theme.colorScheme.primary,
+                                decoration: TextDecoration.underline,
+                              )
+                            : null,
+                      ),
                     ],
                   ),
-                if (message.isThreadReply)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.reply, size: 16),
-                      SizedBox(width: 4),
-                      Text('Thread reply'),
-                    ],
-                  ),
-                if (message.hasFiles)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.attach_file, size: 16),
-                      SizedBox(width: 4),
-                      Text('Includes files'),
-                    ],
-                  ),
-              ],
-            ),
-            if (message.reactions.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final reaction in message.reactions)
-                    Chip(
-                      label: Text(':${reaction.name}: ${reaction.count}'),
-                      visualDensity: VisualDensity.compact,
+                  if (message.postedAt != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.schedule, size: 16),
+                        const SizedBox(width: 4),
+                        Text(_formatTimestamp(message.postedAt!)),
+                      ],
+                    ),
+                  if (message.isThreadReply)
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.reply, size: 16),
+                        SizedBox(width: 4),
+                        Text('Thread reply'),
+                      ],
+                    ),
+                  if (message.hasFiles)
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.attach_file, size: 16),
+                        SizedBox(width: 4),
+                        Text('Includes files'),
+                      ],
+                    ),
+                  if (hasChannelId)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.open_in_new, size: 14, color: theme.colorScheme.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          'View in channel',
+                          style: TextStyle(
+                            color: theme.colorScheme.primary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                 ],
               ),
+              if (message.reactions.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildReactions(context, message.reactions),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  void _navigateToChannel(String channelId) {
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(
+          child: SlackManagementScreen(initialChannelId: channelId),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormattedMessageText(BuildContext context, String? text, ThemeData theme) {
+    if (text == null || text.trim().isEmpty) {
+      return Text(
+        'No message text provided',
+        style: theme.textTheme.bodyLarge?.copyWith(
+          fontStyle: FontStyle.italic,
+          color: theme.textTheme.bodyLarge?.color?.withOpacity(0.6),
+        ),
+      );
+    }
+
+    // Use SlackMessageFormatter to parse the message
+    final spans = SlackMessageFormatter.parse(
+      text,
+      baseStyle: theme.textTheme.bodyLarge ?? const TextStyle(),
+      linkColor: theme.colorScheme.primary,
+      mentionColor: theme.colorScheme.primary,
+      userMappings: _userMappings,
+      onMentionTap: (userId, memberId) {
+        if (memberId != null && memberId.isNotEmpty) {
+          _navigateToMember(memberId);
+        }
+      },
+    );
+
+    if (spans.isEmpty) {
+      return Text(text, style: theme.textTheme.bodyLarge);
+    }
+
+    return RichText(text: TextSpan(children: spans));
+  }
+
+  Widget _buildReactions(BuildContext context, List<SlackReaction> reactions) {
+    final theme = Theme.of(context);
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: reactions.map((reaction) {
+        // Convert emoji shortcode to Unicode
+        final emojiOrName = _getEmojiDisplay(reaction.name);
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: theme.colorScheme.outline.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                emojiOrName,
+                style: const TextStyle(fontSize: 14),
+              ),
+              if (reaction.count > 1) ...[
+                const SizedBox(width: 4),
+                Text(
+                  '${reaction.count}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _getEmojiDisplay(String name) {
+    // Common emoji mappings
+    const emojiMap = {
+      'thumbsup': '\u{1F44D}',
+      '+1': '\u{1F44D}',
+      'thumbsdown': '\u{1F44E}',
+      '-1': '\u{1F44E}',
+      'heart': '\u{2764}\u{FE0F}',
+      'tada': '\u{1F389}',
+      'fire': '\u{1F525}',
+      'rocket': '\u{1F680}',
+      'eyes': '\u{1F440}',
+      '100': '\u{1F4AF}',
+      'clap': '\u{1F44F}',
+      'pray': '\u{1F64F}',
+      'wave': '\u{1F44B}',
+      'smile': '\u{1F604}',
+      'joy': '\u{1F602}',
+      'sob': '\u{1F62D}',
+      'thinking_face': '\u{1F914}',
+      'raised_hands': '\u{1F64C}',
+      'ok_hand': '\u{1F44C}',
+      'muscle': '\u{1F4AA}',
+      'sparkles': '\u{2728}',
+      'star': '\u{2B50}',
+      'white_check_mark': '\u{2705}',
+      'heavy_check_mark': '\u{2714}\u{FE0F}',
+      'x': '\u{274C}',
+      'bangbang': '\u{203C}\u{FE0F}',
+      'warning': '\u{26A0}\u{FE0F}',
+      'question': '\u{2753}',
+      'exclamation': '\u{2757}',
+      'bulb': '\u{1F4A1}',
+      'memo': '\u{1F4DD}',
+      'point_up': '\u{261D}\u{FE0F}',
+      'point_down': '\u{1F447}',
+      'point_right': '\u{1F449}',
+      'point_left': '\u{1F448}',
+      'sunglasses': '\u{1F60E}',
+      'party_popper': '\u{1F389}',
+      'confetti_ball': '\u{1F38A}',
+      'balloon': '\u{1F388}',
+    };
+
+    return emojiMap[name] ?? ':$name:';
+  }
+
+  Future<void> _navigateToMember(String memberId) async {
+    final member = await _slackRepo.getMemberById(memberId);
+    if (member != null && mounted) {
+      Navigator.of(context).push(
+        ThemeSwitcher.buildPageRoute(
+          builder: (context) => TitleBarWrapper(
+            child: MemberDetailScreen(member: member),
+          ),
+        ),
+      );
+    }
   }
 
   String _formatTimestamp(DateTime dateTime) {

@@ -81,7 +81,7 @@ class SlackManagementRepository {
       var query = _readClient
           .from('slack_messages')
           .select(
-              'id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, reactions')
+              'id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, files_archived, reactions')
           .eq('slack_channel_id', channelId);
 
       // Apply full-text search if query provided
@@ -614,6 +614,67 @@ class SlackManagementRepository {
       return Member.fromJson(data);
     } catch (e) {
       debugPrint('Error fetching member by ID: $e');
+      return null;
+    }
+  }
+
+  /// Get messages by Slack user ID with pagination
+  Future<List<Map<String, dynamic>>> getMessagesBySlackUserId(
+    String slackUserId, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    if (!isReady) return [];
+
+    try {
+      final data = await _readClient
+          .from('slack_messages')
+          .select(
+              'id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, files_archived, reactions')
+          .eq('slack_user_id', slackUserId)
+          .order('posted_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      return (data as List<dynamic>).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Error fetching messages by slack user ID: $e');
+      return [];
+    }
+  }
+
+  /// Get unmatched user info by Slack user ID
+  Future<SlackUnmatchedUser?> getUnmatchedUserBySlackId(String slackUserId) async {
+    if (!isReady) return null;
+
+    try {
+      final data = await _readClient
+          .from('slack_users_unmatched')
+          .select()
+          .eq('slack_user_id', slackUserId)
+          .maybeSingle();
+
+      if (data == null) return null;
+      return SlackUnmatchedUser.fromJson(data);
+    } catch (e) {
+      debugPrint('Error fetching unmatched user by slack ID: $e');
+      return null;
+    }
+  }
+
+  /// Get user mapping info by Slack user ID
+  Future<Map<String, dynamic>?> getUserMappingBySlackId(String slackUserId) async {
+    if (!isReady) return null;
+
+    try {
+      final data = await _readClient
+          .from('slack_user_mapping')
+          .select('*, members!member_id(id, name, profile_photos)')
+          .eq('slack_user_id', slackUserId)
+          .maybeSingle();
+
+      return data;
+    } catch (e) {
+      debugPrint('Error fetching user mapping by slack ID: $e');
       return null;
     }
   }
