@@ -753,6 +753,29 @@ class CommitteeRepository {
     }
   }
 
+  /// Get Slack messages by channel ID directly
+  Future<List<Map<String, dynamic>>> getSlackMessagesByChannelId(
+    String channelId, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    if (!isReady) return [];
+
+    try {
+      final data = await _readClient
+          .from('slack_messages')
+          .select('id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, files_archived, reactions')
+          .eq('slack_channel_id', channelId)
+          .order('posted_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      return (data as List<dynamic>).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('Error getting Slack messages by channel ID: $e');
+      return [];
+    }
+  }
+
   /// Get advocacy campaign data for Policy & Advocacy
   Future<Map<String, dynamic>> getAdvocacyCampaignData() async {
     if (!isReady) {
