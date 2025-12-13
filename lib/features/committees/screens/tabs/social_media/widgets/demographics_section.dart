@@ -180,59 +180,69 @@ class DemographicsSection extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
                       ],
-                      // Second row: Countries, Cities, and Device/Traffic
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (combinedCountries.isNotEmpty)
-                            Expanded(
-                              child: _DemographicCard(
-                                title: 'Top Countries',
-                                icon: Icons.public,
-                                data: _convertToIntMap(combinedCountries),
-                                limit: 5,
-                                showFlags: true,
+                      // Second row: Device Types and Traffic Sources (below Gender Split)
+                      if (deviceTypes.isNotEmpty || trafficSources.isNotEmpty) ...[
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (deviceTypes.isNotEmpty)
+                              Expanded(
+                                child: _DemographicCard(
+                                  title: 'Device Types',
+                                  icon: Icons.devices,
+                                  data: _convertToIntMap(deviceTypes),
+                                  limit: 4,
+                                ),
                               ),
-                            ),
-                          if (combinedCountries.isNotEmpty && combinedCities.isNotEmpty)
-                            const SizedBox(width: 20),
-                          if (combinedCities.isNotEmpty)
-                            Expanded(
-                              child: _DemographicCard(
-                                title: 'Top Cities',
-                                icon: Icons.location_city,
-                                data: _convertToIntMap(combinedCities),
-                                limit: 5,
+                            if (deviceTypes.isNotEmpty && trafficSources.isNotEmpty)
+                              const SizedBox(width: 20),
+                            if (trafficSources.isNotEmpty)
+                              Expanded(
+                                child: _DemographicCard(
+                                  title: 'Traffic Sources',
+                                  icon: Icons.trending_up,
+                                  data: _convertToIntMap(trafficSources),
+                                  limit: 4,
+                                ),
                               ),
-                            ),
-                          if ((combinedCountries.isNotEmpty || combinedCities.isNotEmpty) &&
-                              (deviceTypes.isNotEmpty || trafficSources.isNotEmpty))
-                            const SizedBox(width: 20),
-                          if (deviceTypes.isNotEmpty || trafficSources.isNotEmpty)
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  if (deviceTypes.isNotEmpty)
-                                    _DemographicCard(
-                                      title: 'Device Types',
-                                      icon: Icons.devices,
-                                      data: _convertToIntMap(deviceTypes),
-                                      limit: 4,
-                                    ),
-                                  if (deviceTypes.isNotEmpty && trafficSources.isNotEmpty)
-                                    const SizedBox(height: 16),
-                                  if (trafficSources.isNotEmpty)
-                                    _DemographicCard(
-                                      title: 'Traffic Sources',
-                                      icon: Icons.trending_up,
-                                      data: _convertToIntMap(trafficSources),
-                                      limit: 4,
-                                    ),
-                                ],
+                            // Add spacer if only one card to maintain layout balance
+                            if (deviceTypes.isEmpty || trafficSources.isEmpty)
+                              const Expanded(child: SizedBox()),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      // Third row: Countries and Cities
+                      if (combinedCountries.isNotEmpty || combinedCities.isNotEmpty)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (combinedCountries.isNotEmpty)
+                              Expanded(
+                                child: _DemographicCard(
+                                  title: 'Top Countries',
+                                  icon: Icons.public,
+                                  data: _convertToIntMap(combinedCountries),
+                                  limit: 5,
+                                  showFlags: true,
+                                ),
                               ),
-                            ),
-                        ],
-                      ),
+                            if (combinedCountries.isNotEmpty && combinedCities.isNotEmpty)
+                              const SizedBox(width: 20),
+                            if (combinedCities.isNotEmpty)
+                              Expanded(
+                                child: _DemographicCard(
+                                  title: 'Top Cities',
+                                  icon: Icons.location_city,
+                                  data: _convertToIntMap(combinedCities),
+                                  limit: 5,
+                                ),
+                              ),
+                            // Add spacer if only one card to maintain layout balance
+                            if (combinedCountries.isEmpty || combinedCities.isEmpty)
+                              const Expanded(child: SizedBox()),
+                          ],
+                        ),
                     ],
                   );
                 }
@@ -246,6 +256,51 @@ class DemographicsSection extends StatelessWidget {
                       _GenderSplitCard(ageData: ageData),
                       const SizedBox(height: 16),
                     ],
+                    // Device Types and Traffic Sources (below Gender Split)
+                    if (isMedium && deviceTypes.isNotEmpty && trafficSources.isNotEmpty)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _DemographicCard(
+                              title: 'Device Types',
+                              icon: Icons.devices,
+                              data: _convertToIntMap(deviceTypes),
+                              limit: 4,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _DemographicCard(
+                              title: 'Traffic Sources',
+                              icon: Icons.trending_up,
+                              data: _convertToIntMap(trafficSources),
+                              limit: 4,
+                            ),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      if (deviceTypes.isNotEmpty) ...[
+                        _DemographicCard(
+                          title: 'Device Types',
+                          icon: Icons.devices,
+                          data: _convertToIntMap(deviceTypes),
+                          limit: 4,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      if (trafficSources.isNotEmpty) ...[
+                        _DemographicCard(
+                          title: 'Traffic Sources',
+                          icon: Icons.trending_up,
+                          data: _convertToIntMap(trafficSources),
+                          limit: 4,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ],
+                    // Countries and Cities
                     if (isMedium && combinedCountries.isNotEmpty && combinedCities.isNotEmpty)
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,32 +336,14 @@ class DemographicsSection extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      if (combinedCities.isNotEmpty) ...[
+                      if (combinedCities.isNotEmpty)
                         _DemographicCard(
                           title: 'Top Cities',
                           icon: Icons.location_city,
                           data: _convertToIntMap(combinedCities),
                           limit: 5,
                         ),
-                        const SizedBox(height: 16),
-                      ],
                     ],
-                    if (deviceTypes.isNotEmpty) ...[
-                      _DemographicCard(
-                        title: 'Device Types',
-                        icon: Icons.devices,
-                        data: _convertToIntMap(deviceTypes),
-                        limit: 4,
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    if (trafficSources.isNotEmpty)
-                      _DemographicCard(
-                        title: 'Traffic Sources',
-                        icon: Icons.trending_up,
-                        data: _convertToIntMap(trafficSources),
-                        limit: 4,
-                      ),
                   ],
                 );
               },

@@ -162,8 +162,8 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
         _showError('Some platforms failed to refresh');
       }
 
-      // Reload data
-      await _loadStats();
+      // Reload accounts (to get updated last_synced_at) and stats
+      await _loadAccounts();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -326,7 +326,6 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
             child: SyncStatus(
               accounts: _accounts,
               selectedAccountIds: _selectedAccountIds,
-              latestStats: _latestStats,
             ),
           ),
 

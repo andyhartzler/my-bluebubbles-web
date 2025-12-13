@@ -159,58 +159,86 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
 
   Widget _buildHeader(bool isDark) {
     final monthFormat = DateFormat('MMMM yyyy');
+    const accentColor = Color(0xFF3B82F6);
 
-    return Padding(
+    return Container(
       padding: const EdgeInsets.all(16),
-      child: Row(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            accentColor.withOpacity(0.1),
+            accentColor.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.calendar_today_rounded,
-              color: Color(0xFF3B82F6),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              monthFormat.format(_selectedDate),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.calendar_today_rounded,
+                  color: accentColor,
+                  size: 20,
+                ),
               ),
-            ),
-          ),
-          TextButton(
-            onPressed: _goToToday,
-            child: const Text(
-              'Today',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF3B82F6),
-                fontWeight: FontWeight.w500,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Events & Meetings',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    Text(
+                      monthFormat.format(_selectedDate),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? const Color(0xFF98989F)
+                            : const Color(0xFF6B7280),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: widget.onAddEvent ?? _showCreateEventDialog,
-            icon: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3B82F6),
-                borderRadius: BorderRadius.circular(8),
+              TextButton(
+                onPressed: _goToToday,
+                child: const Text(
+                  'Today',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: accentColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
-              child: const Icon(Icons.add, color: Colors.white, size: 18),
-            ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
+              IconButton(
+                onPressed: widget.onAddEvent ?? _showCreateEventDialog,
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 18),
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
           ),
         ],
       ),

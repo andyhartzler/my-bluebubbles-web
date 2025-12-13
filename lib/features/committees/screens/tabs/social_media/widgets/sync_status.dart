@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/social_media_account.dart';
-import '../models/social_media_stats.dart';
 import '../theme/communications_committee_theme.dart';
 
 /// Displays the last sync status for each platform
 class SyncStatus extends StatelessWidget {
   final List<SocialMediaAccount> accounts;
   final Set<String> selectedAccountIds;
-  final Map<String, SocialMediaStats>? latestStats;
 
   const SyncStatus({
     super.key,
     required this.accounts,
     required this.selectedAccountIds,
-    this.latestStats,
   });
 
   @override
@@ -80,21 +77,8 @@ class SyncStatus extends StatelessWidget {
                 final platformColor =
                     CommunicationsCommitteeTheme.getPlatformColor(account.platform);
 
-                // Get sync date from stats if available, fall back to account lastSyncedAt
-                DateTime? lastSyncDate;
-                final stats = latestStats?[account.id];
-                if (stats != null) {
-                  // Try to get collection_date from platform_metrics first
-                  final collectionDateStr = stats.platformMetrics['collection_date'];
-                  if (collectionDateStr is String) {
-                    lastSyncDate = DateTime.tryParse(collectionDateStr);
-                  }
-                  // Fall back to metric_date
-                  lastSyncDate ??= DateTime.tryParse(stats.metricDate);
-                }
-                // Final fallback to account's lastSyncedAt
-                lastSyncDate ??= account.lastSyncedAt;
-
+                // Use last_synced_at from the accounts table
+                final lastSyncDate = account.lastSyncedAt;
                 final hasSync = lastSyncDate != null;
                 final isRecent = hasSync &&
                     lastSyncDate.isAfter(
@@ -113,18 +97,10 @@ class SyncStatus extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: platformColor.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _getPlatformIcon(account.platform),
-                          color: platformColor,
-                          size: 20,
-                        ),
+                      _PlatformIcon(
+                        platform: account.platform,
+                        size: 40,
+                        borderRadius: 8,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -138,7 +114,7 @@ class SyncStatus extends StatelessWidget {
                             const SizedBox(height: 2),
                             Text(
                               hasSync
-                                  ? 'Last synced: ${_formatDateTime(lastSyncDate!)}'
+                                  ? 'Last synced: ${_formatDateTime(lastSyncDate)}'
                                   : 'Never synced',
                               style: TextStyle(
                                 color: hasSync ? Colors.grey[600] : Colors.orange[700],
@@ -193,28 +169,6 @@ class SyncStatus extends StatelessWidget {
     );
   }
 
-  IconData _getPlatformIcon(String platform) {
-    switch (platform.toLowerCase()) {
-      case 'facebook':
-        return Icons.facebook;
-      case 'instagram':
-        return Icons.camera_alt;
-      case 'threads':
-        return Icons.alternate_email;
-      case 'youtube':
-        return Icons.play_circle_filled;
-      case 'reddit':
-        return Icons.reddit;
-      case 'tiktok':
-        return Icons.music_note;
-      case 'twitter':
-      case 'x':
-        return Icons.flutter_dash;
-      default:
-        return Icons.share;
-    }
-  }
-
   String _formatDateTime(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
@@ -232,5 +186,74 @@ class SyncStatus extends StatelessWidget {
     } else {
       return '${date.month}/${date.day}/${date.year}';
     }
+  }
+}
+
+/// Widget to display platform icon from assets
+class _PlatformIcon extends StatelessWidget {
+  final String platform;
+  final double size;
+  final double borderRadius;
+
+  const _PlatformIcon({
+    required this.platform,
+    this.size = 40,
+    this.borderRadius = 8,
+  });
+
+  String? _getIconAsset() {
+    switch (platform.toLowerCase()) {
+      case 'facebook':
+        return 'assets/icon/facebook-icon.png';
+      case 'instagram':
+        return 'assets/icon/instagram-icon.png';
+      case 'threads':
+        return 'assets/icon/threads-icon.png';
+      case 'youtube':
+        return 'assets/icon/youtube-icon.png';
+      case 'reddit':
+        return 'assets/icon/reddit-icon.png';
+      case 'tiktok':
+        return 'assets/icon/tiktok-icon.png';
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final assetPath = _getIconAsset();
+
+    if (assetPath != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: Image.asset(
+          assetPath,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackIcon(),
+        ),
+      );
+    }
+
+    return _buildFallbackIcon();
+  }
+
+  Widget _buildFallbackIcon() {
+    final platformColor = CommunicationsCommitteeTheme.getPlatformColor(platform);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: platformColor.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+      child: Icon(
+        Icons.share,
+        color: platformColor,
+        size: size * 0.5,
+      ),
+    );
   }
 }

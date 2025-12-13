@@ -147,45 +147,42 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
   }
 
   Widget _buildHeader(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
+    final accentColor = widget.accentColor ?? const Color(0xFF3B82F6);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            accentColor.withOpacity(0.1),
+            accentColor.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: accentColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.calendar_today_rounded,
-              color: Color(0xFF3B82F6),
-              size: 20,
+              color: accentColor,
+              size: 24,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'MOYD Calendar',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-                  ),
-                ),
-                Text(
-                  'Organization Events & Meetings',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark
-                        ? const Color(0xFF98989F)
-                        : const Color(0xFF6B7280),
-                  ),
-                ),
-              ],
+            child: Text(
+              'Organization Events & Meetings',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+              ),
             ),
           ),
           CalendarSubscribeButton(
@@ -199,7 +196,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Add Event', style: TextStyle(fontSize: 13)),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF3B82F6),
+                backgroundColor: accentColor,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 shape: RoundedRectangleBorder(

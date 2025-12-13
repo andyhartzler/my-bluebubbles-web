@@ -289,31 +289,40 @@ class CommitteeRepository {
     final stats = <String, dynamic>{};
 
     try {
-      // Total email campaigns sent
-      final PostgrestResponse campaignResponse = await _readClient
-          .from('campaigns')
-          .select('id')
-          .eq('status', 'sent')
-          .count(CountOption.exact);
-      stats['totalCampaignsSent'] = campaignResponse.count ?? 0;
+      // Fetch latest stats for each social media account
+      final accountsResponse = await _readClient
+          .from('social_media_accounts')
+          .select('id, platform');
 
-      // Total emails delivered (sum of total_sent from campaigns)
-      final campaignData = await _readClient
-          .from('campaigns')
-          .select('total_sent')
-          .eq('status', 'sent');
+      final accounts = accountsResponse as List<dynamic>;
+      int totalImpressions = 0;
+      int totalFollowers = 0;
 
-      int totalDelivered = 0;
-      for (final item in campaignData as List<dynamic>) {
-        if (item is Map && item['total_sent'] != null) {
-          totalDelivered += (item['total_sent'] as num).toInt();
+      for (final account in accounts) {
+        final accountId = account['id'] as String;
+
+        // Get latest stats for this account
+        final statsResponse = await _readClient
+            .from('social_media_stats')
+            .select('impressions, followers_count')
+            .eq('account_id', accountId)
+            .order('collection_date', ascending: false)
+            .limit(1);
+
+        final statsList = statsResponse as List<dynamic>;
+        if (statsList.isNotEmpty) {
+          final stat = statsList.first;
+          totalImpressions += (stat['impressions'] as num?)?.toInt() ?? 0;
+          totalFollowers += (stat['followers_count'] as num?)?.toInt() ?? 0;
         }
       }
-      stats['totalEmailsDelivered'] = totalDelivered;
+
+      stats['totalImpressions'] = totalImpressions;
+      stats['totalFollowers'] = totalFollowers;
     } catch (e) {
       print('Error getting communications stats: $e');
-      stats['totalCampaignsSent'] = 0;
-      stats['totalEmailsDelivered'] = 0;
+      stats['totalImpressions'] = 0;
+      stats['totalFollowers'] = 0;
     }
 
     return stats;
