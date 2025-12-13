@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/legislator.dart';
 import '../models/tracked_bill.dart';
+import '../providers/legislation_provider.dart';
 import '../services/legislation_service.dart';
 import '../widgets/bill_card.dart';
 import 'bill_detail_screen.dart';
@@ -495,12 +497,16 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
   }
 
   void _navigateToBillDetail(TrackedBill bill) {
+    final provider = context.read<LegislationProvider>();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BillDetailScreen(
-          billId: bill.id,
-          committeeId: widget.committeeId,
+        builder: (context) => ChangeNotifierProvider.value(
+          value: provider,
+          child: BillDetailScreen(
+            billId: bill.id,
+            committeeId: widget.committeeId,
+          ),
         ),
       ),
     );

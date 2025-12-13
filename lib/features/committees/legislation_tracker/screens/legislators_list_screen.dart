@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/legislator.dart';
+import '../providers/legislation_provider.dart';
 import '../services/legislation_service.dart';
 import '../widgets/legislator_card.dart';
 import 'legislator_detail_screen.dart';
@@ -401,12 +403,16 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
   }
 
   void _openLegislatorDetail(Legislator legislator) {
+    final provider = context.read<LegislationProvider>();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => LegislatorDetailScreen(
-          legislatorId: legislator.id,
-          committeeId: widget.committeeId,
+        builder: (context) => ChangeNotifierProvider.value(
+          value: provider,
+          child: LegislatorDetailScreen(
+            legislatorId: legislator.id,
+            committeeId: widget.committeeId,
+          ),
         ),
       ),
     );

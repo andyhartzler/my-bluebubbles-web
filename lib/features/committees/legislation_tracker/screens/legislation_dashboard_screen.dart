@@ -462,12 +462,16 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
   }
 
   void _navigateToBillDetail(BuildContext context, TrackedBill bill) {
+    final provider = context.read<LegislationProvider>();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BillDetailScreen(
-          billId: bill.id,
-          committeeId: widget.committeeId,
+        builder: (context) => ChangeNotifierProvider.value(
+          value: provider,
+          child: BillDetailScreen(
+            billId: bill.id,
+            committeeId: widget.committeeId,
+          ),
         ),
       ),
     );
