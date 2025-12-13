@@ -223,24 +223,100 @@ class MembershipChange {
     this.memberId,
     this.slackUserId,
     required this.slackChannelId,
+    this.slackChannelName,
     required this.action,
     required this.source,
     this.createdAt,
     this.metadata,
+    // User info from slack_user_mapping
+    this.slackDisplayName,
+    this.slackRealName,
+    this.slackAvatarUrl,
+    // Member info (if linked)
+    this.memberName,
+    this.memberProfilePhotoUrl,
   });
 
   factory MembershipChange.fromJson(Map<String, dynamic> json) {
+    // Parse nested channel mapping data
+    final channelMapping = json['slack_channel_committee_mapping'];
+    String? channelName;
+    if (channelMapping is Map<String, dynamic>) {
+      channelName = channelMapping['slack_channel_name']?.toString();
+    } else if (channelMapping is List && channelMapping.isNotEmpty) {
+      channelName = (channelMapping.first as Map<String, dynamic>?)?['slack_channel_name']?.toString();
+    }
+
+    // Parse nested user mapping data
+    final userMapping = json['slack_user_mapping'];
+    String? displayName;
+    String? realName;
+    String? avatarUrl;
+    if (userMapping is Map<String, dynamic>) {
+      displayName = userMapping['slack_display_name']?.toString();
+      realName = userMapping['slack_real_name']?.toString();
+      avatarUrl = userMapping['slack_avatar_url']?.toString();
+    } else if (userMapping is List && userMapping.isNotEmpty) {
+      final first = userMapping.first as Map<String, dynamic>?;
+      displayName = first?['slack_display_name']?.toString();
+      realName = first?['slack_real_name']?.toString();
+      avatarUrl = first?['slack_avatar_url']?.toString();
+    }
+
+    // Parse nested member data
+    final memberData = json['members'];
+    String? memberName;
+    String? memberPhotoUrl;
+    if (memberData is Map<String, dynamic>) {
+      memberName = memberData['name']?.toString();
+      // Parse profile photos to get primary photo URL
+      final photos = memberData['profile_photos'];
+      if (photos is List && photos.isNotEmpty) {
+        // Find primary photo or use first
+        for (final photo in photos) {
+          if (photo is Map<String, dynamic>) {
+            if (photo['is_primary'] == true) {
+              memberPhotoUrl = photo['public_url']?.toString();
+              break;
+            }
+            memberPhotoUrl ??= photo['public_url']?.toString();
+          }
+        }
+      }
+    } else if (memberData is List && memberData.isNotEmpty) {
+      final first = memberData.first as Map<String, dynamic>?;
+      memberName = first?['name']?.toString();
+      final photos = first?['profile_photos'];
+      if (photos is List && photos.isNotEmpty) {
+        for (final photo in photos) {
+          if (photo is Map<String, dynamic>) {
+            if (photo['is_primary'] == true) {
+              memberPhotoUrl = photo['public_url']?.toString();
+              break;
+            }
+            memberPhotoUrl ??= photo['public_url']?.toString();
+          }
+        }
+      }
+    }
+
     return MembershipChange(
       id: json['id']?.toString() ?? '',
       memberId: json['member_id']?.toString(),
       slackUserId: json['slack_user_id']?.toString(),
       slackChannelId: json['slack_channel_id']?.toString() ?? '',
+      slackChannelName: channelName,
       action: json['action']?.toString() ?? '',
       source: json['source']?.toString() ?? '',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
       metadata: json['metadata'] as Map<String, dynamic>?,
+      slackDisplayName: displayName,
+      slackRealName: realName,
+      slackAvatarUrl: avatarUrl,
+      memberName: memberName,
+      memberProfilePhotoUrl: memberPhotoUrl,
     );
   }
 
@@ -248,8 +324,32 @@ class MembershipChange {
   final String? memberId;
   final String? slackUserId;
   final String slackChannelId;
+  final String? slackChannelName;
   final String action;
   final String source;
   final DateTime? createdAt;
   final Map<String, dynamic>? metadata;
+  // User info from slack_user_mapping
+  final String? slackDisplayName;
+  final String? slackRealName;
+  final String? slackAvatarUrl;
+  // Member info (if linked)
+  final String? memberName;
+  final String? memberProfilePhotoUrl;
+
+  /// Get the display name for the user (member name > slack real name > slack display name)
+  String get displayName {
+    return memberName ?? slackRealName ?? slackDisplayName ?? 'Unknown User';
+  }
+
+  /// Get the channel display name (channel name > channel ID)
+  String get channelDisplayName {
+    return slackChannelName ?? slackChannelId;
+  }
+
+  /// Whether this user is linked to a member
+  bool get isLinkedMember => memberId != null && memberId!.isNotEmpty;
+
+  /// Get the best available avatar URL
+  String? get avatarUrl => memberProfilePhotoUrl ?? slackAvatarUrl;
 }

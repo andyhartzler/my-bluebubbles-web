@@ -566,15 +566,21 @@ class SlackManagementRepository {
     }
   }
 
-  /// Get recent membership changes
+  /// Get recent membership changes with channel and user details
   Future<List<MembershipChange>> getRecentMembershipChanges(
       {int limit = 50}) async {
     if (!isReady) return [];
 
     try {
+      // Query with joins to get channel names and user info
       final data = await _readClient
           .from('slack_channel_membership_log')
-          .select()
+          .select('''
+            *,
+            slack_channel_committee_mapping!slack_channel_id(slack_channel_name),
+            slack_user_mapping!slack_user_id(slack_display_name, slack_real_name, slack_avatar_url),
+            members!member_id(name, profile_photos)
+          ''')
           .order('created_at', ascending: false)
           .limit(limit);
 

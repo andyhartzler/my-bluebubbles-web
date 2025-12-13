@@ -64,10 +64,12 @@ class _SlackManagementScreenState extends State<SlackManagementScreen>
         Expanded(
           child: TabBarView(
             controller: _tabController,
-            children: const [
-              ChannelsTab(),
-              UnmatchedUsersTab(),
-              AnalyticsTab(),
+            children: [
+              const ChannelsTab(),
+              const UnmatchedUsersTab(),
+              AnalyticsTab(
+                onSwitchToUnmatchedTab: () => _tabController.animateTo(1),
+              ),
             ],
           ),
         ),
