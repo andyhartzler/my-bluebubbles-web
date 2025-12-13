@@ -320,23 +320,35 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
 
     final today = DateTime.now();
 
+    // Calculate number of rows needed (typically 5-6 weeks)
+    final totalCells = startWeekday + daysInMonth;
+    final rowCount = (totalCells / 7).ceil();
+    final itemCount = rowCount * 7;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 7,
-          mainAxisSpacing: 2,
-          crossAxisSpacing: 2,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+          // Use a taller aspect ratio to fit event names
           childAspectRatio: 1.0,
+          mainAxisExtent: 80, // Fixed height for consistent layout
         ),
-        itemCount: 42,
+        itemCount: itemCount,
         itemBuilder: (context, index) {
           final dayOffset = index - startWeekday;
 
           if (dayOffset < 0 || dayOffset >= daysInMonth) {
-            return const SizedBox();
+            return Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1C1C1E).withOpacity(0.3) : const Color(0xFFF9FAFB).withOpacity(0.5),
+                borderRadius: BorderRadius.circular(6),
+              ),
+            );
           }
 
           final date =
@@ -355,6 +367,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
             isSelected: isSelected,
             events: dayEvents,
             isDark: isDark,
+            showEventNames: true, // Show event names on desktop
             onTap: () {
               setState(() {
                 _selectedDate = date;
@@ -405,19 +418,21 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
         _selectedDate.month == DateTime.now().month &&
         _selectedDate.day == DateTime.now().day;
 
+    // More compact height for the events panel
     return Container(
-      constraints: const BoxConstraints(maxHeight: 320),
+      constraints: const BoxConstraints(maxHeight: 200),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
                 Text(
                   dayFormat.format(_selectedDate),
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                   ),
@@ -426,15 +441,15 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
                   const SizedBox(width: 8),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: const Color(0xFF3B82F6),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
                       'Today',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
@@ -445,7 +460,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
                 Text(
                   '${_selectedDayEvents.length} event${_selectedDayEvents.length == 1 ? '' : 's'}',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: isDark
                         ? const Color(0xFF98989F)
                         : const Color(0xFF6B7280),
@@ -457,13 +472,14 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
           if (_selectedDayEvents.isEmpty)
             _buildEmptyState(isDark)
           else
-            Expanded(
+            Flexible(
               child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                shrinkWrap: true,
                 itemCount: _selectedDayEvents.length,
                 itemBuilder: (context, index) {
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 6),
                     child: _EventCard(
                       event: _selectedDayEvents[index],
                       isDark: isDark,
@@ -524,6 +540,7 @@ class _CalendarDayCell extends StatelessWidget {
   final bool isSelected;
   final List<CalendarEvent> events;
   final bool isDark;
+  final bool showEventNames;
   final VoidCallback onTap;
 
   const _CalendarDayCell({
@@ -532,6 +549,7 @@ class _CalendarDayCell extends StatelessWidget {
     required this.isSelected,
     required this.events,
     required this.isDark,
+    this.showEventNames = false,
     required this.onTap,
   });
 
@@ -561,47 +579,120 @@ class _CalendarDayCell extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           color: isSelected
               ? (isDark ? const Color(0xFF1E3A5F) : const Color(0xFFDBEAFE))
               : isToday
-                  ? const Color(0xFF3B82F6)
-                  : null,
-          borderRadius: BorderRadius.circular(8),
+                  ? const Color(0xFF3B82F6).withOpacity(0.15)
+                  : isDark
+                      ? const Color(0xFF2C2C2E)
+                      : const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(6),
+          border: isToday
+              ? Border.all(color: const Color(0xFF3B82F6), width: 2)
+              : Border.all(
+                  color: isDark ? const Color(0xFF38383A) : const Color(0xFFE5E7EB),
+                  width: 0.5,
+                ),
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              date.day.toString(),
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight:
-                    isToday || isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isToday
-                    ? Colors.white
-                    : isSelected
-                        ? const Color(0xFF3B82F6)
-                        : isDark
-                            ? Colors.white
-                            : const Color(0xFF1A1A1A),
-              ),
+            // Day number row
+            Row(
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  alignment: Alignment.center,
+                  decoration: isToday
+                      ? BoxDecoration(
+                          color: const Color(0xFF3B82F6),
+                          borderRadius: BorderRadius.circular(11),
+                        )
+                      : null,
+                  child: Text(
+                    date.day.toString(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isToday || isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isToday
+                          ? Colors.white
+                          : isSelected
+                              ? const Color(0xFF3B82F6)
+                              : isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1A1A1A),
+                    ),
+                  ),
+                ),
+                if (events.length > 2) ...[
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '+${events.length - 2}',
+                      style: const TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF3B82F6),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-            if (events.isNotEmpty) ...[
+            // Events area
+            if (events.isNotEmpty && showEventNames) ...[
               const SizedBox(height: 2),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: events.take(2).map((event) {
+                    final eventColor = _getEventColor(event);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: eventColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border(
+                          left: BorderSide(color: eventColor, width: 2),
+                        ),
+                      ),
+                      child: Text(
+                        event.title,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? Colors.white.withOpacity(0.9) : eventColor.withOpacity(0.9),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ] else if (events.isNotEmpty) ...[
+              // Fallback to dots when not showing names
+              const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ...events.take(3).map((event) => Container(
-                        width: 5,
-                        height: 5,
-                        margin: const EdgeInsets.symmetric(horizontal: 1),
-                        decoration: BoxDecoration(
-                          color: isToday ? Colors.white : _getEventColor(event),
-                          shape: BoxShape.circle,
-                        ),
-                      )),
-                ],
+                children: events.take(3).map((event) => Container(
+                      width: 5,
+                      height: 5,
+                      margin: const EdgeInsets.symmetric(horizontal: 1),
+                      decoration: BoxDecoration(
+                        color: _getEventColor(event),
+                        shape: BoxShape.circle,
+                      ),
+                    )).toList(),
               ),
             ],
           ],

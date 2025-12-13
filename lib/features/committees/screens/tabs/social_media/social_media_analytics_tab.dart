@@ -83,13 +83,13 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
     if (_selectedAccountIds.isEmpty) return;
 
     try {
-      // Load latest stats for each account
+      // Load latest stats for each account - need to get most recent per account
+      // Using a subquery approach: get all stats ordered by date, then dedupe by account_id
       final latestResponse = await _supabase
           .from('social_media_stats')
           .select('*, social_media_accounts!inner(platform, account_name)')
           .inFilter('account_id', _selectedAccountIds.toList())
-          .order('metric_date', ascending: false)
-          .limit(_selectedAccountIds.length);
+          .order('metric_date', ascending: false);
 
       // Load historical stats for charts
       final historicalResponse = await _supabase
@@ -105,24 +105,34 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
           .from('social_media_audience_demographics')
           .select('*, social_media_accounts!inner(platform, account_name)')
           .inFilter('account_id', _selectedAccountIds.toList())
-          .order('metric_date', ascending: false)
-          .limit(_selectedAccountIds.length);
+          .order('metric_date', ascending: false);
 
       if (mounted) {
         setState(() {
-          _latestStats = {
-            for (var item in latestResponse as List)
-              item['account_id'] as String:
-                  SocialMediaStats.fromJson(item as Map<String, dynamic>)
-          };
+          // Deduplicate to get only the latest stat per account_id
+          final latestByAccount = <String, SocialMediaStats>{};
+          for (var item in latestResponse as List) {
+            final accountId = item['account_id'] as String;
+            // Only add if we haven't seen this account yet (first one is most recent due to ordering)
+            if (!latestByAccount.containsKey(accountId)) {
+              latestByAccount[accountId] = SocialMediaStats.fromJson(item as Map<String, dynamic>);
+            }
+          }
+          _latestStats = latestByAccount;
+
           _historicalStats = (historicalResponse as List)
               .map((e) => SocialMediaStats.fromJson(e as Map<String, dynamic>))
               .toList();
-          _demographics = {
-            for (var item in demographicsResponse as List)
-              item['account_id'] as String:
-                  AudienceDemographics.fromJson(item as Map<String, dynamic>)
-          };
+
+          // Deduplicate demographics per account
+          final demoByAccount = <String, AudienceDemographics>{};
+          for (var item in demographicsResponse as List) {
+            final accountId = item['account_id'] as String;
+            if (!demoByAccount.containsKey(accountId)) {
+              demoByAccount[accountId] = AudienceDemographics.fromJson(item as Map<String, dynamic>);
+            }
+          }
+          _demographics = demoByAccount;
         });
       }
     } catch (e) {
@@ -224,17 +234,40 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
 
     for (var stats in _latestStats.values) {
       totalFollowers += stats.followersCount ?? 0;
-      // Prefer 30-day totals from platform metrics
+
+      // Get impressions directly from stats column
+      totalImpressions += stats.impressions ?? 0;
+
+      // Get 30-day totals from platform metrics
       final totals = stats.last30DaysTotals;
       if (totals.isNotEmpty) {
-        totalEngagement += _toInt(totals['total_engagement'] ?? totals['likes']) +
-            _toInt(totals['comments']) +
-            _toInt(totals['shares']);
+        // Use total_engagement if available, otherwise sum individual metrics
+        final engagement = _toInt(totals['total_engagement']);
+        if (engagement > 0) {
+          totalEngagement += engagement;
+        } else {
+          totalEngagement += _toInt(totals['likes']) +
+              _toInt(totals['comments'] ?? totals['replies']) +
+              _toInt(totals['shares'] ?? totals['reposts']);
+        }
       } else {
         totalEngagement += stats.totalEngagement;
       }
-      totalImpressions += stats.impressions ?? 0;
-      totalPosts += _toInt(totals['posts']) + (stats.postsCount ?? 0);
+
+      // Get posts count from platform metrics - different platforms use different keys
+      // Try last_30_days.totals.posts first, then account.posts_in_30day_window
+      final posts30Days = _toInt(totals['posts']) > 0
+          ? _toInt(totals['posts'])
+          : _toInt(totals['threads']); // Threads uses 'threads' instead of 'posts'
+
+      // Also check account-level posts_in_30day_window
+      final accountData = stats.platformMetrics['account'];
+      final postsInWindow = accountData is Map
+          ? _toInt(accountData['posts_in_30day_window'] ?? accountData['threads_in_30day_window'])
+          : 0;
+
+      // Use whichever is greater (some platforms report it differently)
+      totalPosts += posts30Days > 0 ? posts30Days : postsInWindow;
     }
 
     return RefreshIndicator(
@@ -293,6 +326,7 @@ class _SocialMediaAnalyticsTabState extends State<SocialMediaAnalyticsTab> {
             child: SyncStatus(
               accounts: _accounts,
               selectedAccountIds: _selectedAccountIds,
+              latestStats: _latestStats,
             ),
           ),
 
