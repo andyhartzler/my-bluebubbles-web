@@ -12,6 +12,7 @@ class Committee {
   final bool hasChaptersTab;
   final bool hasDonorsTab;
   final bool hasCampaignsTab;
+  final bool hasLegislationTab;
   final String? chapterTypeFilter;
   /// The name used to filter meetings in the database (includes "Committee" suffix where needed)
   final String? _meetingsFilterName;
@@ -27,6 +28,7 @@ class Committee {
     this.hasChaptersTab = false,
     this.hasDonorsTab = false,
     this.hasCampaignsTab = false,
+    this.hasLegislationTab = false,
     this.chapterTypeFilter,
     String? meetingsFilterName,
   }) : _meetingsFilterName = meetingsFilterName;
@@ -80,6 +82,7 @@ class CommitteeDefinitions {
     primaryColor: _royalBlue,
     secondaryColor: _slateBlue,
     hasCampaignsTab: true,
+    hasLegislationTab: true,
     meetingsFilterName: 'Policy & Advocacy Committee',
   );
 
