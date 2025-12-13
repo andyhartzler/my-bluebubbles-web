@@ -624,6 +624,7 @@ class LegislationService {
 
   /// Calculate statistics manually if RPC not available
   Future<LegislationStats> _calculateStatisticsManually({String? session}) async {
+    // Use a very high limit to get all bills (Supabase default is 1000)
     var query = _supabase
         .from('legislation_tracked_bills')
         .select()
@@ -633,7 +634,8 @@ class LegislationService {
       query = query.eq('session', session);
     }
 
-    final bills = await query;
+    // Set limit to 10000 to ensure we get all bills
+    final bills = await query.limit(10000);
     final billList = bills as List;
 
     int supportCount = 0;

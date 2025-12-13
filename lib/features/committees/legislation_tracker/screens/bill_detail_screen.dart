@@ -37,7 +37,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
 
     // Load bill details
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -193,6 +193,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
           isScrollable: true,
           tabs: [
             _buildTab('Overview', Icons.info_outline, 0),
+            _buildTab('Bill Text', Icons.article, bill.hasText ? 1 : 0),
             _buildTab('Actions', Icons.timeline, provider.selectedBillActions.length),
             _buildTab('Votes', Icons.how_to_vote, provider.selectedBillVotes.length),
             _buildTab('Documents', Icons.description, provider.selectedBillDocuments.length),
@@ -205,6 +206,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
             controller: _tabController,
             children: [
               _buildOverviewTab(context, theme, provider, bill),
+              _buildBillTextTab(context, theme, bill),
               _buildActionsTab(context, theme, provider, bill),
               _buildVotesTab(context, theme, provider, bill),
               _buildDocumentsTab(context, theme, provider, bill),
@@ -564,6 +566,135 @@ class _BillDetailScreenState extends State<BillDetailScreen>
         content: content,
       ),
     );
+  }
+
+  Widget _buildBillTextTab(
+    BuildContext context,
+    ThemeData theme,
+    TrackedBill bill,
+  ) {
+    // Check if bill has text
+    if (!bill.hasText && !bill.hasPdf) {
+      return _buildEmptyState(
+        theme,
+        bill.textExtractionFailed
+            ? 'Failed to extract bill text'
+            : 'Bill text not yet available',
+        Icons.article_outlined,
+      );
+    }
+
+    return Column(
+      children: [
+        // Header with PDF button and metadata
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            border: Border(bottom: BorderSide(color: theme.dividerColor)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (bill.currentBillTextVersion != null)
+                          Text(
+                            'Version: ${bill.currentBillTextVersion}',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        if (bill.currentBillTextWordCount != null)
+                          Text(
+                            '${bill.currentBillTextWordCount} words',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        if (bill.currentBillTextExtractedAt != null)
+                          Text(
+                            'Extracted: ${BillHelpers.formatDate(bill.currentBillTextExtractedAt)}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (bill.hasPdf)
+                    FilledButton.icon(
+                      onPressed: () => _openPdf(bill),
+                      icon: const Icon(Icons.picture_as_pdf),
+                      label: const Text('View PDF'),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // Bill text content
+        Expanded(
+          child: bill.hasText
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: SelectableText(
+                    bill.currentBillText!,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                )
+              : Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.article_outlined,
+                        size: 64,
+                        color: theme.colorScheme.outline.withOpacity(0.5),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Text not extracted',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      if (bill.hasPdf) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'PDF is available',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: () => _openPdf(bill),
+                          icon: const Icon(Icons.picture_as_pdf),
+                          label: const Text('View PDF'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  void _openPdf(TrackedBill bill) {
+    final pdfUrl = bill.pdfUrl;
+    if (pdfUrl != null) {
+      launchUrl(Uri.parse(pdfUrl));
+    }
   }
 
   Widget _buildEmptyState(ThemeData theme, String message, IconData icon) {
