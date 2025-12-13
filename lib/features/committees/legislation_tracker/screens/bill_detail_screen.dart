@@ -177,7 +177,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
               if (provider.categories.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 CategoryChips(
-                  categories: provider.categories,
+                  availableCategories: provider.categories,
                   selectedCategories: bill.categories,
                   onChanged: (categories) => _updateCategories(provider, bill, categories),
                 ),
@@ -277,7 +277,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
                         ),
                         const SizedBox(height: 8),
                         CategoryChips(
-                          categories: provider.categories,
+                          availableCategories: provider.categories,
                           selectedCategories: bill.categories,
                           onChanged: (categories) => _updateCategories(provider, bill, categories),
                         ),
@@ -520,40 +520,9 @@ class _BillDetailScreenState extends State<BillDetailScreen>
       return _buildEmptyState(theme, 'No votes recorded', Icons.how_to_vote);
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: votes.length,
-      itemBuilder: (context, index) {
-        final vote = votes[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  vote.motion ?? 'Vote',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (vote.voteDate != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    BillHelpers.formatDate(vote.voteDate),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                VoteBreakdownChart(vote: vote),
-              ],
-            ),
-          ),
-        );
-      },
+    return VoteBreakdownChart(
+      votes: votes,
+      onMarkSeen: () => provider.markVotesAsSeen(bill.id),
     );
   }
 

@@ -175,6 +175,12 @@ class BillSearchProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Set tracked bill IDs (batch operation for initialization)
+  void setTrackedBillIds(Set<String> ids) {
+    _trackedBillIds = ids;
+    notifyListeners();
+  }
+
   // Refresh tracked IDs after tracking a bill
   void addTrackedBillId(String openstatesId) {
     _trackedBillIds.add(openstatesId);

@@ -228,7 +228,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
         }
 
         final bill = provider.searchResults[index];
-        final isTracked = provider.isBillTracked(bill.openstatesId);
+        final isTracked = provider.isBillTracked(bill.openstatesBillId);
 
         return _buildSearchResultCard(context, theme, bill, isTracked);
       },
@@ -256,7 +256,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
                 children: [
                   // Bill identifier
                   Text(
-                    bill.identifier,
+                    bill.billIdentifier,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
@@ -351,7 +351,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      BillHelpers.formatDate(bill.latestActionDate!),
+                      BillHelpers.formatDate(DateTime.tryParse(bill.latestActionDate!)),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -487,7 +487,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
             FilledButton.icon(
               onPressed: () {
                 if (_searchController.text.isNotEmpty) {
-                  provider.search(_searchController.text);
+                  provider.quickSearch(_searchController.text);
                 }
               },
               icon: const Icon(Icons.refresh),
@@ -512,7 +512,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
           bill: bill,
           scrollController: scrollController,
           committeeId: widget.committeeId,
-          isTracked: context.read<BillSearchProvider>().isBillTracked(bill.openstatesId),
+          isTracked: context.read<BillSearchProvider>().isBillTracked(bill.openstatesBillId),
           onTrack: () => _trackBill(context, bill),
         ),
       ),
@@ -529,12 +529,12 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
         position: 'watching',
       );
 
-      searchProvider.addTrackedBillId(bill.openstatesId);
+      searchProvider.addTrackedBillId(bill.openstatesBillId);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Now tracking ${bill.identifier}'),
+            content: Text('Now tracking ${bill.billIdentifier}'),
             action: SnackBarAction(
               label: 'View',
               onPressed: () {
@@ -604,7 +604,7 @@ class _BillDetailSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      bill.identifier,
+                      bill.billIdentifier,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -704,7 +704,7 @@ class _BillDetailSheet extends StatelessWidget {
                             children: [
                               if (bill.latestActionDate != null)
                                 Text(
-                                  BillHelpers.formatDate(bill.latestActionDate!),
+                                  BillHelpers.formatDate(DateTime.tryParse(bill.latestActionDate!)),
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
                                   ),
@@ -721,25 +721,17 @@ class _BillDetailSheet extends StatelessWidget {
                 const SizedBox(height: 24),
               ],
 
-              // Subjects
-              if (bill.subjects != null && bill.subjects!.isNotEmpty) ...[
+              // Primary sponsor
+              if (bill.primarySponsor != null) ...[
                 Text(
-                  'Subjects',
+                  'Primary Sponsor',
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.primary,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: bill.subjects!.map((subject) => Chip(
-                        label: Text(subject, style: const TextStyle(fontSize: 12)),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                      )).toList(),
-                ),
+                const SizedBox(height: 4),
+                Text(bill.primarySponsor!, style: theme.textTheme.bodyMedium),
               ],
             ],
           ),
