@@ -231,7 +231,7 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Missouri $currentSession Legislative Session',
+                  'Missouri ${LegislationConstants.currentSession} Legislative Session',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onPrimaryContainer,
