@@ -25,9 +25,11 @@ class LegislationService {
     String? position,
     String? priority,
     String? category,
+    String? sponsor,
     bool includeArchived = false,
     String? searchQuery,
-    int limit = 100,
+    bool searchBillText = false,
+    int limit = 1000,
   }) async {
     var query = _supabase
         .from('legislation_tracked_bills')
@@ -48,8 +50,17 @@ class LegislationService {
     if (category != null) {
       query = query.contains('categories', [category]);
     }
+    if (sponsor != null) {
+      query = query.eq('primary_sponsor_name', sponsor);
+    }
     if (searchQuery != null && searchQuery.isNotEmpty) {
-      query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%');
+      if (searchBillText) {
+        // Search in title, bill identifier, and bill text
+        query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%,current_bill_text.ilike.%$searchQuery%');
+      } else {
+        // Search in title and bill identifier only
+        query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%');
+      }
     }
 
     final response = await query
@@ -624,6 +635,7 @@ class LegislationService {
 
   /// Calculate statistics manually if RPC not available
   Future<LegislationStats> _calculateStatisticsManually({String? session}) async {
+    // Use a very high limit to get all bills (Supabase default is 1000)
     var query = _supabase
         .from('legislation_tracked_bills')
         .select()
@@ -633,7 +645,8 @@ class LegislationService {
       query = query.eq('session', session);
     }
 
-    final bills = await query;
+    // Set limit to 10000 to ensure we get all bills
+    final bills = await query.limit(10000);
     final billList = bills as List;
 
     int supportCount = 0;

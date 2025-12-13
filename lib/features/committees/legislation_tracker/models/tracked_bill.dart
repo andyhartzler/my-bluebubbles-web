@@ -96,6 +96,26 @@ class TrackedBill {
   final String? syncError;
   final Map<String, dynamic>? extras;
 
+  // Bill Text Fields
+  final String? currentBillText;
+  final String? currentBillTextVersion;
+  final String? currentBillTextUrl;
+  final String? currentBillTextHash;
+  final DateTime? currentBillTextExtractedAt;
+  final int? currentBillTextWordCount;
+  final String? currentBillPdfPath;
+
+  // Computed properties for bill text
+  bool get hasText => currentBillText != null && currentBillText!.isNotEmpty;
+  bool get hasPdf => currentBillPdfPath != null && currentBillPdfPath!.isNotEmpty;
+  bool get textExtractionFailed => syncError != null && currentBillText == null;
+
+  /// Get the public URL for the bill's PDF
+  String? get pdfUrl {
+    if (currentBillPdfPath == null) return null;
+    return 'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/legislation-pdfs/$currentBillPdfPath';
+  }
+
   TrackedBill({
     required this.id,
     required this.createdAt,
@@ -157,6 +177,13 @@ class TrackedBill {
     this.lastSyncedAt,
     this.syncError,
     this.extras,
+    this.currentBillText,
+    this.currentBillTextVersion,
+    this.currentBillTextUrl,
+    this.currentBillTextHash,
+    this.currentBillTextExtractedAt,
+    this.currentBillTextWordCount,
+    this.currentBillPdfPath,
   });
 
   factory TrackedBill.fromJson(Map<String, dynamic> json) {
@@ -221,6 +248,13 @@ class TrackedBill {
       lastSyncedAt: _parseDate(json['last_synced_at']),
       syncError: json['sync_error'] as String?,
       extras: json['extras'] as Map<String, dynamic>?,
+      currentBillText: json['current_bill_text'] as String?,
+      currentBillTextVersion: json['current_bill_text_version'] as String?,
+      currentBillTextUrl: json['current_bill_text_url'] as String?,
+      currentBillTextHash: json['current_bill_text_hash'] as String?,
+      currentBillTextExtractedAt: _parseDate(json['current_bill_text_extracted_at']),
+      currentBillTextWordCount: json['current_bill_text_word_count'] as int?,
+      currentBillPdfPath: json['current_bill_pdf_path'] as String?,
     );
   }
 
@@ -286,6 +320,13 @@ class TrackedBill {
       'last_synced_at': lastSyncedAt?.toIso8601String(),
       'sync_error': syncError,
       'extras': extras,
+      'current_bill_text': currentBillText,
+      'current_bill_text_version': currentBillTextVersion,
+      'current_bill_text_url': currentBillTextUrl,
+      'current_bill_text_hash': currentBillTextHash,
+      'current_bill_text_extracted_at': currentBillTextExtractedAt?.toIso8601String(),
+      'current_bill_text_word_count': currentBillTextWordCount,
+      'current_bill_pdf_path': currentBillPdfPath,
     };
   }
 
@@ -350,6 +391,13 @@ class TrackedBill {
     DateTime? lastSyncedAt,
     String? syncError,
     Map<String, dynamic>? extras,
+    String? currentBillText,
+    String? currentBillTextVersion,
+    String? currentBillTextUrl,
+    String? currentBillTextHash,
+    DateTime? currentBillTextExtractedAt,
+    int? currentBillTextWordCount,
+    String? currentBillPdfPath,
   }) {
     return TrackedBill(
       id: id ?? this.id,
@@ -412,6 +460,13 @@ class TrackedBill {
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
       syncError: syncError ?? this.syncError,
       extras: extras ?? this.extras,
+      currentBillText: currentBillText ?? this.currentBillText,
+      currentBillTextVersion: currentBillTextVersion ?? this.currentBillTextVersion,
+      currentBillTextUrl: currentBillTextUrl ?? this.currentBillTextUrl,
+      currentBillTextHash: currentBillTextHash ?? this.currentBillTextHash,
+      currentBillTextExtractedAt: currentBillTextExtractedAt ?? this.currentBillTextExtractedAt,
+      currentBillTextWordCount: currentBillTextWordCount ?? this.currentBillTextWordCount,
+      currentBillPdfPath: currentBillPdfPath ?? this.currentBillPdfPath,
     );
   }
 

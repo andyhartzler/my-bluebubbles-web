@@ -8,14 +8,19 @@ class BillFilters extends StatelessWidget {
   final String? positionFilter;
   final String? priorityFilter;
   final String? categoryFilter;
+  final String? sponsorFilter;
   final String searchQuery;
   final bool showArchived;
+  final bool searchBillText;
   final List<LegislationCategory> categories;
+  final List<String> sponsors;
   final ValueChanged<String?> onPositionChanged;
   final ValueChanged<String?> onPriorityChanged;
   final ValueChanged<String?> onCategoryChanged;
+  final ValueChanged<String?> onSponsorChanged;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<bool> onShowArchivedChanged;
+  final ValueChanged<bool> onSearchBillTextChanged;
   final VoidCallback? onClearFilters;
 
   const BillFilters({
@@ -23,14 +28,19 @@ class BillFilters extends StatelessWidget {
     this.positionFilter,
     this.priorityFilter,
     this.categoryFilter,
+    this.sponsorFilter,
     this.searchQuery = '',
     this.showArchived = false,
+    this.searchBillText = false,
     required this.categories,
+    this.sponsors = const [],
     required this.onPositionChanged,
     required this.onPriorityChanged,
     required this.onCategoryChanged,
+    required this.onSponsorChanged,
     required this.onSearchChanged,
     required this.onShowArchivedChanged,
+    required this.onSearchBillTextChanged,
     this.onClearFilters,
   });
 
@@ -38,6 +48,7 @@ class BillFilters extends StatelessWidget {
       positionFilter != null ||
       priorityFilter != null ||
       categoryFilter != null ||
+      sponsorFilter != null ||
       searchQuery.isNotEmpty ||
       showArchived;
 
@@ -58,26 +69,42 @@ class BillFilters extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Search bar
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'Search bills...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () => onSearchChanged(''),
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+          // Search bar with bill text toggle
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: searchBillText ? 'Search bills & text...' : 'Search bills...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () => onSearchChanged(''),
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    isDense: true,
+                  ),
+                  onChanged: onSearchChanged,
+                  controller: TextEditingController(text: searchQuery)
+                    ..selection = TextSelection.collapsed(offset: searchQuery.length),
+                ),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              isDense: true,
-            ),
-            onChanged: onSearchChanged,
-            controller: TextEditingController(text: searchQuery)
-              ..selection = TextSelection.collapsed(offset: searchQuery.length),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Search bill text content',
+                child: FilterChip(
+                  label: const Text('Text'),
+                  selected: searchBillText,
+                  onSelected: onSearchBillTextChanged,
+                  avatar: searchBillText ? const Icon(Icons.article, size: 16) : null,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
 
@@ -169,6 +196,27 @@ class BillFilters extends StatelessWidget {
             ],
             onChanged: onCategoryChanged,
           ),
+        const SizedBox(width: 12),
+
+        // Sponsor filter
+        if (sponsors.isNotEmpty)
+          _buildFilterDropdown(
+            context: context,
+            theme: theme,
+            label: 'Sponsor',
+            value: sponsorFilter,
+            items: [
+              const DropdownMenuItem(value: null, child: Text('All Sponsors')),
+              ...sponsors.map((s) => DropdownMenuItem(
+                    value: s,
+                    child: Text(
+                      s.length > 20 ? '${s.substring(0, 20)}...' : s,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  )),
+            ],
+            onChanged: onSponsorChanged,
+          ),
         const Spacer(),
 
         // Show archived toggle
@@ -225,6 +273,16 @@ class BillFilters extends StatelessWidget {
                   label: categoryFilter ?? 'Category',
                   isActive: categoryFilter != null,
                   onTap: () => _showCategoryFilterDialog(context),
+                ),
+              const SizedBox(width: 8),
+              if (sponsors.isNotEmpty)
+                _buildFilterChip(
+                  context: context,
+                  label: sponsorFilter != null
+                      ? (sponsorFilter!.length > 15 ? '${sponsorFilter!.substring(0, 15)}...' : sponsorFilter!)
+                      : 'Sponsor',
+                  isActive: sponsorFilter != null,
+                  onTap: () => _showSponsorFilterDialog(context),
                 ),
               const SizedBox(width: 8),
               _buildFilterChip(
@@ -429,6 +487,44 @@ class BillFilters extends StatelessWidget {
                     Text(c.displayName),
                     if (categoryFilter == c.name) ...[
                       const Spacer(),
+                      const Icon(Icons.check),
+                    ],
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  void _showSponsorFilterDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Filter by Sponsor'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () {
+              onSponsorChanged(null);
+              Navigator.pop(context);
+            },
+            child: const Text('All Sponsors'),
+          ),
+          ...sponsors.map((s) => SimpleDialogOption(
+                onPressed: () {
+                  onSponsorChanged(s);
+                  Navigator.pop(context);
+                },
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        s,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (sponsorFilter == s) ...[
+                      const SizedBox(width: 8),
                       const Icon(Icons.check),
                     ],
                   ],
