@@ -11,7 +11,7 @@ class LegislationCategory {
   final int sortOrder;
   final bool isActive;
 
-  LegislationCategory({
+  const LegislationCategory({
     required this.id,
     required this.name,
     required this.displayName,

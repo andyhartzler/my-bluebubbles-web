@@ -49,7 +49,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
-      context.read<BillSearchProvider>().loadMore();
+      context.read<BillSearchProvider>().loadNextPage();
     }
   }
 
@@ -87,7 +87,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
               ),
               onSubmitted: (value) {
                 if (value.isNotEmpty) {
-                  context.read<BillSearchProvider>().search(value);
+                  context.read<BillSearchProvider>().quickSearch(value);
                 }
               },
               onChanged: (value) {
@@ -105,7 +105,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
           Expanded(
             child: Consumer<BillSearchProvider>(
               builder: (context, provider, child) {
-                if (provider.isLoading && provider.results.isEmpty) {
+                if (provider.isSearching && provider.searchResults.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
@@ -113,7 +113,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
                   return _buildErrorState(context, theme, provider);
                 }
 
-                if (provider.results.isEmpty && !provider.isLoading) {
+                if (provider.searchResults.isEmpty && !provider.isSearching) {
                   return _buildEmptyState(context, theme, provider);
                 }
 
@@ -146,9 +146,9 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
                   context,
                   theme,
                   label: 'Session',
-                  value: provider.sessionFilter ?? currentSession,
+                  value: provider.session,
                   items: ['2026', '2025', '2024', '2023'],
-                  onChanged: (value) => provider.setSessionFilter(value),
+                  onChanged: (value) => provider.setSession(value ?? '2026'),
                 ),
                 const SizedBox(width: 12),
                 // Chamber filter
@@ -156,10 +156,10 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
                   context,
                   theme,
                   label: 'Chamber',
-                  value: provider.chamberFilter,
+                  value: provider.chamber,
                   items: const ['', 'lower', 'upper'],
                   itemLabels: const ['All', 'House', 'Senate'],
-                  onChanged: (value) => provider.setChamberFilter(value?.isEmpty == true ? null : value),
+                  onChanged: (value) => provider.setChamber(value?.isEmpty == true ? null : value),
                 ),
                 const SizedBox(width: 12),
                 // Classification filter
@@ -167,10 +167,10 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
                   context,
                   theme,
                   label: 'Type',
-                  value: provider.classificationFilter,
+                  value: provider.classification,
                   items: const ['', 'bill', 'resolution', 'joint resolution', 'concurrent resolution'],
                   itemLabels: const ['All', 'Bill', 'Resolution', 'Joint Resolution', 'Concurrent Resolution'],
-                  onChanged: (value) => provider.setClassificationFilter(value?.isEmpty == true ? null : value),
+                  onChanged: (value) => provider.setClassification(value?.isEmpty == true ? null : value),
                 ),
               ],
             ),
@@ -216,9 +216,9 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: provider.results.length + (provider.hasMore ? 1 : 0),
+      itemCount: provider.searchResults.length + (provider.hasMore ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index == provider.results.length) {
+        if (index == provider.searchResults.length) {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(16),
@@ -227,8 +227,8 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
           );
         }
 
-        final bill = provider.results[index];
-        final isTracked = provider.isTracked(bill.openstatesId);
+        final bill = provider.searchResults[index];
+        final isTracked = provider.isBillTracked(bill.openstatesId);
 
         return _buildSearchResultCard(context, theme, bill, isTracked);
       },
@@ -397,7 +397,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
   }
 
   Widget _buildEmptyState(BuildContext context, ThemeData theme, BillSearchProvider provider) {
-    final hasSearched = _searchController.text.isNotEmpty || provider.hasSearched;
+    final hasSearched = _searchController.text.isNotEmpty || provider.query.isNotEmpty;
 
     return Center(
       child: Padding(
@@ -451,7 +451,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
       label: Text(label),
       onPressed: () {
         _searchController.text = label;
-        context.read<BillSearchProvider>().search(label);
+        context.read<BillSearchProvider>().quickSearch(label);
       },
     );
   }
@@ -512,7 +512,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
           bill: bill,
           scrollController: scrollController,
           committeeId: widget.committeeId,
-          isTracked: context.read<BillSearchProvider>().isTracked(bill.openstatesId),
+          isTracked: context.read<BillSearchProvider>().isBillTracked(bill.openstatesId),
           onTrack: () => _trackBill(context, bill),
         ),
       ),
@@ -525,9 +525,8 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
 
     try {
       await legislationProvider.trackBill(
-        widget.committeeId,
-        bill.openstatesId,
-        initialPosition: 'watching',
+        bill: bill,
+        position: 'watching',
       );
 
       searchProvider.addTrackedBillId(bill.openstatesId);
