@@ -54,7 +54,7 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
       ),
       body: Consumer<LegislationProvider>(
         builder: (context, provider, child) {
-          if (provider.isLoading && provider.stats == null) {
+          if (provider.isLoading && provider.trackedBills.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -81,10 +81,8 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
         const SizedBox(height: 16),
 
         // Stats card
-        if (provider.stats != null) ...[
-          LegislationStatsCard(stats: provider.stats!),
-          const SizedBox(height: 16),
-        ],
+        LegislationStatsCard(stats: provider.stats),
+        const SizedBox(height: 16),
 
         // Position breakdown
         _buildPositionBreakdownCard(theme, provider),
@@ -135,11 +133,10 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Stats
-              if (provider.stats != null)
-                Expanded(
-                  flex: 2,
-                  child: LegislationStatsCard(stats: provider.stats!),
-                ),
+              Expanded(
+                flex: 2,
+                child: LegislationStatsCard(stats: provider.stats),
+              ),
               const SizedBox(width: 16),
               // Position breakdown
               Expanded(
