@@ -584,34 +584,46 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
   }
 
   void _navigateToBillDetail(BuildContext context, TrackedBill bill) {
+    final provider = context.read<LegislationProvider>();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BillDetailScreen(
-          billId: bill.id,
-          committeeId: widget.committeeId,
+        builder: (context) => ChangeNotifierProvider.value(
+          value: provider,
+          child: BillDetailScreen(
+            billId: bill.id,
+            committeeId: widget.committeeId,
+          ),
         ),
       ),
     );
   }
 
   void _navigateToSearch(BuildContext context) {
+    final provider = context.read<LegislationProvider>();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BillSearchScreen(
-          committeeId: widget.committeeId,
+        builder: (context) => ChangeNotifierProvider.value(
+          value: provider,
+          child: BillSearchScreen(
+            committeeId: widget.committeeId,
+          ),
         ),
       ),
     );
   }
 
   void _navigateToDashboard(BuildContext context) {
+    final provider = context.read<LegislationProvider>();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => LegislationDashboardScreen(
-          committeeId: widget.committeeId,
+        builder: (context) => ChangeNotifierProvider.value(
+          value: provider,
+          child: LegislationDashboardScreen(
+            committeeId: widget.committeeId,
+          ),
         ),
       ),
     );
