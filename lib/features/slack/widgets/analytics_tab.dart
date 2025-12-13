@@ -3,6 +3,9 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/slack/models/slack_analytics.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
+import 'package:bluebubbles/features/slack/widgets/message_bubble.dart';
+import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/slack_activity.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/app/layouts/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
@@ -448,45 +451,57 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
             const SizedBox(height: 16),
             ...topUsers.map((user) {
               final barWidth = maxCount > 0 ? (user.messageCount / maxCount) : 0.0;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          user.isLinked ? Icons.person : Icons.person_outline,
-                          size: 14,
-                          color: user.isLinked
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            user.name,
-                            style: theme.textTheme.bodyMedium,
-                            overflow: TextOverflow.ellipsis,
+              return InkWell(
+                onTap: () => _handleUserTap(user),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            user.isLinked ? Icons.person : Icons.person_outline,
+                            size: 14,
+                            color: user.isLinked
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
                           ),
-                        ),
-                        Text(
-                          _formatNumber(user.messageCount),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              user.name,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                decoration: TextDecoration.underline,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    LinearProgressIndicator(
-                      value: barWidth,
-                      backgroundColor: theme.colorScheme.surfaceVariant,
-                      color: user.isLinked
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.secondary,
-                    ),
-                  ],
+                          Text(
+                            _formatNumber(user.messageCount),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 16,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        value: barWidth,
+                        backgroundColor: theme.colorScheme.surfaceVariant,
+                        color: user.isLinked
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.secondary,
+                      ),
+                    ],
+                  ),
                 ),
               );
             }),
@@ -494,6 +509,34 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleUserTap(UserActivity user) async {
+    if (user.isLinked && user.memberId != null && user.memberId!.isNotEmpty) {
+      // Navigate to member profile Slack tab
+      final member = await _repository.getMemberById(user.memberId!);
+      if (member != null && mounted) {
+        Navigator.of(context).push(
+          ThemeSwitcher.buildPageRoute(
+            builder: (context) => TitleBarWrapper(
+              child: MemberDetailScreen(member: member),
+            ),
+          ),
+        );
+      }
+    } else {
+      // Show messages dialog for unmatched user
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (context) => _SlackUserMessagesDialog(
+          slackUserId: user.slackUserId,
+          userName: user.name,
+          repository: _repository,
+          onLinked: _loadAnalytics,
+        ),
+      );
+    }
   }
 
   Widget _buildDayOfWeekCard() {
@@ -1008,6 +1051,365 @@ class _SummaryCard extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dialog to show messages from a specific Slack user and allow linking
+class _SlackUserMessagesDialog extends StatefulWidget {
+  const _SlackUserMessagesDialog({
+    required this.slackUserId,
+    required this.userName,
+    required this.repository,
+    this.onLinked,
+  });
+
+  final String slackUserId;
+  final String userName;
+  final SlackManagementRepository repository;
+  final VoidCallback? onLinked;
+
+  @override
+  State<_SlackUserMessagesDialog> createState() => _SlackUserMessagesDialogState();
+}
+
+class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
+  List<Map<String, dynamic>> _messages = [];
+  Map<String, Map<String, String>> _userMappings = {};
+  Map<String, Member> _memberCache = {};
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
+  static const int _pageSize = 20;
+  SlackUnmatchedUser? _unmatchedUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMessages();
+  }
+
+  Future<void> _loadMessages() async {
+    setState(() => _loading = true);
+
+    try {
+      final results = await Future.wait([
+        widget.repository.getMessagesBySlackUserId(widget.slackUserId, limit: _pageSize),
+        widget.repository.getSlackUserMappings(),
+        widget.repository.getUnmatchedUserBySlackId(widget.slackUserId),
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages = results[0] as List<Map<String, dynamic>>;
+        _userMappings = results[1] as Map<String, Map<String, String>>;
+        _unmatchedUser = results[2] as SlackUnmatchedUser?;
+        _offset = _messages.length;
+        _hasMore = _messages.length >= _pageSize;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+
+    setState(() => _loadingMore = true);
+
+    try {
+      final newMessages = await widget.repository.getMessagesBySlackUserId(
+        widget.slackUserId,
+        limit: _pageSize,
+        offset: _offset,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages.addAll(newMessages);
+        _offset = _messages.length;
+        _hasMore = newMessages.length >= _pageSize;
+        _loadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
+    }
+  }
+
+  Future<void> _showMatchDialog() async {
+    if (_unmatchedUser == null) return;
+
+    final result = await showDialog<Member>(
+      context: context,
+      builder: (context) => _MemberSearchDialog(repository: widget.repository),
+    );
+
+    if (result != null && mounted) {
+      final success = await widget.repository.matchUserToMember(
+        slackUserId: widget.slackUserId,
+        memberId: result.id,
+        slackEmail: _unmatchedUser!.email,
+        slackDisplayName: _unmatchedUser!.displayName,
+        slackRealName: _unmatchedUser!.realName,
+      );
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Matched ${widget.userName} to ${result.name}')),
+        );
+        widget.onLinked?.call();
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 700,
+          maxHeight: screenSize.height * 0.85,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.orange.withOpacity(0.2),
+                    child: Text(
+                      widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : '?',
+                      style: TextStyle(
+                        color: Colors.orange[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.userName,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'Unmatched Slack User',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.orange[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_unmatchedUser != null)
+                    ElevatedButton.icon(
+                      onPressed: _showMatchDialog,
+                      icon: const Icon(Icons.link, size: 18),
+                      label: const Text('Link to Member'),
+                    ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            // Messages
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _messages.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No messages found',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _messages.length + (_hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == _messages.length) {
+                              return Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Center(
+                                  child: _loadingMore
+                                      ? const CircularProgressIndicator()
+                                      : OutlinedButton(
+                                          onPressed: _loadMore,
+                                          child: const Text('Load More'),
+                                        ),
+                                ),
+                              );
+                            }
+
+                            return SlackMessageBubble(
+                              message: _messages[index],
+                              userMappings: _userMappings,
+                              memberCache: _memberCache,
+                              primaryColor: Colors.blue,
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dialog for searching and selecting a member to match
+class _MemberSearchDialog extends StatefulWidget {
+  const _MemberSearchDialog({required this.repository});
+
+  final SlackManagementRepository repository;
+
+  @override
+  State<_MemberSearchDialog> createState() => _MemberSearchDialogState();
+}
+
+class _MemberSearchDialogState extends State<_MemberSearchDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Member> _results = [];
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search(String query) async {
+    if (query.length < 2) {
+      setState(() => _results = []);
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final results = await widget.repository.searchMembers(query, limit: 20);
+      if (!mounted) return;
+      setState(() {
+        _results = results;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Link to Member',
+                style: theme.textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by name or email...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onChanged: _search,
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _results.isEmpty
+                        ? Center(
+                            child: Text(
+                              _searchController.text.length < 2
+                                  ? 'Type to search members...'
+                                  : 'No members found',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: _results.length,
+                            itemBuilder: (context, index) {
+                              final member = _results[index];
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundImage: member.primaryProfilePhotoUrl != null
+                                      ? NetworkImage(member.primaryProfilePhotoUrl!)
+                                      : null,
+                                  child: member.primaryProfilePhotoUrl == null
+                                      ? Text(member.name.isNotEmpty
+                                          ? member.name[0].toUpperCase()
+                                          : '?')
+                                      : null,
+                                ),
+                                title: Text(member.name),
+                                subtitle: Text(
+                                  member.email ?? 'No email',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                onTap: () => Navigator.pop(context, member),
+                              );
+                            },
+                          ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

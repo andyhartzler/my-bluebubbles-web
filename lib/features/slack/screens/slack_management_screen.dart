@@ -6,9 +6,15 @@ import 'package:bluebubbles/features/slack/widgets/analytics_tab.dart';
 
 /// Main screen for Slack management with tabbed interface
 class SlackManagementScreen extends StatefulWidget {
-  const SlackManagementScreen({super.key, this.embed = false});
+  const SlackManagementScreen({
+    super.key,
+    this.embed = false,
+    this.initialChannelId,
+  });
 
   final bool embed;
+  /// Optional channel ID to pre-select when opening the Channels tab
+  final String? initialChannelId;
 
   @override
   State<SlackManagementScreen> createState() => _SlackManagementScreenState();
@@ -65,7 +71,7 @@ class _SlackManagementScreenState extends State<SlackManagementScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              const ChannelsTab(),
+              ChannelsTab(initialChannelId: widget.initialChannelId),
               const UnmatchedUsersTab(),
               AnalyticsTab(
                 onSwitchToUnmatchedTab: () => _tabController.animateTo(1),

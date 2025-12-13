@@ -85,6 +85,7 @@ class SlackMessage {
     this.postedAt,
     this.channelInfo,
     this.slackUserId,
+    this.slackChannelId,
     this.threadTs,
     this.hasFiles = false,
     List<SlackReaction> reactions = const [],
@@ -108,6 +109,7 @@ class SlackMessage {
           ? SlackChannelInfo.fromJson(channelInfo)
           : const SlackChannelInfo(),
       slackUserId: json['slack_user_id'] as String?,
+      slackChannelId: json['slack_channel_id'] as String?,
       threadTs: json['thread_ts'] as String?,
       hasFiles: json['has_files'] == true,
       reactions: reactions,
@@ -120,6 +122,7 @@ class SlackMessage {
   final DateTime? postedAt;
   final SlackChannelInfo? channelInfo;
   final String? slackUserId;
+  final String? slackChannelId;
   final String? threadTs;
   final bool hasFiles;
   final List<SlackReaction> reactions;
