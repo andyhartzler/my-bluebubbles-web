@@ -47,8 +47,7 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
   late DateTime _endDate;
   late TimeOfDay _endTime;
   bool _allDay = false;
-  EventType _eventType = EventType.general;
-  EventVisibility _visibility = EventVisibility.organization;
+  String _eventType = 'event'; // 'event', 'committee', 'social', 'deadline'
   bool _syncToGoogle = true;
 
   bool _isLoading = false;
@@ -56,8 +55,16 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
 
   bool get _isEditing => widget.existingEvent != null;
 
-  String get _currentUserId =>
-      Supabase.instance.client.auth.currentUser?.id ?? 'anonymous';
+  String? get _currentUserId =>
+      Supabase.instance.client.auth.currentUser?.id;
+
+  // Event type options
+  static const _eventTypes = [
+    ('event', 'General Event'),
+    ('committee', 'Committee Meeting'),
+    ('social', 'Social Event'),
+    ('deadline', 'Deadline'),
+  ];
 
   @override
   void initState() {
@@ -73,8 +80,7 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
       _endDate = event.endTime.toLocal();
       _endTime = TimeOfDay.fromDateTime(event.endTime.toLocal());
       _allDay = event.allDay;
-      _eventType = event.eventType;
-      _visibility = event.visibility;
+      _eventType = event.eventType ?? 'event';
       _syncToGoogle = event.googleEventId != null;
     } else {
       // Default to now rounded to next hour
@@ -87,7 +93,7 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
 
       // Set event type to committee if we have a committee name
       if (widget.committeeName != null) {
-        _eventType = EventType.committee;
+        _eventType = 'committee';
       }
     }
   }
@@ -107,13 +113,16 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isSmallScreen = MediaQuery.of(context).size.width < 500;
 
     return Dialog(
+      backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
       insetPadding: EdgeInsets.symmetric(
         horizontal: isSmallScreen ? 16 : 40,
         vertical: 24,
       ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
         child: Column(
@@ -124,22 +133,23 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                color: const Color(0xFF3B82F6).withOpacity(0.1),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               ),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.event,
-                    color: theme.colorScheme.onPrimaryContainer,
+                    color: Color(0xFF3B82F6),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       _isEditing ? 'Edit Event' : 'Create Event',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: theme.colorScheme.onPrimaryContainer,
+                      style: TextStyle(
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                       ),
                     ),
                   ),
@@ -147,7 +157,7 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
                     onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
                     icon: Icon(
                       Icons.close,
-                      color: theme.colorScheme.onPrimaryContainer,
+                      color: isDark ? const Color(0xFF98989F) : const Color(0xFF6B7280),
                     ),
                   ),
                 ],
@@ -166,11 +176,13 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
                       // Title field
                       TextFormField(
                         controller: _titleController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Event Title *',
                           hintText: 'e.g., Monthly Meeting',
-                          prefixIcon: Icon(Icons.title),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.title),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                         textCapitalization: TextCapitalization.words,
                         enabled: !_isLoading,
@@ -185,33 +197,51 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
                       const SizedBox(height: 16),
 
                       // All day switch
-                      SwitchListTile(
-                        title: const Text('All Day Event'),
-                        value: _allDay,
-                        onChanged: _isLoading
-                            ? null
-                            : (value) {
-                                setState(() => _allDay = value);
-                              },
-                        contentPadding: EdgeInsets.zero,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF2C2C2E)
+                              : const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: SwitchListTile(
+                          title: Text(
+                            'All Day Event',
+                            style: TextStyle(
+                              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                            ),
+                          ),
+                          value: _allDay,
+                          onChanged: _isLoading
+                              ? null
+                              : (value) {
+                                  setState(() => _allDay = value);
+                                },
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
 
                       // Start date/time
                       Text(
                         'Start',
-                        style: theme.textTheme.labelMedium?.copyWith(
+                        style: TextStyle(
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? const Color(0xFF98989F)
+                              : const Color(0xFF6B7280),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: _buildDatePicker(context, true)),
+                          Expanded(child: _buildDatePicker(context, isDark, true)),
                           if (!_allDay) ...[
                             const SizedBox(width: 12),
-                            Expanded(child: _buildTimePicker(context, true)),
+                            Expanded(child: _buildTimePicker(context, isDark, true)),
                           ],
                         ],
                       ),
@@ -221,17 +251,21 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
                       // End date/time
                       Text(
                         'End',
-                        style: theme.textTheme.labelMedium?.copyWith(
+                        style: TextStyle(
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? const Color(0xFF98989F)
+                              : const Color(0xFF6B7280),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: _buildDatePicker(context, false)),
+                          Expanded(child: _buildDatePicker(context, isDark, false)),
                           if (!_allDay) ...[
                             const SizedBox(width: 12),
-                            Expanded(child: _buildTimePicker(context, false)),
+                            Expanded(child: _buildTimePicker(context, isDark, false)),
                           ],
                         ],
                       ),
@@ -241,11 +275,13 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
                       // Location field
                       TextFormField(
                         controller: _locationController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Location (optional)',
                           hintText: 'e.g., Room 101 or Zoom',
-                          prefixIcon: Icon(Icons.location_on),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.location_on),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                         enabled: !_isLoading,
                       ),
@@ -255,11 +291,13 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
                       // Description field
                       TextFormField(
                         controller: _descriptionController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Description (optional)',
                           hintText: 'Event details or agenda',
-                          prefixIcon: Icon(Icons.description),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.description),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           alignLabelWithHint: true,
                         ),
                         maxLines: 3,
@@ -270,17 +308,19 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
                       const SizedBox(height: 16),
 
                       // Event type dropdown
-                      DropdownButtonFormField<EventType>(
+                      DropdownButtonFormField<String>(
                         value: _eventType,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Event Type',
-                          prefixIcon: Icon(Icons.category),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.category),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                        items: EventType.values.map((type) {
-                          return DropdownMenuItem<EventType>(
-                            value: type,
-                            child: Text(_eventTypeLabel(type)),
+                        items: _eventTypes.map((type) {
+                          return DropdownMenuItem<String>(
+                            value: type.$1,
+                            child: Text(type.$2),
                           );
                         }).toList(),
                         onChanged: _isLoading
@@ -294,43 +334,40 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
 
                       const SizedBox(height: 16),
 
-                      // Visibility dropdown
-                      DropdownButtonFormField<EventVisibility>(
-                        value: _visibility,
-                        decoration: const InputDecoration(
-                          labelText: 'Visibility',
-                          prefixIcon: Icon(Icons.visibility),
-                          border: OutlineInputBorder(),
-                        ),
-                        items: EventVisibility.values.map((vis) {
-                          return DropdownMenuItem<EventVisibility>(
-                            value: vis,
-                            child: Text(_visibilityLabel(vis)),
-                          );
-                        }).toList(),
-                        onChanged: _isLoading
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  setState(() => _visibility = value);
-                                }
-                              },
-                      ),
-
-                      const SizedBox(height: 16),
-
                       // Sync to Google Calendar
                       if (!_isEditing)
-                        SwitchListTile(
-                          title: const Text('Sync to Google Calendar'),
-                          subtitle: const Text('Add this event to the shared calendar'),
-                          value: _syncToGoogle,
-                          onChanged: _isLoading
-                              ? null
-                              : (value) {
-                                  setState(() => _syncToGoogle = value);
-                                },
-                          contentPadding: EdgeInsets.zero,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF2C2C2E)
+                                : const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: SwitchListTile(
+                            title: Text(
+                              'Sync to Google Calendar',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Add to shared organization calendar',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? const Color(0xFF98989F)
+                                    : const Color(0xFF6B7280),
+                              ),
+                            ),
+                            value: _syncToGoogle,
+                            onChanged: _isLoading
+                                ? null
+                                : (value) {
+                                    setState(() => _syncToGoogle = value);
+                                  },
+                            contentPadding: EdgeInsets.zero,
+                          ),
                         ),
 
                       // Error message
@@ -339,22 +376,18 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.errorContainer,
-                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.red.withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.error_outline,
-                                color: theme.colorScheme.onErrorContainer,
-                              ),
+                              const Icon(Icons.error_outline, color: Colors.red, size: 20),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   _error!,
-                                  style: TextStyle(
-                                    color: theme.colorScheme.onErrorContainer,
-                                  ),
+                                  style: const TextStyle(color: Colors.red, fontSize: 13),
                                 ),
                               ),
                             ],
@@ -371,31 +404,52 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: theme.dividerColor)),
+                border: Border(
+                  top: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF38383A)
+                        : const Color(0xFFE5E7EB),
+                  ),
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
                     onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: isDark
+                            ? const Color(0xFF98989F)
+                            : const Color(0xFF6B7280),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   FilledButton.icon(
                     onPressed: _isLoading ? null : _submitForm,
                     icon: _isLoading
-                        ? SizedBox(
+                        ? const SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: theme.colorScheme.onPrimary,
+                              color: Colors.white,
                             ),
                           )
                         : Icon(_isEditing ? Icons.save : Icons.add),
                     label: Text(_isLoading
                         ? (_isEditing ? 'Saving...' : 'Creating...')
                         : (_isEditing ? 'Save Changes' : 'Create Event')),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF3B82F6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -406,33 +460,35 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
     );
   }
 
-  Widget _buildDatePicker(BuildContext context, bool isStart) {
+  Widget _buildDatePicker(BuildContext context, bool isDark, bool isStart) {
     final dateFormat = DateFormat('EEE, MMM d');
     final date = isStart ? _startDate : _endDate;
 
     return InkWell(
       onTap: _isLoading ? null : () => _selectDate(context, isStart),
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(10),
       child: InputDecorator(
-        decoration: const InputDecoration(
-          prefixIcon: Icon(Icons.calendar_today),
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.calendar_today, size: 20),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
         ),
         child: Text(dateFormat.format(date)),
       ),
     );
   }
 
-  Widget _buildTimePicker(BuildContext context, bool isStart) {
+  Widget _buildTimePicker(BuildContext context, bool isDark, bool isStart) {
     final time = isStart ? _startTime : _endTime;
 
     return InkWell(
       onTap: _isLoading ? null : () => _selectTime(context, isStart),
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(10),
       child: InputDecorator(
-        decoration: const InputDecoration(
-          prefixIcon: Icon(Icons.access_time),
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.access_time, size: 20),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
         ),
         child: Text(_formatTime(time)),
       ),
@@ -444,34 +500,6 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
     final minute = time.minute.toString().padLeft(2, '0');
     final period = time.period == DayPeriod.am ? 'AM' : 'PM';
     return '$hour:$minute $period';
-  }
-
-  String _eventTypeLabel(EventType type) {
-    switch (type) {
-      case EventType.general:
-        return 'General';
-      case EventType.committee:
-        return 'Committee';
-      case EventType.executive:
-        return 'Executive';
-      case EventType.social:
-        return 'Social';
-      case EventType.deadline:
-        return 'Deadline';
-    }
-  }
-
-  String _visibilityLabel(EventVisibility visibility) {
-    switch (visibility) {
-      case EventVisibility.public:
-        return 'Public';
-      case EventVisibility.organization:
-        return 'Organization';
-      case EventVisibility.committee:
-        return 'Committee Only';
-      case EventVisibility.private:
-        return 'Private';
-    }
   }
 
   Future<void> _selectDate(BuildContext context, bool isStart) async {
@@ -489,7 +517,6 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
       setState(() {
         if (isStart) {
           _startDate = picked;
-          // If end date is before start date, update it
           if (_endDate.isBefore(_startDate)) {
             _endDate = _startDate;
           }
@@ -537,7 +564,8 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
     }
 
     // Validate that end is after start
-    if (endDateTime.isBefore(startDateTime) || endDateTime.isAtSameMomentAs(startDateTime)) {
+    if (endDateTime.isBefore(startDateTime) ||
+        endDateTime.isAtSameMomentAs(startDateTime)) {
       setState(() {
         _error = 'End time must be after start time';
       });
@@ -565,9 +593,8 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
               : _locationController.text.trim(),
           startTime: startDateTime,
           endTime: endDateTime,
-          allDay: _allDay,
+          isAllDay: _allDay,
           eventType: _eventType,
-          visibility: _visibility,
         );
       } else {
         event = await service.createEvent(
@@ -580,10 +607,9 @@ class _EventCreateDialogState extends State<EventCreateDialog> {
               : _locationController.text.trim(),
           startTime: startDateTime,
           endTime: endDateTime,
-          allDay: _allDay,
+          isAllDay: _allDay,
           eventType: _eventType,
           committeeName: widget.committeeName,
-          visibility: _visibility,
           createdBy: _currentUserId,
           syncToGoogleCalendar: _syncToGoogle,
         );
