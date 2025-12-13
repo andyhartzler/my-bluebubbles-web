@@ -3,19 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:bluebubbles/features/canvas_board/models/canvas_node.dart';
 
 /// Available tools in the canvas toolbar
+/// Matches fldraw's EditorTool enum for feature parity
 enum CanvasTool {
-  select,
-  pan,
-  draw,
-  arrow,
-  line,
-  rectangle,
-  circle,
-  text,
-  note,
+  select,    // V - Select/move objects
+  pan,       // H - Pan the canvas
+  draw,      // D - Freehand drawing (pencil)
+  arrow,     // A - Arrow connector
+  line,      // L - Line
+  rectangle, // R - Rectangle shape
+  circle,    // O - Circle/oval shape
+  text,      // T - Text object
+  note,      // N - Sticky note
+  figure,    // F - Figure/group container (dashed border)
+  comment,   // C - Comment annotation
 }
 
 /// Toolbar for the canvas board with drawing and selection tools
+/// Designed to match fldraw's feature set with precision
 class CanvasToolbar extends StatelessWidget {
   final CanvasTool selectedTool;
   final ValueChanged<CanvasTool> onToolSelected;
@@ -26,9 +30,13 @@ class CanvasToolbar extends StatelessWidget {
   final VoidCallback? onUndo;
   final VoidCallback? onRedo;
   final VoidCallback? onDelete;
+  final VoidCallback? onCopy;
+  final VoidCallback? onCut;
+  final VoidCallback? onPaste;
   final bool canUndo;
   final bool canRedo;
   final bool hasSelection;
+  final bool canPaste;
 
   // Default colors for the color picker
   static const defaultColors = [
@@ -53,14 +61,19 @@ class CanvasToolbar extends StatelessWidget {
     this.onUndo,
     this.onRedo,
     this.onDelete,
+    this.onCopy,
+    this.onCut,
+    this.onPaste,
     this.canUndo = false,
     this.canRedo = false,
     this.hasSelection = false,
+    this.canPaste = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -76,34 +89,65 @@ class CanvasToolbar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Tool selection buttons
+          // Selection tools
           _buildToolGroup([
             _ToolItem(CanvasTool.select, Icons.near_me, 'Select (V)'),
             _ToolItem(CanvasTool.pan, Icons.pan_tool, 'Pan (H)'),
-          ]),
-          _buildDivider(),
+          ], isDark),
+          _buildDivider(isDark),
+          // Drawing tools
           _buildToolGroup([
             _ToolItem(CanvasTool.draw, Icons.brush, 'Draw (D)'),
             _ToolItem(CanvasTool.arrow, Icons.north_east, 'Arrow (A)'),
             _ToolItem(CanvasTool.line, Icons.remove, 'Line (L)'),
-          ]),
-          _buildDivider(),
+          ], isDark),
+          _buildDivider(isDark),
+          // Shape tools
           _buildToolGroup([
-            _ToolItem(CanvasTool.rectangle, Icons.crop_square, 'Rectangle (R)'),
-            _ToolItem(CanvasTool.circle, Icons.circle_outlined, 'Circle (O)'),
-          ]),
-          _buildDivider(),
+            _ToolItem(CanvasTool.rectangle, Icons.crop_square, 'Rectangle (R) - Hold Shift for square'),
+            _ToolItem(CanvasTool.circle, Icons.circle_outlined, 'Circle (O) - Hold Shift for perfect circle'),
+          ], isDark),
+          _buildDivider(isDark),
+          // Text and annotation tools
           _buildToolGroup([
             _ToolItem(CanvasTool.text, Icons.text_fields, 'Text (T)'),
-            _ToolItem(CanvasTool.note, Icons.note_add, 'Note (N)'),
-          ]),
-          _buildDivider(),
+            _ToolItem(CanvasTool.note, Icons.note_add, 'Sticky Note (N)'),
+          ], isDark),
+          _buildDivider(isDark),
+          // Figure and comment tools (fldraw parity)
+          _buildToolGroup([
+            _ToolItem(CanvasTool.figure, Icons.dashboard_outlined, 'Figure/Group (F)'),
+            _ToolItem(CanvasTool.comment, Icons.chat_bubble_outline, 'Comment (C)'),
+          ], isDark),
+          _buildDivider(isDark),
           // Color picker
           _buildColorPicker(context),
           const SizedBox(width: 8),
           // Stroke width
           _buildStrokeWidthPicker(context),
           const Spacer(),
+          // Clipboard operations
+          if (hasSelection) ...[
+            _buildActionButton(
+              icon: Icons.content_copy,
+              tooltip: 'Copy (Ctrl+C)',
+              onPressed: onCopy,
+              isDark: isDark,
+            ),
+            _buildActionButton(
+              icon: Icons.content_cut,
+              tooltip: 'Cut (Ctrl+X)',
+              onPressed: onCut,
+              isDark: isDark,
+            ),
+          ],
+          _buildActionButton(
+            icon: Icons.content_paste,
+            tooltip: 'Paste (Ctrl+V)',
+            onPressed: canPaste ? onPaste : null,
+            isDark: isDark,
+          ),
+          _buildDivider(isDark),
           // Undo/Redo
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -112,19 +156,22 @@ class CanvasToolbar extends StatelessWidget {
                 icon: Icons.undo,
                 tooltip: 'Undo (Ctrl+Z)',
                 onPressed: canUndo ? onUndo : null,
+                isDark: isDark,
               ),
               _buildActionButton(
                 icon: Icons.redo,
                 tooltip: 'Redo (Ctrl+Shift+Z)',
                 onPressed: canRedo ? onRedo : null,
+                isDark: isDark,
               ),
               if (hasSelection) ...[
-                _buildDivider(),
+                _buildDivider(isDark),
                 _buildActionButton(
                   icon: Icons.delete_outline,
                   tooltip: 'Delete (Del)',
                   onPressed: onDelete,
                   color: Colors.red,
+                  isDark: isDark,
                 ),
               ],
             ],
@@ -134,7 +181,7 @@ class CanvasToolbar extends StatelessWidget {
     );
   }
 
-  Widget _buildToolGroup(List<_ToolItem> tools) {
+  Widget _buildToolGroup(List<_ToolItem> tools, bool isDark) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: tools.map((tool) {
@@ -158,7 +205,9 @@ class CanvasToolbar extends StatelessWidget {
               child: Icon(
                 tool.icon,
                 size: 20,
-                color: isSelected ? Colors.blue : Colors.grey[700],
+                color: isSelected
+                    ? Colors.blue
+                    : isDark ? Colors.grey[400] : Colors.grey[700],
               ),
             ),
           ),
@@ -167,12 +216,12 @@ class CanvasToolbar extends StatelessWidget {
     );
   }
 
-  Widget _buildDivider() {
+  Widget _buildDivider(bool isDark) {
     return Container(
       height: 24,
       width: 1,
       margin: const EdgeInsets.symmetric(horizontal: 8),
-      color: Colors.grey[300],
+      color: isDark ? Colors.grey[700] : Colors.grey[300],
     );
   }
 
@@ -283,6 +332,7 @@ class CanvasToolbar extends StatelessWidget {
     required String tooltip,
     VoidCallback? onPressed,
     Color? color,
+    bool isDark = false,
   }) {
     return Tooltip(
       message: tooltip,
@@ -295,8 +345,8 @@ class CanvasToolbar extends StatelessWidget {
             icon,
             size: 20,
             color: onPressed != null
-                ? (color ?? Colors.grey[700])
-                : Colors.grey[400],
+                ? (color ?? (isDark ? Colors.grey[400] : Colors.grey[700]))
+                : (isDark ? Colors.grey[700] : Colors.grey[400]),
           ),
         ),
       ),

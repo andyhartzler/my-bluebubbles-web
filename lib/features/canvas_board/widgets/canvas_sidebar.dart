@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Sidebar for the canvas board with entity addition and zoom controls
+/// Streamlined sidebar for the canvas board with icon-only buttons
+/// Matches the thin profile of the top toolbar
 class CanvasSidebar extends StatelessWidget {
   final VoidCallback onAddMember;
   final VoidCallback onAddEvent;
@@ -42,233 +43,175 @@ class CanvasSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      width: 180,
+      width: 52,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border(
-          right: BorderSide(color: Colors.grey[300]!),
+          right: BorderSide(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildSectionHeader('Add Entity'),
-          _buildEntityButton(
+          const SizedBox(height: 8),
+          // Add Entity Section
+          _buildIconButton(
+            context,
             icon: Icons.person_add,
-            label: 'Add Member',
+            tooltip: 'Add Member',
             color: const Color(0xFF2196F3),
             onTap: onAddMember,
           ),
-          _buildEntityButton(
+          _buildIconButton(
+            context,
             icon: Icons.event,
-            label: 'Add Event',
+            tooltip: 'Add Event',
             color: const Color(0xFFFF9800),
             onTap: onAddEvent,
           ),
           if (showChapters)
-            _buildEntityButton(
+            _buildIconButton(
+              context,
               icon: Icons.account_tree,
-              label: 'Add Chapter',
+              tooltip: 'Add Chapter',
               color: const Color(0xFF4CAF50),
               onTap: onAddChapter,
             ),
           if (showDonors)
-            _buildEntityButton(
+            _buildIconButton(
+              context,
               icon: Icons.volunteer_activism,
-              label: 'Add Donor',
+              tooltip: 'Add Donor',
               color: const Color(0xFF9C27B0),
               onTap: onAddDonor,
             ),
-          const Divider(),
-          _buildSectionHeader('Add Content'),
-          _buildEntityButton(
+          _buildDivider(isDark),
+          // Add Content Section
+          _buildIconButton(
+            context,
             icon: Icons.note_add,
-            label: 'Add Note',
+            tooltip: 'Add Note (N)',
             color: const Color(0xFFFFC107),
             onTap: onAddNote,
           ),
-          _buildEntityButton(
+          _buildIconButton(
+            context,
             icon: Icons.add_photo_alternate,
-            label: 'Add Image',
+            tooltip: 'Add Image',
             color: const Color(0xFF00BCD4),
             onTap: onAddImage,
           ),
-          _buildEntityButton(
+          _buildIconButton(
+            context,
             icon: Icons.upload_file,
-            label: 'Add File',
+            tooltip: 'Add File',
             color: const Color(0xFF607D8B),
             onTap: onAddFile,
           ),
           const Spacer(),
-          const Divider(),
-          _buildSectionHeader('View'),
-          _buildZoomControls(context),
-          if (onToggleFullscreen != null) ...[
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: SizedBox(
-                width: double.infinity,
-                child: _buildZoomButton(
-                  icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-                  tooltip: isFullscreen ? 'Exit Fullscreen (F)' : 'Fullscreen (F)',
-                  onTap: onToggleFullscreen!,
-                ),
+          _buildDivider(isDark),
+          // Zoom Controls - Stacked Vertically
+          _buildIconButton(
+            context,
+            icon: Icons.zoom_in,
+            tooltip: 'Zoom In',
+            onTap: onZoomIn,
+          ),
+          // Zoom Level Indicator
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey[800] : Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '${(zoomLevel * 100).toInt()}%',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.grey[300] : Colors.grey[700],
               ),
+            ),
+          ),
+          _buildIconButton(
+            context,
+            icon: Icons.zoom_out,
+            tooltip: 'Zoom Out',
+            onTap: onZoomOut,
+          ),
+          _buildDivider(isDark),
+          _buildIconButton(
+            context,
+            icon: Icons.fit_screen,
+            tooltip: 'Fit View',
+            onTap: onFitView,
+          ),
+          _buildIconButton(
+            context,
+            icon: Icons.center_focus_strong,
+            tooltip: 'Reset View',
+            onTap: onResetView,
+          ),
+          if (onToggleFullscreen != null) ...[
+            _buildDivider(isDark),
+            _buildIconButton(
+              context,
+              icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+              tooltip: isFullscreen ? 'Exit Fullscreen (F)' : 'Fullscreen (F)',
+              onTap: onToggleFullscreen!,
             ),
           ],
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: Colors.grey[600],
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEntityButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(icon, size: 16, color: color),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildZoomControls(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _buildZoomButton(
-                  icon: Icons.zoom_out,
-                  tooltip: 'Zoom Out',
-                  onTap: onZoomOut,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '${(zoomLevel * 100).toInt()}%',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey[800],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildZoomButton(
-                  icon: Icons.zoom_in,
-                  tooltip: 'Zoom In',
-                  onTap: onZoomIn,
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildZoomButton(
-                  icon: Icons.fit_screen,
-                  tooltip: 'Fit View',
-                  onTap: onFitView,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildZoomButton(
-                  icon: Icons.center_focus_strong,
-                  tooltip: 'Reset View',
-                  onTap: onResetView,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildZoomButton({
+  Widget _buildDivider(bool isDark) {
+    return Container(
+      width: 32,
+      height: 1,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      color: isDark ? Colors.grey[700] : Colors.grey[300],
+    );
+  }
+
+  Widget _buildIconButton(
+    BuildContext context, {
     required IconData icon,
     required String tooltip,
     required VoidCallback onTap,
+    Color? color,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final defaultColor = isDark ? Colors.grey[400] : Colors.grey[700];
+
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Icon(icon, size: 20, color: Colors.grey[700]),
+      preferBelow: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: color ?? defaultColor,
+              ),
+            ),
           ),
         ),
       ),
