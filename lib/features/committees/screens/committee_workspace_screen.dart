@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_overview_tab.dart';
@@ -16,6 +17,9 @@ import 'package:bluebubbles/features/committees/screens/tabs/social_media/social
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/canvas_board/screens/committee_canvas_tab.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/features/committees/legislation_tracker/screens/legislation_tracker_screen.dart';
+import 'package:bluebubbles/features/committees/legislation_tracker/providers/legislation_provider.dart';
+import 'package:bluebubbles/features/committees/legislation_tracker/providers/bill_search_provider.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
   final Committee committee;
@@ -152,6 +156,20 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         label: 'Campaigns',
         icon: Icons.campaign_outlined,
         builder: () => const CommitteeCampaignsTab(),
+      ));
+    }
+
+    if (committee.hasLegislationTab) {
+      tabs.add(_TabDefinition(
+        label: 'Legislation',
+        icon: Icons.gavel_outlined,
+        builder: () => MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => LegislationProvider()),
+            ChangeNotifierProvider(create: (_) => BillSearchProvider()),
+          ],
+          child: LegislationTrackerScreen(committeeId: committee.id),
+        ),
       ));
     }
 
