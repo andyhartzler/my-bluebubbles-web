@@ -320,6 +320,12 @@ flutter:
     - assets/images/text-logo-1320x440.png
     - assets/icon/icon.png
     - assets/icon/contact-photo.png
+    - assets/icon/facebook-icon.png
+    - assets/icon/instagram-icon.png
+    - assets/icon/threads-icon.png
+    - assets/icon/youtube-icon.png
+    - assets/icon/reddit-icon.png
+    - assets/icon/tiktok-icon.png
     - assets/changelog/changelog.md
     - assets/icon/icon.ico
     - assets/badges/badge-1.ico

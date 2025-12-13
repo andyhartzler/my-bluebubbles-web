@@ -289,7 +289,7 @@ class CommitteeRepository {
     final stats = <String, dynamic>{};
 
     try {
-      // Fetch latest stats for each social media account
+      // Fetch latest stats for each social media account with platform_metrics
       final accountsResponse = await _readClient
           .from('social_media_accounts')
           .select('id, platform');
@@ -300,11 +300,12 @@ class CommitteeRepository {
 
       for (final account in accounts) {
         final accountId = account['id'] as String;
+        final platform = (account['platform'] as String?)?.toLowerCase() ?? '';
 
-        // Get latest stats for this account
+        // Get latest stats for this account including platform_metrics
         final statsResponse = await _readClient
             .from('social_media_stats')
-            .select('impressions, followers_count')
+            .select('impressions, followers_count, platform_metrics')
             .eq('account_id', accountId)
             .order('collection_date', ascending: false)
             .limit(1);
@@ -312,8 +313,64 @@ class CommitteeRepository {
         final statsList = statsResponse as List<dynamic>;
         if (statsList.isNotEmpty) {
           final stat = statsList.first;
-          totalImpressions += (stat['impressions'] as num?)?.toInt() ?? 0;
-          totalFollowers += (stat['followers_count'] as num?)?.toInt() ?? 0;
+
+          // Parse platform_metrics JSON for more accurate data
+          final platformMetrics = stat['platform_metrics'];
+          Map<String, dynamic>? metrics;
+          if (platformMetrics is Map<String, dynamic>) {
+            metrics = platformMetrics;
+          } else if (platformMetrics is String) {
+            try {
+              metrics = Map<String, dynamic>.from(
+                (platformMetrics as dynamic) is String
+                  ? {}
+                  : platformMetrics as Map
+              );
+            } catch (_) {
+              metrics = null;
+            }
+          }
+
+          // Extract impressions based on platform
+          int impressions = 0;
+          int followers = 0;
+
+          if (metrics != null) {
+            // Get impressions from last_30_days totals
+            final last30Days = metrics['last_30_days'] as Map<String, dynamic>?;
+            final totals = last30Days?['totals'] as Map<String, dynamic>?;
+
+            if (platform == 'facebook') {
+              // Facebook uses media_views for impressions
+              impressions = _toInt(totals?['media_views'] ?? stat['impressions']);
+              followers = _toInt(metrics['account']?['current_followers'] ?? stat['followers_count']);
+            } else if (platform == 'instagram') {
+              // Instagram uses views for impressions
+              impressions = _toInt(totals?['views'] ?? stat['impressions']);
+              followers = _toInt(metrics['account']?['current_followers'] ?? stat['followers_count']);
+            } else if (platform == 'threads') {
+              // Threads uses views for impressions
+              impressions = _toInt(totals?['views'] ?? stat['impressions']);
+              followers = _toInt(metrics['account']?['current_followers'] ?? stat['followers_count']);
+            } else if (platform == 'youtube') {
+              // YouTube uses viewCount from statistics or aggregates
+              final statistics = metrics['statistics'] as Map<String, dynamic>?;
+              final aggregates = metrics['aggregates'] as Map<String, dynamic>?;
+              impressions = _toInt(statistics?['viewCount'] ?? aggregates?['totalViews'] ?? stat['impressions']);
+              followers = _toInt(statistics?['subscriberCount'] ?? stat['followers_count']);
+            } else {
+              // Fallback for other platforms
+              impressions = _toInt(stat['impressions']);
+              followers = _toInt(stat['followers_count']);
+            }
+          } else {
+            // Fallback to direct column values
+            impressions = _toInt(stat['impressions']);
+            followers = _toInt(stat['followers_count']);
+          }
+
+          totalImpressions += impressions;
+          totalFollowers += followers;
         }
       }
 
@@ -326,6 +383,14 @@ class CommitteeRepository {
     }
 
     return stats;
+  }
+
+  int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 
   Future<Map<String, dynamic>> _getPoliticalAffairsStats() async {
