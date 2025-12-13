@@ -39,6 +39,7 @@ import 'package:bluebubbles/features/committees/screens/committees_dashboard_scr
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/listmonk_webview_screen.dart';
 import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
+import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:provider/provider.dart';
@@ -508,6 +509,7 @@ enum _HomeSection {
   events,
   memberPortal,
   walletNotifications,
+  slackManagement,
   campaigns,
   forms,
   conversations
@@ -799,6 +801,10 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                         key: PageStorageKey('wallet-notification-view'),
                         embedded: true,
                       ),
+                      const SlackManagementScreen(
+                        key: PageStorageKey('slack-management-view'),
+                        embed: true,
+                      ),
                       const ListmonkWebViewScreen(
                         key: PageStorageKey('campaigns-view'),
                       ),
@@ -870,6 +876,16 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             child: ListTile(
               leading: const Icon(Icons.notifications_active_outlined),
               title: const Text('Wallet Notifications'),
+              subtitle: crmReady ? null : const Text('Available when CRM is connected', style: TextStyle(fontSize: 11)),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          PopupMenuItem<VoidCallback>(
+            value: crmReady ? () => _setSection(_HomeSection.slackManagement) : null,
+            enabled: crmReady,
+            child: ListTile(
+              leading: const Icon(Icons.tag),
+              title: const Text('Slack'),
               subtitle: crmReady ? null : const Text('Available when CRM is connected', style: TextStyle(fontSize: 11)),
               contentPadding: EdgeInsets.zero,
             ),
@@ -1217,6 +1233,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   ),
                   buildItem(
                     order: 10,
+                    icon: Icons.tag,
+                    label: 'Slack',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady ? () => _setSection(_HomeSection.slackManagement) : null,
+                  ),
+                  buildItem(
+                    order: 11,
                     icon: Icons.campaign_outlined,
                     label: 'Campaigns',
                     enabled: crmReady,
@@ -1224,7 +1248,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.campaigns) : null,
                   ),
                   buildItem(
-                    order: 11,
+                    order: 12,
                     icon: Icons.dynamic_form_outlined,
                     label: 'Forms',
                     enabled: crmReady,
@@ -1232,14 +1256,14 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _setSection(_HomeSection.forms) : null,
                   ),
                   buildItem(
-                    order: 12,
+                    order: 13,
                     icon: Icons.chat_bubble_outline,
                     label: 'Conversations',
                     onActivate: () => _setSection(_HomeSection.conversations),
                   ),
                   const Divider(),
                   buildItem(
-                    order: 13,
+                    order: 14,
                     icon: Icons.search,
                     label: 'Search CRM',
                     enabled: crmReady,
@@ -1247,19 +1271,19 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     onActivate: crmReady ? () => _openGlobalSearch(parentContext) : null,
                   ),
                   buildItem(
-                    order: 14,
+                    order: 15,
                     icon: Icons.add_comment,
                     label: 'New Message',
                     onActivate: () => _openNewMessage(parentContext),
                   ),
                   buildItem(
-                    order: 15,
+                    order: 16,
                     icon: Icons.email_outlined,
                     label: 'New Email',
                     onActivate: () => _openNewEmail(parentContext),
                   ),
                   buildItem(
-                    order: 16,
+                    order: 17,
                     icon: Icons.settings_outlined,
                     label: 'Settings',
                     onActivate: () => Actions.invoke(parentContext, const OpenSettingsIntent()),
