@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/meetings/widgets/upcoming_meetings_widget.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 
 class CommitteeOverviewTab extends StatefulWidget {
@@ -106,6 +107,11 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
         padding: const EdgeInsets.all(24),
         children: [
           _buildStatsSection(context),
+          const SizedBox(height: 24),
+          UpcomingMeetingsWidget(
+            committee: committee,
+            accentColor: committee.primaryColor,
+          ),
           const SizedBox(height: 24),
           if (_isSchoolCommittee && _schoolDistribution.isNotEmpty) ...[
             _buildSchoolVisualizationSection(context),
