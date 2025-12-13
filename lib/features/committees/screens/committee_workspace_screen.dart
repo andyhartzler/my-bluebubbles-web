@@ -12,6 +12,7 @@ import 'package:bluebubbles/features/committees/screens/tabs/committee_chapters_
 import 'package:bluebubbles/features/committees/screens/tabs/committee_campaigns_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_meetings_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_votes_tab.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/social_media/social_media_analytics_tab.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/canvas_board/screens/committee_canvas_tab.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
@@ -151,6 +152,15 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         label: 'Campaigns',
         icon: Icons.campaign_outlined,
         builder: () => const CommitteeCampaignsTab(),
+      ));
+    }
+
+    // Add Social Media Analytics tab for Communications committee
+    if (committee.id == 'Communications') {
+      tabs.add(_TabDefinition(
+        label: 'Social Media',
+        icon: Icons.analytics_outlined,
+        builder: () => SocialMediaAnalyticsTab(committee: committee),
       ));
     }
 
