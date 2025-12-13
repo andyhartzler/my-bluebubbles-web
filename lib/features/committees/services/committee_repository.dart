@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 
@@ -289,89 +291,82 @@ class CommitteeRepository {
     final stats = <String, dynamic>{};
 
     try {
-      // Fetch latest stats for each social media account with platform_metrics
-      final accountsResponse = await _readClient
-          .from('social_media_accounts')
-          .select('id, platform');
+      // Get latest stats for all accounts in one query using distinct on account_id
+      // This gets the most recent stat row per account
+      final statsResponse = await _readClient
+          .from('social_media_stats')
+          .select('account_id, platform, impressions, followers_count, platform_metrics')
+          .order('collection_date', ascending: false);
 
-      final accounts = accountsResponse as List<dynamic>;
+      final allStats = statsResponse as List<dynamic>;
+
+      // Deduplicate to get only the latest stat per account_id
+      final latestByAccount = <String, Map<String, dynamic>>{};
+      for (final stat in allStats) {
+        final accountId = stat['account_id'] as String?;
+        if (accountId != null && !latestByAccount.containsKey(accountId)) {
+          latestByAccount[accountId] = stat as Map<String, dynamic>;
+        }
+      }
+
       int totalImpressions = 0;
       int totalFollowers = 0;
 
-      for (final account in accounts) {
-        final accountId = account['id'] as String;
-        final platform = (account['platform'] as String?)?.toLowerCase() ?? '';
+      for (final stat in latestByAccount.values) {
+        final platform = (stat['platform'] as String?)?.toLowerCase() ?? '';
 
-        // Get latest stats for this account including platform_metrics
-        final statsResponse = await _readClient
-            .from('social_media_stats')
-            .select('impressions, followers_count, platform_metrics')
-            .eq('account_id', accountId)
-            .order('collection_date', ascending: false)
-            .limit(1);
+        // First try direct column values (these should have the correct data)
+        int impressions = _toInt(stat['impressions']);
+        int followers = _toInt(stat['followers_count']);
 
-        final statsList = statsResponse as List<dynamic>;
-        if (statsList.isNotEmpty) {
-          final stat = statsList.first;
-
-          // Parse platform_metrics JSON for more accurate data
+        // If direct values are 0, try to get from platform_metrics
+        if (impressions == 0 || followers == 0) {
           final platformMetrics = stat['platform_metrics'];
           Map<String, dynamic>? metrics;
+
           if (platformMetrics is Map<String, dynamic>) {
             metrics = platformMetrics;
-          } else if (platformMetrics is String) {
+          } else if (platformMetrics is Map) {
+            metrics = Map<String, dynamic>.from(platformMetrics);
+          } else if (platformMetrics is String && platformMetrics.isNotEmpty) {
             try {
-              metrics = Map<String, dynamic>.from(
-                (platformMetrics as dynamic) is String
-                  ? {}
-                  : platformMetrics as Map
-              );
-            } catch (_) {
-              metrics = null;
-            }
+              final decoded = jsonDecode(platformMetrics);
+              if (decoded is Map) {
+                metrics = Map<String, dynamic>.from(decoded);
+              }
+            } catch (_) {}
           }
 
-          // Extract impressions based on platform
-          int impressions = 0;
-          int followers = 0;
-
           if (metrics != null) {
-            // Get impressions from last_30_days totals
             final last30Days = metrics['last_30_days'] as Map<String, dynamic>?;
             final totals = last30Days?['totals'] as Map<String, dynamic>?;
 
-            if (platform == 'facebook') {
-              // Facebook uses media_views for impressions
-              impressions = _toInt(totals?['media_views'] ?? stat['impressions']);
-              followers = _toInt(metrics['account']?['current_followers'] ?? stat['followers_count']);
-            } else if (platform == 'instagram') {
-              // Instagram uses views for impressions
-              impressions = _toInt(totals?['views'] ?? stat['impressions']);
-              followers = _toInt(metrics['account']?['current_followers'] ?? stat['followers_count']);
-            } else if (platform == 'threads') {
-              // Threads uses views for impressions
-              impressions = _toInt(totals?['views'] ?? stat['impressions']);
-              followers = _toInt(metrics['account']?['current_followers'] ?? stat['followers_count']);
-            } else if (platform == 'youtube') {
-              // YouTube uses viewCount from statistics or aggregates
-              final statistics = metrics['statistics'] as Map<String, dynamic>?;
-              final aggregates = metrics['aggregates'] as Map<String, dynamic>?;
-              impressions = _toInt(statistics?['viewCount'] ?? aggregates?['totalViews'] ?? stat['impressions']);
-              followers = _toInt(statistics?['subscriberCount'] ?? stat['followers_count']);
-            } else {
-              // Fallback for other platforms
-              impressions = _toInt(stat['impressions']);
-              followers = _toInt(stat['followers_count']);
+            if (impressions == 0) {
+              if (platform == 'facebook') {
+                impressions = _toInt(totals?['media_views']);
+              } else if (platform == 'instagram' || platform == 'threads') {
+                impressions = _toInt(totals?['views']);
+              } else if (platform == 'youtube') {
+                final statistics = metrics['statistics'] as Map<String, dynamic>?;
+                final aggregates = metrics['aggregates'] as Map<String, dynamic>?;
+                impressions = _toInt(statistics?['viewCount'] ?? aggregates?['totalViews']);
+              }
             }
-          } else {
-            // Fallback to direct column values
-            impressions = _toInt(stat['impressions']);
-            followers = _toInt(stat['followers_count']);
-          }
 
-          totalImpressions += impressions;
-          totalFollowers += followers;
+            if (followers == 0) {
+              if (platform == 'youtube') {
+                final statistics = metrics['statistics'] as Map<String, dynamic>?;
+                followers = _toInt(statistics?['subscriberCount']);
+              } else {
+                final account = metrics['account'] as Map<String, dynamic>?;
+                followers = _toInt(account?['current_followers']);
+              }
+            }
+          }
         }
+
+        totalImpressions += impressions;
+        totalFollowers += followers;
       }
 
       stats['totalImpressions'] = totalImpressions;
