@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/legislation_provider.dart';
 import '../models/tracked_bill.dart';
-import '../models/bill_action.dart';
 import '../widgets/legislation_stats_card.dart';
 import '../widgets/bill_card.dart';
 import '../utils/bill_helpers.dart';
@@ -29,7 +28,7 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
     // Refresh data when opening dashboard
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<LegislationProvider>();
-      provider.loadStats(widget.committeeId);
+      provider.loadStats();
     });
   }
 
@@ -47,8 +46,8 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
             icon: const Icon(Icons.refresh),
             onPressed: () {
               final provider = context.read<LegislationProvider>();
-              provider.loadStats(widget.committeeId);
-              provider.loadTrackedBills(widget.committeeId);
+              provider.loadStats();
+              provider.loadTrackedBills();
             },
           ),
         ],
@@ -61,8 +60,8 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
 
           return RefreshIndicator(
             onRefresh: () async {
-              await provider.loadStats(widget.committeeId);
-              await provider.loadTrackedBills(widget.committeeId);
+              await provider.loadStats();
+              await provider.loadTrackedBills();
             },
             child: isWideScreen
                 ? _buildWideLayout(context, theme, provider)
@@ -289,17 +288,13 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
   }
 
   Widget _buildRecentActivityCard(ThemeData theme, LegislationProvider provider) {
-    // Get recent actions from all bills
-    final allActions = <_ActionWithBill>[];
-    for (final bill in provider.trackedBills) {
-      if (bill.actions != null) {
-        for (final action in bill.actions!.take(3)) {
-          allActions.add(_ActionWithBill(action: action, bill: bill));
-        }
-      }
-    }
-    allActions.sort((a, b) => b.action.actionDate.compareTo(a.action.actionDate));
-    final recentActions = allActions.take(10).toList();
+    // Get bills with recent activity using latestActionDate
+    final billsWithActivity = provider.trackedBills
+        .where((bill) => bill.latestActionDate != null && bill.latestActionDescription != null)
+        .toList();
+    billsWithActivity.sort((a, b) =>
+        (b.latestActionDate ?? DateTime(1900)).compareTo(a.latestActionDate ?? DateTime(1900)));
+    final recentBills = billsWithActivity.take(10).toList();
 
     return Card(
       child: Padding(
@@ -309,7 +304,7 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
           children: [
             _buildSectionHeader(theme, 'Recent Activity', Icons.history, theme.colorScheme.secondary),
             const SizedBox(height: 12),
-            if (recentActions.isEmpty)
+            if (recentBills.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Center(
@@ -322,19 +317,16 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
                 ),
               )
             else
-              ...recentActions.map((item) => _buildActivityItem(context, theme, item)),
+              ...recentBills.map((bill) => _buildActivityItem(context, theme, bill)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildActivityItem(BuildContext context, ThemeData theme, _ActionWithBill item) {
-    final icon = BillHelpers.getActionIcon(item.action.actionClassification);
-    final color = BillHelpers.getActionColor(item.action.actionClassification);
-
+  Widget _buildActivityItem(BuildContext context, ThemeData theme, TrackedBill bill) {
     return InkWell(
-      onTap: () => _navigateToBillDetail(context, item.bill),
+      onTap: () => _navigateToBillDetail(context, bill),
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -344,10 +336,10 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: theme.colorScheme.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 16, color: color),
+              child: Icon(Icons.arrow_forward, size: 16, color: theme.colorScheme.primary),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -355,14 +347,14 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.bill.billIdentifier,
+                    bill.billIdentifier,
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: theme.colorScheme.primary,
                     ),
                   ),
                   Text(
-                    item.action.actionDescription,
+                    bill.latestActionDescription ?? '',
                     style: theme.textTheme.bodySmall,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -372,7 +364,7 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
             ),
             const SizedBox(width: 8),
             Text(
-              BillHelpers.formatRelativeTime(item.action.actionDate),
+              BillHelpers.formatRelativeTime(bill.latestActionDate),
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -483,11 +475,4 @@ class _LegislationDashboardScreenState extends State<LegislationDashboardScreen>
       ),
     );
   }
-}
-
-class _ActionWithBill {
-  final BillAction action;
-  final TrackedBill bill;
-
-  _ActionWithBill({required this.action, required this.bill});
 }

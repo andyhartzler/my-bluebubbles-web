@@ -141,6 +141,27 @@ class BillDocument {
   /// Whether this is a supporting document
   bool get isDocument => documentType == 'document';
 
+  /// Whether this is a fiscal note
+  bool get isFiscalNote {
+    final noteLower = note.toLowerCase();
+    final classLower = classification?.toLowerCase() ?? '';
+    return noteLower.contains('fiscal') || classLower.contains('fiscal');
+  }
+
+  /// Whether this is a committee report
+  bool get isCommitteeReport {
+    final noteLower = note.toLowerCase();
+    final classLower = classification?.toLowerCase() ?? '';
+    return noteLower.contains('committee') || classLower.contains('committee');
+  }
+
+  /// Whether this is an amendment
+  bool get isAmendment {
+    final noteLower = note.toLowerCase();
+    final classLower = classification?.toLowerCase() ?? '';
+    return noteLower.contains('amendment') || classLower.contains('amendment');
+  }
+
   /// Get the best available link URL
   String? get bestLink {
     if (primaryLink != null) return primaryLink;

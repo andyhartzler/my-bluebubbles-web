@@ -94,6 +94,12 @@ class BillNote {
     );
   }
 
+  /// Alias for authorId (used by some widgets)
+  String get createdBy => authorId;
+
+  /// Alias for authorName (used by some widgets)
+  String? get createdByName => authorName;
+
   static List<String> _parseStringList(dynamic value) {
     if (value == null) return [];
     if (value is List) {

@@ -38,9 +38,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     // Load data when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<LegislationProvider>();
-      provider.loadTrackedBills(widget.committeeId);
-      provider.loadCategories(widget.committeeId);
-      provider.loadStats(widget.committeeId);
+      provider.initialize();
     });
   }
 
@@ -104,7 +102,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                       compact: true,
                       isSyncing: provider.isSyncing,
                       onSearchBills: () => _navigateToSearch(context),
-                      onSyncBills: () => provider.syncAllBills(widget.committeeId),
+                      onSyncBills: () => provider.syncBills(),
                       onViewDashboard: () => _navigateToDashboard(context),
                     ),
                   ],
@@ -136,7 +134,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                       children: [
                         const Text('All'),
                         const SizedBox(width: 4),
-                        _buildCountBadge(theme, provider.filteredBills.length),
+                        _buildCountBadge(theme, provider.trackedBills.length),
                       ],
                     ),
                   ),
@@ -214,7 +212,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                     QuickActionsPanel(
                       isSyncing: provider.isSyncing,
                       onSearchBills: () => _navigateToSearch(context),
-                      onSyncBills: () => provider.syncAllBills(widget.committeeId),
+                      onSyncBills: () => provider.syncBills(),
                       onViewDashboard: () => _navigateToDashboard(context),
                       onExportReport: () => _exportReport(context, provider),
                       onManageCategories: () => _manageCategories(context),
@@ -256,7 +254,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _buildCountBadge(theme, provider.filteredBills.length),
+                    _buildCountBadge(theme, provider.trackedBills.length),
                     const Spacer(),
                     // View toggle could go here
                   ],
@@ -437,14 +435,14 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
   }
 
   Widget _buildAllBillsTab(BuildContext context, ThemeData theme, LegislationProvider provider) {
-    final bills = provider.filteredBills;
+    final bills = provider.trackedBills;
 
     if (bills.isEmpty) {
       return _buildEmptyState(context, theme, provider);
     }
 
     return RefreshIndicator(
-      onRefresh: () => provider.loadTrackedBills(widget.committeeId),
+      onRefresh: () => provider.loadTrackedBills(),
       child: BillList(
         bills: bills,
         onBillTap: (bill) => _navigateToBillDetail(context, bill),
@@ -460,7 +458,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     String emptyMessage,
   ) {
     return RefreshIndicator(
-      onRefresh: () => provider.loadTrackedBills(widget.committeeId),
+      onRefresh: () => provider.loadTrackedBills(),
       child: BillList(
         bills: bills,
         onBillTap: (bill) => _navigateToBillDetail(context, bill),
@@ -549,7 +547,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: () => provider.loadTrackedBills(widget.committeeId),
+              onPressed: () => provider.loadTrackedBills(),
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
             ),

@@ -7,7 +7,7 @@ import '../models/bill_note.dart';
 import '../models/bill_document.dart';
 import '../models/legislation_category.dart';
 import '../models/legislator.dart';
-import 'openstates_service.dart';
+import 'openstates_service.dart' hide Legislator;
 
 /// Service for managing tracked legislation in Supabase
 class LegislationService {
@@ -759,6 +759,16 @@ class LegislationStats {
       'vetoed_count': vetoedCount,
     };
   }
+
+  // Alias getters for UI compatibility
+  int get totalBills => totalTracked;
+  int get activeBills => totalTracked; // Tracked bills are active
+  int get criticalBills => criticalCount;
+  int get supportBills => supportCount;
+  int get opposeBills => opposeCount;
+  int get watchingBills => watchingCount;
+  int get newActionsThisWeek => 0; // Not tracked currently
+  int get recentVotesCount => 0; // Not tracked currently
 }
 
 // Sync log model

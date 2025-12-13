@@ -40,16 +40,14 @@ class _BillDetailScreenState extends State<BillDetailScreen>
 
     // Load bill details
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LegislationProvider>().loadBillDetails(
-            widget.committeeId,
-            widget.billId,
-          );
+      context.read<LegislationProvider>().selectBill(widget.billId);
     });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    context.read<LegislationProvider>().clearSelectedBill();
     super.dispose();
   }
 
@@ -63,7 +61,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
       builder: (context, provider, child) {
         final bill = provider.selectedBill;
 
-        if (provider.isLoadingDetails || bill == null) {
+        if (provider.isLoading || bill == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Bill Details')),
             body: const Center(child: CircularProgressIndicator()),
@@ -76,7 +74,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
             actions: [
               IconButton(
                 icon: const Icon(Icons.refresh),
-                onPressed: () => provider.syncBill(widget.committeeId, widget.billId),
+                onPressed: () => provider.syncBills(billId: widget.billId),
                 tooltip: 'Sync with Open States',
               ),
               PopupMenuButton<String>(
@@ -133,18 +131,70 @@ class _BillDetailScreenState extends State<BillDetailScreen>
   ) {
     return Column(
       children: [
-        // Header card
-        _buildHeaderCard(context, theme, provider, bill),
-        // Tabs
+        // Header with bill info
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            border: Border(bottom: BorderSide(color: theme.dividerColor)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  BillStatusBadge(bill: bill),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      bill.title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  PositionSelector(
+                    currentPosition: BillPosition.fromString(bill.position),
+                    onChanged: (position) => _updatePosition(provider, bill, position.value),
+                    compact: true,
+                  ),
+                  const SizedBox(width: 8),
+                  PrioritySelector(
+                    currentPriority: BillPriority.fromString(bill.priority),
+                    onChanged: (priority) => _updatePriority(provider, bill, priority.value),
+                    showLabel: false,
+                    compact: true,
+                  ),
+                ],
+              ),
+              if (provider.categories.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                CategoryChips(
+                  categories: provider.categories,
+                  selectedCategories: bill.categories,
+                  onChanged: (categories) => _updateCategories(provider, bill, categories),
+                ),
+              ],
+            ],
+          ),
+        ),
+        // Tab bar
         TabBar(
           controller: _tabController,
           isScrollable: true,
           tabs: [
-            _buildTab('Overview', Icons.info_outline),
-            _buildTab('Actions', Icons.timeline, _getNewCount(bill.actions)),
-            _buildTab('Votes', Icons.how_to_vote, _getNewCount(bill.votes)),
-            _buildTab('Documents', Icons.description, _getNewCount(bill.documents)),
-            _buildTab('Notes', Icons.note, bill.notes?.length ?? 0),
+            _buildTab('Overview', Icons.info_outline, 0),
+            _buildTab('Actions', Icons.timeline, provider.selectedBillActions.length),
+            _buildTab('Votes', Icons.how_to_vote, provider.selectedBillVotes.length),
+            _buildTab('Documents', Icons.description, provider.selectedBillDocuments.length),
+            _buildTab('Notes', Icons.note, provider.selectedBillNotes.length),
           ],
         ),
         // Tab content
@@ -155,7 +205,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
               _buildOverviewTab(context, theme, provider, bill),
               _buildActionsTab(context, theme, provider, bill),
               _buildVotesTab(context, theme, provider, bill),
-              _buildDocumentsTab(context, theme, bill),
+              _buildDocumentsTab(context, theme, provider, bill),
               _buildNotesTab(context, theme, provider, bill),
             ],
           ),
@@ -172,65 +222,117 @@ class _BillDetailScreenState extends State<BillDetailScreen>
   ) {
     return Row(
       children: [
-        // Left sidebar: Overview and controls
+        // Left sidebar with bill info
         SizedBox(
-          width: 400,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header card
-                _buildHeaderCard(context, theme, provider, bill),
-                const SizedBox(height: 16),
-                // Sponsors
-                if (bill.sponsors != null && bill.sponsors!.isNotEmpty) ...[
-                  SponsorList(sponsors: bill.sponsors!),
-                  const SizedBox(height: 16),
-                ],
-                // Categories
-                if (bill.categories.isNotEmpty) ...[
-                  Text(
-                    'Categories',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+          width: 350,
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      BillStatusBadge(bill: bill),
+                      const SizedBox(height: 12),
+                      Text(
+                        bill.title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (bill.description != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          bill.description!,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Text(
+                        'Position',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      PositionSelector(
+                        currentPosition: BillPosition.fromString(bill.position),
+                        onChanged: (position) => _updatePosition(provider, bill, position.value),
+                      ),
+                      const SizedBox(height: 16),
+                      PrioritySelector(
+                        currentPriority: BillPriority.fromString(bill.priority),
+                        onChanged: (priority) => _updatePriority(provider, bill, priority.value),
+                      ),
+                      if (provider.categories.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          'Categories',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        CategoryChips(
+                          categories: provider.categories,
+                          selectedCategories: bill.categories,
+                          onChanged: (categories) => _updateCategories(provider, bill, categories),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      // Primary abstract
+                      if (bill.primaryAbstract != null && bill.primaryAbstract!.isNotEmpty) ...[
+                        Text(
+                          'Summary',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          bill.primaryAbstract!,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      // Sponsors
+                      if (provider.selectedBillSponsors.isNotEmpty) ...[
+                        SponsorList(sponsors: provider.selectedBillSponsors),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  CategoryChips(
-                    selectedCategories: bill.categories,
-                    availableCategories: provider.categories,
-                    onChanged: (categories) => _updateCategories(provider, bill, categories),
-                  ),
-                ],
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
         ),
         const VerticalDivider(width: 1),
-        // Right content: Tabs
+        // Main content with tabs
         Expanded(
           child: Column(
             children: [
               TabBar(
                 controller: _tabController,
                 tabs: [
-                  _buildTab('Actions', Icons.timeline, _getNewCount(bill.actions)),
-                  _buildTab('Votes', Icons.how_to_vote, _getNewCount(bill.votes)),
-                  _buildTab('Documents', Icons.description, _getNewCount(bill.documents)),
-                  _buildTab('Notes', Icons.note, bill.notes?.length ?? 0),
-                  _buildTab('Abstract', Icons.article),
+                  _buildTab('Overview', Icons.info_outline, 0),
+                  _buildTab('Actions', Icons.timeline, provider.selectedBillActions.length),
+                  _buildTab('Votes', Icons.how_to_vote, provider.selectedBillVotes.length),
+                  _buildTab('Documents', Icons.description, provider.selectedBillDocuments.length),
+                  _buildTab('Notes', Icons.note, provider.selectedBillNotes.length),
                 ],
               ),
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
                   children: [
+                    _buildOverviewTab(context, theme, provider, bill),
                     _buildActionsTab(context, theme, provider, bill),
                     _buildVotesTab(context, theme, provider, bill),
-                    _buildDocumentsTab(context, theme, bill),
+                    _buildDocumentsTab(context, theme, provider, bill),
                     _buildNotesTab(context, theme, provider, bill),
-                    _buildAbstractTab(context, theme, bill),
                   ],
                 ),
               ),
@@ -241,20 +343,20 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     );
   }
 
-  Widget _buildTab(String label, IconData icon, [int? count]) {
+  Widget _buildTab(String label, IconData icon, int count) {
     return Tab(
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 18),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           Text(label),
-          if (count != null && count > 0) ...[
+          if (count > 0) ...[
             const SizedBox(width: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
+                color: Theme.of(context).colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -262,110 +364,12 @@ class _BillDetailScreenState extends State<BillDetailScreen>
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onPrimary,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
                 ),
               ),
             ),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _buildHeaderCard(
-    BuildContext context,
-    ThemeData theme,
-    LegislationProvider provider,
-    TrackedBill bill,
-  ) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Bill identifier and status
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        bill.billIdentifier,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Session: ${bill.session}',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                BillStatusBadge(bill: bill),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Title
-            Text(
-              bill.title,
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 16),
-
-            // Position selector
-            Text(
-              'Our Position',
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            PositionSelector(
-              currentPosition: bill.position,
-              onPositionChanged: (position) => _updatePosition(provider, bill, position),
-            ),
-            const SizedBox(height: 16),
-
-            // Priority selector
-            Text(
-              'Priority',
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            PrioritySelector(
-              currentPriority: bill.priority,
-              onPriorityChanged: (priority) => _updatePriority(provider, bill, priority),
-            ),
-
-            // Last updated
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Icon(
-                  Icons.sync,
-                  size: 14,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Last synced: ${bill.lastSyncedAt != null ? BillHelpers.formatRelativeTime(bill.lastSyncedAt!) : 'Never'}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -381,62 +385,106 @@ class _BillDetailScreenState extends State<BillDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Abstract
-          if (bill.billAbstract != null && bill.billAbstract!.isNotEmpty) ...[
-            Text(
-              'Summary',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+          // Bill details card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bill Information',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Divider(),
+                  _buildInfoRow(theme, 'Identifier', bill.billIdentifier),
+                  _buildInfoRow(theme, 'Session', bill.session),
+                  if (bill.chamber != null)
+                    _buildInfoRow(theme, 'Chamber', bill.chamber == 'lower' ? 'House' : 'Senate'),
+                  if (bill.primarySponsorName != null)
+                    _buildInfoRow(theme, 'Primary Sponsor', bill.primarySponsorName!),
+                  if (bill.latestActionDescription != null)
+                    _buildInfoRow(theme, 'Latest Action', bill.latestActionDescription!),
+                  if (bill.latestActionDate != null)
+                    _buildInfoRow(theme, 'Action Date', BillHelpers.formatDate(bill.latestActionDate)),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              bill.billAbstract!,
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 24),
-          ],
-
-          // Sponsors
-          if (bill.sponsors != null && bill.sponsors!.isNotEmpty) ...[
-            SponsorList(sponsors: bill.sponsors!),
-            const SizedBox(height: 24),
-          ],
-
-          // Categories
-          Text(
-            'Categories',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
           ),
-          const SizedBox(height: 8),
-          CategoryChips(
-            selectedCategories: bill.categories,
-            availableCategories: provider.categories,
-            onChanged: (categories) => _updateCategories(provider, bill, categories),
-          ),
-          const SizedBox(height: 24),
-
-          // Subject tags
-          if (bill.subjects != null && bill.subjects!.isNotEmpty) ...[
-            Text(
-              'Subjects',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+          const SizedBox(height: 16),
+          // Summary card
+          if (bill.primaryAbstract != null && bill.primaryAbstract!.isNotEmpty) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Summary',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Divider(),
+                    Text(bill.primaryAbstract!),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: bill.subjects!.map((subject) => Chip(
-                    label: Text(subject, style: const TextStyle(fontSize: 12)),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
-                  )).toList(),
+            const SizedBox(height: 16),
+          ],
+          // Sponsors card
+          if (provider.selectedBillSponsors.isNotEmpty) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sponsors',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Divider(),
+                    SponsorList(sponsors: provider.selectedBillSponsors),
+                  ],
+                ),
+              ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(ThemeData theme, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -448,13 +496,15 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     LegislationProvider provider,
     TrackedBill bill,
   ) {
-    final actions = bill.actions ?? [];
+    final actions = provider.selectedBillActions;
+
+    if (actions.isEmpty) {
+      return _buildEmptyState(theme, 'No actions recorded', Icons.timeline);
+    }
 
     return BillTimeline(
       actions: actions,
-      onMarkSeen: actions.any((a) => a.isNew)
-          ? () => provider.markActionsSeen(widget.committeeId, widget.billId)
-          : null,
+      onMarkSeen: () => provider.markActionsAsSeen(bill.id),
     );
   }
 
@@ -464,27 +514,62 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     LegislationProvider provider,
     TrackedBill bill,
   ) {
-    final votes = bill.votes ?? [];
+    final votes = provider.selectedBillVotes;
 
-    return VoteBreakdownChart(
-      votes: votes,
-      onMarkSeen: votes.any((v) => v.isNew)
-          ? () => provider.markVotesSeen(widget.committeeId, widget.billId)
-          : null,
+    if (votes.isEmpty) {
+      return _buildEmptyState(theme, 'No votes recorded', Icons.how_to_vote);
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: votes.length,
+      itemBuilder: (context, index) {
+        final vote = votes[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  vote.motion ?? 'Vote',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (vote.voteDate != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    BillHelpers.formatDate(vote.voteDate),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                VoteBreakdownChart(vote: vote),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildDocumentsTab(
     BuildContext context,
     ThemeData theme,
+    LegislationProvider provider,
     TrackedBill bill,
   ) {
-    final documents = bill.documents ?? [];
+    final documents = provider.selectedBillDocuments;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: BillDocumentsPanel(documents: documents),
-    );
+    if (documents.isEmpty) {
+      return _buildEmptyState(theme, 'No documents available', Icons.description);
+    }
+
+    return BillDocumentsPanel(documents: documents);
   }
 
   Widget _buildNotesTab(
@@ -493,103 +578,55 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     LegislationProvider provider,
     TrackedBill bill,
   ) {
-    final notes = bill.notes ?? [];
+    final notes = provider.selectedBillNotes;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: BillNotesPanel(
-        notes: notes,
-        onAddNote: (content, isInternal) => provider.addNote(
-          widget.committeeId,
-          widget.billId,
-          content,
-          isInternal,
-        ),
-        onDeleteNote: (note) => provider.deleteNote(
-          widget.committeeId,
-          widget.billId,
-          note.id,
-        ),
-        onUpdateNote: (note, content) => provider.updateNote(
-          widget.committeeId,
-          widget.billId,
-          note.id,
-          content,
-        ),
+    return BillNotesPanel(
+      notes: notes,
+      currentUserId: null, // TODO: Get from auth provider
+      onAddNote: (content, isInternal) => provider.addNote(
+        billId: bill.id,
+        content: content,
+      ),
+      onDeleteNote: (note) => provider.deleteNote(note.id),
+      onUpdateNote: (note, content) => provider.updateNote(
+        noteId: note.id,
+        content: content,
       ),
     );
   }
 
-  Widget _buildAbstractTab(
-    BuildContext context,
-    ThemeData theme,
-    TrackedBill bill,
-  ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+  Widget _buildEmptyState(ThemeData theme, String message, IconData icon) {
+    return Center(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (bill.billAbstract != null && bill.billAbstract!.isNotEmpty) ...[
-            Text(
-              'Official Summary',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          Icon(
+            icon,
+            size: 64,
+            color: theme.colorScheme.outline.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 12),
-            Text(
-              bill.billAbstract!,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ] else
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.article_outlined,
-                      size: 48,
-                      color: theme.colorScheme.outline.withOpacity(0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No summary available',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          ),
         ],
       ),
     );
   }
 
-  int _getNewCount<T>(List<T>? items) {
-    if (items == null) return 0;
-    return items.where((item) {
-      if (item is dynamic && item.isNew is bool) {
-        return item.isNew as bool;
-      }
-      return false;
-    }).length;
-  }
-
   Future<void> _updatePosition(LegislationProvider provider, TrackedBill bill, String position) async {
-    await provider.updateBillPosition(widget.committeeId, bill.id, position);
+    await provider.updatePosition(billId: bill.id, position: position);
   }
 
   Future<void> _updatePriority(LegislationProvider provider, TrackedBill bill, String priority) async {
-    await provider.updateBillPriority(widget.committeeId, bill.id, priority);
+    await provider.updatePriority(billId: bill.id, priority: priority);
   }
 
   Future<void> _updateCategories(LegislationProvider provider, TrackedBill bill, List<String> categories) async {
-    await provider.updateBillCategories(widget.committeeId, bill.id, categories);
+    await provider.updateCategories(billId: bill.id, categories: categories);
   }
 
   void _handleMenuAction(BuildContext context, LegislationProvider provider, TrackedBill bill, String action) {
@@ -600,12 +637,15 @@ class _BillDetailScreenState extends State<BillDetailScreen>
         }
         break;
       case 'legislature':
-        // Open Missouri Legislature URL
-        final url = 'https://house.mo.gov/Bill.aspx?bill=${bill.billIdentifier}&year=${bill.session}';
-        launchUrl(Uri.parse(url));
+        // TODO: Construct MO legislature URL
         break;
       case 'archive':
-        provider.toggleBillArchived(widget.committeeId, bill.id, !bill.isArchived);
+        if (bill.isArchived) {
+          provider.unarchiveBill(bill.id);
+        } else {
+          provider.archiveBill(billId: bill.id);
+        }
+        Navigator.pop(context);
         break;
     }
   }
