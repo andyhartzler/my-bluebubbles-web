@@ -32,6 +32,7 @@ class BillDetailScreen extends StatefulWidget {
 class _BillDetailScreenState extends State<BillDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  LegislationProvider? _provider;
 
   @override
   void initState() {
@@ -40,14 +41,15 @@ class _BillDetailScreenState extends State<BillDetailScreen>
 
     // Load bill details
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LegislationProvider>().selectBill(widget.billId);
+      _provider = context.read<LegislationProvider>();
+      _provider?.selectBill(widget.billId);
     });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    context.read<LegislationProvider>().clearSelectedBill();
+    _provider?.clearSelectedBill();
     super.dispose();
   }
 
