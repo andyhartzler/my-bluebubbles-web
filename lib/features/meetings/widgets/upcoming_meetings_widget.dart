@@ -213,7 +213,7 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
   Future<void> _scheduleMeeting() async {
     final meeting = await ScheduleMeetingDialog.show(
       context,
-      committeeId: widget.committee.id,
+      // Note: committee.id is a string name, not a UUID, so we only use committeeName
       committeeName: widget.committee.name,
       createdBy: _currentUserId,
     );
@@ -234,7 +234,7 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
   Future<void> _editMeeting(ScheduledMeeting meeting) async {
     final updatedMeeting = await ScheduleMeetingDialog.show(
       context,
-      committeeId: widget.committee.id,
+      // Note: committee.id is a string name, not a UUID, so we only use committeeName
       committeeName: widget.committee.name,
       createdBy: _currentUserId,
       existingMeeting: meeting,
