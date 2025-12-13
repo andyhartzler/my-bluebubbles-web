@@ -57,6 +57,31 @@ class _ScheduleMeetingDialogState extends State<ScheduleMeetingDialog> {
 
   bool get _isEditing => widget.existingMeeting != null;
 
+  /// Generates the committee prefix for meeting titles
+  /// For "College Democrats" or "High School Democrats": just "{Name}:"
+  /// For other committees: "{Name} Committee:"
+  String _getCommitteeTitlePrefix() {
+    final name = widget.committeeName;
+    if (name == null || name.isEmpty) return '';
+
+    // These committees don't use "Committee" in their prefix
+    final noCommitteeSuffix = [
+      'College Democrats',
+      'High School Democrats',
+    ];
+
+    if (noCommitteeSuffix.contains(name)) {
+      return '$name: ';
+    }
+
+    // Check if the name already ends with "Committee"
+    if (name.toLowerCase().endsWith('committee')) {
+      return '$name: ';
+    }
+
+    return '$name Committee: ';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +98,9 @@ class _ScheduleMeetingDialogState extends State<ScheduleMeetingDialog> {
       );
       _selectedDuration = meeting.durationMinutes;
     } else {
+      // Pre-fill title with committee prefix
+      _titleController.text = _getCommitteeTitlePrefix();
+
       // Default to today or tomorrow if past business hours
       final now = DateTime.now();
       if (now.hour >= 18) {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:bluebubbles/features/calendar/widgets/committee_calendar_widget.dart';
+import 'package:bluebubbles/features/calendar/widgets/event_create_dialog.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/meetings/widgets/upcoming_meetings_widget.dart';
@@ -117,6 +119,12 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
             onNavigateToMessages: widget.onNavigateToTab != null
                 ? () => widget.onNavigateToTab!(4) // Messages tab index
                 : null,
+          ),
+          const SizedBox(height: 24),
+          CommitteeCalendarWidget(
+            committeeName: committee.name,
+            accentColor: committee.primaryColor,
+            onAddEvent: () => _showAddEventDialog(context),
           ),
           const SizedBox(height: 24),
           if (_isSchoolCommittee && _schoolDistribution.isNotEmpty) ...[
@@ -782,6 +790,21 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
         MaterialPageRoute(
           builder: (_) => MemberDetailScreen(member: member),
         ),
+      );
+    }
+  }
+
+  Future<void> _showAddEventDialog(BuildContext context) async {
+    final event = await EventCreateDialog.show(
+      context,
+      committeeName: committee.name,
+    );
+
+    if (event != null && mounted) {
+      // Refresh the page to show new event
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Event "${event.title}" created')),
       );
     }
   }
