@@ -85,7 +85,7 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => MemberDetailScreen(memberId: member.id),
+        builder: (context) => MemberDetailScreen(member: member),
       ),
     );
   }
