@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../models/job_notification_template.dart';
 import '../../services/jobs_service.dart';
+import '../../widgets/email_template_editor.dart';
 
 /// Screen for managing job notification email/SMS templates
 class JobNotificationTemplatesScreen extends StatefulWidget {
@@ -529,7 +531,7 @@ class _JobNotificationTemplatesScreenState
   }
 }
 
-/// Screen for editing a notification template
+/// Screen for editing a notification template with WYSIWYG editor
 class _TemplateEditorScreen extends StatefulWidget {
   final JobNotificationTemplate? template;
   final VoidCallback? onSaved;
@@ -543,9 +545,11 @@ class _TemplateEditorScreen extends StatefulWidget {
   State<_TemplateEditorScreen> createState() => _TemplateEditorScreenState();
 }
 
-class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
+class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
+    with SingleTickerProviderStateMixin {
   final _jobsService = JobsService();
   final _formKey = GlobalKey<FormState>();
+  late TabController _tabController;
 
   late String _triggerType;
   late String _recipientType;
@@ -553,18 +557,23 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
   late TextEditingController _descriptionController;
   late bool _emailEnabled;
   late TextEditingController _emailSubjectController;
-  late TextEditingController _emailHtmlController;
-  late TextEditingController _emailPlainTextController;
+  String _emailHtml = '';
+  String _emailPlainText = '';
   late bool _smsEnabled;
   late TextEditingController _smsBodyController;
   late bool _isActive;
   late bool _isDefault;
 
   bool _saving = false;
+  bool _showPreview = false;
+
+  final GlobalKey<_EmailTemplateEditorState> _editorKey =
+      GlobalKey<_EmailTemplateEditorState>();
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     final t = widget.template;
     _triggerType = t?.triggerType ?? 'job_submitted';
     _recipientType = t?.recipientType ?? 'job_submitter';
@@ -572,8 +581,8 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
     _descriptionController = TextEditingController(text: t?.description ?? '');
     _emailEnabled = t?.emailEnabled ?? true;
     _emailSubjectController = TextEditingController(text: t?.emailSubject ?? '');
-    _emailHtmlController = TextEditingController(text: t?.emailHtml ?? '');
-    _emailPlainTextController = TextEditingController(text: t?.emailPlainText ?? '');
+    _emailHtml = t?.emailHtml ?? '';
+    _emailPlainText = t?.emailPlainText ?? '';
     _smsEnabled = t?.smsEnabled ?? false;
     _smsBodyController = TextEditingController(text: t?.smsBody ?? '');
     _isActive = t?.isActive ?? true;
@@ -582,13 +591,16 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _nameController.dispose();
     _descriptionController.dispose();
     _emailSubjectController.dispose();
-    _emailHtmlController.dispose();
-    _emailPlainTextController.dispose();
     _smsBodyController.dispose();
     super.dispose();
+  }
+
+  List<MailMergeVariable> get _mergeVariables {
+    return JobNotificationVariables.forTrigger(_triggerType);
   }
 
   @override
@@ -600,6 +612,12 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Template' : 'New Template'),
         actions: [
+          // Preview toggle
+          IconButton(
+            icon: Icon(_showPreview ? Icons.edit : Icons.preview),
+            onPressed: () => setState(() => _showPreview = !_showPreview),
+            tooltip: _showPreview ? 'Edit' : 'Preview',
+          ),
           if (isEditing)
             IconButton(
               icon: const Icon(Icons.star),
@@ -608,202 +626,23 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
               color: _isDefault ? Colors.amber : null,
             ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(icon: Icon(Icons.settings), text: 'Settings'),
+            Tab(icon: Icon(Icons.email), text: 'Email Design'),
+          ],
+        ),
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+        child: TabBarView(
+          controller: _tabController,
           children: [
-            // Basic Info Section
-            _buildSectionHeader(theme, 'Basic Information', Icons.info_outline),
-            const SizedBox(height: 12),
-
-            // Name
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Template Name *',
-                hintText: 'e.g., Job Approval Confirmation',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Name is required';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Description
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                hintText: 'Brief description of this template',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 16),
-
-            // Trigger Type Dropdown
-            DropdownButtonFormField<String>(
-              value: _triggerType,
-              decoration: const InputDecoration(
-                labelText: 'Trigger Event *',
-                border: OutlineInputBorder(),
-              ),
-              items: JobNotificationTemplate.triggerTypes.map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Row(
-                    children: [
-                      Text(JobNotificationTemplate.triggerTypeIcon(type)),
-                      const SizedBox(width: 8),
-                      Text(JobNotificationTemplate.getTriggerLabel(type)),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: widget.template != null
-                  ? null
-                  : (value) {
-                      if (value != null) {
-                        setState(() => _triggerType = value);
-                      }
-                    },
-            ),
-            const SizedBox(height: 16),
-
-            // Recipient Type Dropdown
-            DropdownButtonFormField<String>(
-              value: _recipientType,
-              decoration: const InputDecoration(
-                labelText: 'Send To *',
-                border: OutlineInputBorder(),
-              ),
-              items: JobNotificationTemplate.recipientTypes.map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(JobNotificationTemplate.getRecipientLabel(type)),
-                );
-              }).toList(),
-              onChanged: widget.template != null
-                  ? null
-                  : (value) {
-                      if (value != null) {
-                        setState(() => _recipientType = value);
-                      }
-                    },
-            ),
-            const SizedBox(height: 8),
-
-            // Active toggle
-            SwitchListTile(
-              title: const Text('Active'),
-              subtitle: const Text('Enable this template'),
-              value: _isActive,
-              onChanged: (value) {
-                setState(() => _isActive = value);
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Email Section
-            _buildSectionHeader(theme, 'Email Notification', Icons.email_outlined),
-            const SizedBox(height: 12),
-
-            SwitchListTile(
-              title: const Text('Send Email'),
-              subtitle: const Text('Send email notification when triggered'),
-              value: _emailEnabled,
-              onChanged: (value) {
-                setState(() => _emailEnabled = value);
-              },
-            ),
-
-            if (_emailEnabled) ...[
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailSubjectController,
-                decoration: const InputDecoration(
-                  labelText: 'Email Subject *',
-                  hintText: 'Your job "{{job_title}}" has been approved!',
-                  border: OutlineInputBorder(),
-                  helperText: 'Use {{variable}} for dynamic content',
-                ),
-                validator: (value) {
-                  if (_emailEnabled && (value == null || value.isEmpty)) {
-                    return 'Subject is required when email is enabled';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailHtmlController,
-                decoration: const InputDecoration(
-                  labelText: 'Email Body (HTML)',
-                  hintText: '<h1>Congratulations!</h1><p>Your job...</p>',
-                  border: OutlineInputBorder(),
-                  helperText: 'HTML content for rich email clients',
-                ),
-                maxLines: 8,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailPlainTextController,
-                decoration: const InputDecoration(
-                  labelText: 'Email Body (Plain Text)',
-                  hintText: 'Congratulations! Your job...',
-                  border: OutlineInputBorder(),
-                  helperText: 'Plain text fallback for email clients',
-                ),
-                maxLines: 6,
-              ),
-            ],
-            const SizedBox(height: 24),
-
-            // SMS Section
-            _buildSectionHeader(theme, 'SMS Notification', Icons.sms_outlined),
-            const SizedBox(height: 12),
-
-            SwitchListTile(
-              title: const Text('Send SMS'),
-              subtitle: const Text('Send SMS notification when triggered'),
-              value: _smsEnabled,
-              onChanged: (value) {
-                setState(() => _smsEnabled = value);
-              },
-            ),
-
-            if (_smsEnabled) ...[
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _smsBodyController,
-                decoration: const InputDecoration(
-                  labelText: 'SMS Message *',
-                  hintText: 'Your job "{{job_title}}" has been approved!',
-                  border: OutlineInputBorder(),
-                  helperText: 'Keep under 160 characters for single SMS',
-                  counterText: '',
-                ),
-                maxLines: 3,
-                maxLength: 320,
-                validator: (value) {
-                  if (_smsEnabled && (value == null || value.isEmpty)) {
-                    return 'SMS message is required when SMS is enabled';
-                  }
-                  return null;
-                },
-              ),
-            ],
-            const SizedBox(height: 24),
-
-            // Variable Reference
-            _buildVariableReference(theme),
-            const SizedBox(height: 100),
+            // Settings Tab
+            _buildSettingsTab(theme),
+            // Email Design Tab
+            _buildEmailDesignTab(theme),
           ],
         ),
       ),
@@ -824,6 +663,512 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
     );
   }
 
+  Widget _buildSettingsTab(ThemeData theme) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Basic Info Section
+        _buildSectionHeader(theme, 'Basic Information', Icons.info_outline),
+        const SizedBox(height: 12),
+
+        // Name
+        TextFormField(
+          controller: _nameController,
+          decoration: const InputDecoration(
+            labelText: 'Template Name *',
+            hintText: 'e.g., Job Approval Confirmation',
+            border: OutlineInputBorder(),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Name is required';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Description
+        TextFormField(
+          controller: _descriptionController,
+          decoration: const InputDecoration(
+            labelText: 'Description',
+            hintText: 'Brief description of this template',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 2,
+        ),
+        const SizedBox(height: 16),
+
+        // Trigger Type Dropdown
+        DropdownButtonFormField<String>(
+          value: _triggerType,
+          decoration: const InputDecoration(
+            labelText: 'Trigger Event *',
+            border: OutlineInputBorder(),
+          ),
+          items: JobNotificationTemplate.triggerTypes.map((type) {
+            return DropdownMenuItem(
+              value: type,
+              child: Row(
+                children: [
+                  Text(JobNotificationTemplate.triggerTypeIcon(type)),
+                  const SizedBox(width: 8),
+                  Flexible(child: Text(JobNotificationTemplate.getTriggerLabel(type))),
+                ],
+              ),
+            );
+          }).toList(),
+          onChanged: widget.template != null
+              ? null
+              : (value) {
+                  if (value != null) {
+                    setState(() => _triggerType = value);
+                  }
+                },
+        ),
+        const SizedBox(height: 16),
+
+        // Recipient Type Dropdown
+        DropdownButtonFormField<String>(
+          value: _recipientType,
+          decoration: const InputDecoration(
+            labelText: 'Send To *',
+            border: OutlineInputBorder(),
+          ),
+          items: JobNotificationTemplate.recipientTypes.map((type) {
+            return DropdownMenuItem(
+              value: type,
+              child: Text(JobNotificationTemplate.getRecipientLabel(type)),
+            );
+          }).toList(),
+          onChanged: widget.template != null
+              ? null
+              : (value) {
+                  if (value != null) {
+                    setState(() => _recipientType = value);
+                  }
+                },
+        ),
+        const SizedBox(height: 16),
+
+        // Toggle switches
+        Card(
+          child: Column(
+            children: [
+              SwitchListTile(
+                title: const Text('Active'),
+                subtitle: const Text('Enable this template'),
+                value: _isActive,
+                onChanged: (value) => setState(() => _isActive = value),
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                title: const Text('Send Email'),
+                subtitle: const Text('Send email notification when triggered'),
+                value: _emailEnabled,
+                onChanged: (value) => setState(() => _emailEnabled = value),
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                title: const Text('Send SMS'),
+                subtitle: const Text('Send SMS notification when triggered'),
+                value: _smsEnabled,
+                onChanged: (value) => setState(() => _smsEnabled = value),
+              ),
+            ],
+          ),
+        ),
+
+        if (_smsEnabled) ...[
+          const SizedBox(height: 24),
+          _buildSectionHeader(theme, 'SMS Message', Icons.sms_outlined),
+          const SizedBox(height: 12),
+          _buildSmsEditor(theme),
+        ],
+        const SizedBox(height: 100),
+      ],
+    );
+  }
+
+  Widget _buildSmsEditor(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: _smsBodyController,
+          decoration: const InputDecoration(
+            labelText: 'SMS Message *',
+            hintText: 'Your job "{{job_title}}" has been approved!',
+            border: OutlineInputBorder(),
+            helperText: 'Keep under 160 characters for single SMS',
+            counterText: '',
+          ),
+          maxLines: 3,
+          maxLength: 320,
+          validator: (value) {
+            if (_smsEnabled && (value == null || value.isEmpty)) {
+              return 'SMS message is required when SMS is enabled';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 8),
+        // Quick variable buttons for SMS
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _mergeVariables.take(5).map((v) {
+            return ActionChip(
+              avatar: const Icon(Icons.add, size: 14),
+              label: Text(v.label, style: const TextStyle(fontSize: 11)),
+              onPressed: () {
+                final text = _smsBodyController.text;
+                final selection = _smsBodyController.selection;
+                final newText = text.replaceRange(
+                  selection.start,
+                  selection.end,
+                  v.token,
+                );
+                _smsBodyController.text = newText;
+                _smsBodyController.selection = TextSelection.collapsed(
+                  offset: selection.start + v.token.length,
+                );
+              },
+              visualDensity: VisualDensity.compact,
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmailDesignTab(ThemeData theme) {
+    if (!_emailEnabled) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.email_outlined,
+              size: 64,
+              color: theme.colorScheme.outline.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Email notifications disabled',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Enable "Send Email" in the Settings tab to design your email.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () {
+                setState(() => _emailEnabled = true);
+                _tabController.animateTo(0);
+              },
+              icon: const Icon(Icons.toggle_on),
+              label: const Text('Enable Email'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_showPreview) {
+      return _buildEmailPreview(theme);
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Subject line
+        _buildSectionHeader(theme, 'Email Subject', Icons.subject),
+        const SizedBox(height: 12),
+        _buildSubjectEditor(theme),
+        const SizedBox(height: 24),
+
+        // Rich text editor for body
+        _buildSectionHeader(theme, 'Email Body', Icons.article_outlined),
+        const SizedBox(height: 12),
+        EmailTemplateEditor(
+          key: _editorKey,
+          initialHtml: _emailHtml,
+          mergeVariables: _mergeVariables,
+          minHeight: 400,
+          placeholder: 'Design your beautiful email here...',
+          helperText: 'Use the toolbar to format your email. Insert merge variables to personalize each message.',
+          onHtmlChanged: (html) => _emailHtml = html,
+          onPlainTextChanged: (text) => _emailPlainText = text,
+        ),
+        const SizedBox(height: 100),
+      ],
+    );
+  }
+
+  Widget _buildSubjectEditor(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: _emailSubjectController,
+          decoration: InputDecoration(
+            labelText: 'Email Subject *',
+            hintText: 'Your job "{{job_title}}" has been approved!',
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.data_object),
+              onPressed: () => _showSubjectVariablePicker(theme),
+              tooltip: 'Insert variable',
+            ),
+          ),
+          validator: (value) {
+            if (_emailEnabled && (value == null || value.isEmpty)) {
+              return 'Subject is required when email is enabled';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 8),
+        // Quick variable buttons
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _mergeVariables.take(4).map((v) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ActionChip(
+                  avatar: const Icon(Icons.add, size: 14),
+                  label: Text(v.label, style: const TextStyle(fontSize: 11)),
+                  onPressed: () => _insertSubjectVariable(v.token),
+                  visualDensity: VisualDensity.compact,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _insertSubjectVariable(String token) {
+    final text = _emailSubjectController.text;
+    final selection = _emailSubjectController.selection;
+    final newText = text.replaceRange(
+      selection.start,
+      selection.end,
+      token,
+    );
+    _emailSubjectController.text = newText;
+    _emailSubjectController.selection = TextSelection.collapsed(
+      offset: selection.start + token.length,
+    );
+  }
+
+  void _showSubjectVariablePicker(ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Insert Variable',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _mergeVariables.map((v) {
+                return ActionChip(
+                  label: Text(v.label),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _insertSubjectVariable(v.token);
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmailPreview(ThemeData theme) {
+    // Create sample data for preview
+    final sampleData = {
+      'job_title': 'Software Developer',
+      'job_organization': 'Missouri Young Democrats',
+      'job_type': 'Full-time',
+      'job_location': 'Jefferson City, MO',
+      'job_url': 'https://moyd.org/jobs/software-developer',
+      'submitter_name': 'John Doe',
+      'submitter_email': 'john@example.com',
+      'applicant_name': 'Jane Smith',
+      'applicant_email': 'jane@example.com',
+      'applicant_phone': '(555) 123-4567',
+      'applicant_city': 'St. Louis',
+      'status': 'Under Review',
+      'old_status': 'New',
+      'rejection_reason': 'Position filled',
+    };
+
+    String previewSubject = _emailSubjectController.text;
+    String previewHtml = _emailHtml;
+
+    for (final entry in sampleData.entries) {
+      previewSubject = previewSubject.replaceAll('{{${entry.key}}}', entry.value);
+      previewHtml = previewHtml.replaceAll('{{${entry.key}}}', entry.value);
+    }
+
+    return Column(
+      children: [
+        // Preview header
+        Container(
+          padding: const EdgeInsets.all(16),
+          color: theme.colorScheme.surfaceContainerHighest,
+          child: Row(
+            children: [
+              Icon(Icons.preview, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Email Preview',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'This shows how the email will look with sample data',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => setState(() => _showPreview = false),
+                icon: const Icon(Icons.edit),
+                label: const Text('Edit'),
+              ),
+            ],
+          ),
+        ),
+        // Email preview
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Email header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.grey.shade200,
+                      ),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            'Subject: ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              previewSubject.isEmpty ? '(No subject)' : previewSubject,
+                              style: const TextStyle(color: Colors.black87),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Text(
+                            'To: ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black54,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            _recipientType == 'job_submitter'
+                                ? sampleData['submitter_email']!
+                                : sampleData['applicant_email']!,
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Email body
+                Expanded(
+                  child: previewHtml.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No email content yet.\nGo to Edit mode to design your email.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey.shade500),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: _HtmlPreview(html: previewHtml),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSectionHeader(ThemeData theme, String title, IconData icon) {
     return Row(
       children: [
@@ -838,94 +1183,6 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
         ),
       ],
     );
-  }
-
-  Widget _buildVariableReference(ThemeData theme) {
-    final variables = _getVariablesForTrigger(_triggerType);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.code, size: 20, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Available Variables',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Use these placeholders in your template:',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: variables.map((v) {
-                return InkWell(
-                  onTap: () {
-                    // Copy to clipboard or insert into focused field
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Use {{$v}} in your template'),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '{{$v}}',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<String> _getVariablesForTrigger(String triggerType) {
-    final common = ['job_title', 'job_organization', 'job_type', 'job_location'];
-
-    switch (triggerType) {
-      case 'job_submitted':
-      case 'job_approved':
-      case 'job_rejected':
-      case 'job_expiring_soon':
-      case 'job_expired':
-        return [...common, 'submitter_name', 'submitter_email', 'job_url'];
-      case 'application_received':
-        return [...common, 'applicant_name', 'applicant_email', 'applicant_phone', 'submitter_name'];
-      case 'application_submitted':
-        return [...common, 'applicant_name', 'applicant_email', 'job_url'];
-      case 'application_status_changed':
-        return [...common, 'applicant_name', 'applicant_email', 'status', 'old_status'];
-      default:
-        return common;
-    }
   }
 
   Future<void> _setAsDefault() async {
@@ -968,8 +1225,8 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
           description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
           emailEnabled: _emailEnabled,
           emailSubject: _emailSubjectController.text.isEmpty ? null : _emailSubjectController.text,
-          emailHtml: _emailHtmlController.text.isEmpty ? null : _emailHtmlController.text,
-          emailPlainText: _emailPlainTextController.text.isEmpty ? null : _emailPlainTextController.text,
+          emailHtml: _emailHtml.isEmpty ? null : _emailHtml,
+          emailPlainText: _emailPlainText.isEmpty ? null : _emailPlainText,
           smsEnabled: _smsEnabled,
           smsBody: _smsBodyController.text.isEmpty ? null : _smsBodyController.text,
           isActive: _isActive,
@@ -984,8 +1241,8 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
           description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
           emailEnabled: _emailEnabled,
           emailSubject: _emailSubjectController.text.isEmpty ? null : _emailSubjectController.text,
-          emailHtml: _emailHtmlController.text.isEmpty ? null : _emailHtmlController.text,
-          emailPlainText: _emailPlainTextController.text.isEmpty ? null : _emailPlainTextController.text,
+          emailHtml: _emailHtml.isEmpty ? null : _emailHtml,
+          emailPlainText: _emailPlainText.isEmpty ? null : _emailPlainText,
           smsEnabled: _smsEnabled,
           smsBody: _smsBodyController.text.isEmpty ? null : _smsBodyController.text,
           isActive: _isActive,
@@ -1018,5 +1275,41 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen> {
         setState(() => _saving = false);
       }
     }
+  }
+}
+
+/// Simple HTML preview widget
+class _HtmlPreview extends StatelessWidget {
+  final String html;
+
+  const _HtmlPreview({required this.html});
+
+  @override
+  Widget build(BuildContext context) {
+    // For a simple preview, we'll render using SelectableText with basic parsing
+    // In production, you'd use a proper HTML renderer
+    final plainText = _stripHtml(html);
+    return SelectableText(
+      plainText.isEmpty ? 'Email body will appear here...' : plainText,
+      style: const TextStyle(
+        fontSize: 14,
+        height: 1.6,
+        color: Colors.black87,
+      ),
+    );
+  }
+
+  String _stripHtml(String html) {
+    // Simple HTML stripping for preview
+    return html
+        .replaceAll(RegExp(r'<br\s*/?>'), '\n')
+        .replaceAll(RegExp(r'</p>|</div>|</h[1-6]>'), '\n\n')
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .trim();
   }
 }
