@@ -21,6 +21,7 @@ class LegislationService {
   // ==================== TRACKED BILLS ====================
 
   /// Get all tracked bills with optional filters
+  /// Uses pagination to bypass Supabase's 1000 row limit
   Future<List<TrackedBill>> getTrackedBills({
     String? session,
     String? position,
@@ -32,44 +33,68 @@ class LegislationService {
     bool searchBillText = false,
     int limit = 5000,
   }) async {
-    var query = _supabase
-        .from('legislation_tracked_bills')
-        .select();
+    List<TrackedBill> allBills = [];
+    int offset = 0;
+    const batchSize = 1000; // Supabase max per request
 
-    if (!includeArchived) {
-      query = query.eq('is_archived', false);
-    }
-    if (session != null) {
-      query = query.eq('session', session);
-    }
-    if (position != null) {
-      query = query.eq('position', position);
-    }
-    if (priority != null) {
-      query = query.eq('priority', priority);
-    }
-    if (category != null) {
-      query = query.contains('categories', [category]);
-    }
-    if (sponsor != null) {
-      query = query.eq('primary_sponsor_name', sponsor);
-    }
-    if (searchQuery != null && searchQuery.isNotEmpty) {
-      if (searchBillText) {
-        // Search in title, bill identifier, and bill text
-        query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%,current_bill_text.ilike.%$searchQuery%');
-      } else {
-        // Search in title and bill identifier only
-        query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%');
+    while (allBills.length < limit) {
+      var query = _supabase
+          .from('legislation_tracked_bills')
+          .select();
+
+      if (!includeArchived) {
+        query = query.eq('is_archived', false);
       }
+      if (session != null) {
+        query = query.eq('session', session);
+      }
+      if (position != null) {
+        query = query.eq('position', position);
+      }
+      if (priority != null) {
+        query = query.eq('priority', priority);
+      }
+      if (category != null) {
+        query = query.contains('categories', [category]);
+      }
+      if (sponsor != null) {
+        query = query.eq('primary_sponsor_name', sponsor);
+      }
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        if (searchBillText) {
+          // Search in title, bill identifier, and bill text
+          query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%,current_bill_text.ilike.%$searchQuery%');
+        } else {
+          // Search in title and bill identifier only
+          query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%');
+        }
+      }
+
+      final response = await query
+          .order('priority', ascending: true) // critical first
+          .order('latest_action_date', ascending: false)
+          .range(offset, offset + batchSize - 1);
+
+      final bills = (response as List)
+          .map((json) => TrackedBill.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      allBills.addAll(bills);
+
+      // If we got fewer than batchSize, we've reached the end
+      if (bills.length < batchSize) {
+        break;
+      }
+
+      offset += batchSize;
     }
 
-    final response = await query
-        .order('priority', ascending: true) // critical first
-        .order('latest_action_date', ascending: false)
-        .limit(limit);
+    // Apply limit if we fetched more than requested
+    if (allBills.length > limit) {
+      return allBills.sublist(0, limit);
+    }
 
-    return (response as List).map((json) => TrackedBill.fromJson(json as Map<String, dynamic>)).toList();
+    return allBills;
   }
 
   /// Get a single tracked bill by ID
@@ -679,59 +704,116 @@ class LegislationService {
 
   /// Calculate statistics manually if RPC not available
   Future<LegislationStats> _calculateStatisticsManually({String? session}) async {
-    // Use a very high limit to get all bills (Supabase default is 1000)
+    // Use Supabase count queries to get accurate counts (avoids 1000 row limit)
+    final baseQuery = session != null
+        ? _supabase.from('legislation_tracked_bills').select().eq('is_archived', false).eq('session', session)
+        : _supabase.from('legislation_tracked_bills').select().eq('is_archived', false);
+
+    // Run all count queries in parallel for efficiency
+    final results = await Future.wait([
+      // Total count
+      _countQuery(session: session),
+      // Position counts
+      _countQuery(session: session, position: 'support'),
+      _countQuery(session: session, position: 'oppose'),
+      _countQuery(session: session, position: 'watching'),
+      // Priority counts
+      _countQuery(session: session, priority: 'critical'),
+      _countQuery(session: session, priority: 'high'),
+      // Status counts
+      _countQueryWithField(session: session, field: 'passed_lower', value: true),
+      _countQueryWithField(session: session, field: 'passed_upper', value: true),
+      _countQueryWithField(session: session, field: 'signed_by_governor', value: true),
+      _countQueryWithField(session: session, field: 'vetoed', value: true),
+    ]);
+
+    return LegislationStats(
+      totalTracked: results[0],
+      supportCount: results[1],
+      opposeCount: results[2],
+      watchingCount: results[3],
+      criticalCount: results[4],
+      highCount: results[5],
+      passedLowerCount: results[6],
+      passedUpperCount: results[7],
+      signedCount: results[8],
+      vetoedCount: results[9],
+    );
+  }
+
+  /// Helper to count bills with specific criteria
+  Future<int> _countQuery({
+    String? session,
+    String? position,
+    String? priority,
+  }) async {
     var query = _supabase
         .from('legislation_tracked_bills')
-        .select()
+        .select('id')
         .eq('is_archived', false);
 
     if (session != null) {
       query = query.eq('session', session);
     }
-
-    // Set limit to 10000 to ensure we get all bills
-    final bills = await query.limit(10000);
-    final billList = bills as List;
-
-    int supportCount = 0;
-    int opposeCount = 0;
-    int watchingCount = 0;
-    int criticalCount = 0;
-    int highCount = 0;
-    int passedLowerCount = 0;
-    int passedUpperCount = 0;
-    int signedCount = 0;
-    int vetoedCount = 0;
-
-    for (final bill in billList) {
-      final position = bill['position'] as String?;
-      final priority = bill['priority'] as String?;
-
-      if (position == 'support') supportCount++;
-      if (position == 'oppose') opposeCount++;
-      if (position == 'watching') watchingCount++;
-
-      if (priority == 'critical') criticalCount++;
-      if (priority == 'high') highCount++;
-
-      if (bill['passed_lower'] == true) passedLowerCount++;
-      if (bill['passed_upper'] == true) passedUpperCount++;
-      if (bill['signed_by_governor'] == true) signedCount++;
-      if (bill['vetoed'] == true) vetoedCount++;
+    if (position != null) {
+      query = query.eq('position', position);
+    }
+    if (priority != null) {
+      query = query.eq('priority', priority);
     }
 
-    return LegislationStats(
-      totalTracked: billList.length,
-      supportCount: supportCount,
-      opposeCount: opposeCount,
-      watchingCount: watchingCount,
-      criticalCount: criticalCount,
-      highCount: highCount,
-      passedLowerCount: passedLowerCount,
-      passedUpperCount: passedUpperCount,
-      signedCount: signedCount,
-      vetoedCount: vetoedCount,
-    );
+    // Use pagination to count all rows (Supabase limits to 1000 per request)
+    int totalCount = 0;
+    int offset = 0;
+    const batchSize = 1000;
+
+    while (true) {
+      final response = await query.range(offset, offset + batchSize - 1);
+      final count = (response as List).length;
+      totalCount += count;
+
+      if (count < batchSize) {
+        break; // No more rows
+      }
+      offset += batchSize;
+    }
+
+    return totalCount;
+  }
+
+  /// Helper to count bills with a specific boolean field value
+  Future<int> _countQueryWithField({
+    String? session,
+    required String field,
+    required bool value,
+  }) async {
+    var query = _supabase
+        .from('legislation_tracked_bills')
+        .select('id')
+        .eq('is_archived', false)
+        .eq(field, value);
+
+    if (session != null) {
+      query = query.eq('session', session);
+    }
+
+    // Use pagination to count all rows
+    int totalCount = 0;
+    int offset = 0;
+    const batchSize = 1000;
+
+    while (true) {
+      final response = await query.range(offset, offset + batchSize - 1);
+      final count = (response as List).length;
+      totalCount += count;
+
+      if (count < batchSize) {
+        break;
+      }
+      offset += batchSize;
+    }
+
+    return totalCount;
   }
 
   // ==================== SYNC LOG ====================
