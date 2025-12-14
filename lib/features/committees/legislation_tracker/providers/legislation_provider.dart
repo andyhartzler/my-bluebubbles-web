@@ -18,6 +18,7 @@ class LegislationProvider extends ChangeNotifier {
 
   // State
   List<TrackedBill> _trackedBills = [];
+  List<TrackedBill> _allTrackedBills = []; // Unfiltered list for position tabs
   List<LegislationCategory> _categories = [];
   LegislationStats _stats = LegislationStats.empty();
   TrackedBill? _selectedBill;
@@ -84,15 +85,15 @@ class LegislationProvider extends ChangeNotifier {
     return list;
   }
 
-  // Filtered bills by position
+  // Filtered bills by position (use unfiltered list for accurate tab counts)
   List<TrackedBill> get supportedBills =>
-      _trackedBills.where((b) => b.position == 'support').toList();
+      _allTrackedBills.where((b) => b.position == 'support').toList();
   List<TrackedBill> get opposedBills =>
-      _trackedBills.where((b) => b.position == 'oppose').toList();
+      _allTrackedBills.where((b) => b.position == 'oppose').toList();
   List<TrackedBill> get watchingBills =>
-      _trackedBills.where((b) => b.position == 'watching').toList();
+      _allTrackedBills.where((b) => b.position == 'watching').toList();
   List<TrackedBill> get neutralBills =>
-      _trackedBills.where((b) => b.position == 'neutral').toList();
+      _allTrackedBills.where((b) => b.position == 'neutral').toList();
 
   // Filtered bills by priority
   List<TrackedBill> get criticalBills =>
@@ -165,6 +166,7 @@ class LegislationProvider extends ChangeNotifier {
   // Load tracked bills
   Future<void> loadTrackedBills() async {
     try {
+      // Load filtered bills for display
       _trackedBills = await _service.getTrackedBills(
         session: _sessionFilter,
         position: _positionFilter,
@@ -175,9 +177,16 @@ class LegislationProvider extends ChangeNotifier {
         searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
         searchBillText: _searchBillText,
       );
+
+      // Also load unfiltered list for position tabs (only filter by session)
+      _allTrackedBills = await _service.getTrackedBills(
+        session: _sessionFilter,
+        includeArchived: _showArchived,
+      );
     } catch (e) {
       _error = 'Failed to load bills: $e';
       _trackedBills = [];
+      _allTrackedBills = [];
     }
     notifyListeners();
   }
@@ -341,8 +350,18 @@ class LegislationProvider extends ChangeNotifier {
 
     // Trigger AI analysis in the background (don't await)
     if (autoAnalyze) {
-      _aiService.analyzeBill(billId: trackedBill.id).then((_) {
+      _aiService.analyzeBill(billId: trackedBill.id).then((result) async {
+        // Auto-apply category recommendations after analysis
+        if (result.success) {
+          await _aiService.applyAiRecommendations(
+            billId: trackedBill.id,
+            applyPosition: false,
+            applyPriority: false,
+            applyCategories: true,
+          );
+        }
         loadAiAnalysisCounts();
+        loadTrackedBills();
         // Refresh selected bill if it's the one we just tracked
         if (_selectedBill?.id == trackedBill.id) {
           selectBill(trackedBill.id);
@@ -565,6 +584,7 @@ class LegislationProvider extends ChangeNotifier {
   Future<AiAnalysisResult> analyzeBill({
     required String billId,
     bool forceReanalyze = false,
+    bool autoApplyCategories = true,
   }) async {
     _isAnalyzingAi = true;
     notifyListeners();
@@ -575,6 +595,16 @@ class LegislationProvider extends ChangeNotifier {
         forceReanalyze: forceReanalyze,
       );
 
+      // Auto-apply AI category recommendations
+      if (autoApplyCategories && result.success) {
+        await _aiService.applyAiRecommendations(
+          billId: billId,
+          applyPosition: false,  // Don't auto-apply position - needs user review
+          applyPriority: false,  // Don't auto-apply priority - needs user review
+          applyCategories: true, // Auto-apply categories
+        );
+      }
+
       // Refresh the bill data if it's the selected bill
       if (_selectedBill?.id == billId) {
         await selectBill(billId);
@@ -582,6 +612,7 @@ class LegislationProvider extends ChangeNotifier {
 
       // Update counts
       await loadAiAnalysisCounts();
+      await loadTrackedBills();
 
       return result;
     } finally {
