@@ -922,7 +922,7 @@ class JobsService {
     }
 
     if (member != null) {
-      variables['member_name'] = '${member.firstName} ${member.lastName}'.trim();
+      variables['member_name'] = member.name;
     }
 
     if (additionalVariables != null) {
