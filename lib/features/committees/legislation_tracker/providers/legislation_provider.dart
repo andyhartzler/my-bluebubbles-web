@@ -289,7 +289,7 @@ class LegislationProvider extends ChangeNotifier {
 
   Future<void> _loadBillSponsors(String billId) async {
     try {
-      _selectedBillSponsors = await _service.getBillSponsors(billId);
+      _selectedBillSponsors = await _service.getBillSponsorsWithLegislators(billId);
     } catch (e) {
       _selectedBillSponsors = [];
     }

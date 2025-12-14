@@ -73,6 +73,11 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
         _senateLegislators = results[0] as List<Legislator>;
         _houseLegislators = results[1] as List<Legislator>;
         _stats = results[2] as LegislatorStats;
+
+        // Sort legislators numerically by district
+        _senateLegislators.sort((a, b) => _compareDistricts(a.district, b.district));
+        _houseLegislators.sort((a, b) => _compareDistricts(a.district, b.district));
+
         _isLoading = false;
       });
     } catch (e) {
@@ -416,5 +421,19 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
         ),
       ),
     );
+  }
+
+  /// Compare district strings numerically (e.g., "1" < "2" < "10")
+  int _compareDistricts(String a, String b) {
+    // Try to parse as integers for numeric comparison
+    final aNum = int.tryParse(a);
+    final bNum = int.tryParse(b);
+
+    if (aNum != null && bNum != null) {
+      return aNum.compareTo(bNum);
+    }
+
+    // Fall back to string comparison if not purely numeric
+    return a.compareTo(b);
   }
 }
