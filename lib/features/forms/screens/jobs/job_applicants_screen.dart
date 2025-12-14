@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/job.dart';
 import '../../models/job_application.dart';
 import '../../services/jobs_service.dart';
 import '../../widgets/job_applicant_card.dart';
+import '../../../../models/crm/member.dart';
+import '../../../../screens/crm/member_detail_screen.dart';
 
 /// Screen to display and manage applicants for a specific job
 class JobApplicantsScreen extends StatefulWidget {
@@ -23,11 +26,14 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
   final _jobsService = JobsService();
   String _statusFilter = 'all';
   Map<String, int>? _statusCounts;
+  Map<String, Member> _members = {};
+  bool _membersLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _loadStatusCounts();
+    _loadMembers();
   }
 
   Future<void> _loadStatusCounts() async {
@@ -41,6 +47,47 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
     } catch (_) {
       // Ignore
     }
+  }
+
+  Future<void> _loadMembers() async {
+    try {
+      final applications = await _jobsService.getJobApplications(widget.job.id);
+      final memberIds = applications
+          .where((a) => a.memberId != null)
+          .map((a) => a.memberId!)
+          .toList();
+
+      if (memberIds.isNotEmpty) {
+        final members = await _jobsService.getMembersByIds(memberIds);
+        if (mounted) {
+          setState(() {
+            _members = members;
+            _membersLoaded = true;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _membersLoaded = true;
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _membersLoaded = true;
+        });
+      }
+    }
+  }
+
+  void _navigateToMemberProfile(Member member) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MemberDetailScreen(memberId: member.id),
+      ),
+    );
   }
 
   @override
@@ -93,15 +140,23 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
                 return RefreshIndicator(
                   onRefresh: () async {
                     await _loadStatusCounts();
+                    await _loadMembers();
                   },
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: applications.length,
                     itemBuilder: (context, index) {
                       final application = applications[index];
+                      final member = application.memberId != null
+                          ? _members[application.memberId]
+                          : null;
                       return JobApplicantCard(
                         application: application,
-                        onTap: () => _showApplicantDetails(context, application),
+                        member: member,
+                        onTap: () => _showApplicantDetails(context, application, member),
+                        onMemberTap: member != null
+                            ? () => _navigateToMemberProfile(member)
+                            : null,
                         onStatusChanged: (newStatus) => _updateApplicationStatus(application, newStatus),
                       );
                     },
@@ -323,9 +378,10 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
     );
   }
 
-  void _showApplicantDetails(BuildContext context, JobApplication application) {
+  void _showApplicantDetails(BuildContext context, JobApplication application, Member? member) {
     final theme = Theme.of(context);
     final statusColor = Color(JobApplication.statusColor(application.status));
+    final photoUrl = member?.primaryProfilePhotoUrl;
 
     showModalBottomSheet(
       context: context,
@@ -353,36 +409,59 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: theme.colorScheme.primaryContainer,
-                    child: Text(
-                      _getInitials(application.applicantName),
-                      style: TextStyle(
-                        color: theme.colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
+                  GestureDetector(
+                    onTap: member != null ? () {
+                      Navigator.pop(context);
+                      _navigateToMemberProfile(member);
+                    } : null,
+                    child: _buildDetailAvatar(theme, photoUrl, application.applicantName, member != null),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          application.applicantName,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
+                    child: GestureDetector(
+                      onTap: member != null ? () {
+                        Navigator.pop(context);
+                        _navigateToMemberProfile(member);
+                      } : null,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  application.applicantName,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: member != null ? theme.colorScheme.primary : null,
+                                  ),
+                                ),
+                              ),
+                              if (member != null) ...[
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.verified,
+                                  size: 20,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ],
+                            ],
                           ),
-                        ),
-                        Text(
-                          application.applicantEmail,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                          Text(
+                            application.applicantEmail,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
-                      ],
+                          if (member != null)
+                            Text(
+                              'Tap to view member profile',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                   Container(
@@ -609,6 +688,58 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
     // TODO: Implement export functionality
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Export functionality coming soon')),
+    );
+  }
+
+  Widget _buildDetailAvatar(ThemeData theme, String? photoUrl, String name, bool isMember) {
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 28,
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: photoUrl,
+            width: 56,
+            height: 56,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Center(
+              child: Text(
+                _getInitials(name),
+                style: TextStyle(
+                  color: theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+            ),
+            errorWidget: (context, url, error) => Text(
+              _getInitials(name),
+              style: TextStyle(
+                color: theme.colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 28,
+      backgroundColor: isMember
+          ? theme.colorScheme.primaryContainer
+          : theme.colorScheme.surfaceContainerHighest,
+      child: Text(
+        _getInitials(name),
+        style: TextStyle(
+          color: isMember
+              ? theme.colorScheme.onPrimaryContainer
+              : theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+      ),
     );
   }
 
