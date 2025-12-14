@@ -132,6 +132,8 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               // Tab bar
               TabBar(
                 controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
                 tabs: [
                   Tab(
                     child: Row(

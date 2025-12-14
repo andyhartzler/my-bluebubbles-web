@@ -30,7 +30,7 @@ class LegislationService {
     bool includeArchived = false,
     String? searchQuery,
     bool searchBillText = false,
-    int limit = 1000,
+    int limit = 5000,
   }) async {
     var query = _supabase
         .from('legislation_tracked_bills')

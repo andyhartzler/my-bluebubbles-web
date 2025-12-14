@@ -113,6 +113,12 @@ class CategoryChips extends StatelessWidget {
   }
 
   Widget _buildEditableChips(BuildContext context, ThemeData theme) {
+    // If categories are already selected, show compact view with edit button
+    if (selectedCategories.isNotEmpty) {
+      return _buildCompactEditableChips(context, theme);
+    }
+
+    // Otherwise, show all available categories for initial selection
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -146,6 +152,92 @@ class CategoryChips extends StatelessWidget {
               },
             );
           }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompactEditableChips(BuildContext context, ThemeData theme) {
+    // Get category objects for selected categories
+    final selectedCategoryObjects = selectedCategories
+        .map((name) => availableCategories.firstWhere(
+              (c) => c.name == name || c.id == name,
+              orElse: () => LegislationCategory(
+                id: name,
+                name: name,
+                displayName: name,
+              ),
+            ))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Categories',
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            InkWell(
+              onTap: () async {
+                final result = await showDialog<List<String>>(
+                  context: context,
+                  builder: (context) => CategorySelectionDialog(
+                    initialSelection: selectedCategories,
+                    categories: availableCategories,
+                  ),
+                );
+                if (result != null) {
+                  onChanged(result);
+                }
+              },
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.edit,
+                      size: 14,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Edit',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: selectedCategoryObjects.map((category) => _buildCategoryChip(
+                context,
+                theme,
+                category,
+                isSelected: true,
+                onTap: () {
+                  // Allow removing by tapping
+                  final newSelection = List<String>.from(selectedCategories);
+                  newSelection.remove(category.name);
+                  newSelection.remove(category.id);
+                  onChanged(newSelection);
+                },
+              )).toList(),
         ),
       ],
     );
