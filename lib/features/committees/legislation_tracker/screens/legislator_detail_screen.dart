@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/legislator.dart';
@@ -30,6 +32,8 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
   Legislator? _legislator;
   List<TrackedBill> _sponsoredBills = [];
   bool _isLoading = true;
+  bool _isUploadingPhoto = false;
+  bool _isSavingBio = false;
   String? _error;
 
   @override
@@ -60,6 +64,125 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _pickAndUploadPhoto() async {
+    if (_isUploadingPhoto || _legislator == null) return;
+
+    final result = await file_picker.FilePicker.platform.pickFiles(
+      type: file_picker.FileType.custom,
+      allowedExtensions: const ['png', 'jpg', 'jpeg', 'heic', 'heif', 'webp'],
+      withData: true,
+      withReadStream: !kIsWeb,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+
+    final picked = result.files.first;
+    final bytes = picked.bytes;
+    if (bytes == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to read selected photo')),
+      );
+      return;
+    }
+
+    setState(() => _isUploadingPhoto = true);
+
+    try {
+      final updated = await _service.uploadLegislatorPhoto(
+        legislatorId: _legislator!.id,
+        fileName: picked.name,
+        fileBytes: bytes,
+      );
+
+      if (!mounted) return;
+      if (updated != null) {
+        setState(() => _legislator = updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo uploaded successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to update photo')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading photo: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingPhoto = false);
+      }
+    }
+  }
+
+  Future<void> _editBiography() async {
+    if (_legislator == null) return;
+
+    final controller = TextEditingController(text: _legislator!.biography ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit Biography for ${_legislator!.name}'),
+        content: SizedBox(
+          width: 500,
+          child: TextField(
+            controller: controller,
+            maxLines: 10,
+            decoration: const InputDecoration(
+              hintText: 'Enter biography...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() => _isSavingBio = true);
+
+    try {
+      final updated = await _service.updateLegislatorBiography(
+        legislatorId: _legislator!.id,
+        biography: result,
+      );
+
+      if (!mounted) return;
+      if (updated != null) {
+        setState(() => _legislator = updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Biography updated successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to update biography')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating biography: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingBio = false);
+      }
     }
   }
 
@@ -126,9 +249,8 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
                 // Contact section
                 _buildContactSection(theme, legislator),
 
-                // Biography section
-                if (legislator.biography != null && legislator.biography!.isNotEmpty)
-                  _buildBiographySection(theme, legislator),
+                // Biography section (always show with edit capability)
+                _buildBiographySection(theme, legislator),
 
                 // Bills section
                 _buildBillsSection(theme, legislator),
@@ -160,32 +282,66 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Photo
-              Container(
-                width: 120,
-                height: 150,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+              // Photo with upload overlay
+              Stack(
+                children: [
+                  Container(
+                    width: 120,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: photoUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: photoUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => _buildPhotoPlaceholder(legislator),
-                          errorWidget: (context, url, error) => _buildPhotoPlaceholder(legislator),
-                        )
-                      : _buildPhotoPlaceholder(legislator),
-                ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: photoUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: photoUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => _buildPhotoPlaceholder(legislator),
+                              errorWidget: (context, url, error) => _buildPhotoPlaceholder(legislator),
+                            )
+                          : _buildPhotoPlaceholder(legislator),
+                    ),
+                  ),
+                  // Upload button overlay
+                  Positioned(
+                    right: 4,
+                    bottom: 4,
+                    child: Material(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                      child: InkWell(
+                        onTap: _isUploadingPhoto ? null : _pickAndUploadPhoto,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: _isUploadingPhoto
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.camera_alt,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 16),
 
@@ -392,24 +548,76 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
   }
 
   Widget _buildBiographySection(ThemeData theme, Legislator legislator) {
+    final hasBiography = legislator.biography != null && legislator.biography!.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Biography',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Text(
+                'Biography',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              if (_isSavingBio)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                IconButton(
+                  icon: Icon(hasBiography ? Icons.edit : Icons.add),
+                  onPressed: _editBiography,
+                  tooltip: hasBiography ? 'Edit biography' : 'Add biography',
+                ),
+            ],
           ),
           const SizedBox(height: 12),
-          Text(
-            legislator.biography!,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              height: 1.5,
+          if (hasBiography)
+            Text(
+              legislator.biography!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                height: 1.5,
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.article_outlined,
+                      size: 48,
+                      color: theme.colorScheme.outline.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No biography available',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.icon(
+                      onPressed: _editBiography,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Biography'),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );

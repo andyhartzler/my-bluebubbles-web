@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/tracked_bill.dart';
 import '../models/bill_action.dart';
@@ -458,6 +459,49 @@ class LegislationService {
         .order('latest_action_date', ascending: false);
 
     return (response as List).map((json) => TrackedBill.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  /// Update legislator biography
+  Future<Legislator?> updateLegislatorBiography({
+    required String legislatorId,
+    required String biography,
+  }) async {
+    final response = await _supabase
+        .from('legislation_legislators')
+        .update({'biography': biography})
+        .eq('id', legislatorId)
+        .select()
+        .maybeSingle();
+
+    return response != null ? Legislator.fromJson(response) : null;
+  }
+
+  /// Upload legislator photo to storage and update record
+  Future<Legislator?> uploadLegislatorPhoto({
+    required String legislatorId,
+    required String fileName,
+    required List<int> fileBytes,
+  }) async {
+    // Generate unique storage path
+    final extension = fileName.split('.').last.toLowerCase();
+    final storagePath = '$legislatorId.$extension';
+
+    // Upload to legislator-photos bucket
+    await _supabase.storage.from('legislator-photos').uploadBinary(
+      storagePath,
+      Uint8List.fromList(fileBytes),
+      fileOptions: const FileOptions(upsert: true),
+    );
+
+    // Update legislator record with storage path
+    final response = await _supabase
+        .from('legislation_legislators')
+        .update({'photo_storage_path': storagePath})
+        .eq('id', legislatorId)
+        .select()
+        .maybeSingle();
+
+    return response != null ? Legislator.fromJson(response) : null;
   }
 
   /// Get legislator statistics
