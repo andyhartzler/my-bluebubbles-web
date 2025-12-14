@@ -2,7 +2,10 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/job.dart';
 import '../models/job_application.dart';
+import '../models/job_notification_template.dart';
+import '../../../models/crm/member.dart';
 import '../../../services/crm/supabase_service.dart';
+import '../../../services/crm/crm_email_service.dart';
 
 class JobsService {
   final _supabase = Supabase.instance.client;
@@ -116,7 +119,13 @@ class JobsService {
       'approved_by': _supabase.auth.currentUser?.id,
     }).eq('id', id);
 
-    // TODO: Send approval email to submitter
+    // Send approval notification
+    try {
+      final job = await getJob(id);
+      await notifyJobApproved(job);
+    } catch (_) {
+      // Don't fail the operation if notification fails
+    }
   }
 
   Future<void> rejectJob(String id, String reason) async {
@@ -125,7 +134,13 @@ class JobsService {
       'rejection_reason': reason,
     }).eq('id', id);
 
-    // TODO: Send rejection email to submitter
+    // Send rejection notification
+    try {
+      final job = await getJob(id);
+      await notifyJobRejected(job, reason);
+    } catch (_) {
+      // Don't fail the operation if notification fails
+    }
   }
 
   Future<void> updateJob(String id, Map<String, dynamic> updates) async {
@@ -456,10 +471,25 @@ class JobsService {
 
   /// Update application status
   Future<void> updateApplicationStatus(String applicationId, String status) async {
+    // Get current application to find old status
+    final currentApp = await getJobApplication(applicationId);
+    final oldStatus = currentApp.status;
+
     await _writeClient
         .from('job_applications')
         .update({'status': status})
         .eq('id', applicationId);
+
+    // Send notification if status actually changed
+    if (oldStatus != status) {
+      try {
+        final job = await getJob(currentApp.jobId);
+        final updatedApp = await getJobApplication(applicationId);
+        await notifyApplicationStatusChanged(job, updatedApp, oldStatus);
+      } catch (_) {
+        // Don't fail the operation if notification fails
+      }
+    }
   }
 
   /// Delete a job application
@@ -519,5 +549,488 @@ class JobsService {
     }
 
     return result;
+  }
+
+  // ==================== MEMBER LOOKUP ====================
+
+  /// Get member by ID
+  Future<Member?> getMemberById(String memberId) async {
+    try {
+      final response = await _readClient
+          .from('members')
+          .select()
+          .eq('id', memberId)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return Member.fromJson(response);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Get members for a list of member IDs
+  Future<Map<String, Member>> getMembersByIds(List<String> memberIds) async {
+    if (memberIds.isEmpty) return {};
+
+    try {
+      final response = await _readClient
+          .from('members')
+          .select()
+          .inFilter('id', memberIds);
+
+      final members = <String, Member>{};
+      for (final row in response as List) {
+        final member = Member.fromJson(row);
+        members[member.id] = member;
+      }
+      return members;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Get applications with their associated members
+  Future<List<Map<String, dynamic>>> getApplicationsWithMembers(String jobId) async {
+    final applications = await getJobApplications(jobId);
+    final memberIds = applications
+        .where((a) => a.memberId != null)
+        .map((a) => a.memberId!)
+        .toList();
+
+    final members = await getMembersByIds(memberIds);
+
+    return applications.map((app) => {
+      'application': app,
+      'member': app.memberId != null ? members[app.memberId] : null,
+    }).toList();
+  }
+
+  // ==================== NOTIFICATION TEMPLATES ====================
+
+  /// Get all notification templates
+  Future<List<JobNotificationTemplate>> getNotificationTemplates() async {
+    final response = await _readClient
+        .from('job_notification_templates')
+        .select()
+        .order('trigger_type')
+        .order('recipient_type');
+
+    return (response as List)
+        .map((json) => JobNotificationTemplate.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get templates by trigger type
+  Future<List<JobNotificationTemplate>> getTemplatesByTrigger(String triggerType) async {
+    final response = await _readClient
+        .from('job_notification_templates')
+        .select()
+        .eq('trigger_type', triggerType)
+        .order('recipient_type');
+
+    return (response as List)
+        .map((json) => JobNotificationTemplate.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get the default template for a trigger/recipient combination
+  Future<JobNotificationTemplate?> getDefaultTemplate(
+    String triggerType,
+    String recipientType,
+  ) async {
+    try {
+      final response = await _readClient
+          .from('job_notification_templates')
+          .select()
+          .eq('trigger_type', triggerType)
+          .eq('recipient_type', recipientType)
+          .eq('is_active', true)
+          .eq('is_default', true)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return JobNotificationTemplate.fromJson(response);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Get a single template by ID
+  Future<JobNotificationTemplate?> getTemplate(String id) async {
+    try {
+      final response = await _readClient
+          .from('job_notification_templates')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return JobNotificationTemplate.fromJson(response);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Create a new notification template
+  Future<String> createTemplate({
+    required String triggerType,
+    required String recipientType,
+    required String name,
+    String? description,
+    bool emailEnabled = true,
+    String? emailSubject,
+    String? emailHtml,
+    String? emailPlainText,
+    bool smsEnabled = false,
+    String? smsBody,
+    bool isActive = true,
+    bool isDefault = false,
+  }) async {
+    final userId = _supabase.auth.currentUser?.id;
+
+    final response = await _writeClient
+        .from('job_notification_templates')
+        .insert({
+          'trigger_type': triggerType,
+          'recipient_type': recipientType,
+          'name': name,
+          if (description != null) 'description': description,
+          'email_enabled': emailEnabled,
+          if (emailSubject != null) 'email_subject': emailSubject,
+          if (emailHtml != null) 'email_html': emailHtml,
+          if (emailPlainText != null) 'email_plain_text': emailPlainText,
+          'sms_enabled': smsEnabled,
+          if (smsBody != null) 'sms_body': smsBody,
+          'is_active': isActive,
+          'is_default': isDefault,
+          if (userId != null) 'created_by': userId,
+        })
+        .select()
+        .single();
+
+    return response['id'] as String;
+  }
+
+  /// Update an existing template
+  Future<void> updateTemplate(
+    String id, {
+    String? name,
+    String? description,
+    bool? emailEnabled,
+    String? emailSubject,
+    String? emailHtml,
+    String? emailPlainText,
+    bool? smsEnabled,
+    String? smsBody,
+    bool? isActive,
+    bool? isDefault,
+  }) async {
+    final userId = _supabase.auth.currentUser?.id;
+    final updates = <String, dynamic>{};
+
+    if (name != null) updates['name'] = name;
+    if (description != null) updates['description'] = description;
+    if (emailEnabled != null) updates['email_enabled'] = emailEnabled;
+    if (emailSubject != null) updates['email_subject'] = emailSubject;
+    if (emailHtml != null) updates['email_html'] = emailHtml;
+    if (emailPlainText != null) updates['email_plain_text'] = emailPlainText;
+    if (smsEnabled != null) updates['sms_enabled'] = smsEnabled;
+    if (smsBody != null) updates['sms_body'] = smsBody;
+    if (isActive != null) updates['is_active'] = isActive;
+    if (isDefault != null) updates['is_default'] = isDefault;
+    if (userId != null) updates['updated_by'] = userId;
+
+    if (updates.isNotEmpty) {
+      await _writeClient.from('job_notification_templates').update(updates).eq('id', id);
+    }
+  }
+
+  /// Delete a template
+  Future<void> deleteTemplate(String id) async {
+    await _writeClient.from('job_notification_templates').delete().eq('id', id);
+  }
+
+  /// Get template variables for a trigger type
+  Future<List<Map<String, dynamic>>> getTemplateVariables(String triggerType) async {
+    final response = await _readClient
+        .from('job_notification_template_variables')
+        .select()
+        .eq('trigger_type', triggerType)
+        .order('variable_name');
+
+    return (response as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Get all template variables
+  Future<Map<String, List<Map<String, dynamic>>>> getAllTemplateVariables() async {
+    final response = await _readClient
+        .from('job_notification_template_variables')
+        .select()
+        .order('trigger_type')
+        .order('variable_name');
+
+    final result = <String, List<Map<String, dynamic>>>{};
+    for (final row in response as List) {
+      final triggerType = row['trigger_type'] as String;
+      result.putIfAbsent(triggerType, () => []).add(row as Map<String, dynamic>);
+    }
+    return result;
+  }
+
+  /// Toggle template active status
+  Future<void> toggleTemplateActive(String id, bool isActive) async {
+    await _writeClient
+        .from('job_notification_templates')
+        .update({'is_active': isActive})
+        .eq('id', id);
+  }
+
+  /// Set a template as default (and unset others for same trigger/recipient)
+  Future<void> setTemplateAsDefault(String id) async {
+    final template = await getTemplate(id);
+    if (template == null) return;
+
+    // Unset other defaults for this trigger/recipient combo
+    await _writeClient
+        .from('job_notification_templates')
+        .update({'is_default': false})
+        .eq('trigger_type', template.triggerType)
+        .eq('recipient_type', template.recipientType);
+
+    // Set this one as default
+    await _writeClient
+        .from('job_notification_templates')
+        .update({'is_default': true})
+        .eq('id', id);
+  }
+
+  // ==================== NOTIFICATION SENDING ====================
+
+  final _emailService = CRMEmailService();
+
+  /// Send notification for a job event
+  Future<void> sendJobNotification({
+    required String triggerType,
+    required String recipientType,
+    required Job job,
+    JobApplication? application,
+    Member? member,
+    Map<String, String>? additionalVariables,
+  }) async {
+    // Get the default active template for this trigger/recipient combo
+    final template = await getDefaultTemplate(triggerType, recipientType);
+    if (template == null || !template.isActive) {
+      return; // No active template configured
+    }
+
+    // Build variable substitution map
+    final variables = _buildVariables(
+      job: job,
+      application: application,
+      member: member,
+      additionalVariables: additionalVariables,
+    );
+
+    // Determine recipient email
+    String? recipientEmail;
+    String? recipientName;
+
+    if (recipientType == 'job_submitter') {
+      recipientEmail = job.submitterEmail;
+      recipientName = job.submitterName;
+    } else if (recipientType == 'job_applicant' && application != null) {
+      recipientEmail = application.applicantEmail;
+      recipientName = application.applicantName;
+    }
+
+    if (recipientEmail == null) {
+      return; // No recipient email available
+    }
+
+    // Send email if enabled
+    if (template.emailEnabled && template.emailSubject != null) {
+      try {
+        final subject = _substituteVariables(template.emailSubject!, variables);
+        final htmlBody = template.emailHtml != null
+            ? _substituteVariables(template.emailHtml!, variables)
+            : null;
+        final textBody = template.emailPlainText != null
+            ? _substituteVariables(template.emailPlainText!, variables)
+            : null;
+
+        await _emailService.sendEmail(
+          to: [recipientEmail],
+          subject: subject,
+          htmlBody: htmlBody,
+          textBody: textBody,
+        );
+
+        // Log the notification
+        await _logNotification(
+          templateId: template.id,
+          recipientEmail: recipientEmail,
+          recipientName: recipientName,
+          jobId: job.id,
+          applicationId: application?.id,
+          channel: 'email',
+          status: 'sent',
+        );
+      } catch (e) {
+        // Log failed notification
+        await _logNotification(
+          templateId: template.id,
+          recipientEmail: recipientEmail,
+          recipientName: recipientName,
+          jobId: job.id,
+          applicationId: application?.id,
+          channel: 'email',
+          status: 'failed',
+          errorMessage: e.toString(),
+        );
+      }
+    }
+
+    // TODO: Add SMS sending when SMS service is integrated
+  }
+
+  /// Build variable map for template substitution
+  Map<String, String> _buildVariables({
+    required Job job,
+    JobApplication? application,
+    Member? member,
+    Map<String, String>? additionalVariables,
+  }) {
+    final variables = <String, String>{
+      'job_title': job.title,
+      'job_organization': job.organization,
+      'job_type': job.jobType,
+      'job_location': job.location ?? 'Remote',
+      'job_url': 'https://moyd.org/jobs/${job.slug ?? job.id}',
+      'submitter_name': job.submitterName,
+      'submitter_email': job.submitterEmail,
+    };
+
+    if (application != null) {
+      variables.addAll({
+        'applicant_name': application.applicantName,
+        'applicant_email': application.applicantEmail,
+        'applicant_phone': application.applicantPhone ?? '',
+        'applicant_city': application.applicantCity ?? '',
+        'status': application.status,
+      });
+    }
+
+    if (member != null) {
+      variables['member_name'] = '${member.firstName} ${member.lastName}'.trim();
+    }
+
+    if (additionalVariables != null) {
+      variables.addAll(additionalVariables);
+    }
+
+    return variables;
+  }
+
+  /// Substitute {{variable}} placeholders with actual values
+  String _substituteVariables(String template, Map<String, String> variables) {
+    var result = template;
+    for (final entry in variables.entries) {
+      result = result.replaceAll('{{${entry.key}}}', entry.value);
+    }
+    // Remove any unsubstituted variables
+    result = result.replaceAll(RegExp(r'\{\{[^}]+\}\}'), '');
+    return result;
+  }
+
+  /// Log a notification to the notification_log table
+  Future<void> _logNotification({
+    required String templateId,
+    required String recipientEmail,
+    String? recipientName,
+    required String jobId,
+    String? applicationId,
+    required String channel,
+    required String status,
+    String? errorMessage,
+  }) async {
+    try {
+      await _writeClient.from('job_notification_log').insert({
+        'template_id': templateId,
+        'job_id': jobId,
+        if (applicationId != null) 'application_id': applicationId,
+        'recipient_email': recipientEmail,
+        if (recipientName != null) 'recipient_name': recipientName,
+        'channel': channel,
+        'status': status,
+        if (errorMessage != null) 'error_message': errorMessage,
+        'sent_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {
+      // Ignore logging errors
+    }
+  }
+
+  /// Send job submitted notification to submitter
+  Future<void> notifyJobSubmitted(Job job) async {
+    await sendJobNotification(
+      triggerType: 'job_submitted',
+      recipientType: 'job_submitter',
+      job: job,
+    );
+  }
+
+  /// Send job approved notification to submitter
+  Future<void> notifyJobApproved(Job job) async {
+    await sendJobNotification(
+      triggerType: 'job_approved',
+      recipientType: 'job_submitter',
+      job: job,
+    );
+  }
+
+  /// Send job rejected notification to submitter
+  Future<void> notifyJobRejected(Job job, String reason) async {
+    await sendJobNotification(
+      triggerType: 'job_rejected',
+      recipientType: 'job_submitter',
+      job: job,
+      additionalVariables: {'rejection_reason': reason},
+    );
+  }
+
+  /// Send application received notification to job poster
+  Future<void> notifyApplicationReceived(Job job, JobApplication application) async {
+    await sendJobNotification(
+      triggerType: 'application_received',
+      recipientType: 'job_submitter',
+      job: job,
+      application: application,
+    );
+  }
+
+  /// Send application submitted confirmation to applicant
+  Future<void> notifyApplicationSubmitted(Job job, JobApplication application) async {
+    await sendJobNotification(
+      triggerType: 'application_submitted',
+      recipientType: 'job_applicant',
+      job: job,
+      application: application,
+    );
+  }
+
+  /// Send application status changed notification to applicant
+  Future<void> notifyApplicationStatusChanged(
+    Job job,
+    JobApplication application,
+    String oldStatus,
+  ) async {
+    await sendJobNotification(
+      triggerType: 'application_status_changed',
+      recipientType: 'job_applicant',
+      job: job,
+      application: application,
+      additionalVariables: {'old_status': oldStatus},
+    );
   }
 }

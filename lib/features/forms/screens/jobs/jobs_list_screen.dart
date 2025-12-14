@@ -6,6 +6,7 @@ import '../../widgets/job_card.dart';
 import 'job_builder_screen.dart';
 import 'job_detail_screen.dart';
 import 'job_applicants_screen.dart';
+import 'job_notification_templates_screen.dart';
 
 class JobsListScreen extends StatefulWidget {
   const JobsListScreen({super.key});
@@ -258,9 +259,30 @@ class _JobsListScreenState extends State<JobsListScreen>
                   color: theme.colorScheme.primary,
                 ),
               ),
+              Container(
+                width: 1,
+                height: 40,
+                color: theme.colorScheme.onPrimaryContainer.withOpacity(0.2),
+              ),
+              // Notifications settings button
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined),
+                onPressed: _openNotificationTemplates,
+                tooltip: 'Notification Templates',
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  void _openNotificationTemplates() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const JobNotificationTemplatesScreen(),
       ),
     );
   }

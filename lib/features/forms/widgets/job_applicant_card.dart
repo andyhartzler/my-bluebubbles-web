@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/job_application.dart';
+import '../../../models/crm/member.dart';
 
 /// Card widget to display a job applicant
 class JobApplicantCard extends StatelessWidget {
   final JobApplication application;
+  final Member? member;
   final VoidCallback? onTap;
+  final VoidCallback? onMemberTap;
   final ValueChanged<String>? onStatusChanged;
 
   const JobApplicantCard({
     super.key,
     required this.application,
+    this.member,
     this.onTap,
+    this.onMemberTap,
     this.onStatusChanged,
   });
 
@@ -33,36 +39,57 @@ class JobApplicantCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  // Avatar
-                  CircleAvatar(
-                    backgroundColor: theme.colorScheme.primaryContainer,
-                    child: Text(
-                      _getInitials(application.applicantName),
-                      style: TextStyle(
-                        color: theme.colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  // Avatar - clickable to go to member profile
+                  GestureDetector(
+                    onTap: member != null ? onMemberTap : null,
+                    child: _buildAvatar(theme),
                   ),
                   const SizedBox(width: 12),
                   // Name and email
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          application.applicantName,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                    child: GestureDetector(
+                      onTap: member != null ? onMemberTap : null,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  application.applicantName,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: member != null ? theme.colorScheme.primary : null,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (member != null) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.verified,
+                                  size: 16,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ],
+                            ],
                           ),
-                        ),
-                        Text(
-                          application.applicantEmail,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                          Text(
+                            application.applicantEmail,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
-                      ],
+                          if (member != null)
+                            Text(
+                              'Member',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                   // Status chip
@@ -124,6 +151,16 @@ class JobApplicantCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
                       ),
+                    if (member != null)
+                      TextButton.icon(
+                        onPressed: onMemberTap,
+                        icon: const Icon(Icons.person_outlined, size: 16),
+                        label: const Text('Profile'),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                      ),
                     const Spacer(),
                     // Status dropdown
                     if (onStatusChanged != null)
@@ -162,6 +199,57 @@ class JobApplicantCard extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatar(ThemeData theme) {
+    final photoUrl = member?.primaryProfilePhotoUrl;
+
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 24,
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: photoUrl,
+            width: 48,
+            height: 48,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Center(
+              child: Text(
+                _getInitials(application.applicantName),
+                style: TextStyle(
+                  color: theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            errorWidget: (context, url, error) => Text(
+              _getInitials(application.applicantName),
+              style: TextStyle(
+                color: theme.colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: member != null
+          ? theme.colorScheme.primaryContainer
+          : theme.colorScheme.surfaceContainerHighest,
+      child: Text(
+        _getInitials(application.applicantName),
+        style: TextStyle(
+          color: member != null
+              ? theme.colorScheme.onPrimaryContainer
+              : theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
