@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/job.dart';
+import '../models/job_application.dart';
 import '../../../services/crm/supabase_service.dart';
 
 class JobsService {
@@ -344,5 +345,179 @@ class JobsService {
     if (updates.isNotEmpty) {
       await _writeClient.from('jobs').update(updates).eq('id', id);
     }
+  }
+
+  // ==================== JOB APPLICATIONS ====================
+
+  /// Get all applications for a specific job
+  Future<List<JobApplication>> getJobApplications(String jobId) async {
+    final response = await _readClient
+        .from('job_applications')
+        .select()
+        .eq('job_id', jobId)
+        .order('created_at', ascending: false);
+
+    return (response as List)
+        .map((json) => JobApplication.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get applications for a job filtered by status
+  Future<List<JobApplication>> getJobApplicationsByStatus(
+    String jobId,
+    String status,
+  ) async {
+    final response = await _readClient
+        .from('job_applications')
+        .select()
+        .eq('job_id', jobId)
+        .eq('status', status)
+        .order('created_at', ascending: false);
+
+    return (response as List)
+        .map((json) => JobApplication.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get a single job application by ID
+  Future<JobApplication> getJobApplication(String id) async {
+    final response = await _readClient
+        .from('job_applications')
+        .select()
+        .eq('id', id)
+        .single();
+
+    return JobApplication.fromJson(response);
+  }
+
+  /// Watch applications for a specific job
+  Stream<List<JobApplication>> watchJobApplications(String jobId) {
+    final controller = StreamController<List<JobApplication>>.broadcast();
+    Timer? timer;
+
+    void fetchApplications() async {
+      try {
+        final applications = await getJobApplications(jobId);
+        if (!controller.isClosed) {
+          controller.add(applications);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    // Initial fetch
+    fetchApplications();
+
+    // Poll every 5 seconds for updates
+    timer = Timer.periodic(const Duration(seconds: 5), (_) => fetchApplications());
+
+    controller.onCancel = () {
+      timer?.cancel();
+    };
+
+    return controller.stream;
+  }
+
+  /// Get application count for a job
+  Future<int> getApplicationCount(String jobId) async {
+    final response = await _readClient
+        .from('job_applications')
+        .select('id')
+        .eq('job_id', jobId);
+
+    return (response as List).length;
+  }
+
+  /// Get application counts by status for a job
+  Future<Map<String, int>> getApplicationCountsByStatus(String jobId) async {
+    final response = await _readClient
+        .from('job_applications')
+        .select('status')
+        .eq('job_id', jobId);
+
+    final counts = <String, int>{
+      'submitted': 0,
+      'reviewed': 0,
+      'shortlisted': 0,
+      'rejected': 0,
+      'accepted': 0,
+    };
+
+    for (final row in response as List) {
+      final status = row['status'] as String? ?? 'submitted';
+      counts[status] = (counts[status] ?? 0) + 1;
+    }
+
+    return counts;
+  }
+
+  /// Update application status
+  Future<void> updateApplicationStatus(String applicationId, String status) async {
+    await _writeClient
+        .from('job_applications')
+        .update({'status': status})
+        .eq('id', applicationId);
+  }
+
+  /// Delete a job application
+  Future<void> deleteJobApplication(String id) async {
+    await _writeClient
+        .from('job_applications')
+        .delete()
+        .eq('id', id);
+  }
+
+  /// Get all applications across all jobs (for overview)
+  Future<List<JobApplication>> getAllApplications({
+    String? statusFilter,
+    int limit = 100,
+  }) async {
+    var query = _readClient.from('job_applications').select();
+
+    if (statusFilter != null) {
+      query = query.eq('status', statusFilter);
+    }
+
+    final response = await query
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return (response as List)
+        .map((json) => JobApplication.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get jobs with their application counts
+  Future<List<Map<String, dynamic>>> getJobsWithApplicationCounts(String statusFilter) async {
+    List<Job> jobs;
+    if (statusFilter == 'all') {
+      final response = await _readClient
+          .from('jobs')
+          .select()
+          .order('created_at', ascending: false);
+      jobs = (response as List).map((json) => Job.fromJson(json)).toList();
+    } else {
+      final response = await _readClient
+          .from('jobs')
+          .select()
+          .eq('status', statusFilter)
+          .order('created_at', ascending: false);
+      jobs = (response as List).map((json) => Job.fromJson(json)).toList();
+    }
+
+    // Fetch application counts for each job
+    final result = <Map<String, dynamic>>[];
+    for (final job in jobs) {
+      final count = await getApplicationCount(job.id);
+      result.add({
+        'job': job,
+        'applicationCount': count,
+      });
+    }
+
+    return result;
   }
 }
