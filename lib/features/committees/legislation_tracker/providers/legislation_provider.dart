@@ -8,11 +8,13 @@ import '../models/bill_document.dart';
 import '../models/legislation_category.dart';
 import '../services/legislation_service.dart';
 import '../services/openstates_service.dart';
+import '../services/ai_analysis_service.dart';
 
 /// Main provider for legislation tracker state management
 class LegislationProvider extends ChangeNotifier {
   final LegislationService _service = LegislationService();
   final OpenStatesService _openStatesService = OpenStatesService();
+  final AiAnalysisService _aiService = AiAnalysisService();
 
   // State
   List<TrackedBill> _trackedBills = [];
@@ -27,7 +29,12 @@ class LegislationProvider extends ChangeNotifier {
 
   bool _isLoading = false;
   bool _isSyncing = false;
+  bool _isAnalyzingAi = false;
   String? _error;
+
+  // AI Analysis state
+  int _unanalyzedBillCount = 0;
+  int _analyzedBillCount = 0;
 
   // Filters
   String _sessionFilter = '2026';
@@ -51,7 +58,10 @@ class LegislationProvider extends ChangeNotifier {
   List<BillDocument> get selectedBillDocuments => _selectedBillDocuments;
   bool get isLoading => _isLoading;
   bool get isSyncing => _isSyncing;
+  bool get isAnalyzingAi => _isAnalyzingAi;
   String? get error => _error;
+  int get unanalyzedBillCount => _unanalyzedBillCount;
+  int get analyzedBillCount => _analyzedBillCount;
   String get sessionFilter => _sessionFilter;
   String? get positionFilter => _positionFilter;
   String? get priorityFilter => _priorityFilter;
@@ -121,6 +131,7 @@ class LegislationProvider extends ChangeNotifier {
         loadCategories(),
         loadTrackedBills(),
         loadStats(),
+        loadAiAnalysisCounts(),
       ]);
     } catch (e) {
       _error = e.toString();
@@ -316,6 +327,7 @@ class LegislationProvider extends ChangeNotifier {
     String position = 'watching',
     String priority = 'medium',
     List<String> categories = const [],
+    bool autoAnalyze = true,
   }) async {
     final trackedBill = await _service.trackBillFromSummary(
       bill: bill,
@@ -326,6 +338,17 @@ class LegislationProvider extends ChangeNotifier {
 
     await loadTrackedBills();
     await loadStats();
+
+    // Trigger AI analysis in the background (don't await)
+    if (autoAnalyze) {
+      _aiService.analyzeBill(billId: trackedBill.id).then((_) {
+        loadAiAnalysisCounts();
+        // Refresh selected bill if it's the one we just tracked
+        if (_selectedBill?.id == trackedBill.id) {
+          selectBill(trackedBill.id);
+        }
+      });
+    }
 
     return trackedBill;
   }
@@ -517,5 +540,147 @@ class LegislationProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  // ==========================================
+  // AI Analysis Methods
+  // ==========================================
+
+  /// Load AI analysis counts
+  Future<void> loadAiAnalysisCounts() async {
+    try {
+      final results = await Future.wait([
+        _aiService.getUnanalyzedBillCount(session: _sessionFilter),
+        _aiService.getAnalyzedBillCount(session: _sessionFilter),
+      ]);
+      _unanalyzedBillCount = results[0];
+      _analyzedBillCount = results[1];
+      notifyListeners();
+    } catch (e) {
+      // Silently fail - counts are not critical
+    }
+  }
+
+  /// Analyze a single bill with AI
+  Future<AiAnalysisResult> analyzeBill({
+    required String billId,
+    bool forceReanalyze = false,
+  }) async {
+    _isAnalyzingAi = true;
+    notifyListeners();
+
+    try {
+      final result = await _aiService.analyzeBill(
+        billId: billId,
+        forceReanalyze: forceReanalyze,
+      );
+
+      // Refresh the bill data if it's the selected bill
+      if (_selectedBill?.id == billId) {
+        await selectBill(billId);
+      }
+
+      // Update counts
+      await loadAiAnalysisCounts();
+
+      return result;
+    } finally {
+      _isAnalyzingAi = false;
+      notifyListeners();
+    }
+  }
+
+  /// Analyze multiple bills in batch
+  Future<BatchAnalysisResult> analyzeBillsBatch({
+    int batchSize = 5,
+    bool onlyUnanalyzed = true,
+  }) async {
+    _isAnalyzingAi = true;
+    notifyListeners();
+
+    try {
+      final result = await _aiService.analyzeBillsBatch(
+        batchSize: batchSize,
+        onlyUnanalyzed: onlyUnanalyzed,
+        session: _sessionFilter,
+      );
+
+      // Refresh bills list
+      await loadTrackedBills();
+      await loadAiAnalysisCounts();
+
+      return result;
+    } finally {
+      _isAnalyzingAi = false;
+      notifyListeners();
+    }
+  }
+
+  /// Apply AI recommendations to a bill
+  Future<bool> applyAiRecommendations({
+    required String billId,
+    bool applyPosition = true,
+    bool applyPriority = true,
+    bool applyCategories = true,
+  }) async {
+    try {
+      final success = await _aiService.applyAiRecommendations(
+        billId: billId,
+        applyPosition: applyPosition,
+        applyPriority: applyPriority,
+        applyCategories: applyCategories,
+      );
+
+      if (success) {
+        // Refresh the bill data
+        if (_selectedBill?.id == billId) {
+          await selectBill(billId);
+        }
+        await loadTrackedBills();
+        await loadStats();
+      }
+
+      return success;
+    } catch (e) {
+      _error = 'Failed to apply AI recommendations: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Apply all AI recommendations to bills in watching status
+  Future<int> applyAllAiRecommendations({bool onlyWatching = true}) async {
+    try {
+      final count = await _aiService.applyAllAiRecommendations(
+        session: _sessionFilter,
+        onlyWatching: onlyWatching,
+      );
+
+      if (count > 0) {
+        await loadTrackedBills();
+        await loadStats();
+      }
+
+      return count;
+    } catch (e) {
+      _error = 'Failed to apply AI recommendations: $e';
+      notifyListeners();
+      return 0;
+    }
+  }
+
+  /// Get bills where AI recommendation differs from current position
+  List<TrackedBill> get billsWithDifferentAiRecommendation {
+    return _trackedBills.where((b) => b.aiRecommendsDifferentPosition).toList();
+  }
+
+  /// Get bills with AI analysis
+  List<TrackedBill> get analyzedBills {
+    return _trackedBills.where((b) => b.hasAiAnalysis).toList();
+  }
+
+  /// Get bills without AI analysis
+  List<TrackedBill> get unanalyzedBills {
+    return _trackedBills.where((b) => !b.hasAiAnalysis).toList();
   }
 }

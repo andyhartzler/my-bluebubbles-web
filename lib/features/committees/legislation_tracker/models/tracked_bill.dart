@@ -105,10 +105,31 @@ class TrackedBill {
   final int? currentBillTextWordCount;
   final String? currentBillPdfPath;
 
+  // AI Analysis Fields
+  final String? aiSummary;
+  final String? aiSummaryShort;
+  final String? aiPositionRecommendation;
+  final String? aiPriorityRecommendation;
+  final List<String> aiCategoriesRecommendation;
+  final String? aiRationale;
+  final List<Map<String, dynamic>>? aiKeyProvisions;
+  final String? aiPotentialImpact;
+  final DateTime? aiAnalyzedAt;
+  final String? aiAnalysisVersion;
+  final String? aiAnalysisError;
+  final bool aiAnalysisPending;
+
   // Computed properties for bill text
   bool get hasText => currentBillText != null && currentBillText!.isNotEmpty;
   bool get hasPdf => currentBillPdfPath != null && currentBillPdfPath!.isNotEmpty;
   bool get textExtractionFailed => syncError != null && currentBillText == null;
+
+  // Computed properties for AI analysis
+  bool get hasAiAnalysis => aiAnalyzedAt != null;
+  bool get aiRecommendsDifferentPosition =>
+      aiPositionRecommendation != null && aiPositionRecommendation != position;
+  bool get aiRecommendsDifferentPriority =>
+      aiPriorityRecommendation != null && aiPriorityRecommendation != priority;
 
   /// Get the public URL for the bill's PDF
   String? get pdfUrl {
@@ -184,6 +205,18 @@ class TrackedBill {
     this.currentBillTextExtractedAt,
     this.currentBillTextWordCount,
     this.currentBillPdfPath,
+    this.aiSummary,
+    this.aiSummaryShort,
+    this.aiPositionRecommendation,
+    this.aiPriorityRecommendation,
+    this.aiCategoriesRecommendation = const [],
+    this.aiRationale,
+    this.aiKeyProvisions,
+    this.aiPotentialImpact,
+    this.aiAnalyzedAt,
+    this.aiAnalysisVersion,
+    this.aiAnalysisError,
+    this.aiAnalysisPending = false,
   });
 
   factory TrackedBill.fromJson(Map<String, dynamic> json) {
@@ -255,6 +288,18 @@ class TrackedBill {
       currentBillTextExtractedAt: _parseDate(json['current_bill_text_extracted_at']),
       currentBillTextWordCount: json['current_bill_text_word_count'] as int?,
       currentBillPdfPath: json['current_bill_pdf_path'] as String?,
+      aiSummary: json['ai_summary'] as String?,
+      aiSummaryShort: json['ai_summary_short'] as String?,
+      aiPositionRecommendation: json['ai_position_recommendation'] as String?,
+      aiPriorityRecommendation: json['ai_priority_recommendation'] as String?,
+      aiCategoriesRecommendation: _parseStringList(json['ai_categories_recommendation']),
+      aiRationale: json['ai_rationale'] as String?,
+      aiKeyProvisions: _parseMapList(json['ai_key_provisions']),
+      aiPotentialImpact: json['ai_potential_impact'] as String?,
+      aiAnalyzedAt: _parseDate(json['ai_analyzed_at']),
+      aiAnalysisVersion: json['ai_analysis_version'] as String?,
+      aiAnalysisError: json['ai_analysis_error'] as String?,
+      aiAnalysisPending: json['ai_analysis_pending'] as bool? ?? false,
     );
   }
 
@@ -327,6 +372,18 @@ class TrackedBill {
       'current_bill_text_extracted_at': currentBillTextExtractedAt?.toIso8601String(),
       'current_bill_text_word_count': currentBillTextWordCount,
       'current_bill_pdf_path': currentBillPdfPath,
+      'ai_summary': aiSummary,
+      'ai_summary_short': aiSummaryShort,
+      'ai_position_recommendation': aiPositionRecommendation,
+      'ai_priority_recommendation': aiPriorityRecommendation,
+      'ai_categories_recommendation': aiCategoriesRecommendation,
+      'ai_rationale': aiRationale,
+      'ai_key_provisions': aiKeyProvisions,
+      'ai_potential_impact': aiPotentialImpact,
+      'ai_analyzed_at': aiAnalyzedAt?.toIso8601String(),
+      'ai_analysis_version': aiAnalysisVersion,
+      'ai_analysis_error': aiAnalysisError,
+      'ai_analysis_pending': aiAnalysisPending,
     };
   }
 
@@ -398,6 +455,18 @@ class TrackedBill {
     DateTime? currentBillTextExtractedAt,
     int? currentBillTextWordCount,
     String? currentBillPdfPath,
+    String? aiSummary,
+    String? aiSummaryShort,
+    String? aiPositionRecommendation,
+    String? aiPriorityRecommendation,
+    List<String>? aiCategoriesRecommendation,
+    String? aiRationale,
+    List<Map<String, dynamic>>? aiKeyProvisions,
+    String? aiPotentialImpact,
+    DateTime? aiAnalyzedAt,
+    String? aiAnalysisVersion,
+    String? aiAnalysisError,
+    bool? aiAnalysisPending,
   }) {
     return TrackedBill(
       id: id ?? this.id,
@@ -467,6 +536,18 @@ class TrackedBill {
       currentBillTextExtractedAt: currentBillTextExtractedAt ?? this.currentBillTextExtractedAt,
       currentBillTextWordCount: currentBillTextWordCount ?? this.currentBillTextWordCount,
       currentBillPdfPath: currentBillPdfPath ?? this.currentBillPdfPath,
+      aiSummary: aiSummary ?? this.aiSummary,
+      aiSummaryShort: aiSummaryShort ?? this.aiSummaryShort,
+      aiPositionRecommendation: aiPositionRecommendation ?? this.aiPositionRecommendation,
+      aiPriorityRecommendation: aiPriorityRecommendation ?? this.aiPriorityRecommendation,
+      aiCategoriesRecommendation: aiCategoriesRecommendation ?? this.aiCategoriesRecommendation,
+      aiRationale: aiRationale ?? this.aiRationale,
+      aiKeyProvisions: aiKeyProvisions ?? this.aiKeyProvisions,
+      aiPotentialImpact: aiPotentialImpact ?? this.aiPotentialImpact,
+      aiAnalyzedAt: aiAnalyzedAt ?? this.aiAnalyzedAt,
+      aiAnalysisVersion: aiAnalysisVersion ?? this.aiAnalysisVersion,
+      aiAnalysisError: aiAnalysisError ?? this.aiAnalysisError,
+      aiAnalysisPending: aiAnalysisPending ?? this.aiAnalysisPending,
     );
   }
 

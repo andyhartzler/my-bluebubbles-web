@@ -12,6 +12,7 @@ import '../widgets/vote_breakdown_chart.dart';
 import '../widgets/sponsor_list.dart';
 import '../widgets/bill_notes_panel.dart';
 import '../widgets/bill_documents_panel.dart';
+import '../widgets/ai_analysis_panel.dart';
 import '../utils/bill_helpers.dart';
 import '../models/legislator.dart';
 import 'legislator_detail_screen.dart';
@@ -39,7 +40,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
 
     // Load bill details
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -195,6 +196,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
           isScrollable: true,
           tabs: [
             _buildTab('Overview', Icons.info_outline, 0),
+            _buildTab('AI Analysis', Icons.auto_awesome, bill.hasAiAnalysis ? 1 : 0),
             _buildTab('Bill Text', Icons.article, bill.hasText ? 1 : 0),
             _buildTab('Actions', Icons.timeline, provider.selectedBillActions.length),
             _buildTab('Votes', Icons.how_to_vote, provider.selectedBillVotes.length),
@@ -208,6 +210,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
             controller: _tabController,
             children: [
               _buildOverviewTab(context, theme, provider, bill),
+              _buildAiAnalysisTab(context, theme, provider, bill),
               _buildBillTextTab(context, theme, bill),
               _buildActionsTab(context, theme, provider, bill),
               _buildVotesTab(context, theme, provider, bill),
@@ -325,8 +328,11 @@ class _BillDetailScreenState extends State<BillDetailScreen>
             children: [
               TabBar(
                 controller: _tabController,
+                isScrollable: true,
                 tabs: [
                   _buildTab('Overview', Icons.info_outline, 0),
+                  _buildTab('AI Analysis', Icons.auto_awesome, bill.hasAiAnalysis ? 1 : 0),
+                  _buildTab('Bill Text', Icons.article, bill.hasText ? 1 : 0),
                   _buildTab('Actions', Icons.timeline, provider.selectedBillActions.length),
                   _buildTab('Votes', Icons.how_to_vote, provider.selectedBillVotes.length),
                   _buildTab('Documents', Icons.description, provider.selectedBillDocuments.length),
@@ -338,6 +344,8 @@ class _BillDetailScreenState extends State<BillDetailScreen>
                   controller: _tabController,
                   children: [
                     _buildOverviewTab(context, theme, provider, bill),
+                    _buildAiAnalysisTab(context, theme, provider, bill),
+                    _buildBillTextTab(context, theme, bill),
                     _buildActionsTab(context, theme, provider, bill),
                     _buildVotesTab(context, theme, provider, bill),
                     _buildDocumentsTab(context, theme, provider, bill),
@@ -470,6 +478,33 @@ class _BillDetailScreenState extends State<BillDetailScreen>
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildAiAnalysisTab(
+    BuildContext context,
+    ThemeData theme,
+    LegislationProvider provider,
+    TrackedBill bill,
+  ) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: AiAnalysisPanel(
+        bill: bill,
+        onAnalysisComplete: () {
+          // Refresh the bill data
+          provider.selectBill(bill.id);
+        },
+        onApplyPosition: (position) async {
+          await provider.updatePosition(billId: bill.id, position: position);
+        },
+        onApplyPriority: (priority) async {
+          await provider.updatePriority(billId: bill.id, priority: priority);
+        },
+        onApplyCategories: (categories) async {
+          await provider.updateCategories(billId: bill.id, categories: categories);
+        },
       ),
     );
   }
