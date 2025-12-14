@@ -40,27 +40,37 @@ class PositionSelector extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        SegmentedButton<BillPosition>(
-          segments: BillPosition.values.map((position) {
-            return ButtonSegment<BillPosition>(
-              value: position,
-              label: Text(position.label),
-              icon: Text(position.emoji),
-            );
-          }).toList(),
-          selected: {currentPosition},
-          onSelectionChanged: (selected) {
-            if (selected.isNotEmpty) {
-              onChanged(selected.first);
-            }
-          },
-          style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
-                return currentPosition.color.withOpacity(0.2);
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<BillPosition>(
+            segments: BillPosition.values.map((position) {
+              return ButtonSegment<BillPosition>(
+                value: position,
+                label: Text(
+                  position.label,
+                  softWrap: false,
+                  overflow: TextOverflow.visible,
+                ),
+                icon: Text(position.emoji),
+              );
+            }).toList(),
+            selected: {currentPosition},
+            onSelectionChanged: (selected) {
+              if (selected.isNotEmpty) {
+                onChanged(selected.first);
               }
-              return null;
-            }),
+            },
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return currentPosition.color.withOpacity(0.2);
+                }
+                return null;
+              }),
+              minimumSize: WidgetStateProperty.all(const Size(80, 40)),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
           ),
         ),
       ],
