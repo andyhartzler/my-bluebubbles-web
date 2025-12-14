@@ -140,15 +140,15 @@ class AiAnalysisService {
         .from('legislation_tracked_bills')
         .select()
         .isFilter('ai_analyzed_at', null)
-        .eq('is_archived', false)
-        .order('created_at', ascending: false)
-        .limit(limit);
+        .eq('is_archived', false);
 
     if (session != null) {
       query = query.eq('session', session);
     }
 
-    final response = await query;
+    final response = await query
+        .order('created_at', ascending: false)
+        .limit(limit);
     return (response as List)
         .map((json) => TrackedBill.fromJson(json as Map<String, dynamic>))
         .toList();
@@ -277,14 +277,13 @@ class AiAnalysisService {
         .from('legislation_tracked_bills')
         .select()
         .not('ai_position_recommendation', 'is', null)
-        .eq('is_archived', false)
-        .order('ai_analyzed_at', ascending: false);
+        .eq('is_archived', false);
 
     if (session != null) {
       query = query.eq('session', session);
     }
 
-    final response = await query;
+    final response = await query.order('ai_analyzed_at', ascending: false);
     final bills = (response as List)
         .map((json) => TrackedBill.fromJson(json as Map<String, dynamic>))
         .where((bill) => bill.aiRecommendsDifferentPosition)
