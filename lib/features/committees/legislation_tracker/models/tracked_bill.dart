@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'talking_point.dart';
 
 /// Represents a bill being tracked by the Policy & Advocacy committee
 /// CAPTURES ALL Open States API v3 Bill fields
@@ -119,6 +120,14 @@ class TrackedBill {
   final String? aiAnalysisError;
   final bool aiAnalysisPending;
 
+  // Talking Points Fields
+  final List<TalkingPoint>? aiTalkingPoints;
+  final String? aiCallToAction;
+  final List<TwitterPost>? aiTwitterPosts;
+  final String? aiEmailSnippet;
+  final String? aiTestimonyOutline;
+  final Map<String, List<String>>? aiTargetAudiencePoints;
+
   // Computed properties for bill text
   bool get hasText => currentBillText != null && currentBillText!.isNotEmpty;
   bool get hasPdf => currentBillPdfPath != null && currentBillPdfPath!.isNotEmpty;
@@ -130,6 +139,9 @@ class TrackedBill {
       aiPositionRecommendation != null && aiPositionRecommendation != position;
   bool get aiRecommendsDifferentPriority =>
       aiPriorityRecommendation != null && aiPriorityRecommendation != priority;
+
+  // Computed properties for talking points
+  bool get hasTalkingPoints => aiTalkingPoints != null && aiTalkingPoints!.isNotEmpty;
 
   /// Get the public URL for the bill's PDF
   String? get pdfUrl {
@@ -217,6 +229,12 @@ class TrackedBill {
     this.aiAnalysisVersion,
     this.aiAnalysisError,
     this.aiAnalysisPending = false,
+    this.aiTalkingPoints,
+    this.aiCallToAction,
+    this.aiTwitterPosts,
+    this.aiEmailSnippet,
+    this.aiTestimonyOutline,
+    this.aiTargetAudiencePoints,
   });
 
   factory TrackedBill.fromJson(Map<String, dynamic> json) {
@@ -300,6 +318,12 @@ class TrackedBill {
       aiAnalysisVersion: json['ai_analysis_version'] as String?,
       aiAnalysisError: json['ai_analysis_error'] as String?,
       aiAnalysisPending: json['ai_analysis_pending'] as bool? ?? false,
+      aiTalkingPoints: _parseTalkingPoints(json['ai_talking_points']),
+      aiCallToAction: json['ai_call_to_action'] as String?,
+      aiTwitterPosts: _parseTwitterPosts(json['ai_twitter_posts']),
+      aiEmailSnippet: json['ai_email_snippet'] as String?,
+      aiTestimonyOutline: json['ai_testimony_outline'] as String?,
+      aiTargetAudiencePoints: _parseAudiencePoints(json['ai_target_audience_points']),
     );
   }
 
@@ -384,6 +408,12 @@ class TrackedBill {
       'ai_analysis_version': aiAnalysisVersion,
       'ai_analysis_error': aiAnalysisError,
       'ai_analysis_pending': aiAnalysisPending,
+      'ai_talking_points': aiTalkingPoints?.map((tp) => tp.toJson()).toList(),
+      'ai_call_to_action': aiCallToAction,
+      'ai_twitter_posts': aiTwitterPosts?.map((tp) => tp.toJson()).toList(),
+      'ai_email_snippet': aiEmailSnippet,
+      'ai_testimony_outline': aiTestimonyOutline,
+      'ai_target_audience_points': aiTargetAudiencePoints,
     };
   }
 
@@ -467,6 +497,12 @@ class TrackedBill {
     String? aiAnalysisVersion,
     String? aiAnalysisError,
     bool? aiAnalysisPending,
+    List<TalkingPoint>? aiTalkingPoints,
+    String? aiCallToAction,
+    List<TwitterPost>? aiTwitterPosts,
+    String? aiEmailSnippet,
+    String? aiTestimonyOutline,
+    Map<String, List<String>>? aiTargetAudiencePoints,
   }) {
     return TrackedBill(
       id: id ?? this.id,
@@ -548,6 +584,12 @@ class TrackedBill {
       aiAnalysisVersion: aiAnalysisVersion ?? this.aiAnalysisVersion,
       aiAnalysisError: aiAnalysisError ?? this.aiAnalysisError,
       aiAnalysisPending: aiAnalysisPending ?? this.aiAnalysisPending,
+      aiTalkingPoints: aiTalkingPoints ?? this.aiTalkingPoints,
+      aiCallToAction: aiCallToAction ?? this.aiCallToAction,
+      aiTwitterPosts: aiTwitterPosts ?? this.aiTwitterPosts,
+      aiEmailSnippet: aiEmailSnippet ?? this.aiEmailSnippet,
+      aiTestimonyOutline: aiTestimonyOutline ?? this.aiTestimonyOutline,
+      aiTargetAudiencePoints: aiTargetAudiencePoints ?? this.aiTargetAudiencePoints,
     );
   }
 
@@ -572,6 +614,39 @@ class TrackedBill {
     if (value == null) return null;
     if (value is List) {
       return value.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return null;
+  }
+
+  static List<TalkingPoint>? _parseTalkingPoints(dynamic value) {
+    if (value == null) return null;
+    if (value is List) {
+      return value
+          .map((e) => TalkingPoint.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    return null;
+  }
+
+  static List<TwitterPost>? _parseTwitterPosts(dynamic value) {
+    if (value == null) return null;
+    if (value is List) {
+      return value
+          .map((e) => TwitterPost.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    return null;
+  }
+
+  static Map<String, List<String>>? _parseAudiencePoints(dynamic value) {
+    if (value == null) return null;
+    if (value is Map) {
+      return value.map(
+        (key, val) => MapEntry(
+          key.toString(),
+          (val as List).map((e) => e.toString()).toList(),
+        ),
+      );
     }
     return null;
   }

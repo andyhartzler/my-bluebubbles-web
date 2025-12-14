@@ -13,6 +13,7 @@ import '../widgets/sponsor_list.dart';
 import '../widgets/bill_notes_panel.dart';
 import '../widgets/bill_documents_panel.dart';
 import '../widgets/ai_analysis_panel.dart';
+import '../widgets/talking_points_panel.dart';
 import '../utils/bill_helpers.dart';
 import '../models/legislator.dart';
 import 'legislator_detail_screen.dart';
@@ -40,7 +41,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
 
     // Load bill details
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -197,6 +198,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
           tabs: [
             _buildTab('Overview', Icons.info_outline, 0),
             _buildTab('AI Analysis', Icons.auto_awesome, bill.hasAiAnalysis ? 1 : 0),
+            _buildTab('Talking Points', Icons.campaign, bill.hasTalkingPoints ? 1 : 0),
             _buildTab('Bill Text', Icons.article, bill.hasText ? 1 : 0),
             _buildTab('Actions', Icons.timeline, provider.selectedBillActions.length),
             _buildTab('Votes', Icons.how_to_vote, provider.selectedBillVotes.length),
@@ -211,6 +213,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
             children: [
               _buildOverviewTab(context, theme, provider, bill),
               _buildAiAnalysisTab(context, theme, provider, bill),
+              _buildTalkingPointsTab(context, theme, provider, bill),
               _buildBillTextTab(context, theme, bill),
               _buildActionsTab(context, theme, provider, bill),
               _buildVotesTab(context, theme, provider, bill),
@@ -332,6 +335,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
                 tabs: [
                   _buildTab('Overview', Icons.info_outline, 0),
                   _buildTab('AI Analysis', Icons.auto_awesome, bill.hasAiAnalysis ? 1 : 0),
+                  _buildTab('Talking Points', Icons.campaign, bill.hasTalkingPoints ? 1 : 0),
                   _buildTab('Bill Text', Icons.article, bill.hasText ? 1 : 0),
                   _buildTab('Actions', Icons.timeline, provider.selectedBillActions.length),
                   _buildTab('Votes', Icons.how_to_vote, provider.selectedBillVotes.length),
@@ -345,6 +349,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
                   children: [
                     _buildOverviewTab(context, theme, provider, bill),
                     _buildAiAnalysisTab(context, theme, provider, bill),
+                    _buildTalkingPointsTab(context, theme, provider, bill),
                     _buildBillTextTab(context, theme, bill),
                     _buildActionsTab(context, theme, provider, bill),
                     _buildVotesTab(context, theme, provider, bill),
@@ -504,6 +509,24 @@ class _BillDetailScreenState extends State<BillDetailScreen>
         },
         onApplyCategories: (categories) async {
           await provider.updateCategories(billId: bill.id, categories: categories);
+        },
+      ),
+    );
+  }
+
+  Widget _buildTalkingPointsTab(
+    BuildContext context,
+    ThemeData theme,
+    LegislationProvider provider,
+    TrackedBill bill,
+  ) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: TalkingPointsPanel(
+        bill: bill,
+        onGenerated: () {
+          // Refresh the bill data
+          provider.selectBill(bill.id);
         },
       ),
     );
