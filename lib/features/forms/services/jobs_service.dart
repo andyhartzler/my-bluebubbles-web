@@ -190,6 +190,7 @@ class JobsService {
     String? slug,
     bool featured = false,
     List<String>? tags,
+    List<Map<String, dynamic>>? customQuestions,
   }) async {
     final response = await _writeClient
         .from('jobs')
@@ -219,6 +220,7 @@ class JobsService {
           if (slug != null) 'slug': slug,
           'featured': featured,
           if (tags != null) 'tags': tags,
+          'custom_questions': customQuestions ?? [],
         })
         .select()
         .single();
@@ -268,6 +270,7 @@ class JobsService {
     bool? featured,
     List<String>? tags,
     bool clearTags = false,
+    List<Map<String, dynamic>>? customQuestions,
   }) async {
     final updates = <String, dynamic>{};
 
@@ -355,6 +358,9 @@ class JobsService {
       updates['tags'] = tags;
     } else if (clearTags) {
       updates['tags'] = null;
+    }
+    if (customQuestions != null) {
+      updates['custom_questions'] = customQuestions;
     }
 
     if (updates.isNotEmpty) {

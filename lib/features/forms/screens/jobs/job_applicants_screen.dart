@@ -543,6 +543,13 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
                         _buildDetailRow(theme, 'Cover Letter', application.coverLetter!),
                     ],
                   ),
+
+                  // Custom question responses
+                  if (widget.job.customQuestions.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _buildCustomQuestionResponses(theme, application),
+                  ],
+
                   const SizedBox(height: 24),
 
                   // Status actions
@@ -570,6 +577,88 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCustomQuestionResponses(ThemeData theme, JobApplication application) {
+    final responses = application.customQuestionResponses;
+    final questions = widget.job.customQuestions;
+
+    if (questions.isEmpty) return const SizedBox.shrink();
+
+    return _buildDetailSection(
+      theme,
+      'Custom Questions',
+      Icons.quiz_outlined,
+      questions.map((q) {
+        final response = responses[q.id];
+        String displayValue;
+
+        if (response == null) {
+          displayValue = 'No answer provided';
+        } else if (response is List) {
+          displayValue = response.join(', ');
+        } else if (response is bool) {
+          displayValue = response ? 'Yes' : 'No';
+        } else {
+          displayValue = response.toString();
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: theme.colorScheme.outline.withOpacity(0.2),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      q.question,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  if (q.required)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Required',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                displayValue,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: response == null
+                      ? theme.colorScheme.onSurfaceVariant.withOpacity(0.6)
+                      : theme.colorScheme.onSurface,
+                  fontStyle: response == null ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 

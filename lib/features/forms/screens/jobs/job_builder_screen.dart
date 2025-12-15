@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/job.dart';
 import '../../services/jobs_service.dart';
+import '../../widgets/custom_questions_editor.dart';
 
 class JobBuilderScreen extends StatefulWidget {
   final String? jobId;
@@ -43,6 +44,7 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
   bool _featured = false;
   bool _isLoading = false;
   bool _isSaving = false;
+  List<Map<String, dynamic>> _customQuestions = [];
 
   static const List<String> _jobTypes = [
     'full-time',
@@ -119,6 +121,9 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
         _submitterPhoneController.text = job.submitterPhone ?? '';
         _tagsController.text = job.tags?.join(', ') ?? '';
         _featured = job.featured;
+        _customQuestions = job.customQuestions
+            .map((q) => q.toJson())
+            .toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -170,6 +175,7 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
           submitterPhone: _submitterPhoneController.text.isEmpty ? null : _submitterPhoneController.text,
           featured: _featured,
           tags: tags,
+          customQuestions: _customQuestions,
         );
       } else {
         await _jobsService.updateJobDetails(
@@ -211,6 +217,7 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
           featured: _featured,
           tags: tags,
           clearTags: tags == null || tags.isEmpty,
+          customQuestions: _customQuestions,
         );
       }
 
@@ -551,6 +558,15 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
                       labelText: 'Submitter Phone',
                     ),
                     keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Custom Questions Section
+                  CustomQuestionsEditor(
+                    initialQuestions: _customQuestions,
+                    onChanged: (questions) {
+                      setState(() => _customQuestions = questions);
+                    },
                   ),
                   const SizedBox(height: 24),
 

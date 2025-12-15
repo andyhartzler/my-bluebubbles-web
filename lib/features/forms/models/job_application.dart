@@ -23,6 +23,11 @@ class JobApplication with _$JobApplication {
     // Application Data
     @JsonKey(name: 'application_data') Map<String, dynamic>? applicationData,
 
+    // Custom Question Responses: { "question_id": "response_value" }
+    // response_value can be string, array (for checkbox), or boolean
+    @JsonKey(name: 'custom_question_responses')
+    @Default({}) Map<String, dynamic> customQuestionResponses,
+
     // Status: submitted, reviewed, shortlisted, rejected, accepted
     @Default('submitted') String status,
 
