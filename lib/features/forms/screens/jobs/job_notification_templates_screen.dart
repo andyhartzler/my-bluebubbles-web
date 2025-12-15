@@ -567,6 +567,8 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
 
   bool _saving = false;
   bool _showPreview = false;
+  bool _useRawHtml = false;
+  late TextEditingController _rawHtmlController;
 
   @override
   void initState() {
@@ -581,6 +583,7 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
     _emailSubjectController = TextEditingController(text: t?.emailSubject ?? '');
     _emailHtml = t?.emailHtml ?? '';
     _emailPlainText = t?.emailPlainText ?? '';
+    _rawHtmlController = TextEditingController(text: _emailHtml);
     _smsEnabled = t?.smsEnabled ?? false;
     _smsBodyController = TextEditingController(text: t?.smsBody ?? '');
     _isActive = t?.isActive ?? true;
@@ -594,6 +597,7 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
     _descriptionController.dispose();
     _emailSubjectController.dispose();
     _smsBodyController.dispose();
+    _rawHtmlController.dispose();
     super.dispose();
   }
 
@@ -894,18 +898,59 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
         _buildSubjectEditor(theme),
         const SizedBox(height: 24),
 
-        // Rich text editor for body
-        _buildSectionHeader(theme, 'Email Body', Icons.article_outlined),
-        const SizedBox(height: 12),
-        EmailTemplateEditor(
-          initialHtml: _emailHtml,
-          mergeVariables: _mergeVariables,
-          minHeight: 400,
-          placeholder: 'Design your beautiful email here...',
-          helperText: 'Use the toolbar to format your email. Insert merge variables to personalize each message.',
-          onHtmlChanged: (html) => _emailHtml = html,
-          onPlainTextChanged: (text) => _emailPlainText = text,
+        // Editor mode toggle
+        Row(
+          children: [
+            _buildSectionHeader(theme, 'Email Body', Icons.article_outlined),
+            const Spacer(),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: false,
+                  label: Text('Visual'),
+                  icon: Icon(Icons.format_paint, size: 16),
+                ),
+                ButtonSegment(
+                  value: true,
+                  label: Text('HTML'),
+                  icon: Icon(Icons.code, size: 16),
+                ),
+              ],
+              selected: {_useRawHtml},
+              onSelectionChanged: (selected) {
+                setState(() {
+                  if (selected.first) {
+                    // Switching to raw HTML - sync the controller
+                    _rawHtmlController.text = _emailHtml;
+                  } else {
+                    // Switching to visual - update _emailHtml from raw
+                    _emailHtml = _rawHtmlController.text;
+                  }
+                  _useRawHtml = selected.first;
+                });
+              },
+              style: ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
         ),
+        const SizedBox(height: 12),
+
+        // Editor content based on mode
+        if (_useRawHtml)
+          _buildRawHtmlEditor(theme)
+        else
+          EmailTemplateEditor(
+            initialHtml: _emailHtml,
+            mergeVariables: _mergeVariables,
+            minHeight: 400,
+            placeholder: 'Design your beautiful email here...',
+            helperText: 'Use the toolbar to format your email. Insert merge variables to personalize each message.',
+            onHtmlChanged: (html) => _emailHtml = html,
+            onPlainTextChanged: (text) => _emailPlainText = text,
+          ),
         const SizedBox(height: 100),
       ],
     );
@@ -1168,6 +1213,7 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
 
   Widget _buildSectionHeader(ThemeData theme, String title, IconData icon) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 8),
@@ -1177,6 +1223,183 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
             fontWeight: FontWeight.bold,
             color: theme.colorScheme.primary,
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRawHtmlEditor(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Info banner
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: theme.colorScheme.primary.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.code,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Paste your HTML code below. Use Preview to see exactly how the email will appear.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Raw HTML text field
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: theme.colorScheme.outline.withOpacity(0.3),
+            ),
+          ),
+          child: TextField(
+            controller: _rawHtmlController,
+            maxLines: null,
+            minLines: 15,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 13,
+              color: Color(0xFFD4D4D4),
+              height: 1.5,
+            ),
+            decoration: InputDecoration(
+              hintText: '<!DOCTYPE html>\n<html>\n<body>\n  <h1>Hello {{applicant_name}}</h1>\n  <p>Your email content here...</p>\n</body>\n</html>',
+              hintStyle: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13,
+                color: Colors.grey.shade600,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(16),
+            ),
+            onChanged: (value) {
+              _emailHtml = value;
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Quick actions
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: () {
+                Clipboard.getData(Clipboard.kTextPlain).then((data) {
+                  if (data?.text != null) {
+                    setState(() {
+                      _rawHtmlController.text = data!.text!;
+                      _emailHtml = data.text!;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('HTML pasted from clipboard'),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                });
+              },
+              icon: const Icon(Icons.paste, size: 18),
+              label: const Text('Paste HTML'),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: _rawHtmlController.text));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('HTML copied to clipboard'),
+                    backgroundColor: Colors.green,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.copy, size: 18),
+              label: const Text('Copy'),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _rawHtmlController.clear();
+                  _emailHtml = '';
+                });
+              },
+              icon: const Icon(Icons.clear, size: 18),
+              label: const Text('Clear'),
+            ),
+            const Spacer(),
+            FilledButton.icon(
+              onPressed: () {
+                setState(() => _showPreview = true);
+              },
+              icon: const Icon(Icons.preview, size: 18),
+              label: const Text('Preview Email'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Variable chips for quick reference
+        Text(
+          'Available Variables:',
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: _mergeVariables.map((v) {
+            return ActionChip(
+              avatar: const Icon(Icons.add, size: 14),
+              label: Text(
+                v.token,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                ),
+              ),
+              onPressed: () {
+                final text = _rawHtmlController.text;
+                final selection = _rawHtmlController.selection;
+                final newText = text.replaceRange(
+                  selection.start,
+                  selection.end,
+                  v.token,
+                );
+                _rawHtmlController.text = newText;
+                _rawHtmlController.selection = TextSelection.collapsed(
+                  offset: selection.start + v.token.length,
+                );
+                _emailHtml = newText;
+              },
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+            );
+          }).toList(),
         ),
       ],
     );
