@@ -396,26 +396,15 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 clipBehavior: Clip.hardEdge,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: mapHeight,
-                    maxWidth: constraints.maxWidth - 32, // Account for padding
-                    minHeight: mapHeight,
-                    minWidth: double.infinity,
-                  ),
-                  child: OverflowBox(
-                    maxHeight: mapHeight,
-                    maxWidth: constraints.maxWidth - 32,
-                    child: SizedBox(
-                      height: mapHeight,
-                      width: double.infinity,
-                      child: EventMapWidget(
-                        location: mapAddress,
-                        locationAddress: addressText.replaceAll('\n', ', '),
-                        eventTitle: donor.name ?? 'Donor address',
-                        height: mapHeight,
-                      ),
-                    ),
+                child: SizedBox(
+                  height: mapHeight,
+                  width: double.infinity,
+                  child: EventMapWidget(
+                    key: ValueKey('donor-map-${donor.id}'),
+                    location: mapAddress,
+                    locationAddress: addressText.replaceAll('\n', ', '),
+                    eventTitle: donor.name ?? 'Donor address',
+                    height: mapHeight,
                   ),
                 ),
               ),

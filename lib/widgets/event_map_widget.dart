@@ -22,12 +22,15 @@ class EventMapWidget extends StatefulWidget {
   State<EventMapWidget> createState() => _EventMapWidgetState();
 }
 
-class _EventMapWidgetState extends State<EventMapWidget> {
+class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAliveClientMixin {
   final String _viewType = 'map-${DateTime.now().millisecondsSinceEpoch}';
   int? _actualViewId;
   bool _isLoading = true;
   String? _error;
   bool _mapInitialized = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -62,7 +65,11 @@ class _EventMapWidgetState extends State<EventMapWidget> {
         ..style.overflow = 'hidden'
         ..style.position = 'relative'
         ..style.touchAction = 'pan-x pan-y'
-        ..style.transform = 'translateZ(0)';
+        ..style.transform = 'translateZ(0)'
+        ..style.backfaceVisibility = 'hidden'
+        ..style.setProperty('-webkit-backface-visibility', 'hidden')
+        ..style.setProperty('will-change', 'transform')
+        ..style.setProperty('contain', 'layout paint');
 
       print('[EventMap] Created container with ID: mapkit-$viewId');
       return mapContainer;
@@ -304,6 +311,7 @@ class _EventMapWidgetState extends State<EventMapWidget> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     if (_error != null) {
       return Container(
         width: double.infinity,
