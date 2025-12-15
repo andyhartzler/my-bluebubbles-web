@@ -594,11 +594,12 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
                       ],
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
-        ],
+        ),
+      ],
       ),
     );
   }
