@@ -80,6 +80,29 @@ class JobCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
+                      // Submitter info
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${job.submitterName} • ${job.submitterEmail}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
                       // Tags row
                       Wrap(
                         spacing: 6,
@@ -90,12 +113,6 @@ class JobCard extends StatelessWidget {
                             _buildCompactChip(context, job.locationType!),
                           if (job.isPaid)
                             _buildCompactChip(context, 'Paid', color: Colors.green),
-                          if (job.location != null)
-                            _buildCompactChip(
-                              context,
-                              job.location!,
-                              icon: Icons.location_on_outlined,
-                            ),
                         ],
                       ),
                     ],
