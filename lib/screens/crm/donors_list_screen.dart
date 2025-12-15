@@ -9,6 +9,7 @@ import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/donation.dart';
+import 'package:bluebubbles/models/crm/donation_thank_you.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -583,8 +584,20 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         if (donation.eventId != null || donation.eventName != null) {
           subtitleChips.add(_buildInfoChip(Icons.event_available, donation.eventName ?? 'Linked event'));
         }
-        if (donation.sentThankYou) {
-          subtitleChips.add(_buildInfoChip(Icons.favorite, 'Thank you sent'));
+        if (donation.thankYous.isNotEmpty) {
+          // Use method-specific icon from the latest thank you
+          final method = donation.latestThankYou!.method;
+          final icon = switch (method) {
+            ThankYouMethod.mailed => Icons.mail_outline,
+            ThankYouMethod.call => Icons.phone_outlined,
+            ThankYouMethod.text => Icons.sms_outlined,
+            ThankYouMethod.email => Icons.email_outlined,
+            ThankYouMethod.inPerson => Icons.person_outline,
+          };
+          subtitleChips.add(_buildInfoChip(icon, 'Thank you sent'));
+        } else if (donation.sentThankYou) {
+          // Legacy fallback for old records without method info
+          subtitleChips.add(_buildInfoChip(Icons.check_circle, 'Thank you sent'));
         }
 
         final phoneDisplay = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone ?? donation.donorPhone);
