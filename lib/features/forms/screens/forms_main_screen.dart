@@ -61,6 +61,7 @@ class _FormsMainScreenState extends State<FormsMainScreen>
       ),
       body: TabBarView(
         controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(),
         children: const [
           JobsListScreen(),
           FormsListScreen(),

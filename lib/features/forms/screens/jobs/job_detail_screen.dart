@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/job.dart';
 import '../../models/job_application.dart';
+import '../../models/job_notification_log.dart';
 import '../../services/jobs_service.dart';
 import '../../widgets/job_applicant_card.dart';
 import 'job_builder_screen.dart';
@@ -24,11 +25,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   bool _isLoading = false;
   int _applicationCount = 0;
   List<JobApplication> _recentApplications = [];
+  List<JobNotificationLog> _notificationLogs = [];
+  bool _loadingLogs = true;
 
   @override
   void initState() {
     super.initState();
     _loadApplications();
+    _loadNotificationLogs();
   }
 
   Future<void> _loadApplications() async {
@@ -42,6 +46,23 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       }
     } catch (_) {
       // Ignore
+    }
+  }
+
+  Future<void> _loadNotificationLogs() async {
+    setState(() => _loadingLogs = true);
+    try {
+      final logs = await _jobsService.getNotificationLogsForJob(widget.jobId);
+      if (mounted) {
+        setState(() {
+          _notificationLogs = logs;
+          _loadingLogs = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingLogs = false);
+      }
     }
   }
 
@@ -195,6 +216,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
                       // Dates and metadata
                       _buildMetadataCard(theme, job),
+                      const SizedBox(height: 16),
+
+                      // Notification Logs
+                      _buildNotificationLogsCard(theme),
                     ],
                   ),
                 ),
@@ -763,6 +788,216 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
     return name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
+  }
+
+  Widget _buildNotificationLogsCard(ThemeData theme) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.tertiaryContainer.withOpacity(0.3),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.notifications_outlined,
+                  color: theme.colorScheme.tertiary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Notification History',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${_notificationLogs.length} notification${_notificationLogs.length == 1 ? '' : 's'} sent',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadNotificationLogs,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
+          ),
+          // Content
+          if (_loadingLogs)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_notificationLogs.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.notifications_off_outlined,
+                      size: 48,
+                      color: theme.colorScheme.outline.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No notifications sent yet',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Notifications will appear here when triggered',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _notificationLogs.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final log = _notificationLogs[index];
+                return _buildNotificationLogTile(theme, log);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationLogTile(ThemeData theme, JobNotificationLog log) {
+    final statusColor = log.isSuccess
+        ? Colors.green
+        : log.isFailed
+            ? Colors.red
+            : Colors.orange;
+
+    final channelIcon = log.channel == 'email'
+        ? Icons.email_outlined
+        : Icons.sms_outlined;
+
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: statusColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          channelIcon,
+          color: statusColor,
+          size: 20,
+        ),
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              log.triggerTypeLabel,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              log.statusLabel,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: statusColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(
+                Icons.person_outline,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  log.recipientName ?? log.recipientEmail,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (log.subjectRendered != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              log.subjectRendered!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                fontStyle: FontStyle.italic,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (log.errorMessage != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Error: ${log.errorMessage}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.red,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+      trailing: Text(
+        log.createdAt != null
+            ? DateFormat.MMMd().add_jm().format(log.createdAt!)
+            : '',
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    );
   }
 }
 

@@ -54,6 +54,14 @@ class _JobNotificationTemplatesScreenState
 
   List<JobNotificationTemplate> get _filteredTemplates {
     if (_selectedTrigger == 'all') return _templates;
+    if (_selectedTrigger == 'job') {
+      // Filter for job-related triggers
+      return _templates.where((t) => t.triggerType.startsWith('job_')).toList();
+    }
+    if (_selectedTrigger == 'application') {
+      // Filter for application-related triggers
+      return _templates.where((t) => t.triggerType.startsWith('application_')).toList();
+    }
     return _templates.where((t) => t.triggerType == _selectedTrigger).toList();
   }
 
@@ -153,10 +161,7 @@ class _JobNotificationTemplatesScreenState
   }
 
   Widget _buildFilterChip(String label, String value, {IconData? icon}) {
-    final theme = Theme.of(context);
-    final isSelected = _selectedTrigger == value ||
-        (value == 'job' && _selectedTrigger.startsWith('job_')) ||
-        (value == 'application' && _selectedTrigger.startsWith('application_'));
+    final isSelected = _selectedTrigger == value;
 
     return FilterChip(
       avatar: icon != null ? Icon(icon, size: 18) : null,
@@ -164,7 +169,7 @@ class _JobNotificationTemplatesScreenState
       selected: isSelected,
       onSelected: (selected) {
         setState(() {
-          _selectedTrigger = value == 'job' || value == 'application' ? 'all' : value;
+          _selectedTrigger = value;
         });
       },
     );

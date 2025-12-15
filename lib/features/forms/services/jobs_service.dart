@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/job.dart';
 import '../models/job_application.dart';
 import '../models/job_notification_template.dart';
+import '../models/job_notification_log.dart';
 import '../../../models/crm/member.dart';
 import '../../../services/crm/supabase_service.dart';
 import '../../../services/crm/crm_email_service.dart';
@@ -875,17 +876,20 @@ class JobsService {
         // Log the notification
         await _logNotification(
           templateId: template.id,
+          triggerType: triggerType,
           recipientEmail: recipientEmail,
           recipientName: recipientName,
           jobId: job.id,
           applicationId: application?.id,
           channel: 'email',
           status: 'sent',
+          subjectRendered: subject,
         );
       } catch (e) {
         // Log failed notification
         await _logNotification(
           templateId: template.id,
+          triggerType: triggerType,
           recipientEmail: recipientEmail,
           recipientName: recipientName,
           jobId: job.id,
@@ -952,6 +956,7 @@ class JobsService {
   /// Log a notification to the notification_log table
   Future<void> _logNotification({
     required String templateId,
+    required String triggerType,
     required String recipientEmail,
     String? recipientName,
     required String jobId,
@@ -959,10 +964,12 @@ class JobsService {
     required String channel,
     required String status,
     String? errorMessage,
+    String? subjectRendered,
   }) async {
     try {
       await _writeClient.from('job_notification_log').insert({
         'template_id': templateId,
+        'trigger_type': triggerType,
         'job_id': jobId,
         if (applicationId != null) 'application_id': applicationId,
         'recipient_email': recipientEmail,
@@ -970,6 +977,7 @@ class JobsService {
         'channel': channel,
         'status': status,
         if (errorMessage != null) 'error_message': errorMessage,
+        if (subjectRendered != null) 'subject_rendered': subjectRendered,
         'sent_at': DateTime.now().toIso8601String(),
       });
     } catch (_) {
@@ -978,6 +986,8 @@ class JobsService {
   }
 
   /// Send job submitted notification to submitter
+  /// NOTE: This is handled by Supabase edge function, not called from CRM
+  /// Kept here for reference and potential manual triggering
   Future<void> notifyJobSubmitted(Job job) async {
     await sendJobNotification(
       triggerType: 'job_submitted',
@@ -1006,6 +1016,8 @@ class JobsService {
   }
 
   /// Send application received notification to job poster
+  /// NOTE: This is handled by Supabase edge function, not called from CRM
+  /// Kept here for reference and potential manual triggering
   Future<void> notifyApplicationReceived(Job job, JobApplication application) async {
     await sendJobNotification(
       triggerType: 'application_received',
@@ -1016,6 +1028,8 @@ class JobsService {
   }
 
   /// Send application submitted confirmation to applicant
+  /// NOTE: This is handled by Supabase edge function, not called from CRM
+  /// Kept here for reference and potential manual triggering
   Future<void> notifyApplicationSubmitted(Job job, JobApplication application) async {
     await sendJobNotification(
       triggerType: 'application_submitted',
@@ -1038,5 +1052,81 @@ class JobsService {
       application: application,
       additionalVariables: {'old_status': oldStatus},
     );
+  }
+
+  // ============================================================================
+  // Notification Log Methods
+  // ============================================================================
+
+  /// Get notification logs for a specific job
+  Future<List<JobNotificationLog>> getNotificationLogsForJob(String jobId) async {
+    final response = await _readClient
+        .from('job_notification_log')
+        .select()
+        .eq('job_id', jobId)
+        .order('created_at', ascending: false);
+
+    return (response as List)
+        .map((json) => JobNotificationLog.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get notification logs for a specific application
+  Future<List<JobNotificationLog>> getNotificationLogsForApplication(
+      String applicationId) async {
+    final response = await _readClient
+        .from('job_notification_log')
+        .select()
+        .eq('application_id', applicationId)
+        .order('created_at', ascending: false);
+
+    return (response as List)
+        .map((json) => JobNotificationLog.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Watch notification logs for a specific job
+  Stream<List<JobNotificationLog>> watchNotificationLogsForJob(String jobId) {
+    return _readClient
+        .from('job_notification_log')
+        .stream(primaryKey: ['id'])
+        .eq('job_id', jobId)
+        .order('created_at', ascending: false)
+        .map((data) => data
+            .map((json) => JobNotificationLog.fromJson(json))
+            .toList());
+  }
+
+  /// Get recent notification logs (for admin view)
+  Future<List<JobNotificationLog>> getRecentNotificationLogs({
+    int limit = 50,
+    String? statusFilter,
+  }) async {
+    var query = _readClient
+        .from('job_notification_log')
+        .select();
+
+    if (statusFilter != null) {
+      query = query.eq('status', statusFilter);
+    }
+
+    final response = await query
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return (response as List)
+        .map((json) => JobNotificationLog.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get notification log count for a job
+  Future<int> getNotificationLogCountForJob(String jobId) async {
+    final response = await _readClient
+        .from('job_notification_log')
+        .select()
+        .eq('job_id', jobId)
+        .count(CountOption.exact);
+
+    return response.count;
   }
 }

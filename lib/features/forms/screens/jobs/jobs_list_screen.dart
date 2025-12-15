@@ -69,7 +69,6 @@ class _JobsListScreenState extends State<JobsListScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
-    final isWide = MediaQuery.of(context).size.width > 800;
 
     return Scaffold(
       body: Column(
@@ -165,10 +164,6 @@ class _JobsListScreenState extends State<JobsListScreen>
 
                 if (jobs.isEmpty) {
                   return _buildEmptyState(theme);
-                }
-
-                if (isWide) {
-                  return _buildGridLayout(jobs);
                 }
 
                 return _buildListLayout(jobs);
@@ -383,26 +378,6 @@ class _JobsListScreenState extends State<JobsListScreen>
       },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: jobs.length,
-        itemBuilder: (context, index) => _buildJobCard(jobs[index]),
-      ),
-    );
-  }
-
-  Widget _buildGridLayout(List<Job> jobs) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        setState(() {});
-        await _refreshApplicationCounts();
-      },
-      child: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 1.8,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-        ),
         itemCount: jobs.length,
         itemBuilder: (context, index) => _buildJobCard(jobs[index]),
       ),
