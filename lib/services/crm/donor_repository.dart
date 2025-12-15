@@ -151,7 +151,7 @@ class DonorRepository {
 
     if (fetchTotalCount) {
       var countQuery = _applyFilters(
-        _readClient.from('donors').select('*, donations(*)'),
+        _readClient.from('donors').select('*, donations(*, donation_thank_yous(*))'),
         searchQuery: searchQuery,
         recurring: recurring,
         linkedToMember: linkedToMember,
@@ -171,7 +171,7 @@ class DonorRepository {
     }
 
     var query = _applyFilters(
-      _readClient.from('donors').select('*, donations(*)'),
+      _readClient.from('donors').select('*, donations(*, donation_thank_yous(*))'),
       searchQuery: searchQuery,
       recurring: recurring,
       linkedToMember: linkedToMember,
@@ -260,17 +260,21 @@ class DonorRepository {
       // Split search into terms for better first/last name matching
       final terms = value.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
 
-      if (terms.length == 1) {
-        // Single term: search across all fields
-        query = query.or(
-            'name.ilike.%$value%,email.ilike.%$value%,phone.ilike.%$value%,phone_e164.ilike.%$value%');
-      } else {
-        // Multiple terms: each term must appear in name (handles "John Smith" or "Smith John")
-        // Build filter that requires all terms to be in the name
-        final nameFilters = terms.map((term) => 'name.ilike.%$term%').join(',');
-        // Also allow full search string match on email
-        query = query.or('and($nameFilters),email.ilike.%$value%');
+      // Build OR conditions for each term across name field
+      // This finds "John Smith" when searching "John", "Smith", "John Smith", or "Smith John"
+      final searchConditions = <String>[];
+
+      // Add conditions for each term in name
+      for (final term in terms) {
+        searchConditions.add('name.ilike.%$term%');
       }
+
+      // Also search full query string in email and phone
+      searchConditions.add('email.ilike.%$value%');
+      searchConditions.add('phone.ilike.%$value%');
+      searchConditions.add('phone_e164.ilike.%$value%');
+
+      query = query.or(searchConditions.join(','));
     }
 
     if (recurring != null) {

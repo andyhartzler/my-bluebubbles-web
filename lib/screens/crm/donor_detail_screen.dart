@@ -676,53 +676,18 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                 final thankYouCount = donation.thankYous.length;
 
                 return ListTile(
-                  leading: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const Icon(Icons.volunteer_activism, size: 28),
-                      if (hasThankYou)
-                        Positioned(
-                          right: -4,
-                          top: -4,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 1.5),
-                            ),
-                            child: const Icon(
-                              Icons.check,
-                              size: 10,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                  leading: const Icon(Icons.volunteer_activism, size: 28),
                   title: Text(title),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(subtitleParts.join(' • ')),
                       const SizedBox(height: 6),
-                      // Show thank you method badges
+                      // Show combined thank you pill with method icons
                       if (donation.thankYous.isNotEmpty)
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: donation.thankYous.map((ty) {
-                            return _buildThankYouMethodBadge(ty.method);
-                          }).toList(),
-                        )
+                        _buildCombinedThankYouBadge(donation.thankYous)
                       else if (donation.sentThankYou)
-                        Chip(
-                          avatar: Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
-                          label: const Text('Thanked', style: TextStyle(fontSize: 12)),
-                          backgroundColor: Colors.green.shade50,
-                          padding: EdgeInsets.zero,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
+                        _buildCombinedThankYouBadge([]),
                       if (notes != null && notes.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
@@ -759,22 +724,46 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     );
   }
 
-  Widget _buildThankYouMethodBadge(ThankYouMethod method) {
-    final (IconData icon, Color color, String label) = switch (method) {
-      ThankYouMethod.mailed => (Icons.mail_outline, Colors.brown, 'Mailed'),
-      ThankYouMethod.call => (Icons.phone_outlined, Colors.green, 'Called'),
-      ThankYouMethod.text => (Icons.sms_outlined, Colors.blue, 'Texted'),
-      ThankYouMethod.email => (Icons.email_outlined, Colors.purple, 'Emailed'),
-      ThankYouMethod.inPerson => (Icons.person_outline, Colors.orange, 'In Person'),
-    };
+  Widget _buildCombinedThankYouBadge(List<DonationThankYou> thankYous) {
+    final greenColor = Colors.green.shade700;
 
-    return Chip(
-      avatar: Icon(icon, size: 14, color: color),
-      label: Text(label, style: TextStyle(fontSize: 11, color: color)),
-      backgroundColor: color.withOpacity(0.1),
-      padding: EdgeInsets.zero,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      side: BorderSide(color: color.withOpacity(0.3)),
+    // Get icons for each thank you method
+    final icons = thankYous.map((ty) {
+      return switch (ty.method) {
+        ThankYouMethod.mailed => Icons.mail_outline,
+        ThankYouMethod.call => Icons.phone_outlined,
+        ThankYouMethod.text => Icons.sms_outlined,
+        ThankYouMethod.email => Icons.email_outlined,
+        ThankYouMethod.inPerson => Icons.person_outline,
+      };
+    }).toList();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icons.isNotEmpty) ...[
+            ...icons.map((icon) => Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(icon, size: 16, color: greenColor),
+                )),
+          ] else
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Icon(Icons.check_circle, size: 16, color: greenColor),
+            ),
+          Text(
+            'Thank you sent',
+            style: TextStyle(fontSize: 12, color: greenColor, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1011,6 +1000,11 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
         );
       },
     );
+
+    // Refresh after modal closes to ensure updated data is displayed
+    if (mounted) {
+      await _load();
+    }
   }
 
   Future<void> _toggleThankYou(Donation donation, bool sent) async {
