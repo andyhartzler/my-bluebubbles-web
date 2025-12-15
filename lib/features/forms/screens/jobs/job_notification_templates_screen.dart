@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_html/flutter_html.dart' show Html, Style, Margins, HtmlPaddings, FontSize;
 import '../../models/job_notification_template.dart';
 import '../../services/jobs_service.dart';
 import '../../widgets/email_template_editor.dart';
@@ -1283,6 +1283,8 @@ class _HtmlPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     if (html.isEmpty) {
       return Center(
         child: Text(
@@ -1296,116 +1298,33 @@ class _HtmlPreview extends StatelessWidget {
       );
     }
 
-    // Wrap the HTML content for proper email rendering
-    final wrappedHtml = '''
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      margin: 0;
-      padding: 0;
-    }
-    a {
-      color: #2563eb;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    img {
-      max-width: 100%;
-      height: auto;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-    }
-    td, th {
-      padding: 8px;
-      text-align: left;
-    }
-  </style>
-</head>
-<body>
-$html
-</body>
-</html>
-''';
-
     return Html(
-      data: wrappedHtml,
+      data: html,
       style: {
         'body': Style(
           margin: Margins.zero,
           padding: HtmlPaddings.zero,
           fontSize: FontSize(14),
-          lineHeight: const LineHeight(1.6),
           color: Colors.black87,
         ),
         'h1': Style(
           fontSize: FontSize(24),
           fontWeight: FontWeight.bold,
-          margin: Margins.only(bottom: 16),
         ),
         'h2': Style(
           fontSize: FontSize(20),
           fontWeight: FontWeight.bold,
-          margin: Margins.only(bottom: 12),
         ),
         'h3': Style(
           fontSize: FontSize(18),
           fontWeight: FontWeight.w600,
-          margin: Margins.only(bottom: 10),
         ),
         'p': Style(
           margin: Margins.only(bottom: 12),
         ),
         'a': Style(
-          color: const Color(0xFF2563EB),
-          textDecoration: TextDecoration.none,
+          color: theme.colorScheme.primary,
         ),
-        'strong': Style(
-          fontWeight: FontWeight.bold,
-        ),
-        'em': Style(
-          fontStyle: FontStyle.italic,
-        ),
-        'u': Style(
-          textDecoration: TextDecoration.underline,
-        ),
-        'table': Style(
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        'td': Style(
-          padding: HtmlPaddings.all(8),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        'th': Style(
-          padding: HtmlPaddings.all(8),
-          backgroundColor: Colors.grey.shade100,
-          fontWeight: FontWeight.bold,
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-      },
-      onLinkTap: (url, _, __) {
-        if (url != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Link: $url'),
-              behavior: SnackBarBehavior.floating,
-              action: SnackBarAction(
-                label: 'OK',
-                onPressed: () {},
-              ),
-            ),
-          );
-        }
       },
     );
   }
