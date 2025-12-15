@@ -458,19 +458,21 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
+                final isDesktop = constraints.maxWidth > 600;
                 return SingleChildScrollView(
                   padding: EdgeInsets.symmetric(
                     horizontal: 24.0,
                     vertical: constraints.maxHeight > 600 ? 24.0 : 16.0,
                   ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: 420,
-                      minHeight: constraints.maxHeight - 48,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 420,
+                        minHeight: constraints.maxHeight - 48,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
                         AutofillGroup(
                           child: Card(
                             elevation: 8,
