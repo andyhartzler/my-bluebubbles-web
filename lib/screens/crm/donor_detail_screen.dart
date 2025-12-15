@@ -1000,6 +1000,11 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
         );
       },
     );
+
+    // Refresh after modal closes to ensure updated data is displayed
+    if (mounted) {
+      await _load();
+    }
   }
 
   Future<void> _toggleThankYou(Donation donation, bool sent) async {
