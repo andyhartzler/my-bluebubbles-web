@@ -675,25 +675,6 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  if (donation.sentThankYou)
-                    SizedBox(
-                      width: 150,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Chip(
-                            backgroundColor: Colors.white.withOpacity(0.2),
-                            label: const Text(
-                              'Thank-you sent',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                            ),
-                            avatar: const Icon(Icons.check_circle, color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
                 ],
               ),
             ),
