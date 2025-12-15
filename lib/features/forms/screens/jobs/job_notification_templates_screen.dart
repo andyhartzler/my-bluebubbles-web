@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_html/flutter_html.dart' show Html, Style, Margins, HtmlPaddings, FontSize;
 import '../../models/job_notification_template.dart';
 import '../../services/jobs_service.dart';
 import '../../widgets/email_template_editor.dart';
+import '../../widgets/email_html_preview.dart';
 
 /// Screen for managing job notification email/SMS templates
 class JobNotificationTemplatesScreen extends StatefulWidget {
@@ -1188,7 +1188,7 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
                     ],
                   ),
                 ),
-                // Email body
+                // Email body - uses iframe on web for accurate rendering
                 Expanded(
                   child: previewHtml.isEmpty
                       ? Center(
@@ -1198,9 +1198,12 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
                             style: TextStyle(color: Colors.grey.shade500),
                           ),
                         )
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.all(16),
-                          child: _HtmlPreview(html: previewHtml),
+                      : EmailHtmlPreview(
+                          html: previewHtml,
+                          subject: previewSubject,
+                          recipientEmail: _recipientType == 'job_submitter'
+                              ? sampleData['submitter_email']
+                              : sampleData['applicant_email'],
                         ),
                 ),
               ],
@@ -1495,60 +1498,5 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
         setState(() => _saving = false);
       }
     }
-  }
-}
-
-/// Rich HTML preview widget using flutter_html
-class _HtmlPreview extends StatelessWidget {
-  final String html;
-
-  const _HtmlPreview({required this.html});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    if (html.isEmpty) {
-      return Center(
-        child: Text(
-          'Email body will appear here...',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade500,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      );
-    }
-
-    return Html(
-      data: html,
-      style: {
-        'body': Style(
-          margin: Margins.zero,
-          padding: HtmlPaddings.zero,
-          fontSize: FontSize(14),
-          color: Colors.black87,
-        ),
-        'h1': Style(
-          fontSize: FontSize(24),
-          fontWeight: FontWeight.bold,
-        ),
-        'h2': Style(
-          fontSize: FontSize(20),
-          fontWeight: FontWeight.bold,
-        ),
-        'h3': Style(
-          fontSize: FontSize(18),
-          fontWeight: FontWeight.w600,
-        ),
-        'p': Style(
-          margin: Margins.only(bottom: 12),
-        ),
-        'a': Style(
-          color: theme.colorScheme.primary,
-        ),
-      },
-    );
   }
 }
