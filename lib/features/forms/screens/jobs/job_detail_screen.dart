@@ -183,6 +183,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       _buildSection(theme, 'Description', job.description, Icons.description_outlined),
                       const SizedBox(height: 16),
 
+                      // Custom Questions
+                      if (job.customQuestions.isNotEmpty) ...[
+                        _buildCustomQuestionsCard(theme, job),
+                        const SizedBox(height: 16),
+                      ],
+
                       // Requirements
                       if (job.requirements != null) ...[
                         _buildSection(theme, 'Requirements', job.requirements!, Icons.checklist_outlined),
@@ -651,6 +657,193 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             _buildInfoRow(theme, 'Applications', '$_applicationCount'),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCustomQuestionsCard(ThemeData theme, Job job) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.secondaryContainer.withOpacity(0.3),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.quiz_outlined,
+                  color: theme.colorScheme.secondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Application Questions',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${job.customQuestions.length} custom question${job.customQuestions.length == 1 ? '' : 's'}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Questions list
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: job.customQuestions.asMap().entries.map((entry) {
+                final index = entry.key;
+                final question = entry.value;
+                return _buildCustomQuestionItem(theme, question, index + 1);
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomQuestionItem(ThemeData theme, CustomQuestion question, int number) {
+    // Get question type label and icon
+    String typeLabel;
+    IconData typeIcon;
+    switch (question.type) {
+      case CustomQuestionType.text:
+        typeLabel = 'Short text';
+        typeIcon = Icons.short_text;
+        break;
+      case CustomQuestionType.textarea:
+        typeLabel = 'Long text';
+        typeIcon = Icons.notes;
+        break;
+      case CustomQuestionType.select:
+        typeLabel = 'Dropdown';
+        typeIcon = Icons.arrow_drop_down_circle_outlined;
+        break;
+      case CustomQuestionType.checkbox:
+        typeLabel = 'Checkboxes';
+        typeIcon = Icons.check_box_outlined;
+        break;
+      case CustomQuestionType.radio:
+        typeLabel = 'Multiple choice';
+        typeIcon = Icons.radio_button_checked;
+        break;
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: number < 10 ? 12 : 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text(
+                    '$number',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.secondary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            question.question,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        if (question.required)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'Required',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(typeIcon, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text(
+                          typeLabel,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (question.options.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: question.options.map((option) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              option,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
