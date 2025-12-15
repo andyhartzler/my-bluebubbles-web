@@ -1,33 +1,44 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'job_notification_log.freezed.dart';
-part 'job_notification_log.g.dart';
-
 /// Represents a log entry for a job notification
-@freezed
-class JobNotificationLog with _$JobNotificationLog {
-  const JobNotificationLog._();
+class JobNotificationLog {
+  final String id;
+  final String? templateId;
+  final String triggerType;
+  final String? recipientMemberId;
+  final String recipientEmail;
+  final String? recipientPhone;
+  final String? recipientName;
+  final String? jobId;
+  final String? applicationId;
+  final String channel;
+  final String? subjectRendered;
+  final String? bodyRendered;
+  final String status;
+  final String? errorMessage;
+  final String? externalId;
+  final DateTime? createdAt;
+  final DateTime? sentAt;
+  final DateTime? deliveredAt;
 
-  const factory JobNotificationLog({
-    required String id,
-    String? templateId,
-    required String triggerType,
-    String? recipientMemberId,
-    required String recipientEmail,
-    String? recipientPhone,
-    String? recipientName,
-    String? jobId,
-    String? applicationId,
-    required String channel,
-    String? subjectRendered,
-    String? bodyRendered,
-    @Default('pending') String status,
-    String? errorMessage,
-    String? externalId,
-    DateTime? createdAt,
-    DateTime? sentAt,
-    DateTime? deliveredAt,
-  }) = _JobNotificationLog;
+  const JobNotificationLog({
+    required this.id,
+    this.templateId,
+    required this.triggerType,
+    this.recipientMemberId,
+    required this.recipientEmail,
+    this.recipientPhone,
+    this.recipientName,
+    this.jobId,
+    this.applicationId,
+    required this.channel,
+    this.subjectRendered,
+    this.bodyRendered,
+    this.status = 'pending',
+    this.errorMessage,
+    this.externalId,
+    this.createdAt,
+    this.sentAt,
+    this.deliveredAt,
+  });
 
   factory JobNotificationLog.fromJson(Map<String, dynamic> json) {
     return JobNotificationLog(
