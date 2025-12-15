@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:bluebubbles/models/crm/donation.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
 import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
 import 'package:bluebubbles/services/crm/donor_repository.dart';
@@ -253,6 +254,12 @@ class _DonorsScreenState extends State<DonorsScreen> {
       chips.add(_buildPillChip(Icons.link, donor.member!.name ?? donor.member!.id ?? 'Linked member'));
     }
 
+    // Check if any donations have thank yous logged
+    final hasThankYous = donor.donations.any((d) => d.hasThankYou);
+    if (hasThankYous) {
+      chips.add(_buildThankYouPill(donor.donations));
+    }
+
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -340,6 +347,32 @@ class _DonorsScreenState extends State<DonorsScreen> {
       label: Text(label),
       shape: const StadiumBorder(),
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+
+  Widget _buildThankYouPill(List<Donation> donations) {
+    // Count donations with thank yous
+    final thankedCount = donations.where((d) => d.hasThankYou).length;
+    final totalCount = donations.length;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
+          const SizedBox(width: 4),
+          Text(
+            '$thankedCount/$totalCount thanked',
+            style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
     );
   }
 

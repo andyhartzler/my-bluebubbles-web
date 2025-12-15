@@ -151,7 +151,7 @@ class DonorRepository {
 
     if (fetchTotalCount) {
       var countQuery = _applyFilters(
-        _readClient.from('donors').select('*, donations(*)'),
+        _readClient.from('donors').select('*, donations(*, donation_thank_yous(*))'),
         searchQuery: searchQuery,
         recurring: recurring,
         linkedToMember: linkedToMember,
@@ -171,7 +171,7 @@ class DonorRepository {
     }
 
     var query = _applyFilters(
-      _readClient.from('donors').select('*, donations(*)'),
+      _readClient.from('donors').select('*, donations(*, donation_thank_yous(*))'),
       searchQuery: searchQuery,
       recurring: recurring,
       linkedToMember: linkedToMember,
