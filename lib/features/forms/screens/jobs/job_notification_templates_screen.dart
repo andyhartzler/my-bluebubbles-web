@@ -567,9 +567,6 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
   bool _saving = false;
   bool _showPreview = false;
 
-  final GlobalKey<_EmailTemplateEditorState> _editorKey =
-      GlobalKey<_EmailTemplateEditorState>();
-
   @override
   void initState() {
     super.initState();
@@ -900,7 +897,6 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
         _buildSectionHeader(theme, 'Email Body', Icons.article_outlined),
         const SizedBox(height: 12),
         EmailTemplateEditor(
-          key: _editorKey,
           initialHtml: _emailHtml,
           mergeVariables: _mergeVariables,
           minHeight: 400,
