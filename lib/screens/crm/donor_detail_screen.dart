@@ -4,6 +4,7 @@ import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/models/crm/donation.dart';
+import 'package:bluebubbles/models/crm/donation_thank_you.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
@@ -665,34 +666,63 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                     ? DateFormat.yMMMd().format(donation.donationDate!)
                     : 'Date unknown';
                 final title = _formatCurrency(donation.amount ?? 0);
-                final subtitle = [
+                final subtitleParts = [
                   dateText,
                   if (donation.eventName != null) 'Event: ${donation.eventName}',
                   if (donation.paymentMethod != null) 'Method: ${donation.paymentMethodLabel}',
-                  if (donation.sentThankYou) 'Thank you sent',
-                ].join(' • ');
+                ];
                 final notes = donation.notes?.trim();
+                final hasThankYou = donation.hasThankYou;
+                final thankYouCount = donation.thankYous.length;
 
                 return ListTile(
-                  leading: const Icon(Icons.volunteer_activism),
+                  leading: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(Icons.volunteer_activism, size: 28),
+                      if (hasThankYou)
+                        Positioned(
+                          right: -4,
+                          top: -4,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            child: const Icon(
+                              Icons.check,
+                              size: 10,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   title: Text(title),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(subtitle),
+                      Text(subtitleParts.join(' • ')),
                       const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          if (donation.sentThankYou)
-                            Chip(
-                              label: const Text('Thank you sent', style: TextStyle(fontWeight: FontWeight.w600)),
-                              backgroundColor: Colors.green.shade100,
-                              labelStyle: TextStyle(color: Colors.green.shade800),
-                            ),
-                        ],
-                      ),
+                      // Show thank you method badges
+                      if (donation.thankYous.isNotEmpty)
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: donation.thankYous.map((ty) {
+                            return _buildThankYouMethodBadge(ty.method);
+                          }).toList(),
+                        )
+                      else if (donation.sentThankYou)
+                        Chip(
+                          avatar: Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
+                          label: const Text('Thanked', style: TextStyle(fontSize: 12)),
+                          backgroundColor: Colors.green.shade50,
+                          padding: EdgeInsets.zero,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                       if (notes != null && notes.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
@@ -700,15 +730,19 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
                         ),
                     ],
                   ),
-                  trailing: donation.sentThankYou
+                  trailing: hasThankYou
                       ? OutlinedButton.icon(
-                          icon: const Icon(Icons.check_circle),
-                          label: const Text('Thank-you logged'),
+                          icon: Badge(
+                            label: Text('$thankYouCount'),
+                            isLabelVisible: thankYouCount > 0,
+                            child: const Icon(Icons.check_circle, size: 18),
+                          ),
+                          label: const Text('View'),
                           onPressed: () => _showThankYouConfirmation(donation),
                         )
                       : ElevatedButton.icon(
-                          icon: const Icon(Icons.favorite_border),
-                          label: const Text('Log thank-you'),
+                          icon: const Icon(Icons.favorite_border, size: 18),
+                          label: const Text('Log'),
                           onPressed: () => _showThankYouConfirmation(donation),
                         ),
                   onTap: () => _showThankYouConfirmation(donation),
@@ -722,6 +756,25 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildThankYouMethodBadge(ThankYouMethod method) {
+    final (IconData icon, Color color, String label) = switch (method) {
+      ThankYouMethod.mailed => (Icons.mail_outline, Colors.brown, 'Mailed'),
+      ThankYouMethod.call => (Icons.phone_outlined, Colors.green, 'Called'),
+      ThankYouMethod.text => (Icons.sms_outlined, Colors.blue, 'Texted'),
+      ThankYouMethod.email => (Icons.email_outlined, Colors.purple, 'Emailed'),
+      ThankYouMethod.inPerson => (Icons.person_outline, Colors.orange, 'In Person'),
+    };
+
+    return Chip(
+      avatar: Icon(icon, size: 14, color: color),
+      label: Text(label, style: TextStyle(fontSize: 11, color: color)),
+      backgroundColor: color.withOpacity(0.1),
+      padding: EdgeInsets.zero,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      side: BorderSide(color: color.withOpacity(0.3)),
     );
   }
 
@@ -936,85 +989,28 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
   }
 
   Future<void> _showThankYouConfirmation(Donation donation) async {
-    final markSent = !donation.sentThankYou;
     final amountText = _formatCurrency(donation.amount ?? 0);
     final dateText = donation.donationDate != null
         ? DateFormat.yMMMd().format(donation.donationDate!)
         : 'Unknown date';
     final donorName = donation.donorName ?? _donor?.name ?? 'this donor';
 
-    final confirmed = await showModalBottomSheet<bool>(
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 16,
-              bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      markSent ? 'Log thank-you' : 'Reopen thank-you',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  markSent
-                      ? 'Confirm you have sent a thank-you to $donorName.'
-                      : 'Mark this donation as still needing a thank-you.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    Chip(label: Text(amountText)),
-                    Chip(label: Text(dateText)),
-                    if (donation.eventName != null) Chip(label: Text(donation.eventName!)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      icon: Icon(markSent ? Icons.check_circle : Icons.undo),
-                      label: Text(markSent ? 'Mark thanked' : 'Reopen'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+        return _ThankYouManager(
+          donation: donation,
+          donorName: donorName,
+          amountText: amountText,
+          dateText: dateText,
+          repository: _repository,
+          onUpdated: () async {
+            await _load();
+          },
         );
       },
     );
-
-    if (confirmed == true && mounted) {
-      await _toggleThankYou(donation, markSent);
-    }
   }
 
   Future<void> _toggleThankYou(Donation donation, bool sent) async {
@@ -1375,5 +1371,396 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
       return displayName[0].toUpperCase();
     }
     return 'D';
+  }
+}
+
+/// Widget for managing thank yous for a donation
+class _ThankYouManager extends StatefulWidget {
+  final Donation donation;
+  final String donorName;
+  final String amountText;
+  final String dateText;
+  final DonorRepository repository;
+  final VoidCallback onUpdated;
+
+  const _ThankYouManager({
+    required this.donation,
+    required this.donorName,
+    required this.amountText,
+    required this.dateText,
+    required this.repository,
+    required this.onUpdated,
+  });
+
+  @override
+  State<_ThankYouManager> createState() => _ThankYouManagerState();
+}
+
+class _ThankYouManagerState extends State<_ThankYouManager> {
+  List<DonationThankYou> _thankYous = [];
+  bool _loading = true;
+  bool _saving = false;
+
+  // Form state for new thank you
+  ThankYouMethod _selectedMethod = ThankYouMethod.email;
+  DateTime _selectedDate = DateTime.now();
+  final TextEditingController _notesController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _thankYous = widget.donation.thankYous;
+    _loading = false;
+
+    // Set initial method to first available if email is already used
+    final usedMethods = _thankYous.map((t) => t.method).toSet();
+    if (usedMethods.contains(_selectedMethod)) {
+      final available = ThankYouMethod.values.where((m) => !usedMethods.contains(m)).toList();
+      if (available.isNotEmpty) {
+        _selectedMethod = available.first;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addThankYou() async {
+    setState(() => _saving = true);
+
+    try {
+      final newThankYou = await widget.repository.addThankYou(
+        donationId: widget.donation.id,
+        method: _selectedMethod,
+        sentDate: _selectedDate,
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      );
+
+      if (newThankYou != null && mounted) {
+        setState(() {
+          _thankYous = [..._thankYous, newThankYou];
+          _notesController.clear();
+        });
+        widget.onUpdated();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Thank you logged: ${_selectedMethod.displayName}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error logging thank you: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _deleteThankYou(DonationThankYou thankYou) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete thank you?'),
+        content: Text(
+          'Remove the ${thankYou.method.displayName.toLowerCase()} thank you from ${thankYou.formattedDate}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await widget.repository.deleteThankYou(thankYou.id);
+      if (mounted) {
+        setState(() {
+          _thankYous = _thankYous.where((t) => t.id != thankYou.id).toList();
+        });
+        widget.onUpdated();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  IconData _iconForMethod(ThankYouMethod method) {
+    switch (method) {
+      case ThankYouMethod.mailed:
+        return Icons.mail_outline;
+      case ThankYouMethod.call:
+        return Icons.phone_outlined;
+      case ThankYouMethod.text:
+        return Icons.sms_outlined;
+      case ThankYouMethod.email:
+        return Icons.email_outlined;
+      case ThankYouMethod.inPerson:
+        return Icons.person_outline;
+    }
+  }
+
+  Color _colorForMethod(ThankYouMethod method) {
+    switch (method) {
+      case ThankYouMethod.mailed:
+        return Colors.brown;
+      case ThankYouMethod.call:
+        return Colors.green;
+      case ThankYouMethod.text:
+        return Colors.blue;
+      case ThankYouMethod.email:
+        return Colors.purple;
+      case ThankYouMethod.inPerson:
+        return Colors.orange;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final usedMethods = _thankYous.map((t) => t.method).toSet();
+    final availableMethods = ThankYouMethod.values
+        .where((m) => !usedMethods.contains(m))
+        .toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 16,
+          bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Thank You Tracking', style: theme.textTheme.titleLarge),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Donation info chips
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Chip(
+                    avatar: const Icon(Icons.attach_money, size: 18),
+                    label: Text(widget.amountText),
+                  ),
+                  Chip(
+                    avatar: const Icon(Icons.calendar_today, size: 18),
+                    label: Text(widget.dateText),
+                  ),
+                  if (widget.donation.eventName != null)
+                    Chip(
+                      avatar: const Icon(Icons.event, size: 18),
+                      label: Text(widget.donation.eventName!),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Existing thank yous
+              if (_thankYous.isNotEmpty) ...[
+                Text(
+                  'Logged Thank Yous',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ...(_thankYous.map((thankYou) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: _colorForMethod(thankYou.method).withOpacity(0.15),
+                          child: Icon(
+                            _iconForMethod(thankYou.method),
+                            color: _colorForMethod(thankYou.method),
+                          ),
+                        ),
+                        title: Text(thankYou.method.displayName),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(thankYou.formattedDate),
+                            if (thankYou.notes != null && thankYou.notes!.isNotEmpty)
+                              Text(
+                                thankYou.notes!,
+                                style: theme.textTheme.bodySmall,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          onPressed: () => _deleteThankYou(thankYou),
+                        ),
+                      ),
+                    ))),
+                const Divider(height: 24),
+              ],
+
+              // Add new thank you section
+              if (availableMethods.isNotEmpty) ...[
+                Text(
+                  'Log New Thank You',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+
+                // Method selection
+                Text('Method', style: theme.textTheme.labelMedium),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: availableMethods.map((method) {
+                    final isSelected = method == _selectedMethod;
+                    return ChoiceChip(
+                      avatar: Icon(
+                        _iconForMethod(method),
+                        size: 18,
+                        color: isSelected ? Colors.white : _colorForMethod(method),
+                      ),
+                      label: Text(method.shortName),
+                      selected: isSelected,
+                      selectedColor: _colorForMethod(method),
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() => _selectedMethod = method);
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+
+                // Date picker
+                Text('Date Sent', style: theme.textTheme.labelMedium),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: _pickDate,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 20),
+                        const SizedBox(width: 12),
+                        Text(
+                          DateFormat.yMMMd().format(_selectedDate),
+                          style: theme.textTheme.bodyLarge,
+                        ),
+                        const Spacer(),
+                        const Icon(Icons.arrow_drop_down),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Notes
+                TextField(
+                  controller: _notesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes (optional)',
+                    hintText: 'e.g., Spoke for 5 minutes, very grateful',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+
+                // Add button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _saving ? null : _addThankYou,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add_task),
+                    label: Text(_saving ? 'Saving...' : 'Log Thank You'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      backgroundColor: const Color(0xFF32A6DE),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green.shade700),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'All thank you methods have been logged for this donation!',
+                          style: TextStyle(color: Colors.green.shade800),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

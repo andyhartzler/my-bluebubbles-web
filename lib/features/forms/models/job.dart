@@ -3,6 +3,36 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'job.freezed.dart';
 part 'job.g.dart';
 
+/// Custom question types for job applications
+enum CustomQuestionType {
+  @JsonValue('text')
+  text,
+  @JsonValue('textarea')
+  textarea,
+  @JsonValue('select')
+  select,
+  @JsonValue('checkbox')
+  checkbox,
+  @JsonValue('radio')
+  radio,
+}
+
+/// A custom question for job applications
+@freezed
+class CustomQuestion with _$CustomQuestion {
+  const factory CustomQuestion({
+    required String id,
+    required String question,
+    @Default(CustomQuestionType.text) CustomQuestionType type,
+    @Default(false) bool required,
+    @Default([]) List<String> options,
+    @Default(0) int order,
+  }) = _CustomQuestion;
+
+  factory CustomQuestion.fromJson(Map<String, dynamic> json) =>
+      _$CustomQuestionFromJson(json);
+}
+
 @freezed
 class Job with _$Job {
   const factory Job({
@@ -57,7 +87,27 @@ class Job with _$Job {
     // Application Tracking
     @JsonKey(name: 'application_count') @Default(0) int applicationCount,
     @JsonKey(name: 'view_count') @Default(0) int viewCount,
+
+    // Custom Questions for Applications
+    @JsonKey(name: 'custom_questions', fromJson: _customQuestionsFromJson, toJson: _customQuestionsToJson)
+    @Default([]) List<CustomQuestion> customQuestions,
   }) = _Job;
 
   factory Job.fromJson(Map<String, dynamic> json) => _$JobFromJson(json);
+}
+
+/// Helper to parse custom questions from JSON (handles null and list)
+List<CustomQuestion> _customQuestionsFromJson(dynamic json) {
+  if (json == null) return [];
+  if (json is List) {
+    return json
+        .map((e) => CustomQuestion.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+  return [];
+}
+
+/// Helper to convert custom questions to JSON
+List<Map<String, dynamic>> _customQuestionsToJson(List<CustomQuestion> questions) {
+  return questions.map((q) => q.toJson()).toList();
 }
