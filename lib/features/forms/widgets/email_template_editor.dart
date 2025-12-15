@@ -204,8 +204,6 @@ class _EmailTemplateEditorState extends State<EmailTemplateEditor> {
                 expands: false,
                 padding: const EdgeInsets.all(16),
                 placeholder: widget.placeholder ?? 'Compose your email...',
-                readOnlyMouseCursor: SystemMouseCursors.text,
-                readOnly: widget.readOnly,
               ),
             ),
           ),
@@ -234,8 +232,8 @@ class _EmailTemplateEditorState extends State<EmailTemplateEditor> {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: quill.QuillToolbar.simple(
-          controller: _controller,
           configurations: quill.QuillSimpleToolbarConfigurations(
+            controller: _controller,
             showAlignmentButtons: true,
             showBackgroundColorButton: false,
             showCenterAlignment: true,
