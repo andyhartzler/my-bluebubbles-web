@@ -1,5 +1,7 @@
 import 'package:intl/intl.dart';
 
+import 'donation_thank_you.dart';
+
 class Donation {
   final String id;
   final String? donorId;
@@ -15,6 +17,7 @@ class Donation {
   final String? donorEmail;
   final String? donorPhone;
   final String? donorPhoneE164;
+  final List<DonationThankYou> thankYous;
 
   const Donation({
     required this.id,
@@ -31,6 +34,7 @@ class Donation {
     this.donorEmail,
     this.donorPhone,
     this.donorPhoneE164,
+    this.thankYous = const [],
   });
 
   factory Donation.fromJson(Map<String, dynamic> json) {
@@ -45,6 +49,14 @@ class Donation {
       donorPhone = donor['phone'] as String?;
       donorPhoneE164 = donor['phone_e164'] as String? ?? donorPhone;
     }
+
+    // Parse thank yous if present
+    final thankYousJson = json['donation_thank_yous'] as List<dynamic>?;
+    final thankYous = thankYousJson
+            ?.whereType<Map<String, dynamic>>()
+            .map(DonationThankYou.fromJson)
+            .toList() ??
+        [];
 
     return Donation(
       id: json['id']?.toString() ?? '',
@@ -62,6 +74,7 @@ class Donation {
       donorEmail: donorEmail,
       donorPhone: donorPhone,
       donorPhoneE164: donorPhoneE164,
+      thankYous: thankYous,
     );
   }
 
@@ -72,6 +85,7 @@ class Donation {
 
   Donation copyWith({
     bool? sentThankYou,
+    List<DonationThankYou>? thankYous,
   }) {
     return Donation(
       id: id,
@@ -88,7 +102,17 @@ class Donation {
       donorEmail: donorEmail,
       donorPhone: donorPhone,
       donorPhoneE164: donorPhoneE164,
+      thankYous: thankYous ?? this.thankYous,
     );
+  }
+
+  /// Returns true if any thank you has been logged for this donation
+  bool get hasThankYou => thankYous.isNotEmpty || sentThankYou;
+
+  /// Returns the most recent thank you if any
+  DonationThankYou? get latestThankYou {
+    if (thankYous.isEmpty) return null;
+    return thankYous.reduce((a, b) => a.sentDate.isAfter(b.sentDate) ? a : b);
   }
 
   String get paymentMethodLabel {

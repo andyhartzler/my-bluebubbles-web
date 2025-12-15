@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/donation.dart';
+import 'package:bluebubbles/models/crm/donation_thank_you.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
 
 import 'supabase_service.dart';
@@ -37,7 +38,7 @@ class DonorRepository {
 
     final response = await _readClient
         .from('donors')
-        .select('*, donations(*, events(title))')
+        .select('*, donations(*, events(title), donation_thank_yous(*))')
         .eq('id', id)
         .maybeSingle();
 
@@ -256,8 +257,20 @@ class DonorRepository {
   }) {
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
       final value = searchQuery.trim();
-      query = query.or(
-          'name.ilike.%$value%,email.ilike.%$value%,phone.ilike.%$value%,phone_e164.ilike.%$value%');
+      // Split search into terms for better first/last name matching
+      final terms = value.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+
+      if (terms.length == 1) {
+        // Single term: search across all fields
+        query = query.or(
+            'name.ilike.%$value%,email.ilike.%$value%,phone.ilike.%$value%,phone_e164.ilike.%$value%');
+      } else {
+        // Multiple terms: each term must appear in name (handles "John Smith" or "Smith John")
+        // Build filter that requires all terms to be in the name
+        final nameFilters = terms.map((term) => 'name.ilike.%$term%').join(',');
+        // Also allow full search string match on email
+        query = query.or('and($nameFilters),email.ilike.%$value%');
+      }
     }
 
     if (recurring != null) {
@@ -289,5 +302,92 @@ class DonorRepository {
         .map(Donor.fromJson)
         .toList();
     return list;
+  }
+
+  // ==========================================
+  // Thank You CRUD Operations
+  // ==========================================
+
+  /// Fetches all thank yous for a specific donation
+  Future<List<DonationThankYou>> fetchThankYousForDonation(String donationId) async {
+    if (!isReady) return [];
+
+    final response = await _readClient
+        .from('donation_thank_yous')
+        .select()
+        .eq('donation_id', donationId)
+        .order('sent_date', ascending: false);
+
+    return (response as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(DonationThankYou.fromJson)
+        .toList();
+  }
+
+  /// Adds a new thank you record for a donation
+  Future<DonationThankYou?> addThankYou({
+    required String donationId,
+    required ThankYouMethod method,
+    required DateTime sentDate,
+    String? notes,
+  }) async {
+    if (!isReady) return null;
+
+    final payload = {
+      'donation_id': donationId,
+      'method': method.dbValue,
+      'sent_date': sentDate.toUtc().toIso8601String(),
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    };
+
+    final response = await _writeClient
+        .from('donation_thank_yous')
+        .insert(payload)
+        .select()
+        .single();
+
+    return DonationThankYou.fromJson(response as Map<String, dynamic>);
+  }
+
+  /// Updates an existing thank you record
+  Future<void> updateThankYou({
+    required String thankYouId,
+    ThankYouMethod? method,
+    DateTime? sentDate,
+    String? notes,
+  }) async {
+    if (!isReady) return;
+
+    final payload = <String, dynamic>{};
+    if (method != null) payload['method'] = method.dbValue;
+    if (sentDate != null) payload['sent_date'] = sentDate.toUtc().toIso8601String();
+    if (notes != null) payload['notes'] = notes;
+
+    if (payload.isEmpty) return;
+
+    await _writeClient
+        .from('donation_thank_yous')
+        .update(payload)
+        .eq('id', thankYouId);
+  }
+
+  /// Deletes a thank you record
+  Future<void> deleteThankYou(String thankYouId) async {
+    if (!isReady) return;
+
+    await _writeClient
+        .from('donation_thank_yous')
+        .delete()
+        .eq('id', thankYouId);
+  }
+
+  /// Deletes all thank yous for a donation
+  Future<void> deleteAllThankYousForDonation(String donationId) async {
+    if (!isReady) return;
+
+    await _writeClient
+        .from('donation_thank_yous')
+        .delete()
+        .eq('donation_id', donationId);
   }
 }
