@@ -52,6 +52,9 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
   bool _coverLetterEnabled = true;
   bool _coverLetterRequired = false;
 
+  // External Apply option
+  bool _useExternalApply = false;
+
   static const List<String> _jobTypes = [
     'full-time',
     'part-time',
@@ -134,6 +137,7 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
         _resumeRequired = job.resumeRequired ?? false;
         _coverLetterEnabled = job.coverLetterEnabled ?? true;
         _coverLetterRequired = job.coverLetterRequired ?? false;
+        _useExternalApply = job.useExternalApply;
         _isLoading = false;
       });
     } catch (e) {
@@ -186,10 +190,11 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
           featured: _featured,
           tags: tags,
           customQuestions: _customQuestions,
-          resumeEnabled: _resumeEnabled,
-          resumeRequired: _resumeRequired,
-          coverLetterEnabled: _coverLetterEnabled,
-          coverLetterRequired: _coverLetterRequired,
+          resumeEnabled: _useExternalApply ? false : _resumeEnabled,
+          resumeRequired: _useExternalApply ? false : _resumeRequired,
+          coverLetterEnabled: _useExternalApply ? false : _coverLetterEnabled,
+          coverLetterRequired: _useExternalApply ? false : _coverLetterRequired,
+          useExternalApply: _useExternalApply,
         );
       } else {
         await _jobsService.updateJobDetails(
@@ -232,10 +237,11 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
           tags: tags,
           clearTags: tags == null || tags.isEmpty,
           customQuestions: _customQuestions,
-          resumeEnabled: _resumeEnabled,
-          resumeRequired: _resumeRequired,
-          coverLetterEnabled: _coverLetterEnabled,
-          coverLetterRequired: _coverLetterRequired,
+          resumeEnabled: _useExternalApply ? false : _resumeEnabled,
+          resumeRequired: _useExternalApply ? false : _resumeRequired,
+          coverLetterEnabled: _useExternalApply ? false : _coverLetterEnabled,
+          coverLetterRequired: _useExternalApply ? false : _coverLetterRequired,
+          useExternalApply: _useExternalApply,
         );
       }
 
@@ -491,13 +497,102 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
                   _buildSectionHeader(theme, 'Application', Icons.send),
                   const SizedBox(height: 16),
 
+                  // External Apply Toggle Card
+                  Card(
+                    color: _useExternalApply
+                        ? colorScheme.primaryContainer.withOpacity(0.3)
+                        : null,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.open_in_new,
+                                size: 20,
+                                color: _useExternalApply
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'External Application',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: _useExternalApply
+                                      ? colorScheme.primary
+                                      : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            title: const Text('Use external application URL'),
+                            subtitle: Text(
+                              _useExternalApply
+                                  ? 'Applicants will be redirected to the external URL to apply'
+                                  : 'Applicants will apply through our built-in application form',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            value: _useExternalApply,
+                            onChanged: (v) => setState(() => _useExternalApply = v),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          if (_useExternalApply) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: colorScheme.tertiaryContainer.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: colorScheme.tertiary.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 18,
+                                    color: colorScheme.tertiary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Resume and cover letter options will be hidden since applicants won\'t use our form.',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onTertiaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   TextFormField(
                     controller: _applicationUrlController,
-                    decoration: const InputDecoration(
-                      labelText: 'Application URL',
+                    decoration: InputDecoration(
+                      labelText: _useExternalApply
+                          ? 'External Application URL *'
+                          : 'Application URL',
                       hintText: 'https://...',
+                      helperText: _useExternalApply
+                          ? 'Applicants will be redirected to this URL when they click "Apply Now"'
+                          : null,
                     ),
                     keyboardType: TextInputType.url,
+                    validator: _useExternalApply
+                        ? (v) => v?.isEmpty == true ? 'Required when using external application' : null
+                        : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -512,7 +607,8 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Resume & Cover Letter Options
+                  // Resume & Cover Letter Options (only shown when not using external apply)
+                  if (!_useExternalApply) ...[
                   _buildSectionHeader(theme, 'Application Fields', Icons.upload_file),
                   const SizedBox(height: 8),
                   Text(
@@ -614,6 +710,7 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  ], // End of if (!_useExternalApply)
 
                   ListTile(
                     contentPadding: EdgeInsets.zero,

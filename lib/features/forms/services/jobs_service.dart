@@ -4,6 +4,7 @@ import '../models/job.dart';
 import '../models/job_application.dart';
 import '../models/job_notification_template.dart';
 import '../models/job_notification_log.dart';
+import '../models/job_analytics.dart';
 import '../../../models/crm/member.dart';
 import '../../../services/crm/supabase_service.dart';
 import '../../../services/crm/crm_email_service.dart';
@@ -196,6 +197,7 @@ class JobsService {
     bool? resumeRequired,
     bool? coverLetterEnabled,
     bool? coverLetterRequired,
+    bool? useExternalApply,
   }) async {
     final response = await _writeClient
         .from('jobs')
@@ -230,6 +232,7 @@ class JobsService {
           if (resumeRequired != null) 'resume_required': resumeRequired,
           if (coverLetterEnabled != null) 'cover_letter_enabled': coverLetterEnabled,
           if (coverLetterRequired != null) 'cover_letter_required': coverLetterRequired,
+          if (useExternalApply != null) 'use_external_apply': useExternalApply,
         })
         .select()
         .single();
@@ -284,6 +287,7 @@ class JobsService {
     bool? resumeRequired,
     bool? coverLetterEnabled,
     bool? coverLetterRequired,
+    bool? useExternalApply,
   }) async {
     final updates = <String, dynamic>{};
 
@@ -379,6 +383,7 @@ class JobsService {
     if (resumeRequired != null) updates['resume_required'] = resumeRequired;
     if (coverLetterEnabled != null) updates['cover_letter_enabled'] = coverLetterEnabled;
     if (coverLetterRequired != null) updates['cover_letter_required'] = coverLetterRequired;
+    if (useExternalApply != null) updates['use_external_apply'] = useExternalApply;
 
     if (updates.isNotEmpty) {
       await _writeClient.from('jobs').update(updates).eq('id', id);
@@ -1144,5 +1149,214 @@ class JobsService {
         .count(CountOption.exact);
 
     return response.count;
+  }
+
+  // ============================================================================
+  // Job Analytics Methods
+  // ============================================================================
+
+  /// Get analytics summary for a job from the v_job_analytics_summary view
+  Future<JobAnalyticsSummary?> getJobAnalyticsSummary(String jobId) async {
+    try {
+      final response = await _readClient
+          .from('v_job_analytics_summary')
+          .select()
+          .eq('job_id', jobId)
+          .maybeSingle();
+
+      if (response == null) {
+        // Return default summary if no analytics data exists yet
+        return JobAnalyticsSummary(jobId: jobId);
+      }
+      return JobAnalyticsSummary.fromJson(response);
+    } catch (e) {
+      // Return default summary on error
+      return JobAnalyticsSummary(jobId: jobId);
+    }
+  }
+
+  /// Get recent analytics events for a job
+  Future<List<JobAnalyticsEvent>> getJobAnalyticsEvents(
+    String jobId, {
+    int limit = 100,
+    String? eventType,
+  }) async {
+    var query = _readClient
+        .from('job_analytics_events')
+        .select()
+        .eq('job_id', jobId);
+
+    if (eventType != null) {
+      query = query.eq('event_type', eventType);
+    }
+
+    final response = await query
+        .order('occurred_at', ascending: false)
+        .limit(limit);
+
+    return (response as List)
+        .map((json) => JobAnalyticsEvent.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get member interactions for a job
+  Future<List<JobMemberInteraction>> getJobMemberInteractions(
+    String jobId, {
+    int limit = 50,
+    String? sortBy,
+    bool ascending = false,
+  }) async {
+    final orderColumn = sortBy ?? 'last_view_at';
+
+    final response = await _readClient
+        .from('job_member_interactions')
+        .select()
+        .eq('job_id', jobId)
+        .order(orderColumn, ascending: ascending)
+        .limit(limit);
+
+    return (response as List)
+        .map((json) => JobMemberInteraction.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get member job activity from the v_member_job_activity view
+  Future<List<MemberJobActivity>> getMemberJobActivity(
+    String jobId, {
+    int limit = 50,
+  }) async {
+    try {
+      final response = await _readClient
+          .from('v_member_job_activity')
+          .select()
+          .eq('job_id', jobId)
+          .order('engagement_score', ascending: false)
+          .limit(limit);
+
+      return (response as List)
+          .map((json) => MemberJobActivity.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Get analytics events for a specific member on a job
+  Future<List<JobAnalyticsEvent>> getMemberEventsForJob(
+    String jobId,
+    String memberId, {
+    int limit = 50,
+  }) async {
+    final response = await _readClient
+        .from('job_analytics_events')
+        .select()
+        .eq('job_id', jobId)
+        .eq('member_id', memberId)
+        .order('occurred_at', ascending: false)
+        .limit(limit);
+
+    return (response as List)
+        .map((json) => JobAnalyticsEvent.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Watch job analytics summary (polling-based)
+  Stream<JobAnalyticsSummary?> watchJobAnalyticsSummary(String jobId) {
+    final controller = StreamController<JobAnalyticsSummary?>.broadcast();
+    Timer? timer;
+
+    void fetchSummary() async {
+      try {
+        final summary = await getJobAnalyticsSummary(jobId);
+        if (!controller.isClosed) {
+          controller.add(summary);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    // Initial fetch
+    fetchSummary();
+
+    // Poll every 30 seconds for updates
+    timer = Timer.periodic(const Duration(seconds: 30), (_) => fetchSummary());
+
+    controller.onCancel = () {
+      timer?.cancel();
+    };
+
+    return controller.stream;
+  }
+
+  /// Get top engaged members for a job
+  Future<List<JobMemberInteraction>> getTopEngagedMembers(
+    String jobId, {
+    int limit = 10,
+  }) async {
+    // Get interactions and calculate engagement scores
+    final interactions = await getJobMemberInteractions(
+      jobId,
+      limit: limit * 2, // Get more to sort by engagement
+    );
+
+    // Sort by engagement score (calculated in the model)
+    interactions.sort((a, b) => b.engagementScore.compareTo(a.engagementScore));
+
+    return interactions.take(limit).toList();
+  }
+
+  /// Get analytics event counts by type for a job
+  Future<Map<String, int>> getEventCountsByType(String jobId) async {
+    final response = await _readClient
+        .from('job_analytics_events')
+        .select('event_type')
+        .eq('job_id', jobId);
+
+    final counts = <String, int>{};
+    for (final row in response as List) {
+      final eventType = row['event_type'] as String;
+      counts[eventType] = (counts[eventType] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Get daily view counts for a job (last N days)
+  Future<List<Map<String, dynamic>>> getDailyViewCounts(
+    String jobId, {
+    int days = 30,
+  }) async {
+    final startDate = DateTime.now().subtract(Duration(days: days));
+
+    final response = await _readClient
+        .from('job_analytics_events')
+        .select('occurred_at')
+        .eq('job_id', jobId)
+        .eq('event_type', 'page_view')
+        .gte('occurred_at', startDate.toIso8601String())
+        .order('occurred_at');
+
+    // Group by date
+    final dailyCounts = <String, int>{};
+    for (final row in response as List) {
+      final date = DateTime.parse(row['occurred_at'] as String);
+      final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      dailyCounts[dateKey] = (dailyCounts[dateKey] ?? 0) + 1;
+    }
+
+    // Convert to list with all dates in range
+    final result = <Map<String, dynamic>>[];
+    for (var i = 0; i < days; i++) {
+      final date = DateTime.now().subtract(Duration(days: days - 1 - i));
+      final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      result.add({
+        'date': dateKey,
+        'count': dailyCounts[dateKey] ?? 0,
+      });
+    }
+
+    return result;
   }
 }

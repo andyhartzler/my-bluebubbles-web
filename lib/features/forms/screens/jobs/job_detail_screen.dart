@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../models/job.dart';
 import '../../models/job_application.dart';
 import '../../models/job_notification_log.dart';
+import '../../models/job_analytics.dart';
 import '../../services/jobs_service.dart';
 import '../../widgets/job_applicant_card.dart';
 import 'job_builder_screen.dart';
@@ -28,11 +29,39 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   List<JobNotificationLog> _notificationLogs = [];
   bool _loadingLogs = true;
 
+  // Analytics state
+  JobAnalyticsSummary? _analyticsSummary;
+  List<JobMemberInteraction> _memberInteractions = [];
+  bool _loadingAnalytics = true;
+
   @override
   void initState() {
     super.initState();
     _loadApplications();
     _loadNotificationLogs();
+    _loadAnalytics();
+  }
+
+  Future<void> _loadAnalytics() async {
+    setState(() => _loadingAnalytics = true);
+    try {
+      final results = await Future.wait([
+        _jobsService.getJobAnalyticsSummary(widget.jobId),
+        _jobsService.getTopEngagedMembers(widget.jobId, limit: 10),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _analyticsSummary = results[0] as JobAnalyticsSummary?;
+          _memberInteractions = results[1] as List<JobMemberInteraction>;
+          _loadingAnalytics = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingAnalytics = false);
+      }
+    }
   }
 
   Future<void> _loadApplications() async {
@@ -224,6 +253,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       _buildMetadataCard(theme, job),
                       const SizedBox(height: 16),
 
+                      // Analytics Section (only for approved jobs)
+                      if (job.status == 'approved') ...[
+                        _buildAnalyticsSummaryCard(theme),
+                        const SizedBox(height: 16),
+                        _buildMemberEngagementCard(theme),
+                        const SizedBox(height: 16),
+                      ],
+
                       // Notification Logs
                       _buildNotificationLogsCard(theme),
                     ],
@@ -283,37 +320,53 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _isLoading ? null : () => _rejectJob(job),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                      ),
-                      child: const Text('Reject'),
+                  // Edit button row
+                  OutlinedButton.icon(
+                    onPressed: _isLoading ? null : () => _editJob(job),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit Before Approving'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 44),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton(
-                      onPressed: _isLoading ? null : () => _approveJob(job),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green,
+                  const SizedBox(height: 12),
+                  // Approve/Reject row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _isLoading ? null : () => _rejectJob(job),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                          ),
+                          child: const Text('Reject'),
+                        ),
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Text('Approve & Publish'),
-                    ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton(
+                          onPressed: _isLoading ? null : () => _approveJob(job),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Text('Approve & Publish'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -657,6 +710,506 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             _buildInfoRow(theme, 'Applications', '$_applicationCount'),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsSummaryCard(ThemeData theme) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primaryContainer.withOpacity(0.5),
+                  theme.colorScheme.secondaryContainer.withOpacity(0.3),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.analytics_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Job Analytics',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Performance insights from member activity',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadAnalytics,
+                  tooltip: 'Refresh Analytics',
+                ),
+              ],
+            ),
+          ),
+          // Stats Grid
+          if (_loadingAnalytics)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_analyticsSummary != null) ...[
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // First row: Views and Unique Viewers
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatTile(
+                          theme,
+                          icon: Icons.visibility_outlined,
+                          value: '${_analyticsSummary!.totalViews}',
+                          label: 'Total Views',
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatTile(
+                          theme,
+                          icon: Icons.people_outline,
+                          value: '${_analyticsSummary!.uniqueViewers}',
+                          label: 'Unique Viewers',
+                          color: Colors.indigo,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Second row: Apply Clicks and Applications
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatTile(
+                          theme,
+                          icon: Icons.touch_app_outlined,
+                          value: '${_analyticsSummary!.applyClicks}',
+                          label: 'Apply Clicks',
+                          color: Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatTile(
+                          theme,
+                          icon: Icons.assignment_turned_in_outlined,
+                          value: '${_analyticsSummary!.applications}',
+                          label: 'Applications',
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Third row: Engagement metrics
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatTile(
+                          theme,
+                          icon: Icons.timer_outlined,
+                          value: _analyticsSummary!.formattedAvgTime,
+                          label: 'Avg. Time on Page',
+                          color: Colors.purple,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatTile(
+                          theme,
+                          icon: Icons.trending_up,
+                          value: _analyticsSummary!.formattedClickThroughRate,
+                          label: 'Click-Through Rate',
+                          color: Colors.teal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Fourth row: Shares and Saves
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatTile(
+                          theme,
+                          icon: Icons.share_outlined,
+                          value: '${_analyticsSummary!.shares}',
+                          label: 'Shares',
+                          color: Colors.cyan,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatTile(
+                          theme,
+                          icon: Icons.bookmark_outline,
+                          value: '${_analyticsSummary!.saves}',
+                          label: 'Saves',
+                          color: Colors.amber,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ] else
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.analytics_outlined,
+                      size: 48,
+                      color: theme.colorScheme.outline.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No analytics data yet',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Analytics will appear when members view this job',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatTile(
+    ThemeData theme, {
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: color),
+              const Spacer(),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMemberEngagementCard(ThemeData theme) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.secondaryContainer.withOpacity(0.3),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.group_outlined,
+                  color: theme.colorScheme.secondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Member Engagement',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Top engaged members who viewed this job',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Member list
+          if (_loadingAnalytics)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_memberInteractions.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.person_search_outlined,
+                      size: 48,
+                      color: theme.colorScheme.outline.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No member activity yet',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Engagement data will appear when logged-in members view this job',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _memberInteractions.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final interaction = _memberInteractions[index];
+                return _buildMemberInteractionTile(theme, interaction);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMemberInteractionTile(ThemeData theme, JobMemberInteraction interaction) {
+    // Get engagement level color
+    Color engagementColor;
+    switch (interaction.engagementLevel) {
+      case 'High':
+        engagementColor = Colors.green;
+        break;
+      case 'Medium':
+        engagementColor = Colors.orange;
+        break;
+      case 'Low':
+        engagementColor = Colors.blue;
+        break;
+      default:
+        engagementColor = Colors.grey;
+    }
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: CircleAvatar(
+        backgroundColor: theme.colorScheme.surfaceContainerHighest,
+        child: Text(
+          _getInitials(interaction.memberName ?? 'Unknown'),
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              interaction.memberName ?? 'Unknown Member',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: engagementColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '${interaction.engagementScore}%',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: engagementColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 4),
+          if (interaction.memberEmail != null)
+            Text(
+              interaction.memberEmail!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          const SizedBox(height: 6),
+          // Activity indicators
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              _buildActivityChip(
+                theme,
+                icon: Icons.visibility_outlined,
+                label: '${interaction.viewCount} views',
+              ),
+              _buildActivityChip(
+                theme,
+                icon: Icons.timer_outlined,
+                label: interaction.formattedTimeOnPage,
+              ),
+              if (interaction.maxScrollDepth > 0)
+                _buildActivityChip(
+                  theme,
+                  icon: Icons.expand_more,
+                  label: '${interaction.maxScrollDepth}% scroll',
+                ),
+              if (interaction.clickedApply)
+                _buildActivityChip(
+                  theme,
+                  icon: Icons.touch_app,
+                  label: 'Applied',
+                  highlight: true,
+                ),
+              if (interaction.savedJob)
+                _buildActivityChip(
+                  theme,
+                  icon: Icons.bookmark,
+                  label: 'Saved',
+                ),
+              if (interaction.sharedJob)
+                _buildActivityChip(
+                  theme,
+                  icon: Icons.share,
+                  label: 'Shared',
+                ),
+            ],
+          ),
+          if (interaction.lastViewAt != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Last viewed ${DateFormat.MMMd().add_jm().format(interaction.lastViewAt!)}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityChip(
+    ThemeData theme, {
+    required IconData icon,
+    required String label,
+    bool highlight = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: highlight
+            ? Colors.green.withOpacity(0.1)
+            : theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(4),
+        border: highlight
+            ? Border.all(color: Colors.green.withOpacity(0.3))
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 12,
+            color: highlight
+                ? Colors.green
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: highlight
+                  ? Colors.green
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }
