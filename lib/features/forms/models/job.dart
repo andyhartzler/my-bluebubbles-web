@@ -97,6 +97,9 @@ class Job with _$Job {
     @JsonKey(name: 'resume_required') bool? resumeRequired,
     @JsonKey(name: 'cover_letter_enabled') bool? coverLetterEnabled,
     @JsonKey(name: 'cover_letter_required') bool? coverLetterRequired,
+
+    // External Application Option
+    @JsonKey(name: 'use_external_apply') @Default(false) bool useExternalApply,
   }) = _Job;
 
   factory Job.fromJson(Map<String, dynamic> json) => _$JobFromJson(json);
