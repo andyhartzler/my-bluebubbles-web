@@ -9,6 +9,7 @@ import '../../services/jobs_service.dart';
 import '../../widgets/job_applicant_card.dart';
 import 'job_builder_screen.dart';
 import 'job_applicants_screen.dart';
+import 'job_analytics_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -46,15 +47,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   Future<void> _loadAnalytics() async {
     setState(() => _loadingAnalytics = true);
     try {
-      final results = await Future.wait([
-        _jobsService.getJobAnalyticsSummary(widget.jobId),
-        _jobsService.getTopEngagedMembers(widget.jobId, limit: 10),
-      ]);
+      final summary = await _jobsService.getJobAnalyticsSummary(widget.jobId);
+      final interactions = await _jobsService.getTopEngagedMembers(widget.jobId, limit: 5);
 
       if (mounted) {
         setState(() {
-          _analyticsSummary = results[0] as JobAnalyticsSummary?;
-          _memberInteractions = results[1] as List<JobMemberInteraction>;
+          _analyticsSummary = summary;
+          _memberInteractions = interactions;
           _loadingAnalytics = false;
         });
       }
@@ -256,9 +255,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
                       // Analytics Section (only for approved jobs)
                       if (job.status == 'approved') ...[
-                        _buildAnalyticsSummaryCard(theme),
+                        _buildAnalyticsSummaryCard(theme, job),
                         const SizedBox(height: 16),
-                        _buildMemberEngagementCard(theme),
+                        _buildMemberEngagementCard(theme, job),
                         const SizedBox(height: 16),
                       ],
 
@@ -715,59 +714,60 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Widget _buildAnalyticsSummaryCard(ThemeData theme) {
+  Widget _buildAnalyticsSummaryCard(ThemeData theme, Job job) {
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  theme.colorScheme.primaryContainer.withOpacity(0.5),
-                  theme.colorScheme.secondaryContainer.withOpacity(0.3),
+      child: InkWell(
+        onTap: () => _openAnalyticsScreen(job, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primaryContainer.withOpacity(0.5),
+                    theme.colorScheme.secondaryContainer.withOpacity(0.3),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.analytics_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Job Analytics',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Tap to view detailed analytics',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
               ),
             ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.analytics_outlined,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Job Analytics',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Performance insights from member activity',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _loadAnalytics,
-                  tooltip: 'Refresh Analytics',
-                ),
-              ],
-            ),
-          ),
           // Stats Grid
           if (_loadingAnalytics)
             const Padding(
@@ -911,8 +911,22 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               ),
             ),
         ],
+        ),
       ),
     );
+  }
+
+  void _openAnalyticsScreen(Job job, int initialTab) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => JobAnalyticsScreen(
+          job: job,
+          initialTab: initialTab,
+        ),
+      ),
+    ).then((_) {
+      _loadAnalytics(); // Refresh after returning
+    });
   }
 
   Widget _buildStatTile(
@@ -958,47 +972,53 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Widget _buildMemberEngagementCard(ThemeData theme) {
+  Widget _buildMemberEngagementCard(ThemeData theme, Job job) {
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.secondaryContainer.withOpacity(0.3),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.group_outlined,
-                  color: theme.colorScheme.secondary,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Member Engagement',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Top engaged members who viewed this job',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+      child: InkWell(
+        onTap: () => _openAnalyticsScreen(job, 1),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondaryContainer.withOpacity(0.3),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.group_outlined,
+                    color: theme.colorScheme.secondary,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Member Engagement',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Tap to view all member activity',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
             ),
-          ),
           // Member list
           if (_loadingAnalytics)
             const Padding(
@@ -1046,7 +1066,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 return _buildMemberInteractionTile(theme, interaction);
               },
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1068,12 +1089,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         engagementColor = Colors.grey;
     }
 
+    final memberDisplay = 'Member #${interaction.memberId.substring(0, 8)}';
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       leading: CircleAvatar(
         backgroundColor: theme.colorScheme.surfaceContainerHighest,
         child: Text(
-          _getInitials(interaction.memberName ?? 'Unknown'),
+          interaction.memberId.substring(0, 2).toUpperCase(),
           style: theme.textTheme.labelMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -1083,7 +1106,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         children: [
           Expanded(
             child: Text(
-              interaction.memberName ?? 'Unknown Member',
+              memberDisplay,
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w500,
               ),
@@ -1110,9 +1133,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 4),
-          if (interaction.memberEmail != null)
+          if (interaction.locationDescription != 'Unknown location')
             Text(
-              interaction.memberEmail!,
+              interaction.locationDescription,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -1131,28 +1154,28 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               _buildActivityChip(
                 theme,
                 icon: Icons.timer_outlined,
-                label: interaction.formattedTimeOnPage,
+                label: interaction.formattedTotalTime,
               ),
-              if (interaction.maxScrollDepth > 0)
+              if (interaction.maxScrollDepthPercent > 0)
                 _buildActivityChip(
                   theme,
                   icon: Icons.expand_more,
-                  label: '${interaction.maxScrollDepth}% scroll',
+                  label: '${interaction.maxScrollDepthPercent}% scroll',
                 ),
-              if (interaction.clickedApply)
+              if (interaction.hasApplied)
                 _buildActivityChip(
                   theme,
-                  icon: Icons.touch_app,
+                  icon: Icons.check_circle,
                   label: 'Applied',
                   highlight: true,
                 ),
-              if (interaction.savedJob)
+              if (interaction.hasClickedApply && !interaction.hasApplied)
                 _buildActivityChip(
                   theme,
-                  icon: Icons.bookmark,
-                  label: 'Saved',
+                  icon: Icons.touch_app,
+                  label: 'Clicked',
                 ),
-              if (interaction.sharedJob)
+              if (interaction.hasShared)
                 _buildActivityChip(
                   theme,
                   icon: Icons.share,
@@ -1160,10 +1183,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 ),
             ],
           ),
-          if (interaction.lastViewAt != null) ...[
+          if (interaction.lastViewedAt != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Last viewed ${DateFormat.MMMd().add_jm().format(interaction.lastViewAt!)}',
+              'Last viewed ${DateFormat.MMMd().add_jm().format(interaction.lastViewedAt!)}',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
               ),

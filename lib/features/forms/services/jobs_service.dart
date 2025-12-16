@@ -1155,22 +1155,12 @@ class JobsService {
   // Job Analytics Methods
   // ============================================================================
 
-  /// Get analytics summary for a job from the v_job_analytics_summary view
-  Future<JobAnalyticsSummary?> getJobAnalyticsSummary(String jobId) async {
+  /// Get analytics summary for a job (calculated from member interactions)
+  Future<JobAnalyticsSummary> getJobAnalyticsSummary(String jobId) async {
     try {
-      final response = await _readClient
-          .from('v_job_analytics_summary')
-          .select()
-          .eq('job_id', jobId)
-          .maybeSingle();
-
-      if (response == null) {
-        // Return default summary if no analytics data exists yet
-        return JobAnalyticsSummary(jobId: jobId);
-      }
-      return JobAnalyticsSummary.fromJson(response);
+      final interactions = await getJobMemberInteractions(jobId, limit: 1000);
+      return JobAnalyticsSummary.fromInteractions(jobId, interactions);
     } catch (e) {
-      // Return default summary on error
       return JobAnalyticsSummary(jobId: jobId);
     }
   }
@@ -1181,22 +1171,26 @@ class JobsService {
     int limit = 100,
     String? eventType,
   }) async {
-    var query = _readClient
-        .from('job_analytics_events')
-        .select()
-        .eq('job_id', jobId);
+    try {
+      var query = _readClient
+          .from('job_analytics_events')
+          .select()
+          .eq('job_id', jobId);
 
-    if (eventType != null) {
-      query = query.eq('event_type', eventType);
+      if (eventType != null) {
+        query = query.eq('event_type', eventType);
+      }
+
+      final response = await query
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      return (response as List)
+          .map((json) => JobAnalyticsEvent.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      return [];
     }
-
-    final response = await query
-        .order('occurred_at', ascending: false)
-        .limit(limit);
-
-    return (response as List)
-        .map((json) => JobAnalyticsEvent.fromJson(json as Map<String, dynamic>))
-        .toList();
   }
 
   /// Get member interactions for a job
@@ -1206,37 +1200,20 @@ class JobsService {
     String? sortBy,
     bool ascending = false,
   }) async {
-    final orderColumn = sortBy ?? 'last_view_at';
-
-    final response = await _readClient
-        .from('job_member_interactions')
-        .select()
-        .eq('job_id', jobId)
-        .order(orderColumn, ascending: ascending)
-        .limit(limit);
-
-    return (response as List)
-        .map((json) => JobMemberInteraction.fromJson(json as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// Get member job activity from the v_member_job_activity view
-  Future<List<MemberJobActivity>> getMemberJobActivity(
-    String jobId, {
-    int limit = 50,
-  }) async {
     try {
+      final orderColumn = sortBy ?? 'last_viewed_at';
+
       final response = await _readClient
-          .from('v_member_job_activity')
+          .from('job_member_interactions')
           .select()
           .eq('job_id', jobId)
-          .order('engagement_score', ascending: false)
+          .order(orderColumn, ascending: ascending)
           .limit(limit);
 
       return (response as List)
-          .map((json) => MemberJobActivity.fromJson(json as Map<String, dynamic>))
+          .map((json) => JobMemberInteraction.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e) {
       return [];
     }
   }
@@ -1247,48 +1224,21 @@ class JobsService {
     String memberId, {
     int limit = 50,
   }) async {
-    final response = await _readClient
-        .from('job_analytics_events')
-        .select()
-        .eq('job_id', jobId)
-        .eq('member_id', memberId)
-        .order('occurred_at', ascending: false)
-        .limit(limit);
+    try {
+      final response = await _readClient
+          .from('job_analytics_events')
+          .select()
+          .eq('job_id', jobId)
+          .eq('member_id', memberId)
+          .order('created_at', ascending: false)
+          .limit(limit);
 
-    return (response as List)
-        .map((json) => JobAnalyticsEvent.fromJson(json as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// Watch job analytics summary (polling-based)
-  Stream<JobAnalyticsSummary?> watchJobAnalyticsSummary(String jobId) {
-    final controller = StreamController<JobAnalyticsSummary?>.broadcast();
-    Timer? timer;
-
-    void fetchSummary() async {
-      try {
-        final summary = await getJobAnalyticsSummary(jobId);
-        if (!controller.isClosed) {
-          controller.add(summary);
-        }
-      } catch (e) {
-        if (!controller.isClosed) {
-          controller.addError(e);
-        }
-      }
+      return (response as List)
+          .map((json) => JobAnalyticsEvent.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      return [];
     }
-
-    // Initial fetch
-    fetchSummary();
-
-    // Poll every 30 seconds for updates
-    timer = Timer.periodic(const Duration(seconds: 30), (_) => fetchSummary());
-
-    controller.onCancel = () {
-      timer?.cancel();
-    };
-
-    return controller.stream;
   }
 
   /// Get top engaged members for a job
@@ -1296,31 +1246,38 @@ class JobsService {
     String jobId, {
     int limit = 10,
   }) async {
-    // Get interactions and calculate engagement scores
-    final interactions = await getJobMemberInteractions(
-      jobId,
-      limit: limit * 2, // Get more to sort by engagement
-    );
+    try {
+      final interactions = await getJobMemberInteractions(
+        jobId,
+        limit: limit * 2,
+      );
 
-    // Sort by engagement score (calculated in the model)
-    interactions.sort((a, b) => b.engagementScore.compareTo(a.engagementScore));
+      // Sort by engagement score (calculated in the model)
+      interactions.sort((a, b) => b.engagementScore.compareTo(a.engagementScore));
 
-    return interactions.take(limit).toList();
+      return interactions.take(limit).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   /// Get analytics event counts by type for a job
   Future<Map<String, int>> getEventCountsByType(String jobId) async {
-    final response = await _readClient
-        .from('job_analytics_events')
-        .select('event_type')
-        .eq('job_id', jobId);
+    try {
+      final response = await _readClient
+          .from('job_analytics_events')
+          .select('event_type')
+          .eq('job_id', jobId);
 
-    final counts = <String, int>{};
-    for (final row in response as List) {
-      final eventType = row['event_type'] as String;
-      counts[eventType] = (counts[eventType] ?? 0) + 1;
+      final counts = <String, int>{};
+      for (final row in response as List) {
+        final eventType = row['event_type'] as String;
+        counts[eventType] = (counts[eventType] ?? 0) + 1;
+      }
+      return counts;
+    } catch (e) {
+      return {};
     }
-    return counts;
   }
 
   /// Get daily view counts for a job (last N days)
@@ -1328,35 +1285,107 @@ class JobsService {
     String jobId, {
     int days = 30,
   }) async {
-    final startDate = DateTime.now().subtract(Duration(days: days));
+    try {
+      final startDate = DateTime.now().subtract(Duration(days: days));
 
-    final response = await _readClient
-        .from('job_analytics_events')
-        .select('occurred_at')
-        .eq('job_id', jobId)
-        .eq('event_type', 'page_view')
-        .gte('occurred_at', startDate.toIso8601String())
-        .order('occurred_at');
+      final response = await _readClient
+          .from('job_analytics_events')
+          .select('created_at')
+          .eq('job_id', jobId)
+          .eq('event_type', 'view')
+          .gte('created_at', startDate.toIso8601String())
+          .order('created_at');
 
-    // Group by date
-    final dailyCounts = <String, int>{};
-    for (final row in response as List) {
-      final date = DateTime.parse(row['occurred_at'] as String);
-      final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      dailyCounts[dateKey] = (dailyCounts[dateKey] ?? 0) + 1;
+      // Group by date
+      final dailyCounts = <String, int>{};
+      for (final row in response as List) {
+        final date = DateTime.parse(row['created_at'] as String);
+        final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        dailyCounts[dateKey] = (dailyCounts[dateKey] ?? 0) + 1;
+      }
+
+      // Convert to list with all dates in range
+      final result = <Map<String, dynamic>>[];
+      for (var i = 0; i < days; i++) {
+        final date = DateTime.now().subtract(Duration(days: days - 1 - i));
+        final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        result.add({
+          'date': dateKey,
+          'count': dailyCounts[dateKey] ?? 0,
+        });
+      }
+
+      return result;
+    } catch (e) {
+      return [];
     }
+  }
 
-    // Convert to list with all dates in range
-    final result = <Map<String, dynamic>>[];
-    for (var i = 0; i < days; i++) {
-      final date = DateTime.now().subtract(Duration(days: days - 1 - i));
-      final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      result.add({
-        'date': dateKey,
-        'count': dailyCounts[dateKey] ?? 0,
-      });
+  /// Get location breakdown for a job
+  Future<Map<String, int>> getLocationBreakdown(String jobId) async {
+    try {
+      final interactions = await getJobMemberInteractions(jobId, limit: 1000);
+      final locationCounts = <String, int>{};
+
+      for (final interaction in interactions) {
+        final location = interaction.lastCountry ?? 'Unknown';
+        locationCounts[location] = (locationCounts[location] ?? 0) + 1;
+      }
+
+      return locationCounts;
+    } catch (e) {
+      return {};
     }
+  }
 
-    return result;
+  /// Get browser breakdown for a job
+  Future<Map<String, int>> getBrowserBreakdown(String jobId) async {
+    try {
+      final interactions = await getJobMemberInteractions(jobId, limit: 1000);
+      final browserCounts = <String, int>{};
+
+      for (final interaction in interactions) {
+        final browser = interaction.lastBrowser ?? 'Unknown';
+        browserCounts[browser] = (browserCounts[browser] ?? 0) + 1;
+      }
+
+      return browserCounts;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /// Get device type breakdown for a job
+  Future<Map<String, int>> getDeviceBreakdown(String jobId) async {
+    try {
+      final interactions = await getJobMemberInteractions(jobId, limit: 1000);
+      final deviceCounts = <String, int>{};
+
+      for (final interaction in interactions) {
+        final device = interaction.lastDeviceType ?? 'Unknown';
+        deviceCounts[device] = (deviceCounts[device] ?? 0) + 1;
+      }
+
+      return deviceCounts;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /// Get referrer breakdown for a job
+  Future<Map<String, int>> getReferrerBreakdown(String jobId) async {
+    try {
+      final interactions = await getJobMemberInteractions(jobId, limit: 1000);
+      final referrerCounts = <String, int>{};
+
+      for (final interaction in interactions) {
+        final referrer = interaction.firstReferrerDomain ?? 'Direct';
+        referrerCounts[referrer] = (referrerCounts[referrer] ?? 0) + 1;
+      }
+
+      return referrerCounts;
+    } catch (e) {
+      return {};
+    }
   }
 }
