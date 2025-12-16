@@ -91,6 +91,12 @@ class Job with _$Job {
     // Custom Questions for Applications
     @JsonKey(name: 'custom_questions', fromJson: _customQuestionsFromJson, toJson: _customQuestionsToJson)
     @Default([]) List<CustomQuestion> customQuestions,
+
+    // Resume & Cover Letter Options
+    @JsonKey(name: 'resume_enabled') bool? resumeEnabled,
+    @JsonKey(name: 'resume_required') bool? resumeRequired,
+    @JsonKey(name: 'cover_letter_enabled') bool? coverLetterEnabled,
+    @JsonKey(name: 'cover_letter_required') bool? coverLetterRequired,
   }) = _Job;
 
   factory Job.fromJson(Map<String, dynamic> json) => _$JobFromJson(json);

@@ -192,6 +192,10 @@ class JobsService {
     bool featured = false,
     List<String>? tags,
     List<Map<String, dynamic>>? customQuestions,
+    bool? resumeEnabled,
+    bool? resumeRequired,
+    bool? coverLetterEnabled,
+    bool? coverLetterRequired,
   }) async {
     final response = await _writeClient
         .from('jobs')
@@ -222,6 +226,10 @@ class JobsService {
           'featured': featured,
           if (tags != null) 'tags': tags,
           'custom_questions': customQuestions ?? [],
+          if (resumeEnabled != null) 'resume_enabled': resumeEnabled,
+          if (resumeRequired != null) 'resume_required': resumeRequired,
+          if (coverLetterEnabled != null) 'cover_letter_enabled': coverLetterEnabled,
+          if (coverLetterRequired != null) 'cover_letter_required': coverLetterRequired,
         })
         .select()
         .single();
@@ -272,6 +280,10 @@ class JobsService {
     List<String>? tags,
     bool clearTags = false,
     List<Map<String, dynamic>>? customQuestions,
+    bool? resumeEnabled,
+    bool? resumeRequired,
+    bool? coverLetterEnabled,
+    bool? coverLetterRequired,
   }) async {
     final updates = <String, dynamic>{};
 
@@ -363,6 +375,10 @@ class JobsService {
     if (customQuestions != null) {
       updates['custom_questions'] = customQuestions;
     }
+    if (resumeEnabled != null) updates['resume_enabled'] = resumeEnabled;
+    if (resumeRequired != null) updates['resume_required'] = resumeRequired;
+    if (coverLetterEnabled != null) updates['cover_letter_enabled'] = coverLetterEnabled;
+    if (coverLetterRequired != null) updates['cover_letter_required'] = coverLetterRequired;
 
     if (updates.isNotEmpty) {
       await _writeClient.from('jobs').update(updates).eq('id', id);
