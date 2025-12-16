@@ -299,6 +299,7 @@ class JobAnalyticsSummary {
   final int applyClicks;
   final int applications;
   final int shares;
+  final int saves;
   final int totalTimeSeconds;
   final int avgTimeSeconds;
   final int maxScrollDepth;
@@ -315,6 +316,7 @@ class JobAnalyticsSummary {
     this.applyClicks = 0,
     this.applications = 0,
     this.shares = 0,
+    this.saves = 0,
     this.totalTimeSeconds = 0,
     this.avgTimeSeconds = 0,
     this.maxScrollDepth = 0,
@@ -408,6 +410,7 @@ class JobAnalyticsSummary {
       applyClicks: applyClicks,
       applications: applications,
       shares: shares,
+      saves: 0, // Not tracked in current schema
       totalTimeSeconds: totalTime,
       avgTimeSeconds: interactions.isEmpty ? 0 : totalTime ~/ interactions.length,
       maxScrollDepth: maxScroll,
