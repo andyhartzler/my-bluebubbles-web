@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/job.dart';
 import '../../models/job_application.dart';
 import '../../models/job_notification_log.dart';
@@ -1417,22 +1418,74 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: isLink
-                    ? theme.colorScheme.primary
-                    : highlight
-                        ? Colors.red
-                        : null,
-                decoration: isLink ? TextDecoration.underline : null,
-                fontWeight: highlight ? FontWeight.bold : null,
-              ),
-            ),
+            child: isLink
+                ? InkWell(
+                    onTap: () => _launchUrl(value),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            value,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.open_in_new,
+                          size: 14,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ],
+                    ),
+                  )
+                : Text(
+                    value,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: highlight ? Colors.red : null,
+                      fontWeight: highlight ? FontWeight.bold : null,
+                    ),
+                  ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    // Ensure URL has a scheme
+    String urlToLaunch = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      urlToLaunch = 'https://$url';
+    }
+
+    final uri = Uri.parse(urlToLaunch);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open $url'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening URL: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _approveJob(Job job) async {
