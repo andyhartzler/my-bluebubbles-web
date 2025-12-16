@@ -46,6 +46,12 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
   bool _isSaving = false;
   List<Map<String, dynamic>> _customQuestions = [];
 
+  // Resume & Cover Letter options
+  bool _resumeEnabled = true;
+  bool _resumeRequired = false;
+  bool _coverLetterEnabled = true;
+  bool _coverLetterRequired = false;
+
   static const List<String> _jobTypes = [
     'full-time',
     'part-time',
@@ -124,6 +130,10 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
         _customQuestions = job.customQuestions
             .map((q) => q.toJson())
             .toList();
+        _resumeEnabled = job.resumeEnabled ?? true;
+        _resumeRequired = job.resumeRequired ?? false;
+        _coverLetterEnabled = job.coverLetterEnabled ?? true;
+        _coverLetterRequired = job.coverLetterRequired ?? false;
         _isLoading = false;
       });
     } catch (e) {
@@ -176,6 +186,10 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
           featured: _featured,
           tags: tags,
           customQuestions: _customQuestions,
+          resumeEnabled: _resumeEnabled,
+          resumeRequired: _resumeRequired,
+          coverLetterEnabled: _coverLetterEnabled,
+          coverLetterRequired: _coverLetterRequired,
         );
       } else {
         await _jobsService.updateJobDetails(
@@ -218,6 +232,10 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
           tags: tags,
           clearTags: tags == null || tags.isEmpty,
           customQuestions: _customQuestions,
+          resumeEnabled: _resumeEnabled,
+          resumeRequired: _resumeRequired,
+          coverLetterEnabled: _coverLetterEnabled,
+          coverLetterRequired: _coverLetterRequired,
         );
       }
 
@@ -491,6 +509,109 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
                       alignLabelWithHint: true,
                     ),
                     maxLines: 3,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Resume & Cover Letter Options
+                  _buildSectionHeader(theme, 'Application Fields', Icons.upload_file),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Configure which fields applicants see when applying for this job.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Resume options
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.description_outlined,
+                                   size: 20,
+                                   color: theme.colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Resume Upload',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SwitchListTile(
+                            title: const Text('Show resume upload field'),
+                            subtitle: const Text('Allow applicants to upload a resume'),
+                            value: _resumeEnabled,
+                            onChanged: (v) => setState(() {
+                              _resumeEnabled = v;
+                              if (!v) _resumeRequired = false;
+                            }),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          if (_resumeEnabled)
+                            SwitchListTile(
+                              title: const Text('Require resume'),
+                              subtitle: const Text('Applicants must upload a resume'),
+                              value: _resumeRequired,
+                              onChanged: (v) => setState(() => _resumeRequired = v),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Cover letter options
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.article_outlined,
+                                   size: 20,
+                                   color: theme.colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Cover Letter',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SwitchListTile(
+                            title: const Text('Show cover letter field'),
+                            subtitle: const Text('Allow applicants to submit a cover letter'),
+                            value: _coverLetterEnabled,
+                            onChanged: (v) => setState(() {
+                              _coverLetterEnabled = v;
+                              if (!v) _coverLetterRequired = false;
+                            }),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          if (_coverLetterEnabled)
+                            SwitchListTile(
+                              title: const Text('Require cover letter'),
+                              subtitle: const Text('Applicants must provide a cover letter'),
+                              value: _coverLetterRequired,
+                              onChanged: (v) => setState(() => _coverLetterRequired = v),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
 
