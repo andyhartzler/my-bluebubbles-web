@@ -49,6 +49,8 @@ class JobNotificationTemplate with _$JobNotificationTemplate {
         return 'Application Submitted';
       case 'application_status_changed':
         return 'Application Status Changed';
+      case 'new_job_alert':
+        return 'New Job Alert';
       default:
         return triggerType;
     }
@@ -61,6 +63,8 @@ class JobNotificationTemplate with _$JobNotificationTemplate {
         return 'Job Poster';
       case 'job_applicant':
         return 'Job Applicant';
+      case 'job_subscriber':
+        return 'Job Subscribers';
       default:
         return recipientType;
     }
@@ -85,6 +89,8 @@ class JobNotificationTemplate with _$JobNotificationTemplate {
         return '📤';
       case 'application_status_changed':
         return '🔄';
+      case 'new_job_alert':
+        return '🔔';
       default:
         return '📧';
     }
@@ -109,6 +115,8 @@ class JobNotificationTemplate with _$JobNotificationTemplate {
         return 'Confirmation sent to applicant after applying';
       case 'application_status_changed':
         return 'Sent when application status is updated';
+      case 'new_job_alert':
+        return 'Sent to subscribers when a new job is approved';
       default:
         return '';
     }
@@ -124,12 +132,14 @@ class JobNotificationTemplate with _$JobNotificationTemplate {
     'application_received',
     'application_submitted',
     'application_status_changed',
+    'new_job_alert',
   ];
 
   /// All available recipient types
   static const List<String> recipientTypes = [
     'job_submitter',
     'job_applicant',
+    'job_subscriber',
   ];
 
   /// Get recipient type label
@@ -139,6 +149,8 @@ class JobNotificationTemplate with _$JobNotificationTemplate {
         return 'Job Poster';
       case 'job_applicant':
         return 'Job Applicant';
+      case 'job_subscriber':
+        return 'Job Subscribers';
       default:
         return type;
     }
@@ -163,6 +175,8 @@ class JobNotificationTemplate with _$JobNotificationTemplate {
         return 'Application Submitted';
       case 'application_status_changed':
         return 'Application Status Changed';
+      case 'new_job_alert':
+        return 'New Job Alert';
       default:
         return type;
     }
