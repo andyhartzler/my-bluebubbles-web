@@ -55,12 +55,18 @@ class _JobNotificationTemplatesScreenState
   List<JobNotificationTemplate> get _filteredTemplates {
     if (_selectedTrigger == 'all') return _templates;
     if (_selectedTrigger == 'job') {
-      // Filter for job-related triggers
-      return _templates.where((t) => t.triggerType.startsWith('job_')).toList();
+      // Filter for job-related triggers (excluding new_job_alert which goes in alerts)
+      return _templates.where((t) =>
+        t.triggerType.startsWith('job_') && t.triggerType != 'new_job_alert'
+      ).toList();
     }
     if (_selectedTrigger == 'application') {
       // Filter for application-related triggers
       return _templates.where((t) => t.triggerType.startsWith('application_')).toList();
+    }
+    if (_selectedTrigger == 'alerts') {
+      // Filter for job alert notifications
+      return _templates.where((t) => t.triggerType == 'new_job_alert').toList();
     }
     return _templates.where((t) => t.triggerType == _selectedTrigger).toList();
   }
@@ -135,6 +141,8 @@ class _JobNotificationTemplatesScreenState
                 _buildFilterChip('Job Events', 'job', icon: Icons.work_outline),
                 const SizedBox(width: 8),
                 _buildFilterChip('Applications', 'application', icon: Icons.person_outline),
+                const SizedBox(width: 8),
+                _buildFilterChip('Job Alerts', 'alerts', icon: Icons.notifications_outlined),
               ],
             ),
           ),

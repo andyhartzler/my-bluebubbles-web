@@ -1841,6 +1841,26 @@ class JobNotificationVariables {
       description: 'Reason for job rejection',
       category: 'Status',
     ),
+
+    // Job Alert Subscriber variables
+    MailMergeVariable(
+      token: '{{member_name}}',
+      label: 'Member Name',
+      description: 'Name of the subscribed member',
+      category: 'Subscriber',
+    ),
+    MailMergeVariable(
+      token: '{{job_location_type}}',
+      label: 'Location Type',
+      description: 'Remote, On-site, Hybrid',
+      category: 'Job',
+    ),
+    MailMergeVariable(
+      token: '{{unsubscribe_url}}',
+      label: 'Unsubscribe URL',
+      description: 'Link to unsubscribe from job alerts',
+      category: 'Subscriber',
+    ),
   ];
 
   /// Get variables for a specific trigger type
@@ -1874,6 +1894,10 @@ class JobNotificationVariables {
           v.category == 'Job' ||
           v.category == 'Applicant' ||
           v.category == 'Status'
+        ).toList();
+      case 'new_job_alert':
+        return all.where((v) =>
+          v.category == 'Job' || v.category == 'Subscriber'
         ).toList();
       default:
         return all;
