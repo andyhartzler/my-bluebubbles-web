@@ -259,6 +259,16 @@ class _JobsListScreenState extends State<JobsListScreen>
                 height: 40,
                 color: theme.colorScheme.onPrimaryContainer.withOpacity(0.2),
               ),
+              // Refresh button
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                onPressed: () {
+                  setState(() {});
+                  _refreshApplicationCounts();
+                },
+                tooltip: 'Refresh',
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
               // Notifications settings button
               IconButton(
                 icon: const Icon(Icons.notifications_outlined),

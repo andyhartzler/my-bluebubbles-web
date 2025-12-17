@@ -128,6 +128,7 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
               controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
               children: [
                 _buildOverviewTab(theme),
                 _buildMemberEngagementTab(theme),
