@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/job.dart';
 import '../../models/job_application.dart';
 import '../../models/job_notification_log.dart';
@@ -715,21 +716,29 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Widget _buildAnalyticsSummaryCard(ThemeData theme, Job job) {
+    final colorScheme = theme.colorScheme;
+
     return Card(
       clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+      ),
       child: InkWell(
         onTap: () => _openAnalyticsScreen(job, 0),
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
+            // Compact Header
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    theme.colorScheme.primaryContainer.withOpacity(0.5),
-                    theme.colorScheme.secondaryContainer.withOpacity(0.3),
+                    colorScheme.primaryContainer,
+                    colorScheme.secondaryContainer.withOpacity(0.5),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -737,9 +746,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.analytics_outlined,
-                    color: theme.colorScheme.primary,
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.analytics_rounded,
+                      color: colorScheme.primary,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -747,172 +765,188 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Job Analytics',
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          'Analytics Overview',
+                          style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          'Tap to view detailed analytics',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                          'View detailed insights',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
                   ),
                   Icon(
-                    Icons.chevron_right,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    Icons.chevron_right_rounded,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ],
               ),
             ),
-          // Stats Grid
-          if (_loadingAnalytics)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_analyticsSummary != null) ...[
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // First row: Views and Unique Viewers
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatTile(
-                          theme,
-                          icon: Icons.visibility_outlined,
-                          value: '${_analyticsSummary!.totalViews}',
-                          label: 'Total Views',
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatTile(
-                          theme,
-                          icon: Icons.people_outline,
-                          value: '${_analyticsSummary!.uniqueViewers}',
-                          label: 'Unique Viewers',
-                          color: Colors.indigo,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Second row: Apply Clicks and Applications
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatTile(
-                          theme,
-                          icon: Icons.touch_app_outlined,
-                          value: '${_analyticsSummary!.applyClicks}',
-                          label: 'Apply Clicks',
-                          color: Colors.orange,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatTile(
-                          theme,
-                          icon: Icons.assignment_turned_in_outlined,
-                          value: '${_analyticsSummary!.applications}',
-                          label: 'Applications',
-                          color: Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Third row: Engagement metrics
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatTile(
-                          theme,
-                          icon: Icons.timer_outlined,
-                          value: _analyticsSummary!.formattedAvgTime,
-                          label: 'Avg. Time on Page',
-                          color: Colors.purple,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatTile(
-                          theme,
-                          icon: Icons.trending_up,
-                          value: _analyticsSummary!.formattedClickThroughRate,
-                          label: 'Click-Through Rate',
-                          color: Colors.teal,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Fourth row: Shares and Saves
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatTile(
-                          theme,
-                          icon: Icons.share_outlined,
-                          value: '${_analyticsSummary!.shares}',
-                          label: 'Shares',
-                          color: Colors.cyan,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatTile(
-                          theme,
-                          icon: Icons.bookmark_outline,
-                          value: '${_analyticsSummary!.saves}',
-                          label: 'Saves',
-                          color: Colors.amber,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ] else
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Center(
+            // Compact Stats
+            if (_loadingAnalytics)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_analyticsSummary != null) ...[
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.analytics_outlined,
-                      size: 48,
-                      color: theme.colorScheme.outline.withOpacity(0.5),
+                    // Primary metrics row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildCompactStat(
+                            theme,
+                            value: '${_analyticsSummary!.totalViews}',
+                            label: 'Views',
+                            icon: Icons.visibility_rounded,
+                            color: Colors.blue,
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: colorScheme.outlineVariant.withOpacity(0.3),
+                        ),
+                        Expanded(
+                          child: _buildCompactStat(
+                            theme,
+                            value: '${_analyticsSummary!.uniqueViewers}',
+                            label: 'Unique',
+                            icon: Icons.people_rounded,
+                            color: Colors.indigo,
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: colorScheme.outlineVariant.withOpacity(0.3),
+                        ),
+                        Expanded(
+                          child: _buildCompactStat(
+                            theme,
+                            value: '${_analyticsSummary!.applyClicks}',
+                            label: 'Clicks',
+                            icon: Icons.touch_app_rounded,
+                            color: Colors.orange,
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: colorScheme.outlineVariant.withOpacity(0.3),
+                        ),
+                        Expanded(
+                          child: _buildCompactStat(
+                            theme,
+                            value: '${_analyticsSummary!.applications}',
+                            label: 'Applied',
+                            icon: Icons.check_circle_rounded,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No analytics data yet',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    const SizedBox(height: 12),
+                    // Secondary metrics row
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Analytics will appear when members view this job',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildMiniMetric(theme, _analyticsSummary!.formattedAvgTime, 'Avg Time'),
+                          _buildMiniMetric(theme, _analyticsSummary!.formattedClickThroughRate, 'CTR'),
+                          _buildMiniMetric(theme, '${_analyticsSummary!.shares}', 'Shares'),
+                          _buildMiniMetric(theme, '${_analyticsSummary!.maxScrollDepth}%', 'Scroll'),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-        ],
+            ] else
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.analytics_outlined,
+                        size: 40,
+                        color: colorScheme.outline.withOpacity(0.5),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No analytics data yet',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCompactStat(
+    ThemeData theme, {
+    required String value,
+    required String label,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniMetric(ThemeData theme, String value, String label) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 10,
+          ),
+        ),
+      ],
     );
   }
 
@@ -973,10 +1007,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Widget _buildMemberEngagementCard(ThemeData theme, Job job) {
+    final colorScheme = theme.colorScheme;
+
     return Card(
       clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+      ),
       child: InkWell(
         onTap: () => _openAnalyticsScreen(job, 1),
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -984,13 +1026,22 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: theme.colorScheme.secondaryContainer.withOpacity(0.3),
+                color: colorScheme.secondaryContainer.withOpacity(0.3),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.group_outlined,
-                    color: theme.colorScheme.secondary,
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.group_rounded,
+                      color: colorScheme.secondary,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -999,80 +1050,87 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       children: [
                         Text(
                           'Member Engagement',
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          'Tap to view all member activity',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                          '${_memberInteractions.length} engaged members',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
                   ),
                   Icon(
-                    Icons.chevron_right,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    Icons.chevron_right_rounded,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ],
               ),
             ),
-          // Member list
-          if (_loadingAnalytics)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_memberInteractions.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Center(
+            // Member avatars preview
+            if (_loadingAnalytics)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_memberInteractions.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.person_search_outlined,
+                        size: 40,
+                        color: colorScheme.outline.withOpacity(0.5),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No member activity yet',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.person_search_outlined,
-                      size: 48,
-                      color: theme.colorScheme.outline.withOpacity(0.5),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No member activity yet',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    // Stacked avatars with member names
+                    ...(_memberInteractions.take(3).toList().asMap().entries.map((entry) {
+                      final interaction = entry.value;
+                      return _buildMemberInteractionTile(theme, interaction, entry.key + 1);
+                    })),
+                    if (_memberInteractions.length > 3)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          '+${_memberInteractions.length - 3} more members',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Engagement data will appear when logged-in members view this job',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
                   ],
                 ),
               ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _memberInteractions.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final interaction = _memberInteractions[index];
-                return _buildMemberInteractionTile(theme, interaction);
-              },
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMemberInteractionTile(ThemeData theme, JobMemberInteraction interaction) {
+  Widget _buildMemberInteractionTile(ThemeData theme, JobMemberInteraction interaction, int rank) {
+    final colorScheme = theme.colorScheme;
+
     // Get engagement level color
     Color engagementColor;
     switch (interaction.engagementLevel) {
@@ -1089,109 +1147,166 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         engagementColor = Colors.grey;
     }
 
-    final memberDisplay = 'Member #${interaction.memberId.substring(0, 8)}';
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      leading: CircleAvatar(
-        backgroundColor: theme.colorScheme.surfaceContainerHighest,
-        child: Text(
-          interaction.memberId.substring(0, 2).toUpperCase(),
-          style: theme.textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: rank <= 3 ? Border.all(
+          color: engagementColor.withOpacity(0.2),
+        ) : null,
       ),
-      title: Row(
+      child: Row(
         children: [
-          Expanded(
-            child: Text(
-              memberDisplay,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: engagementColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              '${interaction.engagementScore}%',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: engagementColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 4),
-          if (interaction.locationDescription != 'Unknown location')
-            Text(
-              interaction.locationDescription,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          const SizedBox(height: 6),
-          // Activity indicators
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
+          // Avatar with rank badge
+          Stack(
             children: [
-              _buildActivityChip(
-                theme,
-                icon: Icons.visibility_outlined,
-                label: '${interaction.viewCount} views',
-              ),
-              _buildActivityChip(
-                theme,
-                icon: Icons.timer_outlined,
-                label: interaction.formattedTotalTime,
-              ),
-              if (interaction.maxScrollDepthPercent > 0)
-                _buildActivityChip(
-                  theme,
-                  icon: Icons.expand_more,
-                  label: '${interaction.maxScrollDepthPercent}% scroll',
+              if (interaction.hasProfilePhoto)
+                CircleAvatar(
+                  radius: 22,
+                  backgroundImage: CachedNetworkImageProvider(
+                    interaction.memberProfilePhotoUrl!,
+                  ),
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                )
+              else
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: colorScheme.primaryContainer,
+                  child: Text(
+                    interaction.initials,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
                 ),
-              if (interaction.hasApplied)
-                _buildActivityChip(
-                  theme,
-                  icon: Icons.check_circle,
-                  label: 'Applied',
-                  highlight: true,
-                ),
-              if (interaction.hasClickedApply && !interaction.hasApplied)
-                _buildActivityChip(
-                  theme,
-                  icon: Icons.touch_app,
-                  label: 'Clicked',
-                ),
-              if (interaction.hasShared)
-                _buildActivityChip(
-                  theme,
-                  icon: Icons.share,
-                  label: 'Shared',
+              if (rank <= 3)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: rank == 1
+                          ? Colors.amber
+                          : rank == 2
+                              ? Colors.grey[400]
+                              : Colors.orange[300],
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$rank',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
             ],
           ),
-          if (interaction.lastViewedAt != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Last viewed ${DateFormat.MMMd().add_jm().format(interaction.lastViewedAt!)}',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
-              ),
+          const SizedBox(width: 12),
+          // Member info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        interaction.displayName,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: engagementColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: engagementColor.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            interaction.engagementLevel == 'High'
+                                ? Icons.local_fire_department_rounded
+                                : Icons.trending_up_rounded,
+                            size: 10,
+                            color: engagementColor,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${interaction.engagementScore}%',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: engagementColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  interaction.memberHomeLocation ?? interaction.locationDescription,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                // Quick action chips
+                Row(
+                  children: [
+                    _buildActivityChip(
+                      theme,
+                      icon: Icons.visibility_rounded,
+                      label: '${interaction.viewCount}',
+                    ),
+                    const SizedBox(width: 6),
+                    _buildActivityChip(
+                      theme,
+                      icon: Icons.timer_rounded,
+                      label: interaction.formattedTotalTime,
+                    ),
+                    if (interaction.hasApplied) ...[
+                      const SizedBox(width: 6),
+                      _buildActivityChip(
+                        theme,
+                        icon: Icons.check_circle_rounded,
+                        label: 'Applied',
+                        highlight: true,
+                      ),
+                    ] else if (interaction.hasClickedApply) ...[
+                      const SizedBox(width: 6),
+                      _buildActivityChip(
+                        theme,
+                        icon: Icons.touch_app_rounded,
+                        label: 'Clicked',
+                        color: Colors.orange,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -1202,16 +1317,19 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     required IconData icon,
     required String label,
     bool highlight = false,
+    Color? color,
   }) {
+    final chipColor = color ?? (highlight ? Colors.green : null);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: highlight
-            ? Colors.green.withOpacity(0.1)
+        color: chipColor != null
+            ? chipColor.withOpacity(0.1)
             : theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(4),
-        border: highlight
-            ? Border.all(color: Colors.green.withOpacity(0.3))
+        borderRadius: BorderRadius.circular(6),
+        border: chipColor != null
+            ? Border.all(color: chipColor.withOpacity(0.3))
             : null,
       ),
       child: Row(
@@ -1219,18 +1337,16 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         children: [
           Icon(
             icon,
-            size: 12,
-            color: highlight
-                ? Colors.green
-                : theme.colorScheme.onSurfaceVariant,
+            size: 11,
+            color: chipColor ?? theme.colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: highlight
-                  ? Colors.green
-                  : theme.colorScheme.onSurfaceVariant,
+              fontSize: 10,
+              color: chipColor ?? theme.colorScheme.onSurfaceVariant,
+              fontWeight: chipColor != null ? FontWeight.w600 : null,
             ),
           ),
         ],
