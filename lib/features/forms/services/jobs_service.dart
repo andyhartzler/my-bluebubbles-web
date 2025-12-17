@@ -613,7 +613,8 @@ class JobsService {
         members[member.id] = member;
       }
       return members;
-    } catch (_) {
+    } catch (e) {
+      print('⚠️ Error fetching members by IDs: $e');
       return {};
     }
   }
@@ -1159,8 +1160,10 @@ class JobsService {
   Future<JobAnalyticsSummary> getJobAnalyticsSummary(String jobId) async {
     try {
       final interactions = await getJobMemberInteractions(jobId, limit: 1000);
+      print('📊 Loaded ${interactions.length} member interactions for job $jobId');
       return JobAnalyticsSummary.fromInteractions(jobId, interactions);
     } catch (e) {
+      print('⚠️ Error fetching job analytics summary: $e');
       return JobAnalyticsSummary(jobId: jobId);
     }
   }
@@ -1189,6 +1192,7 @@ class JobsService {
           .map((json) => JobAnalyticsEvent.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
+      print('⚠️ Error fetching job analytics events: $e');
       return [];
     }
   }
@@ -1223,56 +1227,31 @@ class JobsService {
           .toSet()
           .toList();
 
-      // Fetch member data separately
-      Map<String, Map<String, dynamic>> memberMap = {};
-      if (memberIds.isNotEmpty) {
-        final membersResponse = await _readClient
-            .from('members')
-            .select('id, name, email, city, state, profile_pictures')
-            .inFilter('id', memberIds);
-
-        for (final row in membersResponse as List) {
-          final memberId = row['id'] as String;
-          memberMap[memberId] = row as Map<String, dynamic>;
-        }
-      }
+      // Fetch member data using the existing getMembersByIds method
+      final memberMap = await getMembersByIds(memberIds);
 
       // Build interactions with member data enriched
       return interactionData.map((json) {
         final data = Map<String, dynamic>.from(json);
         final memberId = data['member_id'] as String;
-        final memberData = memberMap[memberId];
+        final member = memberMap[memberId];
 
-        if (memberData != null) {
-          data['memberName'] = memberData['name'];
-          data['memberEmail'] = memberData['email'];
-          data['memberCity'] = memberData['city'];
-          data['memberState'] = memberData['state'];
+        if (member != null) {
+          data['memberName'] = member.name;
+          data['memberEmail'] = member.email;
+          data['memberCity'] = member.city;
+          data['memberState'] = member.state;
 
-          // Extract profile photo URL from profile_pictures
-          final profilePictures = memberData['profile_pictures'];
-          if (profilePictures != null) {
-            String? photoUrl;
-            if (profilePictures is List && profilePictures.isNotEmpty) {
-              final firstPhoto = profilePictures.first;
-              if (firstPhoto is Map) {
-                photoUrl = firstPhoto['public_url'] as String? ??
-                           firstPhoto['publicUrl'] as String? ??
-                           firstPhoto['url'] as String? ??
-                           firstPhoto['path'] as String?;
-              } else if (firstPhoto is String) {
-                photoUrl = firstPhoto;
-              }
-            } else if (profilePictures is String && profilePictures.isNotEmpty) {
-              photoUrl = profilePictures;
-            }
-            data['memberProfilePhotoUrl'] = photoUrl;
+          // Get profile photo URL from the Member model
+          if (member.profilePhotos.isNotEmpty) {
+            data['memberProfilePhotoUrl'] = member.profilePhotos.first.publicUrl;
           }
         }
 
         return JobMemberInteraction.fromJson(data);
       }).toList();
     } catch (e) {
+      print('⚠️ Error fetching job member interactions: $e');
       return [];
     }
   }
