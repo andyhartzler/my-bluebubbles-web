@@ -368,8 +368,9 @@ class _JobAnalyticsMapState extends State<JobAnalyticsMap> {
                   _selectedLocation = null;
                 });
               },
+              // Disable drag to allow parent scroll, keep pinch zoom and double-tap zoom
               interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                flags: InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
               ),
             ),
             children: [

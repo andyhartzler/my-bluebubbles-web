@@ -99,6 +99,14 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
         title: Text('Applicants - ${widget.job.title}'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () async {
+              await _loadStatusCounts();
+              await _loadMembers();
+            },
+            tooltip: 'Refresh',
+          ),
+          IconButton(
             icon: const Icon(Icons.download),
             onPressed: () => _exportApplicants(context),
             tooltip: 'Export Applicants',

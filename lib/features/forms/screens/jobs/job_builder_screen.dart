@@ -310,6 +310,12 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
       appBar: AppBar(
         title: Text(widget.jobId == null ? 'Create Job' : 'Edit Job'),
         actions: [
+          if (widget.jobId != null)
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: _isLoading ? null : _loadJob,
+              tooltip: 'Refresh',
+            ),
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: _isSaving ? null : _saveJob,

@@ -26,7 +26,8 @@ class JobDetailScreen extends StatefulWidget {
 
 class _JobDetailScreenState extends State<JobDetailScreen> {
   final _jobsService = JobsService();
-  bool _isLoading = false;
+  bool _isLoading = true;
+  Job? _job;
   int _applicationCount = 0;
   List<JobApplication> _recentApplications = [];
   List<JobNotificationLog> _notificationLogs = [];
@@ -40,9 +41,29 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadApplications();
-    _loadNotificationLogs();
-    _loadAnalytics();
+    _loadAllData();
+  }
+
+  Future<void> _loadAllData() async {
+    setState(() => _isLoading = true);
+    await Future.wait([
+      _loadJob(),
+      _loadApplications(),
+      _loadNotificationLogs(),
+      _loadAnalytics(),
+    ]);
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadJob() async {
+    try {
+      final job = await _jobsService.getJob(widget.jobId);
+      if (mounted && job != null) {
+        setState(() => _job = job);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadAnalytics() async {
@@ -105,275 +126,299 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         title: const Text('Job Details'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _loadAllData,
+            tooltip: 'Refresh',
+          ),
+          IconButton(
             icon: const Icon(Icons.open_in_new),
             onPressed: () => _openInBrowser(),
             tooltip: 'View on Website',
           ),
         ],
       ),
-      body: FutureBuilder<Job>(
-        future: _jobsService.getJob(widget.jobId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: _buildBody(theme),
+      bottomNavigationBar: _buildBottomBar(theme),
+    );
+  }
 
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
+  Widget? _buildBottomBar(ThemeData theme) {
+    final job = _job;
+    if (job == null) return null;
 
-          final job = snapshot.data!;
-
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Status Banner
-                if (job.status == 'pending')
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    color: Colors.orange[100],
-                    child: Row(
-                      children: [
-                        Icon(Icons.pending_outlined, color: Colors.orange[900]),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'This job is pending approval',
-                            style: TextStyle(
-                              color: Colors.orange[900],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+    if (job.status != 'pending') {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _editJob(job),
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Edit Job'),
+                ),
+              ),
+              if (_applicationCount > 0) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => _viewApplicants(job),
+                    icon: const Icon(Icons.people),
+                    label: Text('View $_applicationCount Applicants'),
                   ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
 
-                // Job Content
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title and status
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              job.title,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Edit button row
+            OutlinedButton.icon(
+              onPressed: _isLoading ? null : () => _editJob(job),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Edit Before Approving'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 44),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Approve/Reject row
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : () => _rejectJob(job),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                    ),
+                    child: const Text('Reject'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton(
+                    onPressed: _isLoading ? null : () => _approveJob(job),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
-                          ),
-                          _buildStatusChip(job.status),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Organization
-                      Text(
-                        job.organization,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Tags
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _buildChip(job.jobType, Colors.blue, Icons.work_outline),
-                          if (job.locationType != null)
-                            _buildChip(job.locationType!, Colors.green, Icons.laptop_mac),
-                          if (job.isPaid)
-                            _buildChip('Paid', Colors.purple, Icons.attach_money),
-                          if (job.featured)
-                            _buildChip('Featured', Colors.amber, Icons.star),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Applicants Card
-                      _buildApplicantsCard(theme, job),
-                      const SizedBox(height: 16),
-
-                      // Location
-                      if (job.location != null) ...[
-                        _buildSection(theme, 'Location', job.location!, Icons.location_on_outlined),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Description
-                      _buildSection(theme, 'Description', job.description, Icons.description_outlined),
-                      const SizedBox(height: 16),
-
-                      // Custom Questions
-                      if (job.customQuestions.isNotEmpty) ...[
-                        _buildCustomQuestionsCard(theme, job),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Requirements
-                      if (job.requirements != null) ...[
-                        _buildSection(theme, 'Requirements', job.requirements!, Icons.checklist_outlined),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Qualifications
-                      if (job.qualifications != null) ...[
-                        _buildSection(theme, 'Qualifications', job.qualifications!, Icons.school_outlined),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Compensation
-                      if (job.salaryRange != null || job.hourlyRate != null) ...[
-                        _buildSection(
-                          theme,
-                          'Compensation',
-                          job.salaryRange ?? job.hourlyRate ?? '',
-                          Icons.payments_outlined,
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Contact Info
-                      _buildContactCard(theme, job),
-                      const SizedBox(height: 16),
-
-                      // Submitter Info
-                      _buildSubmitterCard(theme, job),
-                      const SizedBox(height: 16),
-
-                      // Dates and metadata
-                      _buildMetadataCard(theme, job),
-                      const SizedBox(height: 16),
-
-                      // Analytics Section (only for approved jobs)
-                      if (job.status == 'approved') ...[
-                        _buildAnalyticsSummaryCard(theme, job),
-                        const SizedBox(height: 16),
-                        _buildMemberEngagementCard(theme, job),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Notification Logs
-                      _buildNotificationLogsCard(theme),
-                    ],
+                          )
+                        : const Text('Approve & Publish'),
                   ),
                 ),
               ],
             ),
-          );
-        },
+          ],
+        ),
       ),
-      bottomNavigationBar: FutureBuilder<Job>(
-        future: _jobsService.getJob(widget.jobId),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const SizedBox.shrink();
+    );
+  }
 
-          final job = snapshot.data!;
+  Widget _buildBody(ThemeData theme) {
+    if (_isLoading && _job == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-          if (job.status != 'pending') {
-            return SafeArea(
-              child: Padding(
+    final job = _job;
+    if (job == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+            const SizedBox(height: 16),
+            const Text('Failed to load job'),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadAllData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _buildJobContent(theme, job);
+  }
+
+  Widget _buildJobContent(ThemeData theme, Job job) {
+    return RefreshIndicator(
+      onRefresh: _loadAllData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status Banner
+            if (job.status == 'pending')
+              Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(16),
+                color: Colors.orange[100],
                 child: Row(
                   children: [
+                    Icon(Icons.pending_outlined, color: Colors.orange[900]),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _editJob(job),
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Edit Job'),
-                      ),
-                    ),
-                    if (_applicationCount > 0) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () => _viewApplicants(job),
-                          icon: const Icon(Icons.people),
-                          label: Text('View $_applicationCount Applicants'),
+                      child: Text(
+                        'This job is pending approval',
+                        style: TextStyle(
+                          color: Colors.orange[900],
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),
-            );
-          }
 
-          return SafeArea(
-            child: Container(
+            // Job Content
+            Padding(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Edit button row
-                  OutlinedButton.icon(
-                    onPressed: _isLoading ? null : () => _editJob(job),
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Edit Before Approving'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 44),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Approve/Reject row
+                  // Title and status
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: _isLoading ? null : () => _rejectJob(job),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            side: const BorderSide(color: Colors.red),
+                        child: Text(
+                          job.title,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
-                          child: const Text('Reject'),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton(
-                          onPressed: _isLoading ? null : () => _approveJob(job),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.green,
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : const Text('Approve & Publish'),
-                        ),
-                      ),
+                      _buildStatusChip(job.status),
                     ],
                   ),
+                  const SizedBox(height: 8),
+
+                  // Organization
+                  Text(
+                    job.organization,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Tags
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildChip(job.jobType, Colors.blue, Icons.work_outline),
+                      if (job.locationType != null)
+                        _buildChip(job.locationType!, Colors.green, Icons.laptop_mac),
+                      if (job.isPaid)
+                        _buildChip('Paid', Colors.purple, Icons.attach_money),
+                      if (job.featured)
+                        _buildChip('Featured', Colors.amber, Icons.star),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Applicants Card
+                  _buildApplicantsCard(theme, job),
+                  const SizedBox(height: 16),
+
+                  // Location
+                  if (job.location != null) ...[
+                    _buildSection(theme, 'Location', job.location!, Icons.location_on_outlined),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Description
+                  _buildSection(theme, 'Description', job.description, Icons.description_outlined),
+                  const SizedBox(height: 16),
+
+                  // Custom Questions
+                  if (job.customQuestions.isNotEmpty) ...[
+                    _buildCustomQuestionsCard(theme, job),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Requirements
+                  if (job.requirements != null) ...[
+                    _buildSection(theme, 'Requirements', job.requirements!, Icons.checklist_outlined),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Qualifications
+                  if (job.qualifications != null) ...[
+                    _buildSection(theme, 'Qualifications', job.qualifications!, Icons.school_outlined),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Compensation
+                  if (job.salaryRange != null || job.hourlyRate != null) ...[
+                    _buildSection(
+                      theme,
+                      'Compensation',
+                      job.salaryRange ?? job.hourlyRate ?? '',
+                      Icons.payments_outlined,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Contact Info
+                  _buildContactCard(theme, job),
+                  const SizedBox(height: 16),
+
+                  // Submitter Info
+                  _buildSubmitterCard(theme, job),
+                  const SizedBox(height: 16),
+
+                  // Dates and metadata
+                  _buildMetadataCard(theme, job),
+                  const SizedBox(height: 16),
+
+                  // Analytics Section (only for approved jobs)
+                  if (job.status == 'approved') ...[
+                    _buildAnalyticsSummaryCard(theme, job),
+                    const SizedBox(height: 16),
+                    _buildMemberEngagementCard(theme, job),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Notification Logs
+                  _buildNotificationLogsCard(theme),
                 ],
               ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
