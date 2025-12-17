@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/job.dart';
 import '../../models/job_analytics.dart';
 import '../../services/jobs_service.dart';
+import '../../widgets/job_analytics_map.dart';
 
 class JobAnalyticsScreen extends StatefulWidget {
   final Job job;
@@ -30,6 +31,7 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
   List<JobAnalyticsEvent> _recentEvents = [];
   Map<String, int> _eventCounts = {};
   List<Map<String, dynamic>> _dailyViews = [];
+  List<JobViewLocation> _viewLocations = [];
 
   @override
   void initState() {
@@ -58,6 +60,7 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
         _jobsService.getJobAnalyticsEvents(widget.job.id, limit: 50),
         _jobsService.getEventCountsByType(widget.job.id),
         _jobsService.getDailyViewCounts(widget.job.id, days: 14),
+        _jobsService.getJobViewLocations(widget.job.id),
       ]);
 
       if (mounted) {
@@ -67,6 +70,7 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
           _recentEvents = results[2] as List<JobAnalyticsEvent>;
           _eventCounts = results[3] as Map<String, int>;
           _dailyViews = results[4] as List<Map<String, dynamic>>;
+          _viewLocations = results[5] as List<JobViewLocation>;
           _isLoading = false;
         });
       }
@@ -154,6 +158,10 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
 
             // Activity Sparkline
             _buildActivitySparkline(theme),
+            const SizedBox(height: 20),
+
+            // View Locations Map
+            _buildViewLocationsMap(theme),
             const SizedBox(height: 20),
 
             // Quick Breakdown Row
@@ -612,6 +620,167 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
     } catch (_) {
       return dateStr;
     }
+  }
+
+  Widget _buildViewLocationsMap(ThemeData theme) {
+    return JobAnalyticsMap(
+      locations: _viewLocations,
+      height: 300,
+      onLocationTap: (location) {
+        _showLocationMembersSheet(location);
+      },
+    );
+  }
+
+  void _showLocationMembersSheet(JobViewLocation location) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colorScheme.outline.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.location_on_rounded,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            location.locationName,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '${location.viewCount} views from ${location.members.length} ${location.members.length == 1 ? 'member' : 'members'}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(height: 1),
+
+              // Members list
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: location.members.length,
+                  itemBuilder: (context, index) {
+                    final member = location.members[index];
+                    return _buildLocationMemberTile(member, theme);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationMemberTile(dynamic member, ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+    final photoUrl = member.profilePhotos.isNotEmpty
+        ? member.profilePhotos.first.publicUrl
+        : null;
+
+    return ListTile(
+      leading: photoUrl != null
+          ? CircleAvatar(
+              radius: 22,
+              backgroundImage: CachedNetworkImageProvider(photoUrl),
+              backgroundColor: colorScheme.surfaceContainerHighest,
+            )
+          : CircleAvatar(
+              radius: 22,
+              backgroundColor: colorScheme.primaryContainer,
+              child: Text(
+                _getInitials(member.name ?? member.email ?? ''),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onPrimaryContainer,
+                ),
+              ),
+            ),
+      title: Text(
+        member.name ?? member.email ?? 'Unknown Member',
+        style: theme.textTheme.bodyLarge?.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      subtitle: member.email != null && member.name != null
+          ? Text(
+              member.email!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            )
+          : null,
+      trailing: Icon(
+        Icons.chevron_right_rounded,
+        color: colorScheme.outline,
+      ),
+    );
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return '?';
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
   }
 
   Widget _buildQuickBreakdownRow(ThemeData theme) {

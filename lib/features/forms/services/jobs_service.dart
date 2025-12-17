@@ -1426,4 +1426,121 @@ class JobsService {
       return {};
     }
   }
+
+  /// Get location data for map pins (grouped by coordinates)
+  /// Returns a list of locations with coordinates and associated member info
+  Future<List<JobViewLocation>> getJobViewLocations(String jobId) async {
+    try {
+      // Get unique locations from analytics events with coordinates
+      final response = await _readClient
+          .from('job_analytics_events')
+          .select('member_id, city, region, country, latitude, longitude')
+          .eq('job_id', jobId)
+          .eq('event_type', 'view')
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null);
+
+      final events = (response as List).cast<Map<String, dynamic>>();
+
+      if (events.isEmpty) {
+        return [];
+      }
+
+      // Group by rounded coordinates (to cluster nearby pins)
+      final locationGroups = <String, List<Map<String, dynamic>>>{};
+      for (final event in events) {
+        final lat = (event['latitude'] as num?)?.toDouble();
+        final lng = (event['longitude'] as num?)?.toDouble();
+        if (lat == null || lng == null) continue;
+
+        // Round to ~1km precision for clustering
+        final roundedLat = (lat * 100).round() / 100;
+        final roundedLng = (lng * 100).round() / 100;
+        final key = '$roundedLat,$roundedLng';
+
+        locationGroups.putIfAbsent(key, () => []).add(event);
+      }
+
+      // Get unique member IDs
+      final memberIds = events
+          .map((e) => e['member_id'] as String)
+          .toSet()
+          .toList();
+
+      // Fetch member data
+      final memberMap = await getMembersByIds(memberIds);
+
+      // Build location objects
+      final locations = <JobViewLocation>[];
+      for (final entry in locationGroups.entries) {
+        final coords = entry.key.split(',');
+        final lat = double.parse(coords[0]);
+        final lng = double.parse(coords[1]);
+        final groupEvents = entry.value;
+
+        // Get unique members at this location
+        final uniqueMemberIds = groupEvents
+            .map((e) => e['member_id'] as String)
+            .toSet();
+
+        final members = uniqueMemberIds
+            .map((id) => memberMap[id])
+            .whereType<Member>()
+            .toList();
+
+        // Get location name from first event
+        final firstEvent = groupEvents.first;
+        final city = firstEvent['city'] as String?;
+        final region = firstEvent['region'] as String?;
+        final country = firstEvent['country'] as String?;
+
+        locations.add(JobViewLocation(
+          latitude: lat,
+          longitude: lng,
+          city: city,
+          region: region,
+          country: country,
+          viewCount: groupEvents.length,
+          members: members,
+        ));
+      }
+
+      // Sort by view count descending
+      locations.sort((a, b) => b.viewCount.compareTo(a.viewCount));
+
+      return locations;
+    } catch (e) {
+      print('⚠️ Error fetching job view locations: $e');
+      return [];
+    }
+  }
+}
+
+/// Represents a location where the job was viewed
+class JobViewLocation {
+  final double latitude;
+  final double longitude;
+  final String? city;
+  final String? region;
+  final String? country;
+  final int viewCount;
+  final List<Member> members;
+
+  JobViewLocation({
+    required this.latitude,
+    required this.longitude,
+    this.city,
+    this.region,
+    this.country,
+    required this.viewCount,
+    required this.members,
+  });
+
+  String get locationName {
+    final parts = <String>[];
+    if (city != null && city!.isNotEmpty) parts.add(city!);
+    if (region != null && region!.isNotEmpty) parts.add(region!);
+    if (parts.isEmpty && country != null) parts.add(country!);
+    return parts.isEmpty ? 'Unknown' : parts.join(', ');
+  }
 }
