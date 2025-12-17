@@ -1193,7 +1193,7 @@ class JobsService {
     }
   }
 
-  /// Get member interactions for a job
+  /// Get member interactions for a job (with member info)
   Future<List<JobMemberInteraction>> getJobMemberInteractions(
     String jobId, {
     int limit = 50,
@@ -1203,16 +1203,59 @@ class JobsService {
     try {
       final orderColumn = sortBy ?? 'last_viewed_at';
 
+      // Fetch interactions with member data via join
       final response = await _readClient
           .from('job_member_interactions')
-          .select()
+          .select('''
+            *,
+            members:member_id (
+              id,
+              name,
+              email,
+              city,
+              state,
+              profile_pictures
+            )
+          ''')
           .eq('job_id', jobId)
           .order(orderColumn, ascending: ascending)
           .limit(limit);
 
-      return (response as List)
-          .map((json) => JobMemberInteraction.fromJson(json as Map<String, dynamic>))
-          .toList();
+      return (response as List).map((json) {
+        final data = Map<String, dynamic>.from(json as Map<String, dynamic>);
+
+        // Extract member info from the join
+        final memberData = data['members'] as Map<String, dynamic>?;
+        if (memberData != null) {
+          data['memberName'] = memberData['name'];
+          data['memberEmail'] = memberData['email'];
+          data['memberCity'] = memberData['city'];
+          data['memberState'] = memberData['state'];
+
+          // Extract profile photo URL from profile_pictures
+          final profilePictures = memberData['profile_pictures'];
+          if (profilePictures != null) {
+            String? photoUrl;
+            if (profilePictures is List && profilePictures.isNotEmpty) {
+              final firstPhoto = profilePictures.first;
+              if (firstPhoto is Map) {
+                photoUrl = firstPhoto['public_url'] as String? ??
+                           firstPhoto['publicUrl'] as String? ??
+                           firstPhoto['url'] as String? ??
+                           firstPhoto['path'] as String?;
+              } else if (firstPhoto is String) {
+                photoUrl = firstPhoto;
+              }
+            } else if (profilePictures is String && profilePictures.isNotEmpty) {
+              photoUrl = profilePictures;
+            }
+            data['memberProfilePhotoUrl'] = photoUrl;
+          }
+        }
+        data.remove('members');
+
+        return JobMemberInteraction.fromJson(data);
+      }).toList();
     } catch (e) {
       return [];
     }

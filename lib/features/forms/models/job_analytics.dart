@@ -146,6 +146,13 @@ class JobMemberInteraction with _$JobMemberInteraction {
     @JsonKey(name: 'job_id') required String jobId,
     @JsonKey(name: 'member_id') required String memberId,
 
+    // Member info (populated from join)
+    String? memberName,
+    String? memberEmail,
+    String? memberProfilePhotoUrl,
+    String? memberCity,
+    String? memberState,
+
     // Action flags
     @JsonKey(name: 'has_viewed') @Default(false) bool hasViewed,
     @JsonKey(name: 'has_clicked_apply') @Default(false) bool hasClickedApply,
@@ -288,6 +295,39 @@ class JobMemberInteraction with _$JobMemberInteraction {
     if (firstUtmSource != null) return firstUtmSource;
     if (firstReferrerDomain != null) return firstReferrerDomain;
     return null;
+  }
+
+  /// Get display name for the member
+  String get displayName {
+    if (memberName != null && memberName!.isNotEmpty) return memberName!;
+    if (memberEmail != null && memberEmail!.isNotEmpty) {
+      return memberEmail!.split('@').first;
+    }
+    return 'Member #${memberId.substring(0, 8)}';
+  }
+
+  /// Get initials for avatar
+  String get initials {
+    if (memberName != null && memberName!.isNotEmpty) {
+      final parts = memberName!.split(' ');
+      if (parts.length >= 2) {
+        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      }
+      return memberName!.substring(0, memberName!.length >= 2 ? 2 : 1).toUpperCase();
+    }
+    return memberId.substring(0, 2).toUpperCase();
+  }
+
+  /// Check if member has profile photo
+  bool get hasProfilePhoto =>
+      memberProfilePhotoUrl != null && memberProfilePhotoUrl!.isNotEmpty;
+
+  /// Get member home location (from member data, not analytics)
+  String? get memberHomeLocation {
+    final parts = <String>[];
+    if (memberCity != null && memberCity!.isNotEmpty) parts.add(memberCity!);
+    if (memberState != null && memberState!.isNotEmpty) parts.add(memberState!);
+    return parts.isEmpty ? null : parts.join(', ');
   }
 }
 
