@@ -1203,29 +1203,46 @@ class JobsService {
     try {
       final orderColumn = sortBy ?? 'last_viewed_at';
 
-      // Fetch interactions with member data via join
+      // Fetch interactions first
       final response = await _readClient
           .from('job_member_interactions')
-          .select('''
-            *,
-            members:member_id (
-              id,
-              name,
-              email,
-              city,
-              state,
-              profile_pictures
-            )
-          ''')
+          .select()
           .eq('job_id', jobId)
           .order(orderColumn, ascending: ascending)
           .limit(limit);
 
-      return (response as List).map((json) {
-        final data = Map<String, dynamic>.from(json as Map<String, dynamic>);
+      final interactionData = (response as List).cast<Map<String, dynamic>>();
 
-        // Extract member info from the join
-        final memberData = data['members'] as Map<String, dynamic>?;
+      if (interactionData.isEmpty) {
+        return [];
+      }
+
+      // Collect unique member IDs
+      final memberIds = interactionData
+          .map((json) => json['member_id'] as String)
+          .toSet()
+          .toList();
+
+      // Fetch member data separately
+      Map<String, Map<String, dynamic>> memberMap = {};
+      if (memberIds.isNotEmpty) {
+        final membersResponse = await _readClient
+            .from('members')
+            .select('id, name, email, city, state, profile_pictures')
+            .inFilter('id', memberIds);
+
+        for (final row in membersResponse as List) {
+          final memberId = row['id'] as String;
+          memberMap[memberId] = row as Map<String, dynamic>;
+        }
+      }
+
+      // Build interactions with member data enriched
+      return interactionData.map((json) {
+        final data = Map<String, dynamic>.from(json);
+        final memberId = data['member_id'] as String;
+        final memberData = memberMap[memberId];
+
         if (memberData != null) {
           data['memberName'] = memberData['name'];
           data['memberEmail'] = memberData['email'];
@@ -1252,7 +1269,6 @@ class JobsService {
             data['memberProfilePhotoUrl'] = photoUrl;
           }
         }
-        data.remove('members');
 
         return JobMemberInteraction.fromJson(data);
       }).toList();
