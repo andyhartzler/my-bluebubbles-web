@@ -248,7 +248,8 @@ class FormFieldConfig {
       allowCamera: json['allowCamera'] as bool? ?? json['allow_camera'] as bool? ?? false,
       allowGallery: json['allowGallery'] as bool? ?? json['allow_gallery'] as bool? ?? false,
       conditionalFieldId: json['conditionalFieldId'] as String? ?? json['conditional_field_id'] as String? ?? json['condition']?['field'] as String?,
-      conditionalOperator: json['conditionalOperator'] as String? ?? json['conditional_operator'] as String?,
+      // Default to 'equals' operator when a condition object is present but no explicit operator is specified
+      conditionalOperator: json['conditionalOperator'] as String? ?? json['conditional_operator'] as String? ?? (json['condition']?['field'] != null ? 'equals' : null),
       conditionalValue: json['conditionalValue'] ?? json['conditional_value'] ?? json['condition']?['value'],
       showWhenConditionMet: json['showWhenConditionMet'] as bool? ?? json['show_when_condition_met'] as bool? ?? true,
       pageNumber: (json['pageNumber'] as num?)?.toInt() ?? (json['page_number'] as num?)?.toInt() ?? (json['page'] as num?)?.toInt(),

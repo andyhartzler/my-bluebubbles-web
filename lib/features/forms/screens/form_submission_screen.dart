@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
+import 'package:flutter_html/flutter_html.dart';
 import '../models/form_schema.dart';
 import '../services/forms_service.dart';
 import '../widgets/form_field_renderer.dart';
@@ -128,12 +129,23 @@ class _FormSubmissionScreenState extends State<FormSubmissionScreen> {
                           Icon(Icons.info, color: Colors.blue[700], size: isMobile ? 20 : 24),
                           SizedBox(width: isMobile ? 12 : 16),
                           Expanded(
-                            child: Text(
-                              _formSchema!.description!,
-                              style: TextStyle(
-                                color: Colors.blue[900],
-                                fontSize: isMobile ? 13 : 14,
-                              ),
+                            child: Html(
+                              data: _formSchema!.description!,
+                              style: {
+                                'body': Style(
+                                  margin: Margins.zero,
+                                  padding: HtmlPaddings.zero,
+                                  color: Colors.blue[900],
+                                  fontSize: FontSize(isMobile ? 13 : 14),
+                                ),
+                                'p': Style(
+                                  margin: Margins.only(bottom: 8),
+                                ),
+                                'a': Style(
+                                  color: Colors.blue[800],
+                                  textDecoration: TextDecoration.underline,
+                                ),
+                              },
                             ),
                           ),
                         ],
@@ -247,28 +259,41 @@ class _FormSubmissionScreenState extends State<FormSubmissionScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(_formSchema!.title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_formSchema!.description != null) ...[
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_formSchema!.description != null) ...[
+                const Text(
+                  'Description:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Html(
+                  data: _formSchema!.description!,
+                  style: {
+                    'body': Style(
+                      margin: Margins.zero,
+                      padding: HtmlPaddings.zero,
+                    ),
+                    'p': Style(
+                      margin: Margins.only(bottom: 8),
+                    ),
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
               const Text(
-                'Description:',
+                'Details:',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              Text(_formSchema!.description!),
-              const SizedBox(height: 16),
+              Text('Type: ${_formSchema!.formType}'),
+              Text('Fields: ${_formSchema!.schema.fields.length}'),
+              Text('Required fields: ${_formSchema!.schema.fields.where((f) => f.required).length}'),
             ],
-            const Text(
-              'Details:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text('Type: ${_formSchema!.formType}'),
-            Text('Fields: ${_formSchema!.schema.fields.length}'),
-            Text('Required fields: ${_formSchema!.schema.fields.where((f) => f.required).length}'),
-          ],
+          ),
         ),
         actions: [
           TextButton(
