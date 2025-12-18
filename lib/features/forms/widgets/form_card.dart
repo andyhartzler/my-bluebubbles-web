@@ -6,6 +6,8 @@ class FormCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onViewResults;
+  final VoidCallback? onDelete;
+  final VoidCallback? onDuplicate;
 
   const FormCard({
     Key? key,
@@ -13,6 +15,8 @@ class FormCard extends StatelessWidget {
     required this.onTap,
     this.onEdit,
     this.onViewResults,
+    this.onDelete,
+    this.onDuplicate,
   }) : super(key: key);
 
   @override
@@ -142,7 +146,14 @@ class FormCard extends StatelessWidget {
                       color: colorScheme.onSurfaceVariant,
                     ),
                     onSelected: (value) {
-                      // Handle menu actions
+                      switch (value) {
+                        case 'delete':
+                          onDelete?.call();
+                          break;
+                        case 'duplicate':
+                          onDuplicate?.call();
+                          break;
+                      }
                     },
                     itemBuilder: (context) => [
                       const PopupMenuItem(
