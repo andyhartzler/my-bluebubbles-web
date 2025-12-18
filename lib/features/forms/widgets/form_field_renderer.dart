@@ -111,6 +111,9 @@ class FormFieldRenderer extends StatelessWidget {
       case FormFieldTypes.filePicker:
         return _buildFilePicker();
 
+      case FormFieldTypes.fileUpload:
+        return _buildFileUpload();
+
       case FormFieldTypes.imagePicker:
         return _buildImagePicker();
 
@@ -823,6 +826,70 @@ class FormFieldRenderer extends StatelessWidget {
         }
       },
     );
+  }
+
+  Widget _buildFileUpload() {
+    // Extract file config settings
+    final fileConfig = config.fileConfig;
+    final accept = fileConfig?['accept'] as List?;
+    final maxSizeMb = fileConfig?['max_size_mb'] as num?;
+
+    // Use allowedExtensions from config or extract from file_config.accept
+    final extensions = config.allowedExtensions ??
+        accept?.map((e) => e.toString().replaceAll('.', '')).toList();
+
+    // Use maxFileSizeMB from config or extract from file_config
+    final maxSize = config.maxFileSizeMB ?? maxSizeMb?.toInt();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (config.label.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              config.label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          ),
+        FormBuilderFilePicker(
+          name: config.id,
+          decoration: InputDecoration(
+            helperText: config.help ?? _buildFileHelperText(extensions, maxSize),
+            border: const OutlineInputBorder(),
+          ),
+          maxFiles: config.allowMultipleFiles ? null : 1,
+          previewImages: true,
+          allowedExtensions: extensions,
+          allowCompression: true,
+          validator: FormBuilderValidators.compose([
+            if (config.required) FormBuilderValidators.required(),
+            // Add file size validation
+            (files) {
+              if (maxSize != null && files != null) {
+                for (final file in files) {
+                  if (file.size > (maxSize * 1024 * 1024)) {
+                    return 'File size exceeds ${maxSize}MB limit';
+                  }
+                }
+              }
+              return null;
+            },
+          ]),
+        ),
+      ],
+    );
+  }
+
+  String? _buildFileHelperText(List<String>? extensions, int? maxSize) {
+    final parts = <String>[];
+    if (extensions != null && extensions.isNotEmpty) {
+      parts.add('Allowed: ${extensions.join(', ')}');
+    }
+    if (maxSize != null) {
+      parts.add('Max size: ${maxSize}MB');
+    }
+    return parts.isEmpty ? null : parts.join(' | ');
   }
 
   Widget _buildImagePicker() {
