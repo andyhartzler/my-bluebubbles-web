@@ -75,6 +75,9 @@ class FormFieldConfig {
   final int? maxFileSizeMB;
   final String? fileTypeFilter; // 'any', 'image', 'video', 'audio', 'custom'
 
+  // File upload configuration (for file_upload question type)
+  final Map<String, dynamic>? fileConfig;
+
   // Image picker
   final int? maxImages;
   final double? imageQuality; // 0.0 to 1.0
@@ -83,11 +86,16 @@ class FormFieldConfig {
   final bool allowCamera;
   final bool allowGallery;
 
-  // Conditional logic
+  // Conditional logic - simple condition
   final String? conditionalFieldId; // ID of field to watch
   final String? conditionalOperator; // 'equals', 'notEquals', 'contains', 'greaterThan', 'lessThan'
   final dynamic conditionalValue; // Value to compare against
   final bool showWhenConditionMet; // Show field when condition is true or false
+
+  // Conditional logic - complex AND conditions
+  // List of conditions that ALL must be met (AND logic)
+  // Each condition is {field: String, value: dynamic, operator: String?}
+  final List<Map<String, dynamic>>? conditions;
 
   // Form page (for multi-page forms)
   final int? pageNumber; // Which page this field belongs to (0-indexed)
@@ -152,10 +160,12 @@ class FormFieldConfig {
     this.maxImageHeight,
     this.allowCamera = false,
     this.allowGallery = false,
+    this.fileConfig,
     this.conditionalFieldId,
     this.conditionalOperator,
     this.conditionalValue,
     this.showWhenConditionMet = true,
+    this.conditions,
     this.pageNumber,
     this.enabled = true,
     this.defaultValue,
@@ -188,6 +198,57 @@ class FormFieldConfig {
     if (extensionsData is List) {
       allowedExtensions = extensionsData.map((e) => e.toString()).toList();
     }
+
+    // Parse file_config for file_upload type
+    Map<String, dynamic>? fileConfig;
+    final fileConfigData = json['file_config'] ?? json['fileConfig'];
+    if (fileConfigData is Map<String, dynamic>) {
+      fileConfig = fileConfigData;
+      // Extract allowed extensions from file_config.accept if present
+      if (allowedExtensions == null && fileConfig['accept'] is List) {
+        allowedExtensions = (fileConfig['accept'] as List).map((e) => e.toString()).toList();
+      }
+      // Extract max file size from file_config if present
+    }
+
+    // Parse conditions - handle both simple {field, value} and complex {and: [...]}
+    String? conditionalFieldId;
+    String? conditionalOperator;
+    dynamic conditionalValue;
+    List<Map<String, dynamic>>? conditions;
+
+    final conditionData = json['condition'];
+    if (conditionData is Map<String, dynamic>) {
+      // Check for complex AND condition
+      if (conditionData['and'] is List) {
+        // Complex AND conditions: {and: [{field, value}, {field, value}]}
+        final andConditions = conditionData['and'] as List;
+        conditions = andConditions
+            .whereType<Map<String, dynamic>>()
+            .map((c) => {
+                  'field': c['field'],
+                  'value': c['value'],
+                  'operator': c['operator'] ?? 'equals',
+                })
+            .toList();
+        // For backwards compatibility, also set the first condition as the simple condition
+        if (conditions.isNotEmpty) {
+          conditionalFieldId = conditions.first['field'] as String?;
+          conditionalValue = conditions.first['value'];
+          conditionalOperator = conditions.first['operator'] as String? ?? 'equals';
+        }
+      } else if (conditionData['field'] != null) {
+        // Simple condition: {field, value}
+        conditionalFieldId = conditionData['field'] as String?;
+        conditionalValue = conditionData['value'];
+        conditionalOperator = conditionData['operator'] as String? ?? 'equals';
+      }
+    }
+
+    // Also check for direct conditional* properties (new format)
+    conditionalFieldId ??= json['conditionalFieldId'] as String? ?? json['conditional_field_id'] as String?;
+    conditionalOperator ??= json['conditionalOperator'] as String? ?? json['conditional_operator'] as String?;
+    conditionalValue ??= json['conditionalValue'] ?? json['conditional_value'];
 
     return FormFieldConfig(
       id: json['id'] as String,
@@ -247,10 +308,11 @@ class FormFieldConfig {
       maxImageHeight: (json['maxImageHeight'] as num?)?.toInt() ?? (json['max_image_height'] as num?)?.toInt(),
       allowCamera: json['allowCamera'] as bool? ?? json['allow_camera'] as bool? ?? false,
       allowGallery: json['allowGallery'] as bool? ?? json['allow_gallery'] as bool? ?? false,
-      conditionalFieldId: json['conditionalFieldId'] as String? ?? json['conditional_field_id'] as String? ?? json['condition']?['field'] as String?,
-      // Default to 'equals' operator when a condition object is present but no explicit operator is specified
-      conditionalOperator: json['conditionalOperator'] as String? ?? json['conditional_operator'] as String? ?? (json['condition']?['field'] != null ? 'equals' : null),
-      conditionalValue: json['conditionalValue'] ?? json['conditional_value'] ?? json['condition']?['value'],
+      conditionalFieldId: conditionalFieldId,
+      conditionalOperator: conditionalOperator,
+      conditionalValue: conditionalValue,
+      conditions: conditions,
+      fileConfig: fileConfig,
       showWhenConditionMet: json['showWhenConditionMet'] as bool? ?? json['show_when_condition_met'] as bool? ?? true,
       pageNumber: (json['pageNumber'] as num?)?.toInt() ?? (json['page_number'] as num?)?.toInt() ?? (json['page'] as num?)?.toInt(),
       enabled: json['enabled'] as bool? ?? true,
@@ -317,6 +379,8 @@ class FormFieldConfig {
     if (conditionalFieldId != null) 'conditionalFieldId': conditionalFieldId,
     if (conditionalOperator != null) 'conditionalOperator': conditionalOperator,
     if (conditionalValue != null) 'conditionalValue': conditionalValue,
+    if (conditions != null) 'conditions': conditions,
+    if (fileConfig != null) 'fileConfig': fileConfig,
     'showWhenConditionMet': showWhenConditionMet,
     if (pageNumber != null) 'pageNumber': pageNumber,
     'enabled': enabled,
@@ -382,6 +446,8 @@ class FormFieldConfig {
     String? conditionalFieldId,
     String? conditionalOperator,
     dynamic conditionalValue,
+    List<Map<String, dynamic>>? conditions,
+    Map<String, dynamic>? fileConfig,
     bool? showWhenConditionMet,
     int? pageNumber,
     bool? enabled,
@@ -446,6 +512,8 @@ class FormFieldConfig {
       conditionalFieldId: conditionalFieldId ?? this.conditionalFieldId,
       conditionalOperator: conditionalOperator ?? this.conditionalOperator,
       conditionalValue: conditionalValue ?? this.conditionalValue,
+      conditions: conditions ?? this.conditions,
+      fileConfig: fileConfig ?? this.fileConfig,
       showWhenConditionMet: showWhenConditionMet ?? this.showWhenConditionMet,
       pageNumber: pageNumber ?? this.pageNumber,
       enabled: enabled ?? this.enabled,

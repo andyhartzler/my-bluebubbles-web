@@ -42,6 +42,7 @@ class FormFieldTypes {
   static const String signaturePad = 'signature_pad';
   static const String typeahead = 'typeahead';
   static const String filePicker = 'file_picker';
+  static const String fileUpload = 'file_upload'; // Alias for file_picker with storage config
   static const String imagePicker = 'image_picker';
 
   // Cupertino (iOS) fields
@@ -89,6 +90,7 @@ class FormFieldTypes {
           FieldTypeInfo(signaturePad, 'Signature Pad', 'Draw signature'),
           FieldTypeInfo(typeahead, 'Typeahead', 'Auto-complete text input'),
           FieldTypeInfo(filePicker, 'File Picker', 'Upload files (PDF, documents, etc.)'),
+          FieldTypeInfo(fileUpload, 'File Upload', 'Upload files to cloud storage'),
           FieldTypeInfo(imagePicker, 'Image Picker', 'Select or capture images/photos'),
         ],
         'iOS (Cupertino)': [
@@ -151,6 +153,22 @@ class FormFieldTypes {
       cupertinoSlider,
       cupertinoSegmentedControl,
       cupertinoSlidingSegmentedControl,
+    ].contains(type);
+  }
+
+  /// Check if a field type is file/media related
+  static bool isFileType(String type) {
+    return [
+      filePicker,
+      fileUpload,
+      imagePicker,
+    ].contains(type);
+  }
+
+  /// Check if a field type is a layout/display element (not an input)
+  static bool isLayoutElement(String type) {
+    return [
+      sectionHeader,
     ].contains(type);
   }
 }

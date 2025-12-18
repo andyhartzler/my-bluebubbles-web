@@ -17,15 +17,20 @@ class ConditionalFieldWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // If no conditional logic, just return the child
-    if (config.conditionalFieldId == null || config.conditionalOperator == null) {
+    // If no conditional logic (neither simple nor complex), just return the child
+    final hasSimpleCondition = config.conditionalFieldId != null && config.conditionalOperator != null;
+    final hasComplexConditions = config.conditions != null && config.conditions!.isNotEmpty;
+
+    if (!hasSimpleCondition && !hasComplexConditions) {
       return child;
     }
 
     return ValueListenableBuilder<Map<String, dynamic>>(
       valueListenable: _createValueListenable(),
       builder: (context, values, _) {
-        final shouldShow = _evaluateCondition(values);
+        final shouldShow = hasComplexConditions
+            ? _evaluateAllConditions(values)
+            : _evaluateCondition(values);
 
         if (!shouldShow) {
           // Field is hidden - return empty container
@@ -116,6 +121,97 @@ class ConditionalFieldWrapper extends StatelessWidget {
 
     // If showWhenConditionMet is false, invert the result
     return config.showWhenConditionMet ? conditionMet : !conditionMet;
+  }
+
+  /// Evaluate all AND conditions - ALL conditions must be met
+  bool _evaluateAllConditions(Map<String, dynamic> values) {
+    if (config.conditions == null || config.conditions!.isEmpty) {
+      return true;
+    }
+
+    // ALL conditions must be met (AND logic)
+    for (final condition in config.conditions!) {
+      final fieldId = condition['field'] as String?;
+      final conditionValue = condition['value'];
+      final operator = condition['operator'] as String? ?? 'equals';
+
+      if (fieldId == null) continue;
+
+      final watchedFieldValue = values[fieldId];
+      final conditionMet = _evaluateSingleCondition(watchedFieldValue, conditionValue, operator);
+
+      if (!conditionMet) {
+        // If any condition is not met, return false (AND logic)
+        return config.showWhenConditionMet ? false : true;
+      }
+    }
+
+    // All conditions are met
+    return config.showWhenConditionMet ? true : false;
+  }
+
+  /// Evaluate a single condition with given operator
+  bool _evaluateSingleCondition(dynamic watchedFieldValue, dynamic conditionValue, String operator) {
+    switch (operator) {
+      case 'equals':
+        return watchedFieldValue == conditionValue;
+
+      case 'notEquals':
+        return watchedFieldValue != conditionValue;
+
+      case 'contains':
+        if (watchedFieldValue is String && conditionValue is String) {
+          return watchedFieldValue.contains(conditionValue);
+        } else if (watchedFieldValue is List) {
+          return watchedFieldValue.contains(conditionValue);
+        }
+        return false;
+
+      case 'notContains':
+        if (watchedFieldValue is String && conditionValue is String) {
+          return !watchedFieldValue.contains(conditionValue);
+        } else if (watchedFieldValue is List) {
+          return !watchedFieldValue.contains(conditionValue);
+        }
+        return false;
+
+      case 'greaterThan':
+        if (watchedFieldValue is num && conditionValue is num) {
+          return watchedFieldValue > conditionValue;
+        }
+        return false;
+
+      case 'lessThan':
+        if (watchedFieldValue is num && conditionValue is num) {
+          return watchedFieldValue < conditionValue;
+        }
+        return false;
+
+      case 'greaterThanOrEqual':
+        if (watchedFieldValue is num && conditionValue is num) {
+          return watchedFieldValue >= conditionValue;
+        }
+        return false;
+
+      case 'lessThanOrEqual':
+        if (watchedFieldValue is num && conditionValue is num) {
+          return watchedFieldValue <= conditionValue;
+        }
+        return false;
+
+      case 'isEmpty':
+        return watchedFieldValue == null ||
+            (watchedFieldValue is String && watchedFieldValue.isEmpty) ||
+            (watchedFieldValue is List && watchedFieldValue.isEmpty);
+
+      case 'isNotEmpty':
+        return watchedFieldValue != null &&
+            (watchedFieldValue is! String || watchedFieldValue.isNotEmpty) &&
+            (watchedFieldValue is! List || watchedFieldValue.isNotEmpty);
+
+      default:
+        return false;
+    }
   }
 }
 
