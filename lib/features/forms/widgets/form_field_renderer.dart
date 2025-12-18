@@ -30,8 +30,13 @@ class FormFieldRenderer extends StatelessWidget {
 
   Widget _buildField(BuildContext context) {
     switch (config.type) {
+      // Layout / Display elements
+      case FormFieldTypes.sectionHeader:
+        return _buildSectionHeader(context);
+
       // Basic text fields
       case FormFieldTypes.text:
+      case FormFieldTypes.shortAnswer: // Alias for text
       case FormFieldTypes.email:
       case FormFieldTypes.phone:
       case FormFieldTypes.url:
@@ -55,6 +60,7 @@ class FormFieldRenderer extends StatelessWidget {
         return _buildCheckboxGroup();
 
       case FormFieldTypes.radio:
+      case FormFieldTypes.multipleChoice: // Alias for radio
         return _buildRadioGroup();
 
       case FormFieldTypes.choiceChips:
@@ -235,6 +241,34 @@ class FormFieldRenderer extends StatelessWidget {
       prefixText: config.prefixText,
       suffixText: config.suffixText,
       border: const OutlineInputBorder(),
+    );
+  }
+
+  // Section header (display-only, not an input)
+  Widget _buildSectionHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          config.label,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.primary,
+          ),
+        ),
+        if (config.help != null && config.help!.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            config.help!,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Divider(color: theme.colorScheme.outlineVariant),
+      ],
     );
   }
 

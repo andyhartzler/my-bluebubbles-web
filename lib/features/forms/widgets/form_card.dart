@@ -19,6 +19,22 @@ class FormCard extends StatelessWidget {
     this.onDuplicate,
   }) : super(key: key);
 
+  /// Strips HTML tags from a string and returns plain text
+  String _stripHtmlTags(String htmlString) {
+    // Remove HTML tags
+    final withoutTags = htmlString.replaceAll(RegExp(r'<[^>]*>'), ' ');
+    // Decode common HTML entities
+    return withoutTags
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -87,7 +103,7 @@ class FormCard extends StatelessWidget {
               if (form.description != null && form.description!.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
-                  form.description!,
+                  _stripHtmlTags(form.description!),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),

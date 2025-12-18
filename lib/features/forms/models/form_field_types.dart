@@ -1,12 +1,19 @@
 /// All supported form field types from flutter_form_builder ecosystem
 class FormFieldTypes {
+  // Layout / Display elements (not actual inputs)
+  static const String sectionHeader = 'section_header';
+
   // Basic text input fields
   static const String text = 'text';
+  static const String shortAnswer = 'short_answer'; // Alias for text
   static const String email = 'email';
   static const String phone = 'phone';
   static const String textarea = 'textarea';
   static const String url = 'url';
   static const String number = 'number';
+
+  // Alias for radio (used in legacy schema)
+  static const String multipleChoice = 'multiple_choice';
 
   // Selection fields
   static const String dropdown = 'dropdown';
