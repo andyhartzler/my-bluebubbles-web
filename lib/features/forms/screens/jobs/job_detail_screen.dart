@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:timezone/timezone.dart' as tz;
 import '../../models/job.dart';
 import '../../models/job_application.dart';
 import '../../models/job_notification_log.dart';
@@ -1973,7 +1974,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       ),
       trailing: Text(
         log.createdAt != null
-            ? DateFormat.MMMd().add_jm().format(log.createdAt!)
+            ? _formatCentralTime(log.createdAt!)
             : '',
         style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
@@ -1981,6 +1982,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     );
+  }
+
+  String _formatCentralTime(DateTime dateTime) {
+    final central = tz.getLocation('America/Chicago');
+    final centralTime = tz.TZDateTime.from(dateTime.toUtc(), central);
+    return DateFormat.MMMd().add_jm().format(centralTime);
   }
 }
 
