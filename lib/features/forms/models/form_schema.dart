@@ -3,7 +3,6 @@ import 'form_field_config.dart';
 import 'identity_config.dart';
 
 /// FormSchema model - manually implemented to handle flexible schema parsing
-/// This mirrors VotingForm's approach for consistency
 class FormSchema {
   final String id;
   final DateTime createdAt;
@@ -15,8 +14,8 @@ class FormSchema {
   final String? description;
   final String formType;
 
-  // Form Schema (JSON) - stored as Map for flexibility
-  final Map<String, dynamic> schema;
+  // Form Schema - typed as FormSchemaData for proper field access
+  final FormSchemaData schema;
 
   // Settings
   final Map<String, dynamic> settings;
@@ -93,19 +92,22 @@ class FormSchema {
 
   factory FormSchema.fromJson(Map<String, dynamic> json) {
     // Handle schema field - can be a Map or a JSON string
-    Map<String, dynamic> schemaData;
+    Map<String, dynamic> schemaMap;
     final rawSchema = json['schema'];
     if (rawSchema is String) {
       try {
-        schemaData = jsonDecode(rawSchema) as Map<String, dynamic>;
+        schemaMap = jsonDecode(rawSchema) as Map<String, dynamic>;
       } catch (e) {
-        schemaData = {};
+        schemaMap = {};
       }
     } else if (rawSchema is Map<String, dynamic>) {
-      schemaData = rawSchema;
+      schemaMap = rawSchema;
     } else {
-      schemaData = {};
+      schemaMap = {};
     }
+
+    // Parse schema into FormSchemaData
+    final schemaData = FormSchemaData.fromJson(schemaMap);
 
     // Handle notification_emails - can be null or a list
     List<String>? notificationEmails;
@@ -170,7 +172,7 @@ class FormSchema {
     'title': title,
     'description': description,
     'form_type': formType,
-    'schema': schema,
+    'schema': schema.toJson(),
     'settings': settings,
     'status': status,
     'voting_starts_at': votingStartsAt?.toIso8601String(),
@@ -200,7 +202,7 @@ class FormSchema {
     String? title,
     String? description,
     String? formType,
-    Map<String, dynamic>? schema,
+    FormSchemaData? schema,
     Map<String, dynamic>? settings,
     String? status,
     DateTime? votingStartsAt,
