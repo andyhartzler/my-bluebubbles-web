@@ -95,6 +95,8 @@ class JobNotificationLog {
   /// Get a human-readable label for the trigger type
   String get triggerTypeLabel {
     switch (triggerType) {
+      case 'new_job_alert':
+        return 'New Job Alert';
       case 'job_submitted':
         return 'Job Submitted';
       case 'job_approved':
@@ -112,7 +114,13 @@ class JobNotificationLog {
       case 'application_status_changed':
         return 'Application Status Changed';
       default:
-        return triggerType;
+        // Convert snake_case to Title Case as fallback
+        return triggerType
+            .split('_')
+            .map((word) => word.isNotEmpty
+                ? '${word[0].toUpperCase()}${word.substring(1)}'
+                : '')
+            .join(' ');
     }
   }
 
