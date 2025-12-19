@@ -23,7 +23,7 @@ class DonorRepository {
 
     final response = await _readClient
         .from('donations')
-        .select('*, donor:donor_id(*), events(title)')
+        .select('*, donor:donor_id(*), events(title), donation_thank_yous(*)')
         .order('donation_date', ascending: false)
         .limit(limit);
 
