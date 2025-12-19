@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/job.dart';
 import '../../models/job_analytics.dart';
+import '../../models/job_notification_log.dart';
 import '../../services/jobs_service.dart';
 import '../../widgets/job_analytics_map.dart';
+import 'job_builder_screen.dart';
+import 'job_applicants_screen.dart';
 
 class JobAnalyticsScreen extends StatefulWidget {
   final Job job;
@@ -25,6 +30,9 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
   final _jobsService = JobsService();
   late TabController _tabController;
 
+  // Current job (may be updated after edit)
+  late Job _job;
+
   bool _isLoading = true;
   JobAnalyticsSummary? _summary;
   List<JobMemberInteraction> _interactions = [];
@@ -33,15 +41,23 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
   List<Map<String, dynamic>> _dailyViews = [];
   List<JobViewLocation> _viewLocations = [];
 
+  // Job details state
+  int _applicationCount = 0;
+
+  // Notifications state
+  List<JobNotificationLog> _notificationLogs = [];
+  bool _loadingLogs = false;
+
   @override
   void initState() {
     super.initState();
+    _job = widget.job;
     _tabController = TabController(
-      length: 2,
+      length: 4,
       vsync: this,
       initialIndex: widget.initialTab,
     );
-    _loadAnalytics();
+    _loadAllData();
   }
 
   @override
@@ -50,17 +66,36 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
     super.dispose();
   }
 
-  Future<void> _loadAnalytics() async {
+  Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
+    await Future.wait([
+      _loadAnalytics(),
+      _loadApplicationCount(),
+      _loadNotificationLogs(),
+    ]);
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
 
+  Future<void> _refreshJob() async {
+    try {
+      final job = await _jobsService.getJob(_job.id);
+      if (mounted) {
+        setState(() => _job = job);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadAnalytics() async {
     try {
       final results = await Future.wait([
-        _jobsService.getJobAnalyticsSummary(widget.job.id),
-        _jobsService.getJobMemberInteractions(widget.job.id, limit: 100),
-        _jobsService.getJobAnalyticsEvents(widget.job.id, limit: 50),
-        _jobsService.getEventCountsByType(widget.job.id),
-        _jobsService.getDailyViewCounts(widget.job.id, days: 14),
-        _jobsService.getJobViewLocations(widget.job.id),
+        _jobsService.getJobAnalyticsSummary(_job.id),
+        _jobsService.getJobMemberInteractions(_job.id, limit: 100),
+        _jobsService.getJobAnalyticsEvents(_job.id, limit: 50),
+        _jobsService.getEventCountsByType(_job.id),
+        _jobsService.getDailyViewCounts(_job.id, days: 14),
+        _jobsService.getJobViewLocations(_job.id),
       ]);
 
       if (mounted) {
@@ -71,15 +106,39 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
           _eventCounts = results[3] as Map<String, int>;
           _dailyViews = results[4] as List<Map<String, dynamic>>;
           _viewLocations = results[5] as List<JobViewLocation>;
-          _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading analytics: $e')),
         );
+      }
+    }
+  }
+
+  Future<void> _loadApplicationCount() async {
+    try {
+      final count = await _jobsService.getApplicationCount(_job.id);
+      if (mounted) {
+        setState(() => _applicationCount = count);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadNotificationLogs() async {
+    setState(() => _loadingLogs = true);
+    try {
+      final logs = await _jobsService.getNotificationLogsForJob(_job.id);
+      if (mounted) {
+        setState(() {
+          _notificationLogs = logs;
+          _loadingLogs = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingLogs = false);
       }
     }
   }
@@ -97,9 +156,9 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Analytics'),
+            Text(_job.title, maxLines: 1, overflow: TextOverflow.ellipsis),
             Text(
-              widget.job.title,
+              _job.organization,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -111,16 +170,24 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadAnalytics,
+            onPressed: _loadAllData,
             tooltip: 'Refresh',
+          ),
+          IconButton(
+            icon: const Icon(Icons.open_in_new),
+            onPressed: _openInBrowser,
+            tooltip: 'View on Website',
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
           indicatorSize: TabBarIndicatorSize.label,
+          isScrollable: true,
           tabs: const [
             Tab(text: 'Overview'),
             Tab(text: 'Members'),
+            Tab(text: 'Job Details'),
+            Tab(text: 'Notifications'),
           ],
         ),
       ),
@@ -132,9 +199,21 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
               children: [
                 _buildOverviewTab(theme),
                 _buildMemberEngagementTab(theme),
+                _buildJobDetailsTab(theme),
+                _buildNotificationsTab(theme),
               ],
             ),
     );
+  }
+
+  void _openInBrowser() async {
+    final url = 'https://moyd.org/jobs/${_job.slug ?? _job.id}';
+    final uri = Uri.parse(url);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
   }
 
   Widget _buildOverviewTab(ThemeData theme) {
@@ -1724,6 +1803,947 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
         ),
       ),
     );
+  }
+
+  // ============================================================================
+  // JOB DETAILS TAB
+  // ============================================================================
+
+  Widget _buildJobDetailsTab(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+
+    return RefreshIndicator(
+      onRefresh: _refreshJob,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Edit Button at top
+            FilledButton.tonalIcon(
+              onPressed: () => _editJob(),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Edit Job Details'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Title and Status
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    _job.title,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                _buildStatusChip(_job.status),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Organization
+            Text(
+              _job.organization,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Tags
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildChip(_job.jobType, Colors.blue, Icons.work_outline),
+                if (_job.locationType != null)
+                  _buildChip(_job.locationType!, Colors.green, Icons.laptop_mac),
+                if (_job.isPaid)
+                  _buildChip('Paid', Colors.purple, Icons.attach_money),
+                if (_job.featured)
+                  _buildChip('Featured', Colors.amber, Icons.star),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Applicants Summary
+            _buildApplicantsSummaryCard(theme),
+            const SizedBox(height: 16),
+
+            // Location
+            if (_job.location != null) ...[
+              _buildSectionCard(theme, 'Location', _job.location!, Icons.location_on_outlined),
+              const SizedBox(height: 16),
+            ],
+
+            // Description
+            _buildSectionCard(theme, 'Description', _job.description, Icons.description_outlined),
+            const SizedBox(height: 16),
+
+            // Custom Questions
+            if (_job.customQuestions.isNotEmpty) ...[
+              _buildCustomQuestionsCard(theme),
+              const SizedBox(height: 16),
+            ],
+
+            // Requirements
+            if (_job.requirements != null) ...[
+              _buildSectionCard(theme, 'Requirements', _job.requirements!, Icons.checklist_outlined),
+              const SizedBox(height: 16),
+            ],
+
+            // Qualifications
+            if (_job.qualifications != null) ...[
+              _buildSectionCard(theme, 'Qualifications', _job.qualifications!, Icons.school_outlined),
+              const SizedBox(height: 16),
+            ],
+
+            // Compensation
+            if (_job.salaryRange != null || _job.hourlyRate != null) ...[
+              _buildSectionCard(
+                theme,
+                'Compensation',
+                _job.salaryRange ?? _job.hourlyRate ?? '',
+                Icons.payments_outlined,
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // References
+            if (_job.referencesEnabled) ...[
+              _buildReferencesCard(theme),
+              const SizedBox(height: 16),
+            ],
+
+            // Contact Info
+            _buildContactCard(theme),
+            const SizedBox(height: 16),
+
+            // Submitter Info
+            _buildSubmitterCard(theme),
+            const SizedBox(height: 16),
+
+            // Dates and metadata
+            _buildMetadataCard(theme),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String status) {
+    Color color;
+    switch (status) {
+      case 'pending':
+        color = Colors.orange;
+        break;
+      case 'approved':
+        color = Colors.green;
+        break;
+      case 'rejected':
+        color = Colors.red;
+        break;
+      default:
+        color = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        status.toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChip(String label, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w500,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApplicantsSummaryCard(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _applicationCount > 0 ? () => _viewApplicants() : null,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer.withOpacity(0.3),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.people_outline,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Applicants',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '$_applicationCount total application${_applicationCount == 1 ? '' : 's'}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_applicationCount > 0)
+                FilledButton.tonal(
+                  onPressed: _viewApplicants,
+                  child: const Text('View All'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard(ThemeData theme, String title, String content, IconData icon) {
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              content,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomQuestionsCard(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.secondaryContainer.withOpacity(0.3),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.quiz_outlined,
+                  color: colorScheme.secondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Application Questions',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${_job.customQuestions.length} custom question${_job.customQuestions.length == 1 ? '' : 's'}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: _job.customQuestions.asMap().entries.map((entry) {
+                final index = entry.key;
+                final question = entry.value;
+                return _buildCustomQuestionItem(theme, question, index + 1);
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomQuestionItem(ThemeData theme, CustomQuestion question, int number) {
+    String typeLabel;
+    IconData typeIcon;
+    switch (question.type) {
+      case CustomQuestionType.text:
+        typeLabel = 'Short text';
+        typeIcon = Icons.short_text;
+        break;
+      case CustomQuestionType.textarea:
+        typeLabel = 'Long text';
+        typeIcon = Icons.notes;
+        break;
+      case CustomQuestionType.select:
+        typeLabel = 'Dropdown';
+        typeIcon = Icons.arrow_drop_down_circle_outlined;
+        break;
+      case CustomQuestionType.checkbox:
+        typeLabel = 'Checkboxes';
+        typeIcon = Icons.check_box_outlined;
+        break;
+      case CustomQuestionType.radio:
+        typeLabel = 'Multiple choice';
+        typeIcon = Icons.radio_button_checked;
+        break;
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: number < _job.customQuestions.length ? 12 : 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.secondary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Text(
+                '$number',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.secondary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        question.question,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (question.required)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Required',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(typeIcon, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 4),
+                    Text(
+                      typeLabel,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                if (question.options.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: question.options.map((option) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          option,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReferencesCard(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.contact_page_outlined, size: 18, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'References',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildDetailInfoRow(theme, 'Required', _job.referencesRequired ? 'Yes' : 'Optional'),
+            _buildDetailInfoRow(theme, 'Count', '${_job.referencesCount} reference${_job.referencesCount == 1 ? '' : 's'}'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContactCard(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.contact_mail_outlined, size: 18, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Contact Information',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildDetailInfoRow(theme, 'Email', _job.contactEmail),
+            if (_job.contactName != null)
+              _buildDetailInfoRow(theme, 'Contact', _job.contactName!),
+            if (_job.contactPhone != null)
+              _buildDetailInfoRow(theme, 'Phone', _job.contactPhone!),
+            if (_job.applicationUrl != null)
+              _buildDetailInfoRow(theme, 'Apply URL', _job.applicationUrl!, isLink: true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubmitterCard(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.person_outline, size: 18, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Submitted By',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildDetailInfoRow(theme, 'Name', _job.submitterName),
+            _buildDetailInfoRow(theme, 'Email', _job.submitterEmail),
+            if (_job.submitterOrganization != null)
+              _buildDetailInfoRow(theme, 'Organization', _job.submitterOrganization!),
+            if (_job.submitterPhone != null)
+              _buildDetailInfoRow(theme, 'Phone', _job.submitterPhone!),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetadataCard(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.info_outline, size: 18, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Job Metadata',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildDetailInfoRow(theme, 'Posted', DateFormat.yMMMd().format(_job.createdAt)),
+            if (_job.expiresAt != null)
+              _buildDetailInfoRow(
+                theme,
+                'Expires',
+                DateFormat.yMMMd().format(_job.expiresAt!),
+                highlight: _job.expiresAt!.isBefore(DateTime.now()),
+              ),
+            if (_job.approvedAt != null)
+              _buildDetailInfoRow(theme, 'Approved', DateFormat.yMMMd().format(_job.approvedAt!)),
+            _buildDetailInfoRow(theme, 'Views', '${_job.viewCount}'),
+            _buildDetailInfoRow(theme, 'Applications', '$_applicationCount'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailInfoRow(ThemeData theme, String label, String value, {bool isLink = false, bool highlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: isLink
+                ? InkWell(
+                    onTap: () => _launchUrl(value),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            value,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.open_in_new,
+                          size: 14,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ],
+                    ),
+                  )
+                : Text(
+                    value,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: highlight ? Colors.red : null,
+                      fontWeight: highlight ? FontWeight.bold : null,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    String urlToLaunch = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      urlToLaunch = 'https://$url';
+    }
+
+    final uri = Uri.parse(urlToLaunch);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
+
+  void _editJob() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => JobBuilderScreen(jobId: _job.id),
+      ),
+    ).then((_) {
+      _refreshJob();
+      _loadApplicationCount();
+    });
+  }
+
+  void _viewApplicants() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => JobApplicantsScreen(job: _job),
+      ),
+    ).then((_) {
+      _loadApplicationCount();
+    });
+  }
+
+  // ============================================================================
+  // NOTIFICATIONS TAB
+  // ============================================================================
+
+  Widget _buildNotificationsTab(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+
+    if (_loadingLogs) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_notificationLogs.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(
+                  Icons.notifications_off_outlined,
+                  size: 40,
+                  color: colorScheme.outline,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'No notifications sent yet',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Notifications will appear here when\ntriggered for this job listing',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadNotificationLogs,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _notificationLogs.length,
+        itemBuilder: (context, index) {
+          final log = _notificationLogs[index];
+          return _buildNotificationLogCard(theme, log);
+        },
+      ),
+    );
+  }
+
+  Widget _buildNotificationLogCard(ThemeData theme, JobNotificationLog log) {
+    final colorScheme = theme.colorScheme;
+    final statusColor = log.isSuccess
+        ? Colors.green
+        : log.isFailed
+            ? Colors.red
+            : Colors.orange;
+
+    final channelIcon = log.channel == 'email'
+        ? Icons.email_outlined
+        : Icons.sms_outlined;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with status
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.05),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    channelIcon,
+                    color: statusColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              log.triggerTypeLabel,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: statusColor.withOpacity(0.3)),
+                            ),
+                            child: Text(
+                              log.statusLabel,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        log.createdAt != null
+                            ? _formatNotificationTime(log.createdAt!)
+                            : 'Unknown time',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Recipient
+                Row(
+                  children: [
+                    Icon(
+                      Icons.person_outline,
+                      size: 16,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        log.recipientName ?? log.recipientEmail,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (log.recipientName != null) ...[
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 24),
+                    child: Text(
+                      log.recipientEmail,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+                // Subject
+                if (log.subjectRendered != null) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.subject_rounded,
+                        size: 16,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          log.subjectRendered!,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                // Error message
+                if (log.errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 16,
+                          color: Colors.red,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            log.errorMessage!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.red,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatNotificationTime(DateTime dateTime) {
+    final central = tz.getLocation('America/Chicago');
+    final centralTime = tz.TZDateTime.from(dateTime.toUtc(), central);
+    return DateFormat.yMMMd().add_jm().format(centralTime);
   }
 }
 
