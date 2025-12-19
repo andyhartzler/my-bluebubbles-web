@@ -197,6 +197,9 @@ class JobsService {
     bool? resumeRequired,
     bool? coverLetterEnabled,
     bool? coverLetterRequired,
+    bool? referencesEnabled,
+    bool? referencesRequired,
+    int? referencesCount,
     bool? useExternalApply,
   }) async {
     final response = await _writeClient
@@ -232,6 +235,9 @@ class JobsService {
           if (resumeRequired != null) 'resume_required': resumeRequired,
           if (coverLetterEnabled != null) 'cover_letter_enabled': coverLetterEnabled,
           if (coverLetterRequired != null) 'cover_letter_required': coverLetterRequired,
+          if (referencesEnabled != null) 'references_enabled': referencesEnabled,
+          if (referencesRequired != null) 'references_required': referencesRequired,
+          if (referencesCount != null) 'references_count': referencesCount,
           if (useExternalApply != null) 'use_external_apply': useExternalApply,
         })
         .select()
@@ -287,6 +293,9 @@ class JobsService {
     bool? resumeRequired,
     bool? coverLetterEnabled,
     bool? coverLetterRequired,
+    bool? referencesEnabled,
+    bool? referencesRequired,
+    int? referencesCount,
     bool? useExternalApply,
   }) async {
     final updates = <String, dynamic>{};
@@ -383,6 +392,9 @@ class JobsService {
     if (resumeRequired != null) updates['resume_required'] = resumeRequired;
     if (coverLetterEnabled != null) updates['cover_letter_enabled'] = coverLetterEnabled;
     if (coverLetterRequired != null) updates['cover_letter_required'] = coverLetterRequired;
+    if (referencesEnabled != null) updates['references_enabled'] = referencesEnabled;
+    if (referencesRequired != null) updates['references_required'] = referencesRequired;
+    if (referencesCount != null) updates['references_count'] = referencesCount;
     if (useExternalApply != null) updates['use_external_apply'] = useExternalApply;
 
     if (updates.isNotEmpty) {

@@ -98,6 +98,11 @@ class Job with _$Job {
     @JsonKey(name: 'cover_letter_enabled') bool? coverLetterEnabled,
     @JsonKey(name: 'cover_letter_required') bool? coverLetterRequired,
 
+    // References Options
+    @JsonKey(name: 'references_enabled') @Default(false) bool referencesEnabled,
+    @JsonKey(name: 'references_required') @Default(false) bool referencesRequired,
+    @JsonKey(name: 'references_count') @Default(2) int referencesCount,
+
     // External Application Option
     @JsonKey(name: 'use_external_apply') @Default(false) bool useExternalApply,
   }) = _Job;
