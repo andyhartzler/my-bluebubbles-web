@@ -13,6 +13,16 @@ class JobsService {
   final _supabase = Supabase.instance.client;
   final _crmService = CRMSupabaseService();
 
+  /// Wait for CRM service to be initialized (with timeout)
+  Future<void> _ensureInitialized() async {
+    // Wait up to 5 seconds for CRM to initialize
+    for (var i = 0; i < 50; i++) {
+      if (_crmService.isInitialized) return;
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    // If not initialized after 5 seconds, continue with regular client
+  }
+
   /// Get privileged client for bypassing RLS when reading/writing jobs
   SupabaseClient get _privilegedClient =>
       _crmService.isInitialized && _crmService.hasServiceRole
@@ -29,9 +39,16 @@ class JobsService {
     // Use a polling approach with the privileged client to bypass RLS
     final controller = StreamController<List<Job>>.broadcast();
     Timer? timer;
+    bool isFirstFetch = true;
 
     void fetchJobs() async {
       try {
+        // Wait for CRM initialization on first fetch
+        if (isFirstFetch) {
+          await _ensureInitialized();
+          isFirstFetch = false;
+        }
+
         List<Job> jobs;
         if (statusFilter == 'all') {
           final response = await _readClient
@@ -74,9 +91,16 @@ class JobsService {
     // Use a polling approach with the privileged client to bypass RLS
     final controller = StreamController<int>.broadcast();
     Timer? timer;
+    bool isFirstFetch = true;
 
     void fetchCount() async {
       try {
+        // Wait for CRM initialization on first fetch
+        if (isFirstFetch) {
+          await _ensureInitialized();
+          isFirstFetch = false;
+        }
+
         final response = await _readClient
             .from('jobs')
             .select('id')
