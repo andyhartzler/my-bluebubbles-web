@@ -522,6 +522,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   _HomeSection _currentSection = _HomeSection.dashboard;
   final FocusNode _mobileMenuButtonFocusNode = FocusNode(debugLabel: 'mobileMenuButton');
   final PageStorageBucket _bucket = PageStorageBucket();
+  DateTime? _lastTouchTime;
 
   @override
   void initState() {
@@ -578,7 +579,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         // Visibility change - fires when tab/app visibility changes
         html.document.onVisibilityChange.listen((event) {
           if (html.document.visibilityState == 'visible' && mounted) {
-            _refreshPWAState();
+            _refreshPWAState(aggressive: true);
           }
         });
 
@@ -586,21 +587,53 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         // This is more reliable for force-close/reopen scenarios
         html.window.on['pageshow'].listen((event) {
           if (mounted) {
-            _refreshPWAState();
+            _refreshPWAState(aggressive: true);
           }
         });
 
         // Window focus - fires when window gains focus
         html.window.onFocus.listen((event) {
           if (mounted) {
-            _refreshPWAState();
+            _refreshPWAState(aggressive: false);
           }
         });
 
         // Touchstart on document - helps detect if touch events are working
         // and forces a refresh if the app was in a frozen state
         html.document.on['touchstart'].listen((event) {
-          // Touch registered - this helps keep the app responsive
+          // Track that touch events are working
+          _lastTouchTime = DateTime.now();
+        });
+
+        // Touchend on document - check if UI is responding after touch completes
+        html.document.on['touchend'].listen((event) {
+          // If we get touchend without seeing UI updates, the app might be frozen
+          _lastTouchTime = DateTime.now();
+        });
+
+        // Focusin event - fires when any element receives focus
+        // This helps detect keyboard interactions that might freeze navigation
+        html.document.on['focusin'].listen((event) {
+          if (mounted) {
+            // Light refresh when focus changes (don't be too aggressive)
+            _refreshPWAState(aggressive: false);
+          }
+        });
+
+        // Periodic health check - detect frozen state even if no events fire
+        Timer.periodic(const Duration(seconds: 3), (timer) {
+          if (!mounted) {
+            timer.cancel();
+            return;
+          }
+          // If we haven't had a touch in a while and visibility is visible,
+          // do a light refresh to ensure responsiveness
+          if (html.document.visibilityState == 'visible') {
+            final now = DateTime.now();
+            if (_lastTouchTime != null && now.difference(_lastTouchTime!).inSeconds > 10) {
+              _refreshPWAState(aggressive: false);
+            }
+          }
         });
       }
 
@@ -724,12 +757,15 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
 
   /// Refresh PWA state to fix iOS Safari touch event issues
   /// This is called from multiple event listeners as fallbacks
+  /// [aggressive] - when true, performs more thorough refresh (e.g., after force close)
   DateTime? _lastPWARefresh;
-  void _refreshPWAState() {
+  void _refreshPWAState({bool aggressive = false}) {
     // Debounce to avoid multiple rapid refreshes
+    // Use shorter debounce for non-aggressive refreshes
     final now = DateTime.now();
+    final debounceMs = aggressive ? 300 : 1000;
     if (_lastPWARefresh != null &&
-        now.difference(_lastPWARefresh!).inMilliseconds < 500) {
+        now.difference(_lastPWARefresh!).inMilliseconds < debounceMs) {
       return;
     }
     _lastPWARefresh = now;
@@ -761,6 +797,35 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         FocusManager.instance.primaryFocus?.unfocus();
       }
     });
+
+    // For aggressive refresh (after force close), add even more delayed rebuilds
+    // iOS Safari PWA can take up to 500ms+ to fully restore touch handling
+    if (aggressive) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() {});
+          // Dispatch another resize to force layout recalculation
+          if (kIsWeb) {
+            html.window.dispatchEvent(html.Event('resize'));
+          }
+        }
+      });
+
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() {});
+          // Clear any lingering focus
+          FocusManager.instance.primaryFocus?.unfocus();
+        }
+      });
+
+      // Final rebuild at 1 second for the most stubborn cases
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    }
   }
 
   /// Handle app lifecycle changes - force rebuild when resuming from background
@@ -769,7 +834,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      _refreshPWAState();
+      // Use aggressive mode when resuming as this is likely after force close
+      _refreshPWAState(aggressive: true);
     }
   }
 
