@@ -301,21 +301,32 @@ class JobMemberInteraction with _$JobMemberInteraction {
   String get displayName {
     if (memberName != null && memberName!.isNotEmpty) return memberName!;
     if (memberEmail != null && memberEmail!.isNotEmpty) {
-      return memberEmail!.split('@').first;
+      final emailPart = memberEmail!.split('@').first;
+      if (emailPart.isNotEmpty) return emailPart;
     }
-    return 'Member #${memberId.substring(0, 8)}';
+    // memberId is a UUID so should have at least 8 chars, but be safe
+    if (memberId.length >= 8) {
+      return 'Member #${memberId.substring(0, 8)}';
+    }
+    return 'Member #$memberId';
   }
 
   /// Get initials for avatar
   String get initials {
     if (memberName != null && memberName!.isNotEmpty) {
-      final parts = memberName!.split(' ');
-      if (parts.length >= 2) {
+      final parts = memberName!.split(' ').where((p) => p.isNotEmpty).toList();
+      if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
         return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
       }
-      return memberName!.substring(0, memberName!.length >= 2 ? 2 : 1).toUpperCase();
+      if (parts.isNotEmpty && parts[0].isNotEmpty) {
+        return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+      }
     }
-    return memberId.substring(0, 2).toUpperCase();
+    // Fallback to memberId (which is a UUID, so always has at least 2 chars)
+    if (memberId.length >= 2) {
+      return memberId.substring(0, 2).toUpperCase();
+    }
+    return '??';
   }
 
   /// Check if member has profile photo

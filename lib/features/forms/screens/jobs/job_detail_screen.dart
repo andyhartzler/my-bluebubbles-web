@@ -1767,11 +1767,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   String _getInitials(String name) {
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
+    if (name.isEmpty) return '??';
+    final parts = name.split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
-    return name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
+    if (parts.isNotEmpty && parts[0].isNotEmpty) {
+      return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+    }
+    return '??';
   }
 
   Widget _buildNotificationLogsCard(ThemeData theme) {
