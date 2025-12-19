@@ -565,6 +565,15 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             e.preventDefault();
           }
         });
+
+        /* ----- PWA VISIBILITY CHANGE LISTENER (for iOS Safari) ----- */
+        // Flutter's lifecycle may not fire properly on iOS PWA, so we listen
+        // to visibility changes directly to force a rebuild when app resumes
+        html.document.onVisibilityChange.listen((event) {
+          if (html.document.visibilityState == 'visible' && mounted) {
+            setState(() {});
+          }
+        });
       }
 
       if (kIsDesktop) {
@@ -682,6 +691,19 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         AdaptiveTheme.maybeOf(context)?.setDark();
       }
       AdaptiveTheme.maybeOf(context)?.setSystem();
+    }
+  }
+
+  /// Handle app lifecycle changes - force rebuild when resuming from background
+  /// This fixes iOS PWA issues where touch events don't work after reopening
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Force a rebuild to refresh touch event handlers
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
 

@@ -52,6 +52,11 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
   bool _coverLetterEnabled = true;
   bool _coverLetterRequired = false;
 
+  // References options
+  bool _referencesEnabled = false;
+  bool _referencesRequired = false;
+  int _referencesCount = 2;
+
   // External Apply option
   bool _useExternalApply = false;
 
@@ -137,6 +142,9 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
         _resumeRequired = job.resumeRequired ?? false;
         _coverLetterEnabled = job.coverLetterEnabled ?? true;
         _coverLetterRequired = job.coverLetterRequired ?? false;
+        _referencesEnabled = job.referencesEnabled;
+        _referencesRequired = job.referencesRequired;
+        _referencesCount = job.referencesCount;
         _useExternalApply = job.useExternalApply;
         _isLoading = false;
       });
@@ -194,6 +202,9 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
           resumeRequired: _useExternalApply ? false : _resumeRequired,
           coverLetterEnabled: _useExternalApply ? false : _coverLetterEnabled,
           coverLetterRequired: _useExternalApply ? false : _coverLetterRequired,
+          referencesEnabled: _useExternalApply ? false : _referencesEnabled,
+          referencesRequired: _useExternalApply ? false : _referencesRequired,
+          referencesCount: _referencesCount,
           useExternalApply: _useExternalApply,
         );
       } else {
@@ -241,6 +252,9 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
           resumeRequired: _useExternalApply ? false : _resumeRequired,
           coverLetterEnabled: _useExternalApply ? false : _coverLetterEnabled,
           coverLetterRequired: _useExternalApply ? false : _coverLetterRequired,
+          referencesEnabled: _useExternalApply ? false : _referencesEnabled,
+          referencesRequired: _useExternalApply ? false : _referencesRequired,
+          referencesCount: _referencesCount,
           useExternalApply: _useExternalApply,
         );
       }
@@ -711,6 +725,70 @@ class _JobBuilderScreenState extends State<JobBuilderScreen> {
                               onChanged: (v) => setState(() => _coverLetterRequired = v),
                               contentPadding: EdgeInsets.zero,
                             ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // References options
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.people_outline,
+                                   size: 20,
+                                   color: theme.colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Text(
+                                'References',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SwitchListTile(
+                            title: const Text('Allow reference fields'),
+                            subtitle: const Text('Allow applicants to provide references'),
+                            value: _referencesEnabled,
+                            onChanged: (v) => setState(() {
+                              _referencesEnabled = v;
+                              if (!v) _referencesRequired = false;
+                            }),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          if (_referencesEnabled) ...[
+                            SwitchListTile(
+                              title: const Text('Require references'),
+                              subtitle: const Text('Applicants must provide references'),
+                              value: _referencesRequired,
+                              onChanged: (v) => setState(() => _referencesRequired = v),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            if (_referencesRequired)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: DropdownButtonFormField<int>(
+                                  value: _referencesCount,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Number of required references',
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                  items: [1, 2, 3, 4, 5].map((count) => DropdownMenuItem(
+                                    value: count,
+                                    child: Text('$count reference${count > 1 ? 's' : ''}'),
+                                  )).toList(),
+                                  onChanged: (v) => setState(() => _referencesCount = v ?? 2),
+                                ),
+                              ),
+                          ],
                         ],
                       ),
                     ),
