@@ -66,6 +66,8 @@ class FormsService {
     List<String>? notificationEmails,
     // Template reference
     String? templateId,
+    // Public form - display preview on Forms homepage
+    bool publicForm = false,
   }) async {
     final response = await _supabase
         .from('form_schemas')
@@ -85,6 +87,7 @@ class FormsService {
           if (confirmationEmailTemplate != null) 'confirmation_email_template': confirmationEmailTemplate,
           if (notificationEmails != null) 'notification_emails': notificationEmails,
           if (templateId != null) 'template_id': templateId,
+          'public_form': publicForm,
         })
         .select()
         .single();
@@ -117,6 +120,8 @@ class FormsService {
     bool clearConfirmationEmailTemplate = false,
     List<String>? notificationEmails,
     bool clearNotificationEmails = false,
+    // Public form - display preview on Forms homepage
+    bool? publicForm,
   }) async {
     final updates = <String, dynamic>{};
 
@@ -166,6 +171,9 @@ class FormsService {
     } else if (clearNotificationEmails) {
       updates['notification_emails'] = null;
     }
+
+    // Public form
+    if (publicForm != null) updates['public_form'] = publicForm;
 
     await _supabase
         .from('form_schemas')

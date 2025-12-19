@@ -60,6 +60,9 @@ class FormSchema {
   // Supporting documents (list of document metadata objects)
   final List<Map<String, dynamic>>? supportingDocuments;
 
+  // Public form - if true, show preview on Forms homepage
+  final bool publicForm;
+
   const FormSchema({
     required this.id,
     required this.createdAt,
@@ -88,6 +91,7 @@ class FormSchema {
     this.confirmationEmailTemplate,
     this.notificationEmails,
     this.supportingDocuments,
+    this.publicForm = false,
   });
 
   factory FormSchema.fromJson(Map<String, dynamic> json) {
@@ -161,6 +165,7 @@ class FormSchema {
       confirmationEmailTemplate: json['confirmation_email_template'] as String?,
       notificationEmails: notificationEmails,
       supportingDocuments: supportingDocuments,
+      publicForm: (json['public_form'] as bool?) ?? false,
     );
   }
 
@@ -192,6 +197,7 @@ class FormSchema {
     'confirmation_email_template': confirmationEmailTemplate,
     'notification_emails': notificationEmails,
     'supporting_documents': supportingDocuments,
+    'public_form': publicForm,
   };
 
   FormSchema copyWith({
@@ -222,6 +228,7 @@ class FormSchema {
     String? confirmationEmailTemplate,
     List<String>? notificationEmails,
     List<Map<String, dynamic>>? supportingDocuments,
+    bool? publicForm,
   }) {
     return FormSchema(
       id: id ?? this.id,
@@ -251,6 +258,7 @@ class FormSchema {
       confirmationEmailTemplate: confirmationEmailTemplate ?? this.confirmationEmailTemplate,
       notificationEmails: notificationEmails ?? this.notificationEmails,
       supportingDocuments: supportingDocuments ?? this.supportingDocuments,
+      publicForm: publicForm ?? this.publicForm,
     );
   }
 

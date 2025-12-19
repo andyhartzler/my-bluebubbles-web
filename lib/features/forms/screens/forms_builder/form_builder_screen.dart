@@ -40,6 +40,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   DateTime? _closesAt;
   bool _requireLogin = false;
   bool _oneSubmissionPerUser = false;
+  bool _publicForm = false;
   bool _showSettings = false;
 
   @override
@@ -84,6 +85,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         _closesAt = form.closesAt;
         _requireLogin = form.requireLogin;
         _oneSubmissionPerUser = form.oneSubmissionPerUser;
+        _publicForm = form.publicForm;
 
         // Load SMS confirmation message from schema
         _confirmationSmsController.text =
@@ -283,6 +285,15 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                             onChanged: _formType == 'vote'
                                 ? null // Locked for vote forms
                                 : (value) => setState(() => _oneSubmissionPerUser = value),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          SwitchListTile(
+                            title: const Text('Display Preview on Forms Homepage'),
+                            subtitle: const Text(
+                              'Show this form in the public forms list',
+                            ),
+                            value: _publicForm,
+                            onChanged: (value) => setState(() => _publicForm = value),
                             contentPadding: EdgeInsets.zero,
                           ),
                           const SizedBox(height: 8),
@@ -961,6 +972,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           slug: slug,
           confirmationEmailTemplate: confirmationEmail,
           notificationEmails: notificationEmails,
+          publicForm: _publicForm,
         );
       } else {
         // Update existing
@@ -980,6 +992,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           slug: slug,
           confirmationEmailTemplate: confirmationEmail,
           notificationEmails: notificationEmails,
+          publicForm: _publicForm,
         );
       }
 
