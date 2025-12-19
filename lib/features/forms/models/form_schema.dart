@@ -63,6 +63,9 @@ class FormSchema {
   // Public form - if true, show preview on Forms homepage
   final bool publicForm;
 
+  // Preview text - used for preview tiles and social share text
+  final String? previewText;
+
   const FormSchema({
     required this.id,
     required this.createdAt,
@@ -92,6 +95,7 @@ class FormSchema {
     this.notificationEmails,
     this.supportingDocuments,
     this.publicForm = false,
+    this.previewText,
   });
 
   factory FormSchema.fromJson(Map<String, dynamic> json) {
@@ -166,6 +170,7 @@ class FormSchema {
       notificationEmails: notificationEmails,
       supportingDocuments: supportingDocuments,
       publicForm: (json['public_form'] as bool?) ?? false,
+      previewText: json['preview_text'] as String?,
     );
   }
 
@@ -198,6 +203,7 @@ class FormSchema {
     'notification_emails': notificationEmails,
     'supporting_documents': supportingDocuments,
     'public_form': publicForm,
+    'preview_text': previewText,
   };
 
   FormSchema copyWith({
@@ -229,6 +235,7 @@ class FormSchema {
     List<String>? notificationEmails,
     List<Map<String, dynamic>>? supportingDocuments,
     bool? publicForm,
+    String? previewText,
   }) {
     return FormSchema(
       id: id ?? this.id,
@@ -259,6 +266,7 @@ class FormSchema {
       notificationEmails: notificationEmails ?? this.notificationEmails,
       supportingDocuments: supportingDocuments ?? this.supportingDocuments,
       publicForm: publicForm ?? this.publicForm,
+      previewText: previewText ?? this.previewText,
     );
   }
 

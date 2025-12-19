@@ -68,6 +68,8 @@ class FormsService {
     String? templateId,
     // Public form - display preview on Forms homepage
     bool publicForm = false,
+    // Preview text - used for preview tiles and social share text
+    String? previewText,
   }) async {
     final response = await _supabase
         .from('form_schemas')
@@ -88,6 +90,7 @@ class FormsService {
           if (notificationEmails != null) 'notification_emails': notificationEmails,
           if (templateId != null) 'template_id': templateId,
           'public_form': publicForm,
+          if (previewText != null) 'preview_text': previewText,
         })
         .select()
         .single();
@@ -122,6 +125,9 @@ class FormsService {
     bool clearNotificationEmails = false,
     // Public form - display preview on Forms homepage
     bool? publicForm,
+    // Preview text - used for preview tiles and social share text
+    String? previewText,
+    bool clearPreviewText = false,
   }) async {
     final updates = <String, dynamic>{};
 
@@ -174,6 +180,13 @@ class FormsService {
 
     // Public form
     if (publicForm != null) updates['public_form'] = publicForm;
+
+    // Preview text
+    if (previewText != null) {
+      updates['preview_text'] = previewText;
+    } else if (clearPreviewText) {
+      updates['preview_text'] = null;
+    }
 
     await _supabase
         .from('form_schemas')

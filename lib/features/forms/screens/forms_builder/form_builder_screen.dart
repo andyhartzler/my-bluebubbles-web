@@ -29,6 +29,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   final _confirmationEmailController = TextEditingController();
   final _notificationEmailsController = TextEditingController();
   final _confirmationSmsController = TextEditingController();
+  final _previewTextController = TextEditingController();
 
   List<FormFieldConfig> _fields = [];
   String _formType = 'survey';
@@ -60,6 +61,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
     _confirmationEmailController.dispose();
     _notificationEmailsController.dispose();
     _confirmationSmsController.dispose();
+    _previewTextController.dispose();
     super.dispose();
   }
 
@@ -86,6 +88,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         _requireLogin = form.requireLogin;
         _oneSubmissionPerUser = form.oneSubmissionPerUser;
         _publicForm = form.publicForm;
+        _previewTextController.text = form.previewText ?? '';
 
         // Load SMS confirmation message from schema
         _confirmationSmsController.text =
@@ -296,7 +299,19 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                             onChanged: (value) => setState(() => _publicForm = value),
                             contentPadding: EdgeInsets.zero,
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _previewTextController,
+                            decoration: const InputDecoration(
+                              labelText: 'Preview Text (optional)',
+                              hintText: 'Short description for preview tiles and social shares',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.short_text),
+                              helperText: 'Used in preview tiles on the website and as social share text',
+                            ),
+                            maxLines: 3,
+                          ),
+                          const SizedBox(height: 16),
                           TextField(
                             controller: _maxSubmissionsController,
                             decoration: const InputDecoration(
@@ -973,6 +988,9 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           confirmationEmailTemplate: confirmationEmail,
           notificationEmails: notificationEmails,
           publicForm: _publicForm,
+          previewText: _previewTextController.text.trim().isEmpty
+              ? null
+              : _previewTextController.text.trim(),
         );
       } else {
         // Update existing
@@ -993,6 +1011,9 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           confirmationEmailTemplate: confirmationEmail,
           notificationEmails: notificationEmails,
           publicForm: _publicForm,
+          previewText: _previewTextController.text.trim().isEmpty
+              ? null
+              : _previewTextController.text.trim(),
         );
       }
 
