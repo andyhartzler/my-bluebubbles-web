@@ -87,6 +87,10 @@ class FormCard extends StatelessWidget {
                           children: [
                             _buildStatusChip(context, form.status),
                             const SizedBox(width: 8),
+                            if (form.publicForm) ...[
+                              _buildPublicChip(context),
+                              const SizedBox(width: 8),
+                            ],
                             Text(
                               _capitalize(form.formType),
                               style: theme.textTheme.bodySmall?.copyWith(
@@ -302,6 +306,34 @@ class FormCard extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             _capitalize(status),
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPublicChip(BuildContext context) {
+    const color = Color(0xFF3B82F6); // Blue
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.public, size: 12, color: color),
+          SizedBox(width: 4),
+          Text(
+            'Public',
             style: TextStyle(
               color: color,
               fontSize: 11,
