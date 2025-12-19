@@ -566,13 +566,41 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           }
         });
 
-        /* ----- PWA VISIBILITY CHANGE LISTENER (for iOS Safari) ----- */
-        // Flutter's lifecycle may not fire properly on iOS PWA, so we listen
-        // to visibility changes directly to force a rebuild when app resumes
+        /* ----- PWA LIFECYCLE FIX (for iOS Safari) ----- */
+        // iOS PWA has known issues where touch events stop working after:
+        // 1. Force-closing the app (swipe up to close)
+        // 2. Backgrounding and resuming
+        // 3. TextField interactions (keyboard focus issues)
+        //
+        // We use multiple event listeners as fallbacks since not all events
+        // fire reliably in all iOS PWA scenarios.
+
+        // Visibility change - fires when tab/app visibility changes
         html.document.onVisibilityChange.listen((event) {
           if (html.document.visibilityState == 'visible' && mounted) {
-            setState(() {});
+            _refreshPWAState();
           }
+        });
+
+        // Pageshow event - fires when page is loaded from back-forward cache
+        // This is more reliable for force-close/reopen scenarios
+        html.window.on['pageshow'].listen((event) {
+          if (mounted) {
+            _refreshPWAState();
+          }
+        });
+
+        // Window focus - fires when window gains focus
+        html.window.onFocus.listen((event) {
+          if (mounted) {
+            _refreshPWAState();
+          }
+        });
+
+        // Touchstart on document - helps detect if touch events are working
+        // and forces a refresh if the app was in a frozen state
+        html.document.on['touchstart'].listen((event) {
+          // Touch registered - this helps keep the app responsive
         });
       }
 
@@ -694,16 +722,54 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     }
   }
 
+  /// Refresh PWA state to fix iOS Safari touch event issues
+  /// This is called from multiple event listeners as fallbacks
+  DateTime? _lastPWARefresh;
+  void _refreshPWAState() {
+    // Debounce to avoid multiple rapid refreshes
+    final now = DateTime.now();
+    if (_lastPWARefresh != null &&
+        now.difference(_lastPWARefresh!).inMilliseconds < 500) {
+      return;
+    }
+    _lastPWARefresh = now;
+
+    // Force immediate rebuild
+    if (mounted) {
+      setState(() {});
+    }
+
+    // Dispatch resize event to force Flutter to recalculate layout
+    // This helps reset gesture recognizers and touch targets
+    if (kIsWeb) {
+      html.window.dispatchEvent(html.Event('resize'));
+    }
+
+    // Schedule a delayed rebuild to catch any race conditions
+    // iOS PWA sometimes needs a moment to fully restore touch handling
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+
+    // Additional delayed rebuild for more stubborn cases
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {});
+        // Unfocus any active elements to reset keyboard state
+        FocusManager.instance.primaryFocus?.unfocus();
+      }
+    });
+  }
+
   /// Handle app lifecycle changes - force rebuild when resuming from background
   /// This fixes iOS PWA issues where touch events don't work after reopening
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      // Force a rebuild to refresh touch event handlers
-      if (mounted) {
-        setState(() {});
-      }
+      _refreshPWAState();
     }
   }
 

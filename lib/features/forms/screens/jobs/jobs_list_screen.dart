@@ -5,6 +5,7 @@ import '../../services/jobs_service.dart';
 import '../../widgets/job_card.dart';
 import 'job_builder_screen.dart';
 import 'job_detail_screen.dart';
+import 'job_analytics_screen.dart';
 import 'job_applicants_screen.dart';
 import 'job_notification_templates_screen.dart';
 
@@ -502,12 +503,23 @@ class _JobsListScreenState extends State<JobsListScreen>
   }
 
   void _viewJob(BuildContext context, Job job) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => JobDetailScreen(jobId: job.id),
-      ),
-    );
+    // For approved (published) jobs, go to analytics screen with 4 tabs
+    // For pending/rejected jobs, go to detail screen for approval workflow
+    if (job.status == 'approved') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => JobAnalyticsScreen(job: job),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => JobDetailScreen(jobId: job.id),
+        ),
+      );
+    }
   }
 
   void _viewApplicants(Job job) {
