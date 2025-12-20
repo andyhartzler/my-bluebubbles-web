@@ -319,23 +319,27 @@ class BarChartWidget extends StatelessWidget {
                   return const SizedBox.shrink();
                 }
                 final label = displayData[index].name;
-                // Truncate based on number of items
-                final maxLen = displayData.length > 6 ? 6 : 10;
-                final displayLabel = label.length > maxLen
-                    ? '${label.substring(0, maxLen - 1)}…'
-                    : label;
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: RotatedBox(
-                    quarterTurns: -1,
-                    child: Text(
-                      displayLabel,
-                      style: const TextStyle(
-                        fontSize: 9,
-                        color: _unityBlue,
-                        fontWeight: FontWeight.w500,
+                // Use full name with tooltip for overflow
+                return Tooltip(
+                  message: label,
+                  waitDuration: const Duration(milliseconds: 300),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: RotatedBox(
+                      quarterTurns: -1,
+                      child: SizedBox(
+                        width: 50,
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: _unityBlue,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 );
@@ -392,63 +396,68 @@ class BarChartWidget extends StatelessWidget {
         final entry = displayData[index];
         final percentage = maxValue > 0 ? entry.count / maxValue : 0.0;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
-          child: Row(
-            children: [
-              // Label
-              SizedBox(
-                width: 70,
-                child: Text(
-                  entry.name.length > 10 ? '${entry.name.substring(0, 9)}…' : entry.name,
-                  style: const TextStyle(fontSize: 10, color: _unityBlue),
-                  overflow: TextOverflow.ellipsis,
+        return Tooltip(
+          message: '${entry.name}: ${entry.count}',
+          waitDuration: const Duration(milliseconds: 300),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              children: [
+                // Label - show full name with overflow handling
+                SizedBox(
+                  width: 70,
+                  child: Text(
+                    entry.name,
+                    style: const TextStyle(fontSize: 10, color: _unityBlue),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              // Bar
-              Expanded(
-                child: Stack(
-                  children: [
-                    Container(
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    FractionallySizedBox(
-                      widthFactor: percentage,
-                      child: Container(
+                const SizedBox(width: 6),
+                // Bar
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Container(
                         height: 16,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: config.gradientColors.isNotEmpty
-                                ? config.gradientColors
-                                : [_momentumBlue, _justicePurple],
-                          ),
+                          color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              // Value
-              SizedBox(
-                width: 32,
-                child: Text(
-                  _formatNumber(entry.count),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: _unityBlue,
+                      FractionallySizedBox(
+                        widthFactor: percentage,
+                        child: Container(
+                          height: 16,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: config.gradientColors.isNotEmpty
+                                  ? config.gradientColors
+                                  : [_momentumBlue, _justicePurple],
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  textAlign: TextAlign.right,
                 ),
-              ),
-            ],
+                const SizedBox(width: 6),
+                // Value
+                SizedBox(
+                  width: 32,
+                  child: Text(
+                    _formatNumber(entry.count),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: _unityBlue,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -785,23 +794,27 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
                   return const SizedBox.shrink();
                 }
                 final label = displayData[index].name;
-                // Show more of the label for readability
-                final maxLen = displayData.length > 8 ? 8 : 12;
-                final displayLabel = label.length > maxLen
-                    ? '${label.substring(0, maxLen - 1)}…'
-                    : label;
-                return Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: RotatedBox(
-                    quarterTurns: -1,
-                    child: Text(
-                      displayLabel,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: _unityBlue,
-                        fontWeight: FontWeight.w600,
+                // Use full name - Tooltip provides full name on hover/long-press
+                return Tooltip(
+                  message: label,
+                  waitDuration: const Duration(milliseconds: 300),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: RotatedBox(
+                      quarterTurns: -1,
+                      child: SizedBox(
+                        width: 60, // Max height when rotated
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: _unityBlue,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 );
@@ -864,63 +877,68 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
         final entry = displayData[index];
         final percentage = maxValue > 0 ? entry.count / maxValue : 0.0;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
-          child: Row(
-            children: [
-              // Label
-              SizedBox(
-                width: 65,
-                child: Text(
-                  entry.name.length > 8 ? '${entry.name.substring(0, 7)}…' : entry.name,
-                  style: const TextStyle(fontSize: 10, color: _unityBlue),
-                  overflow: TextOverflow.ellipsis,
+        return Tooltip(
+          message: '${entry.name}: ${entry.count}',
+          waitDuration: const Duration(milliseconds: 300),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              children: [
+                // Label - show full name with ellipsis if needed
+                SizedBox(
+                  width: 65,
+                  child: Text(
+                    entry.name,
+                    style: const TextStyle(fontSize: 10, color: _unityBlue),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              // Bar
-              Expanded(
-                child: Stack(
-                  children: [
-                    Container(
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    FractionallySizedBox(
-                      widthFactor: percentage,
-                      child: Container(
+                const SizedBox(width: 4),
+                // Bar
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Container(
                         height: 14,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: widget.config.gradientColors.isNotEmpty
-                                ? widget.config.gradientColors
-                                : [_momentumBlue, _justicePurple],
-                          ),
+                          color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 4),
-              // Value
-              SizedBox(
-                width: 28,
-                child: Text(
-                  _formatNumber(entry.count),
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: _unityBlue,
+                      FractionallySizedBox(
+                        widthFactor: percentage,
+                        child: Container(
+                          height: 14,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: widget.config.gradientColors.isNotEmpty
+                                  ? widget.config.gradientColors
+                                  : [_momentumBlue, _justicePurple],
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  textAlign: TextAlign.right,
                 ),
-              ),
-            ],
+                const SizedBox(width: 4),
+                // Value
+                SizedBox(
+                  width: 28,
+                  child: Text(
+                    _formatNumber(entry.count),
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: _unityBlue,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -986,14 +1004,12 @@ class PieChartWidget extends StatefulWidget {
   final DashboardWidgetConfig config;
   final List<NameCount> data;
   final bool isDonut;
-  final int maxItems;
 
   const PieChartWidget({
     super.key,
     required this.config,
     required this.data,
     this.isDonut = false,
-    this.maxItems = 6,
   });
 
   @override
@@ -1012,19 +1028,44 @@ class _PieChartWidgetState extends State<PieChartWidget> {
     Color(0xFF00BCD4),
     Color(0xFFFF9800),
     Color(0xFF9C27B0),
+    Color(0xFF795548),
+    Color(0xFF607D8B),
+    Color(0xFFE91E63),
+    Color(0xFF3F51B5),
   ];
 
   @override
   Widget build(BuildContext context) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return _buildResponsiveChart(constraints);
+        },
+      ),
+    );
+  }
+
+  Widget _buildResponsiveChart(BoxConstraints constraints) {
+    final width = constraints.maxWidth;
+    final height = constraints.maxHeight;
+    final isCompact = width < 250 || height < 200;
+    final isLarge = width >= 400 && height >= 300;
+    final isMedium = !isCompact && !isLarge;
+
+    // Dynamic maxItems based on size
+    final maxItems = isCompact ? 5 : (isLarge ? 12 : 8);
+
     final sortedData = List<NameCount>.from(widget.data)
       ..sort((a, b) => b.count.compareTo(a.count));
-    final displayData = sortedData.take(widget.maxItems).toList();
+    final displayData = sortedData.take(maxItems).toList();
 
     // Add "Other" category if there are more items
-    if (sortedData.length > widget.maxItems) {
-      final otherCount = sortedData.skip(widget.maxItems).fold<int>(0, (sum, e) => sum + e.count);
+    if (sortedData.length > maxItems) {
+      final otherCount = sortedData.skip(maxItems).fold<int>(0, (sum, e) => sum + e.count);
       if (otherCount > 0) {
-        displayData.add(NameCount(name: 'Other', count: otherCount));
+        displayData.add(NameCount(name: 'Other (${sortedData.length - maxItems} more)', count: otherCount));
       }
     }
 
@@ -1034,11 +1075,17 @@ class _PieChartWidgetState extends State<PieChartWidget> {
 
     final total = displayData.fold<int>(0, (sum, e) => sum + e.count);
 
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(20),
+    // Calculate dynamic pie radius based on available space
+    final availableChartHeight = height - 80; // Account for header
+    final availableChartWidth = isCompact ? width - 40 : (width - 40) * 0.55;
+    final maxRadius = math.min(availableChartHeight / 2, availableChartWidth / 2) - 10;
+    final baseRadius = maxRadius.clamp(30.0, 120.0);
+    final touchedRadius = baseRadius + 10;
+
+    // For compact view, show chart only with tooltip on hover/touch
+    if (isCompact) {
+      return Container(
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -1046,130 +1093,203 @@ class _PieChartWidgetState extends State<PieChartWidget> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(),
-            const SizedBox(height: 16),
+            _buildHeader(compact: true),
+            const SizedBox(height: 8),
             Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: PieChart(
-                      PieChartData(
-                        pieTouchData: PieTouchData(
-                          touchCallback: (event, response) {
-                            setState(() {
-                              if (!event.isInterestedForInteractions ||
-                                  response == null ||
-                                  response.touchedSection == null) {
-                                _touchedIndex = -1;
-                                return;
-                              }
-                              _touchedIndex = response.touchedSection!.touchedSectionIndex;
-                            });
-                          },
-                        ),
-                        borderData: FlBorderData(show: false),
-                        sectionsSpace: 2,
-                        centerSpaceRadius: widget.isDonut ? 40 : 0,
-                        sections: List.generate(displayData.length, (index) {
-                          final isTouched = index == _touchedIndex;
-                          final entry = displayData[index];
-                          final percentage = total > 0 ? (entry.count / total * 100) : 0.0;
-                          return PieChartSectionData(
-                            color: _pieColors[index % _pieColors.length],
-                            value: entry.count.toDouble(),
-                            title: isTouched ? '${percentage.toStringAsFixed(1)}%' : '',
-                            radius: isTouched ? 60 : 50,
-                            titleStyle: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(displayData.length, (index) {
-                          final entry = displayData[index];
-                          final percentage = total > 0 ? (entry.count / total * 100) : 0.0;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 3),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: _pieColors[index % _pieColors.length],
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    entry.name.length > 12
-                                        ? '${entry.name.substring(0, 11)}…'
-                                        : entry.name,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: _touchedIndex == index ? _unityBlue : Colors.grey[700],
-                                      fontWeight: _touchedIndex == index ? FontWeight.bold : FontWeight.normal,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Text(
-                                  '${percentage.toStringAsFixed(0)}%',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                  ),
-                ],
+              child: Center(
+                child: _buildPieWithTooltip(displayData, total, baseRadius, touchedRadius),
               ),
             ),
           ],
         ),
+      );
+    }
+
+    // For medium/large views, show chart with legend
+    return Container(
+      padding: EdgeInsets.all(isLarge ? 20 : 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(compact: false),
+          SizedBox(height: isLarge ? 16 : 12),
+          Expanded(
+            child: Row(
+              children: [
+                // Pie chart section
+                Expanded(
+                  flex: isLarge ? 5 : 4,
+                  child: Center(
+                    child: _buildPieWithTooltip(displayData, total, baseRadius, touchedRadius),
+                  ),
+                ),
+                SizedBox(width: isLarge ? 20 : 12),
+                // Legend section
+                Expanded(
+                  flex: isLarge ? 4 : 3,
+                  child: _buildLegend(displayData, total, isLarge: isLarge),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildPieWithTooltip(List<NameCount> displayData, int total, double baseRadius, double touchedRadius) {
+    return PieChart(
+      PieChartData(
+        pieTouchData: PieTouchData(
+          touchCallback: (event, response) {
+            setState(() {
+              if (!event.isInterestedForInteractions ||
+                  response == null ||
+                  response.touchedSection == null) {
+                _touchedIndex = -1;
+                return;
+              }
+              _touchedIndex = response.touchedSection!.touchedSectionIndex;
+            });
+          },
+        ),
+        borderData: FlBorderData(show: false),
+        sectionsSpace: 2,
+        centerSpaceRadius: widget.isDonut ? baseRadius * 0.5 : 0,
+        sections: List.generate(displayData.length, (index) {
+          final isTouched = index == _touchedIndex;
+          final entry = displayData[index];
+          final percentage = total > 0 ? (entry.count / total * 100) : 0.0;
+
+          return PieChartSectionData(
+            color: _pieColors[index % _pieColors.length],
+            value: entry.count.toDouble(),
+            // Show full name and percentage when touched
+            title: isTouched
+                ? '${entry.name}\n${percentage.toStringAsFixed(1)}%'
+                : '',
+            radius: isTouched ? touchedRadius : baseRadius,
+            titleStyle: TextStyle(
+              fontSize: isTouched ? 11 : 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              shadows: const [
+                Shadow(color: Colors.black54, blurRadius: 4),
+              ],
+            ),
+            titlePositionPercentageOffset: 0.55,
+            badgePositionPercentageOffset: 1.1,
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildLegend(List<NameCount> displayData, int total, {required bool isLarge}) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(displayData.length, (index) {
+          final entry = displayData[index];
+          final percentage = total > 0 ? (entry.count / total * 100) : 0.0;
+          final isSelected = _touchedIndex == index;
+
+          return Tooltip(
+            message: '${entry.name}: ${entry.count} (${percentage.toStringAsFixed(1)}%)',
+            waitDuration: const Duration(milliseconds: 300),
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _touchedIndex = _touchedIndex == index ? -1 : index;
+                });
+              },
+              borderRadius: BorderRadius.circular(4),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: EdgeInsets.symmetric(
+                  vertical: isLarge ? 6 : 4,
+                  horizontal: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? _pieColors[index % _pieColors.length].withOpacity(0.1) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: isLarge ? 12 : 10,
+                      height: isLarge ? 12 : 10,
+                      decoration: BoxDecoration(
+                        color: _pieColors[index % _pieColors.length],
+                        shape: BoxShape.circle,
+                        boxShadow: isSelected
+                            ? [BoxShadow(color: _pieColors[index % _pieColors.length].withOpacity(0.5), blurRadius: 4)]
+                            : null,
+                      ),
+                    ),
+                    SizedBox(width: isLarge ? 10 : 6),
+                    Expanded(
+                      child: Text(
+                        entry.name, // Always show full name
+                        style: TextStyle(
+                          fontSize: isLarge ? 13 : 11,
+                          color: isSelected ? _unityBlue : Colors.grey[700],
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${percentage.toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        fontSize: isLarge ? 12 : 10,
+                        color: isSelected ? _unityBlue : Colors.grey[600],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildHeader({required bool compact}) {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(compact ? 6 : 8),
           decoration: BoxDecoration(
             color: _momentumBlue.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(widget.config.icon ?? Icons.pie_chart, color: _momentumBlue, size: 20),
+          child: Icon(
+            widget.config.icon ?? Icons.pie_chart,
+            color: _momentumBlue,
+            size: compact ? 16 : 20,
+          ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: compact ? 8 : 12),
         Expanded(
           child: Text(
             widget.config.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 16,
+              fontSize: compact ? 14 : 16,
               color: _unityBlue,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -1177,23 +1297,23 @@ class _PieChartWidgetState extends State<PieChartWidget> {
   }
 
   Widget _buildEmptyState() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.pie_chart, size: 48, color: Colors.grey[400]),
-              const SizedBox(height: 8),
-              Text(
-                'No data available',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            ],
-          ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.pie_chart, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 8),
+            Text(
+              'No data available',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ],
         ),
       ),
     );
