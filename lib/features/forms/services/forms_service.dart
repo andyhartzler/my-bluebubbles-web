@@ -14,24 +14,69 @@ class FormsService {
           ? _crmService.privilegedClient
           : _supabase;
 
-  Stream<List<FormSchema>> watchForms(String typeFilter) {
-    if (typeFilter == 'all') {
-      // When showing 'all' forms, exclude votes since they have their own management screen
-      return _supabase
-          .from('form_schemas')
-          .stream(primaryKey: ['id'])
-          .order('created_at', ascending: false)
-          .map((data) => data
+  /// Watch forms with realtime updates, with fallback to one-time fetch on error
+  Stream<List<FormSchema>> watchForms(String typeFilter) async* {
+    try {
+      // First, yield immediate data from a one-time fetch
+      final initialData = await fetchForms(typeFilter);
+      yield initialData;
+
+      // Then try to set up realtime subscription
+      Stream<List<Map<String, dynamic>>> realtimeStream;
+      if (typeFilter == 'all') {
+        realtimeStream = _supabase
+            .from('form_schemas')
+            .stream(primaryKey: ['id'])
+            .order('created_at', ascending: false);
+      } else {
+        realtimeStream = _supabase
+            .from('form_schemas')
+            .stream(primaryKey: ['id'])
+            .eq('form_type', typeFilter)
+            .order('created_at', ascending: false);
+      }
+
+      await for (final data in realtimeStream) {
+        List<FormSchema> forms;
+        if (typeFilter == 'all') {
+          forms = data
               .where((json) => json['form_type'] != 'vote')
               .map((json) => FormSchema.fromJson(json))
-              .toList());
-    } else {
-      return _supabase
-          .from('form_schemas')
-          .stream(primaryKey: ['id'])
-          .eq('form_type', typeFilter)
-          .order('created_at', ascending: false)
-          .map((data) => data.map((json) => FormSchema.fromJson(json)).toList());
+              .toList();
+        } else {
+          forms = data.map((json) => FormSchema.fromJson(json)).toList();
+        }
+        yield forms;
+      }
+    } catch (e) {
+      // On realtime subscription error, yield data from one-time fetch
+      print('FormsService.watchForms: Realtime subscription failed, using fallback: $e');
+      final fallbackData = await fetchForms(typeFilter);
+      yield fallbackData;
+    }
+  }
+
+  /// Fetch forms once (non-realtime)
+  Future<List<FormSchema>> fetchForms(String typeFilter) async {
+    try {
+      List<dynamic> response;
+      if (typeFilter == 'all') {
+        response = await _supabase
+            .from('form_schemas')
+            .select()
+            .neq('form_type', 'vote')
+            .order('created_at', ascending: false);
+      } else {
+        response = await _supabase
+            .from('form_schemas')
+            .select()
+            .eq('form_type', typeFilter)
+            .order('created_at', ascending: false);
+      }
+      return response.map((json) => FormSchema.fromJson(json as Map<String, dynamic>)).toList();
+    } catch (e) {
+      print('FormsService.fetchForms: Error fetching forms: $e');
+      rethrow;
     }
   }
 

@@ -19,21 +19,33 @@ class FormTemplatesService {
           ? _crmService.privilegedClient
           : _supabase;
 
-  /// Watch all templates (real-time stream)
-  Stream<List<FormTemplateDb>> watchTemplates({String? category}) {
-    var query = _supabase
-        .from('form_templates')
-        .stream(primaryKey: ['id'])
-        .order('use_count', ascending: false)
-        .order('name', ascending: true);
+  /// Watch all templates (real-time stream) with fallback to one-time fetch on error
+  Stream<List<FormTemplateDb>> watchTemplates({String? category}) async* {
+    try {
+      // First, yield immediate data from a one-time fetch
+      final initialData = await fetchTemplates(category: category);
+      yield initialData;
 
-    return query.map((data) {
-      var templates = data.map((json) => FormTemplateDb.fromJson(json)).toList();
-      if (category != null && category.isNotEmpty) {
-        templates = templates.where((t) => t.category == category).toList();
+      // Then try to set up realtime subscription
+      final realtimeStream = _supabase
+          .from('form_templates')
+          .stream(primaryKey: ['id'])
+          .order('use_count', ascending: false)
+          .order('name', ascending: true);
+
+      await for (final data in realtimeStream) {
+        var templates = data.map((json) => FormTemplateDb.fromJson(json)).toList();
+        if (category != null && category.isNotEmpty) {
+          templates = templates.where((t) => t.category == category).toList();
+        }
+        yield templates;
       }
-      return templates;
-    });
+    } catch (e) {
+      // On realtime subscription error, yield data from one-time fetch
+      print('FormTemplatesService.watchTemplates: Realtime subscription failed, using fallback: $e');
+      final fallbackData = await fetchTemplates(category: category);
+      yield fallbackData;
+    }
   }
 
   /// Fetch all templates (one-time)
