@@ -3,16 +3,20 @@ import 'package:uuid/uuid.dart';
 import '../../models/form_schema.dart';
 import '../../models/form_field_config.dart';
 import '../../models/form_field_types.dart';
+import '../../models/form_template_db.dart';
 import '../../models/identity_config.dart';
 import '../../services/forms_service.dart';
+import '../../services/form_templates_service.dart';
 import '../../widgets/field_config_dialog.dart';
 
 class FormBuilderScreen extends StatefulWidget {
   final String? formId; // null for new form
+  final FormTemplateDb? templateToApply; // template to pre-populate form
 
   const FormBuilderScreen({
     Key? key,
     this.formId,
+    this.templateToApply,
   }) : super(key: key);
 
   @override
@@ -44,12 +48,213 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   bool _publicForm = false;
   bool _showSettings = false;
 
+  String? _templateId; // Track if form was created from a template
+
   @override
   void initState() {
     super.initState();
     if (widget.formId != null) {
       _loadForm();
+    } else if (widget.templateToApply != null) {
+      _applyTemplate(widget.templateToApply!);
     }
+  }
+
+  /// Apply a template to pre-populate the form
+  void _applyTemplate(FormTemplateDb template) {
+    // Check if template has variables that need values
+    if (template.hasVariables) {
+      // Show dialog to collect variable values
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showVariableInputDialog(template);
+      });
+    } else {
+      _loadTemplateData(template, {});
+    }
+  }
+
+  void _showVariableInputDialog(FormTemplateDb template) {
+    final variables = template.variables.toList();
+    final controllers = <String, TextEditingController>{};
+    for (final v in variables) {
+      controllers[v] = TextEditingController();
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Template Variables'),
+        content: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'This template uses variables. Please provide values:',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                ...variables.map((v) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: TextField(
+                        controller: controllers[v],
+                        decoration: InputDecoration(
+                          labelText: v.replaceAll('_', ' ').toUpperCase(),
+                          hintText: 'Enter value for {{$v}}',
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                    )),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context); // Go back if cancelled
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final values = <String, String>{};
+              for (final entry in controllers.entries) {
+                values[entry.key] = entry.value.text;
+              }
+              Navigator.pop(context);
+              _loadTemplateData(template, values);
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _loadTemplateData(FormTemplateDb template, Map<String, String> variableValues) {
+    _templateId = template.id;
+
+    // Apply variable substitutions to schema
+    final schema = variableValues.isEmpty
+        ? template.schema
+        : template.applyVariables(variableValues);
+
+    // Convert template questions to FormFieldConfig
+    final questions = schema['questions'] as List? ?? [];
+    final fields = <FormFieldConfig>[];
+
+    for (final q in questions) {
+      final questionMap = q as Map<String, dynamic>;
+      final fieldConfig = _convertQuestionToField(questionMap);
+      if (fieldConfig != null) {
+        fields.add(fieldConfig);
+      }
+    }
+
+    setState(() {
+      _titleController.text = template.name;
+      _descriptionController.text = template.description ?? '';
+      _fields = fields;
+
+      // Apply template settings
+      final settings = template.settings;
+      if (settings['confirmation_message'] != null) {
+        // Store for later use
+      }
+    });
+
+    // Increment template use count
+    FormTemplatesService().incrementUseCount(template.id).catchError((_) {});
+  }
+
+  FormFieldConfig? _convertQuestionToField(Map<String, dynamic> question) {
+    final type = question['question_type'] as String? ?? 'short_answer';
+
+    // Skip section headers as they're display-only
+    if (type == 'section_header') {
+      return FormFieldConfig(
+        id: question['id'] as String? ?? _uuid.v4(),
+        type: 'section',
+        label: question['text'] as String? ?? '',
+        description: question['description'] as String?,
+      );
+    }
+
+    // Map template question types to form field types
+    String fieldType;
+    switch (type) {
+      case 'short_answer':
+        fieldType = FormFieldTypes.text;
+        break;
+      case 'paragraph':
+        fieldType = FormFieldTypes.textarea;
+        break;
+      case 'email':
+        fieldType = FormFieldTypes.email;
+        break;
+      case 'phone':
+        fieldType = FormFieldTypes.phone;
+        break;
+      case 'number':
+        fieldType = FormFieldTypes.number;
+        break;
+      case 'date':
+        fieldType = FormFieldTypes.datePicker;
+        break;
+      case 'dropdown':
+        fieldType = FormFieldTypes.dropdown;
+        break;
+      case 'radio':
+        fieldType = FormFieldTypes.radio;
+        break;
+      case 'checkbox':
+        fieldType = FormFieldTypes.checkboxGroup;
+        break;
+      case 'chips':
+        fieldType = FormFieldTypes.filterChips;
+        break;
+      case 'rating':
+        fieldType = FormFieldTypes.rating;
+        break;
+      case 'slider':
+        fieldType = FormFieldTypes.slider;
+        break;
+      case 'hidden':
+        fieldType = 'hidden';
+        break;
+      default:
+        fieldType = FormFieldTypes.text;
+    }
+
+    // Convert options if present
+    List<FormFieldOption>? options;
+    if (question['options'] != null) {
+      final optionsList = question['options'] as List;
+      options = optionsList
+          .map((o) => FormFieldOption(
+                value: (o as Map<String, dynamic>)['value'] as String? ?? '',
+                label: o['label'] as String? ?? '',
+              ))
+          .toList();
+    }
+
+    return FormFieldConfig(
+      id: question['id'] as String? ?? _uuid.v4(),
+      type: fieldType,
+      label: question['text'] as String? ?? '',
+      required: question['required'] as bool? ?? false,
+      placeholder: question['placeholder'] as String?,
+      helperText: question['helper_text'] as String?,
+      description: question['description'] as String?,
+      options: options,
+      initialValue: question['default_value'],
+      pageNumber: question['page'] as int? ?? 1,
+    );
   }
 
   @override
