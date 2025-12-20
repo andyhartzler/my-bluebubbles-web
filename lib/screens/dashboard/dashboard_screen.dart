@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -61,7 +62,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   late AnimationController _flipController;
   late Animation<double> _flipAnimation;
   bool _showPalette = false;
-  String? _draggingWidgetId;  // Track which widget is being dragged
 
   // Dashboard configuration
   DashboardConfig _config = _getDefaultConfig();
@@ -683,6 +683,28 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildWidget(DashboardWidgetConfig config, DashboardMetrics metrics) {
+    try {
+      return _buildWidgetInternal(config, metrics);
+    } catch (e) {
+      return Card(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, color: Colors.red[300], size: 32),
+              const SizedBox(height: 8),
+              Text(
+                'Error loading widget',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildWidgetInternal(DashboardWidgetConfig config, DashboardMetrics metrics) {
     final value = _getValueForDataSource(config.dataSourceKey, metrics);
 
     switch (config.type) {
@@ -993,6 +1015,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _buildMobilePaletteCategory(DashboardDataCategory category, List<DashboardDataSource> sources) {
     return Column(
+      key: ValueKey('mobile_cat_${category.name}'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
@@ -1014,6 +1037,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _buildMobilePaletteItem(DashboardDataSource source) {
     return Card(
+      key: ValueKey('mobile_item_${source.key}'),
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: ListTile(
         dense: true,
@@ -1294,9 +1318,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildWidgetPalette() {
-    final categories = DashboardDataCategory.values;
+    final categories = DashboardDataCategory.values
+        .where((c) => DashboardDataSources.getByCategory(c).isNotEmpty)
+        .toList();
 
     return Container(
+      key: const ValueKey('widget_palette'),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(right: BorderSide(color: Colors.grey[300]!)),
@@ -1325,26 +1352,32 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ),
           Expanded(
-            child: ListView(
+            child: ListView.builder(
+              key: const ValueKey('palette_list'),
               padding: const EdgeInsets.all(12),
-              children: categories.map((category) {
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                final category = categories[index];
                 final sources = DashboardDataSources.getByCategory(category);
-                if (sources.isEmpty) return const SizedBox.shrink();
 
-                return ExpansionTile(
-                  title: Text(
-                    _getCategoryLabel(category),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                return Theme(
+                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    key: ValueKey('category_${category.name}'),
+                    title: Text(
+                      _getCategoryLabel(category),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
+                    initiallyExpanded: index == 0,
+                    children: sources.map((source) {
+                      return _buildPaletteItem(source);
+                    }).toList(),
                   ),
-                  initiallyExpanded: category == DashboardDataCategory.members,
-                  children: sources.map((source) {
-                    return _buildPaletteItem(source);
-                  }).toList(),
                 );
-              }).toList(),
+              },
             ),
           ),
         ],
@@ -1354,6 +1387,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _buildPaletteItem(DashboardDataSource source) {
     return Card(
+      key: ValueKey('palette_${source.key}'),
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: ListTile(
         dense: true,
@@ -1368,25 +1402,31 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: PopupMenuButton<DashboardWidgetType>(
-          icon: const Icon(Icons.add_circle_outline, color: _grassrootsGreen),
-          tooltip: 'Add as...',
-          onSelected: (type) => _addWidget(source, type),
-          itemBuilder: (context) {
-            return source.supportedWidgets.map((type) {
-              return PopupMenuItem<DashboardWidgetType>(
-                value: type,
-                child: Row(
-                  children: [
-                    Icon(_getWidgetTypeIcon(type), size: 18),
-                    const SizedBox(width: 8),
-                    Text(_getWidgetTypeLabel(type)),
-                  ],
-                ),
-              );
-            }).toList();
-          },
-        ),
+        trailing: source.supportedWidgets.length == 1
+            ? IconButton(
+                icon: const Icon(Icons.add_circle, color: _grassrootsGreen),
+                tooltip: 'Add widget',
+                onPressed: () => _addWidget(source, source.supportedWidgets.first),
+              )
+            : PopupMenuButton<DashboardWidgetType>(
+                icon: const Icon(Icons.add_circle_outline, color: _grassrootsGreen),
+                tooltip: 'Add as...',
+                onSelected: (type) => _addWidget(source, type),
+                itemBuilder: (context) {
+                  return source.supportedWidgets.map((type) {
+                    return PopupMenuItem<DashboardWidgetType>(
+                      value: type,
+                      child: Row(
+                        children: [
+                          Icon(_getWidgetTypeIcon(type), size: 18),
+                          const SizedBox(width: 8),
+                          Text(_getWidgetTypeLabel(type)),
+                        ],
+                      ),
+                    );
+                  }).toList();
+                },
+              ),
       ),
     );
   }
@@ -1404,187 +1444,175 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         // Use the widget list order directly (no sorting by grid position)
         final widgets = _config.widgets;
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Hint text
-              if (widgets.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    children: [
-                      Icon(Icons.drag_indicator, size: 16, color: Colors.grey[500]),
-                      const SizedBox(width: 4),
-                      Text(
-                        isMobile ? 'Long press to drag' : 'Drag to reorder widgets',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: List.generate(widgets.length, (index) {
-                  final widget = widgets[index];
-                  final width = _getWidgetWidth(widget, widgetWidth, columns);
-                  final height = _getWidgetHeight(widget, widgetHeight);
-                  final isDragging = _draggingWidgetId == widget.id;
-
-                  return DragTarget<String>(
-                    onWillAcceptWithDetails: (details) => details.data != widget.id,
-                    onAcceptWithDetails: (details) {
-                      _reorderWidget(details.data, widget.id);
-                    },
-                    builder: (context, candidateData, rejectedData) {
-                      final isDropTarget = candidateData.isNotEmpty;
-
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: width,
-                        height: height,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          border: isDropTarget
-                              ? Border.all(color: _grassrootsGreen, width: 3)
-                              : null,
-                        ),
-                        child: LongPressDraggable<String>(
-                          data: widget.id,
-                          onDragStarted: () {
-                            setState(() => _draggingWidgetId = widget.id);
-                          },
-                          onDragEnd: (_) {
-                            setState(() => _draggingWidgetId = null);
-                          },
-                          onDraggableCanceled: (_, __) {
-                            setState(() => _draggingWidgetId = null);
-                          },
-                          feedback: Material(
-                            elevation: 8,
-                            borderRadius: BorderRadius.circular(16),
-                            child: SizedBox(
-                              width: width * 0.9,
-                              height: height * 0.9,
-                              child: Opacity(
-                                opacity: 0.9,
-                                child: _buildWidget(widget, metrics),
-                              ),
-                            ),
-                          ),
-                          childWhenDragging: AnimatedOpacity(
-                            duration: const Duration(milliseconds: 200),
-                            opacity: 0.3,
-                            child: _buildEditableWidget(widget, metrics),
-                          ),
-                          child: AnimatedOpacity(
-                            duration: const Duration(milliseconds: 200),
-                            opacity: isDragging ? 0.3 : 1.0,
-                            child: _buildEditableWidget(widget, metrics),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                }),
-              ),
-              // Empty state
-              if (widgets.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(40),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.widgets_outlined, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No widgets added',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          isMobile
-                              ? 'Tap "Add Widget" above to get started'
-                              : 'Select widgets from the palette on the left',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+        // Empty state
+        if (widgets.isEmpty) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(40),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.widgets_outlined, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No widgets added',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[600],
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isMobile
+                        ? 'Tap "Add Widget" above to get started'
+                        : 'Select widgets from the palette on the left',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[500],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ReorderableListView.builder(
+          padding: const EdgeInsets.all(16),
+          buildDefaultDragHandles: false,
+          proxyDecorator: (child, index, animation) {
+            return AnimatedBuilder(
+              animation: animation,
+              builder: (context, child) {
+                final animValue = Curves.easeInOut.transform(animation.value);
+                final elevation = lerpDouble(0, 8, animValue)!;
+                return Material(
+                  elevation: elevation,
+                  borderRadius: BorderRadius.circular(16),
+                  child: child,
+                );
+              },
+              child: child,
+            );
+          },
+          onReorder: (oldIndex, newIndex) {
+            setState(() {
+              if (newIndex > oldIndex) newIndex--;
+              final widgetsList = List<DashboardWidgetConfig>.from(_config.widgets);
+              final item = widgetsList.removeAt(oldIndex);
+              widgetsList.insert(newIndex, item);
+              // Update grid positions
+              for (int i = 0; i < widgetsList.length; i++) {
+                widgetsList[i] = widgetsList[i].copyWith(gridY: i);
+              }
+              _config = DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList);
+            });
+          },
+          header: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: _momentumBlue,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Icon(Icons.drag_indicator, size: 14, color: Colors.white),
                 ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  isMobile ? 'Drag the handle to reorder' : 'Drag the blue handle to reorder widgets',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
           ),
+          itemCount: widgets.length,
+          itemBuilder: (context, index) {
+            final widget = widgets[index];
+            final width = _getWidgetWidth(widget, widgetWidth, columns);
+            final height = _getWidgetHeight(widget, widgetHeight);
+
+            return Padding(
+              key: ValueKey(widget.id),
+              padding: const EdgeInsets.only(bottom: 16),
+              child: SizedBox(
+                width: width,
+                height: height,
+                child: _buildEditableWidget(widget, metrics, index),
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  void _reorderWidget(String draggedId, String targetId) {
-    final widgets = List<DashboardWidgetConfig>.from(_config.widgets);
-    final draggedIndex = widgets.indexWhere((w) => w.id == draggedId);
-    final targetIndex = widgets.indexWhere((w) => w.id == targetId);
-
-    if (draggedIndex == -1 || targetIndex == -1 || draggedIndex == targetIndex) return;
-
-    final draggedWidget = widgets.removeAt(draggedIndex);
-    // Insert at target position
-    widgets.insert(targetIndex, draggedWidget);
-
-    // Update grid positions to match new order
-    for (int i = 0; i < widgets.length; i++) {
-      widgets[i] = widgets[i].copyWith(gridY: i);
-    }
-
-    setState(() {
-      _config = DashboardConfig(id: _config.id, name: _config.name, widgets: widgets);
-    });
-  }
-
-  Widget _buildEditableWidget(DashboardWidgetConfig config, DashboardMetrics metrics) {
+  Widget _buildEditableWidget(DashboardWidgetConfig config, DashboardMetrics metrics, int index) {
     return Stack(
       children: [
-        _buildWidget(config, metrics),
-        // Edit overlay with drag handle
+        // The actual widget
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: _buildWidget(config, metrics),
+        ),
+        // Tap overlay for editing options (not covering drag handle area)
         Positioned.fill(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _showWidgetOptions(config),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _momentumBlue.withOpacity(0.5), width: 2),
-                ),
+          child: GestureDetector(
+            onTap: () => _showWidgetOptions(config),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _momentumBlue.withOpacity(0.5), width: 2),
               ),
             ),
           ),
         ),
-        // Drag handle indicator
+        // Drag handle - uses ReorderableDragStartListener
         Positioned(
           top: 4,
           left: 4,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(8),
+          child: ReorderableDragStartListener(
+            index: index,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _momentumBlue,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.drag_indicator, size: 18, color: Colors.white),
             ),
-            child: Icon(Icons.drag_indicator, size: 16, color: Colors.grey[600]),
+          ),
+        ),
+        // Settings button
+        Positioned(
+          top: 4,
+          right: 36,
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 2,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _showWidgetOptions(config),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                child: const Icon(Icons.settings, size: 14, color: _momentumBlue),
+              ),
+            ),
           ),
         ),
         // Delete button
@@ -1599,8 +1627,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               borderRadius: BorderRadius.circular(12),
               onTap: () => _removeWidget(config.id),
               child: Container(
-                padding: const EdgeInsets.all(4),
-                child: const Icon(Icons.close, size: 16, color: _actionRed),
+                padding: const EdgeInsets.all(6),
+                child: const Icon(Icons.close, size: 14, color: _actionRed),
               ),
             ),
           ),
