@@ -1543,7 +1543,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
 
     setState(() {
-      _config = DashboardConfig(widgets: widgets);
+      _config = DashboardConfig(id: _config.id, widgets: widgets);
     });
   }
 
