@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../models/form_schema.dart';
+import '../../models/form_template_db.dart';
 import '../../services/forms_service.dart';
 import '../../widgets/form_card.dart';
 import 'form_builder_screen.dart';
 import '../form_submission_screen.dart';
 import '../form_results_screen.dart';
+import '../templates/templates_list_screen.dart';
+import '../templates/template_builder_screen.dart';
 
 class FormsListScreen extends StatefulWidget {
   const FormsListScreen({Key? key}) : super(key: key);
@@ -32,22 +35,40 @@ class _FormsListScreenState extends State<FormsListScreen>
     return Scaffold(
       body: Column(
         children: [
-          // Filter Chips
+          // Filter Chips and Templates button
           Container(
             padding: EdgeInsets.all(padding),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildFilterChip('All', 'all', isMobile: isMobile),
-                  SizedBox(width: isMobile ? 6 : 8),
-                  _buildFilterChip('Survey', 'survey', isMobile: isMobile),
-                  SizedBox(width: isMobile ? 6 : 8),
-                  _buildFilterChip('Registration', 'registration', isMobile: isMobile),
-                  SizedBox(width: isMobile ? 6 : 8),
-                  _buildFilterChip('Feedback', 'feedback', isMobile: isMobile),
-                ],
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterChip('All', 'all', isMobile: isMobile),
+                        SizedBox(width: isMobile ? 6 : 8),
+                        _buildFilterChip('Survey', 'survey', isMobile: isMobile),
+                        SizedBox(width: isMobile ? 6 : 8),
+                        _buildFilterChip('Registration', 'registration', isMobile: isMobile),
+                        SizedBox(width: isMobile ? 6 : 8),
+                        _buildFilterChip('Feedback', 'feedback', isMobile: isMobile),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _openTemplates,
+                  icon: const Icon(Icons.dashboard_customize_outlined, size: 18),
+                  label: Text(isMobile ? 'Templates' : 'Manage Templates'),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 12 : 16,
+                      vertical: isMobile ? 8 : 12,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -135,10 +156,73 @@ class _FormsListScreenState extends State<FormsListScreen>
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createNewForm,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showCreateOptions,
         tooltip: 'Create Form',
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text('Create Form'),
+      ),
+    );
+  }
+
+  void _showCreateOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('Blank Form'),
+              subtitle: const Text('Start from scratch'),
+              onTap: () {
+                Navigator.pop(context);
+                _createNewForm();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.dashboard_customize_outlined),
+              title: const Text('From Template'),
+              subtitle: const Text('Use a pre-built template'),
+              onTap: () {
+                Navigator.pop(context);
+                _createFromTemplate();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _createFromTemplate() async {
+    final template = await Navigator.push<FormTemplateDb>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const TemplatesListScreen(pickerMode: true),
+      ),
+    );
+
+    if (template != null && mounted) {
+      // Navigate to form builder with template pre-filled
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => FormBuilderScreen(templateToApply: template),
+        ),
+      );
+    }
+  }
+
+  void _openTemplates() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Form Templates')),
+          body: const TemplatesListScreen(),
+        ),
       ),
     );
   }

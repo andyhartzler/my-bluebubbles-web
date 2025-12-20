@@ -57,13 +57,32 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
       _actualViewId = viewId;
 
       final containerHeight = (widget.height ?? 400).toStringAsFixed(0);
+
+      // Create outer wrapper that clips content on mobile scroll
+      // This fixes the issue where the map escapes its container when scrolling on mobile
+      final outerWrapper = html.DivElement()
+        ..style.width = '100%'
+        ..style.height = '${containerHeight}px'
+        ..style.position = 'relative'
+        ..style.overflow = 'hidden'
+        ..style.borderRadius = '12px'
+        // clip-path ensures content is clipped even on mobile browsers
+        ..style.setProperty('clip-path', 'inset(0 round 12px)')
+        ..style.setProperty('-webkit-clip-path', 'inset(0 round 12px)')
+        // isolation creates a new stacking context to prevent z-index bleed
+        ..style.setProperty('isolation', 'isolate')
+        // contain: strict prevents the element from affecting layout outside its bounds
+        ..style.setProperty('contain', 'strict');
+
       final mapContainer = html.DivElement()
         ..id = 'mapkit-$viewId'
         ..style.width = '100%'
         ..style.height = '${containerHeight}px'
         ..style.borderRadius = '12px'
         ..style.overflow = 'hidden'
-        ..style.position = 'relative'
+        ..style.position = 'absolute'
+        ..style.top = '0'
+        ..style.left = '0'
         ..style.touchAction = 'pan-x pan-y'
         ..style.transform = 'translateZ(0)'
         ..style.backfaceVisibility = 'hidden'
@@ -71,8 +90,10 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
         ..style.setProperty('will-change', 'transform')
         ..style.setProperty('contain', 'layout paint');
 
+      outerWrapper.append(mapContainer);
+
       print('[EventMap] Created container with ID: mapkit-$viewId');
-      return mapContainer;
+      return outerWrapper;
     });
 
     _waitForMapKitAndInitialize();
@@ -329,39 +350,46 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
       );
     }
 
-    return Stack(
-      children: [
-        Container(
-          width: double.infinity,
-          height: widget.height ?? 400,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: HtmlElementView(viewType: _viewType),
-        ),
-        if (_isLoading)
+    // Use ClipRRect with Clip.hardEdge to ensure proper clipping on mobile scroll
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.hardEdge,
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
+        children: [
           Container(
             width: double.infinity,
             height: widget.height ?? 400,
             decoration: BoxDecoration(
-              color: Colors.grey[200],
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text(
-                    'Loading map...',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                ],
+            clipBehavior: Clip.hardEdge,
+            child: HtmlElementView(viewType: _viewType),
+          ),
+          if (_isLoading)
+            Container(
+              width: double.infinity,
+              height: widget.height ?? 400,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text(
+                      'Loading map...',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

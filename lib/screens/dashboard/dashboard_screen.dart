@@ -6,15 +6,25 @@ import 'package:flutter/material.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/models/crm/dashboard_metrics.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
+import 'package:bluebubbles/services/crm/dashboard_metrics_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/quick_links_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/screens/dashboard/widgets/quick_links_dialog.dart';
+
+// Brand colors matching meetings/committees pages
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+const _sunriseGold = Color(0xFFFDB813);
+const _actionRed = Color(0xFFE63946);
+const _justicePurple = Color(0xFF6A1B9A);
+const _grassrootsGreen = Color(0xFF43A047);
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -27,8 +37,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final MemberRepository _memberRepo = MemberRepository();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
   final QuickLinksRepository _quickLinksRepo = QuickLinksRepository();
+  final DashboardMetricsService _metricsService = DashboardMetricsService();
 
-  _DashboardData? _data;
+  DashboardMetrics? _metrics;
+  List<Member> _recentMembers = [];
+  int _chatCount = 0;
+  int _totalMessages = 0;
+  int _weeklyMessages = 0;
   bool _loading = true;
   String? _error;
   String _selectedMetric = 'counties';
@@ -43,7 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!CRMConfig.crmEnabled || !_supabaseService.isInitialized) {
       setState(() {
         _loading = false;
-        _data = const _DashboardData.empty();
+        _metrics = DashboardMetrics.empty;
       });
       return;
     }
@@ -55,90 +70,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       final weeklySince = DateTime.now().subtract(const Duration(days: 7));
+
+      // Fetch metrics from new table and BlueBubbles data in parallel
       final results = await Future.wait<dynamic>([
-        _memberRepo.fetchDashboardMetrics(),
+        _metricsService.fetchMetrics(),
         _fetchChatCount(),
         _fetchMessageCount(),
         _fetchMessageCount(after: weeklySince),
+        _memberRepo.getRecentMembers(limit: 5),
       ]);
 
-      final metrics = (results[0] as Map<String, dynamic>?) ?? <String, dynamic>{};
-      final fallbackChatCount = (results[1] as int?) ?? 0;
-      final fallbackTotalMessages = (results[2] as int?) ?? 0;
-      final fallbackWeeklyMessages = (results[3] as int?) ?? 0;
+      final metrics = results[0] as DashboardMetrics?;
+      final chatCount = (results[1] as int?) ?? 0;
+      final totalMessages = (results[2] as int?) ?? 0;
+      final weeklyMessages = (results[3] as int?) ?? 0;
+      final recentMembers = (results[4] as List<Member>?) ?? [];
 
-      final memberStats = (metrics['memberStats'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-      final totalMembers = _intOrFallback(memberStats['total'], 0);
-      final optedOutMembers =
-          _intOrFallback(memberStats['optedOut'] ?? memberStats['opted_out'], 0);
-      final contactableMembers = _intOrFallback(
-        memberStats['contactable'],
-        totalMembers - optedOutMembers,
-      );
-      final withPhoneMembers = _intOrFallback(
-        memberStats['withPhone'] ?? memberStats['with_phone'],
-        0,
-      );
-
-      final chatCount = _intOrFallback(metrics['chatCount'], fallbackChatCount);
-      final totalMessages =
-          _intOrFallback(metrics['totalMessages'], fallbackTotalMessages);
-      final weeklyMessages =
-          _intOrFallback(metrics['weeklyMessages'], fallbackWeeklyMessages);
-
-      final counties = _toCountMap(metrics['counties']);
-      final districts = _toCountMap(metrics['districts']);
-      final committees = _toCountMap(metrics['committees']);
-      final highSchools = _toCountMap(metrics['highSchools']);
-      final colleges = _toCountMap(metrics['colleges']);
-      final chapters = _toCountMap(metrics['chapters']);
-      final chapterStatuses = _toCountMap(metrics['chapterStatuses']);
-      final graduationYears = _toCountMap(metrics['graduationYears']);
-      final pronouns = _toCountMap(metrics['pronouns']);
-      final genders = _toCountMap(metrics['genders']);
-      final races = _toCountMap(metrics['races']);
-      final languages = _toCountMap(metrics['languages']);
-      final communityTypes = _toCountMap(metrics['communityTypes']);
-      final industries = _toCountMap(metrics['industries']);
-      final educationLevels = _toCountMap(metrics['educationLevels']);
-      final registeredVoters = _toCountMap(metrics['registeredVoters']);
-      final sexualOrientations = _toCountMap(metrics['sexualOrientations']);
-      final ageBuckets = _toCountMap(metrics['ageBuckets']);
-      final recentMembers =
-          _toMemberList(metrics['recentMembers'] ?? metrics['recent_members']);
+      if (!mounted) return;
 
       setState(() {
-        _data = _DashboardData(
-          totalMembers: totalMembers,
-          contactableMembers: contactableMembers,
-          optedOutMembers: optedOutMembers,
-          withPhoneMembers: withPhoneMembers,
-          chatCount: chatCount,
-          totalMessages: totalMessages,
-          weeklyMessages: weeklyMessages,
-          counties: counties,
-          districts: districts,
-          committees: committees,
-          highSchools: highSchools,
-          colleges: colleges,
-          chapters: chapters,
-          chapterStatuses: chapterStatuses,
-          graduationYears: graduationYears,
-          pronouns: pronouns,
-          genders: genders,
-          races: races,
-          languages: languages,
-          communityTypes: communityTypes,
-          industries: industries,
-          educationLevels: educationLevels,
-          registeredVoters: registeredVoters,
-          sexualOrientations: sexualOrientations,
-          ageBuckets: ageBuckets,
-          recentMembers: recentMembers,
-        );
+        _metrics = metrics ?? DashboardMetrics.empty;
+        _chatCount = chatCount;
+        _totalMessages = totalMessages;
+        _weeklyMessages = weeklyMessages;
+        _recentMembers = recentMembers;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _error = e.toString();
@@ -164,76 +123,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  int? _parseInt(dynamic value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value);
-    return null;
-  }
-
-  int _intOrFallback(dynamic value, int fallback) {
-    final parsed = _parseInt(value);
-    return parsed ?? fallback;
-  }
-
-  Map<String, int> _toCountMap(dynamic value) {
-    if (value is Map<String, int>) {
-      return Map<String, int>.from(value);
-    }
-    if (value is Map) {
-      final result = <String, int>{};
-      value.forEach((key, dynamic count) {
-        final label = key == null ? '' : key.toString();
-        final parsed = _parseInt(count);
-        if (label.isEmpty || parsed == null) return;
-        result[label] = parsed;
-      });
-      return result;
-    }
-    if (value is Iterable) {
-      final result = <String, int>{};
-      for (final entry in value) {
-        if (entry is Map<String, dynamic>) {
-          final label = entry['label'] ?? entry['key'] ?? entry['name'] ?? entry['value'];
-          final parsed = _parseInt(entry['count'] ?? entry['total'] ?? entry['members']);
-          if (label == null) continue;
-          final cleaned = label.toString().trim();
-          if (cleaned.isEmpty || parsed == null) continue;
-          result[cleaned] = parsed;
-        }
-      }
-      return result;
-    }
-    return <String, int>{};
-  }
-
-  List<Member> _toMemberList(dynamic value) {
-    if (value is List<Member>) {
-      return List<Member>.from(value);
-    }
-    if (value is Iterable) {
-      final members = <Member>[];
-      for (final item in value) {
-        if (item is Member) {
-          members.add(item);
-          continue;
-        }
-        Map<String, dynamic>? json;
-        if (item is Map<String, dynamic>) {
-          json = item;
-        } else if (item is Map) {
-          json = item.map((key, dynamic val) => MapEntry(key.toString(), val));
-        }
-        if (json == null) continue;
-        try {
-          members.add(Member.fromJson(json));
-        } catch (_) {}
-      }
-      return members;
-    }
-    return <Member>[];
-  }
-
   void _openMembersList(BuildContext context, {bool showChaptersOnly = false}) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
@@ -242,14 +131,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
     );
-  }
-
-  void _openCountiesView(BuildContext context) {
-    _openMembersList(context);
-  }
-
-  void _openChaptersView(BuildContext context) {
-    _openMembersList(context, showChaptersOnly: true);
   }
 
   void _openBulkMessaging(BuildContext context) {
@@ -274,221 +155,405 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 56),
-              const SizedBox(height: 12),
-              Text('Unable to load dashboard', style: theme.textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
+      return _buildErrorState(context);
     }
 
-    final data = _data ?? const _DashboardData.empty();
-
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final padding = constraints.maxWidth > 1200
-              ? EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.1, vertical: 32)
-              : const EdgeInsets.fromLTRB(24, 24, 24, 32);
-
-          return SelectionArea(
-            child: ListView(
-              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-              padding: padding,
-              children: [
-                _buildHeader(context, theme, data),
-                const SizedBox(height: 24),
-                _buildStatsGrid(context, data),
-                const SizedBox(height: 32),
-                _buildInteractiveChart(context, data),
-                const SizedBox(height: 32),
-                _buildBreakdownRow(context, data),
-                const SizedBox(height: 32),
-                _buildRecentMembers(context, data.recentMembers),
-              ],
-            ),
-          );
-        },
-      ),
+    return Stack(
+      children: [
+        // Background gradient
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/Blue-Gradient-Background.png',
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned.fill(
+          child: Container(
+            color: Colors.white.withOpacity(0.15),
+          ),
+        ),
+        Positioned.fill(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: _buildContent(context),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildHeader(BuildContext context, ThemeData theme, _DashboardData data) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primary,
-            theme.colorScheme.secondary,
+  Widget _buildErrorState(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 56, color: _actionRed),
+            const SizedBox(height: 12),
+            Text('Unable to load dashboard', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: theme.textTheme.bodyMedium?.copyWith(color: _actionRed),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _momentumBlue,
+                foregroundColor: Colors.white,
+              ),
+            ),
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withOpacity(0.25),
-            blurRadius: 24,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Welcome back, Missouri Young Democrats!',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: theme.colorScheme.onPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Real-time insights into your statewide organizing work.',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onPrimary.withOpacity(0.85),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 16,
-            runSpacing: 12,
-            children: [
-              _HeaderPill(
-                label: 'Total Members',
-                valueText: data.totalMembers.toString(),
-                icon: Icons.people_alt,
-                onTap: () => _openMembersList(context),
-                semanticsLabel: '${data.totalMembers} total members',
-              ),
-              _HeaderPill(
-                label: 'Counties Represented',
-                valueText: '${data.countiesRepresented} / 114',
-                icon: Icons.map_outlined,
-                onTap: () => _openCountiesView(context),
-                semanticsLabel:
-                    '${data.countiesRepresented} of 114 Missouri counties represented',
-              ),
-              _HeaderPill(
-                label: 'Chartered Chapters',
-                valueText: data.charteredChapters.toString(),
-                icon: Icons.flag,
-                onTap: () => _openChaptersView(context),
-                semanticsLabel: '${data.charteredChapters} chartered chapters',
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildStatsGrid(BuildContext context, _DashboardData data) {
-    final theme = Theme.of(context);
-
-    /// Design refresh plan for stats grid:
-    /// - Introduce carousel navigation on compact layouts (implemented for <480 px widths).
-    /// - Maintain responsive tiles that collapse into a single column when space tightens.
-    /// - Add quick-action CTAs so each metric routes straight into deeper CRM workflows.
-    final cards = [
-      _StatCardData(
-        title: 'Members with Phone Numbers',
-        value: data.withPhoneMembers,
-        icon: Icons.phone_in_talk,
-        description: 'Ready for outreach',
-        colors: [theme.colorScheme.secondary, theme.colorScheme.tertiary],
-        actionLabel: 'View members with phones',
-        semanticsLabel: '${data.withPhoneMembers} members with phone numbers',
-        onTap: (context) => _openMembersList(context),
-      ),
-      _StatCardData(
-        title: 'Quick Links',
-        icon: Icons.link,
-        description: 'Launch shared resources and governing documents',
-        colors: [theme.colorScheme.primaryContainer, theme.colorScheme.primary],
-        actionLabel: 'Open quick links',
-        semanticsLabel: 'Open quick links',
-        onTap: (context) => _openQuickLinks(context),
-      ),
-      _StatCardData(
-        title: 'Active Conversations',
-        value: data.chatCount,
-        icon: Icons.forum,
-        description: 'Current chats on BlueBubbles',
-        colors: [theme.colorScheme.primary, theme.colorScheme.secondaryContainer],
-        actionLabel: 'Open messaging hub',
-        semanticsLabel: '${data.chatCount} active conversations',
-        onTap: (context) => _openBulkMessaging(context),
-      ),
-      _StatCardData(
-        title: 'Total Messages',
-        value: data.totalMessages,
-        icon: Icons.message,
-        description: 'All-time across every channel',
-        colors: [theme.colorScheme.tertiary, theme.colorScheme.primaryContainer],
-        actionLabel: 'Review outreach analytics',
-        semanticsLabel: '${data.totalMessages} total messages sent',
-        onTap: (context) => _openBulkMessaging(context),
-      ),
-    ];
+  Widget _buildContent(BuildContext context) {
+    final metrics = _metrics ?? DashboardMetrics.empty;
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 600;
+        final horizontalPadding = isCompact ? 16.0 : 32.0;
+
+        return SelectionArea(
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+            slivers: [
+              // Header
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _buildHeader(context, metrics),
+                ),
+              ),
+              // Hero Stats Row
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _buildHeroStats(context, metrics),
+                ),
+              ),
+              // Action Cards Grid
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _buildActionCards(context, metrics),
+                ),
+              ),
+              // Interactive Chart
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 32, horizontalPadding, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _buildInteractiveChart(context, metrics),
+                ),
+              ),
+              // Breakdown Cards
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 32, horizontalPadding, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _buildBreakdownSection(context, metrics),
+                ),
+              ),
+              // Recent Members
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 32, horizontalPadding, 32),
+                sliver: SliverToBoxAdapter(
+                  child: _buildRecentMembers(context),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, DashboardMetrics metrics) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Container(
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: _momentumBlue,
+          ),
+          padding: const EdgeInsets.all(12),
+          child: const Icon(Icons.dashboard_outlined, color: Colors.white, size: 28),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Dashboard',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: _unityBlue,
+                ),
+              ),
+              Text(
+                'Real-time insights into your statewide organizing work',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: _unityBlue.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Refresh',
+          icon: Icon(Icons.refresh, color: _unityBlue),
+          onPressed: _load,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeroStats(BuildContext context, DashboardMetrics metrics) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isVeryNarrow = constraints.maxWidth < 400;
+        final isNarrow = constraints.maxWidth < 600;
+
+        final stats = [
+          _HeroStat(
+            icon: Icons.people_alt,
+            label: 'Total Members',
+            value: metrics.totalMembers.toString(),
+            color: _momentumBlue,
+            onTap: () => _openMembersList(context),
+          ),
+          _HeroStat(
+            icon: Icons.map_outlined,
+            label: 'Counties',
+            value: '${metrics.countiesRepresented} / 114',
+            color: _sunriseGold,
+            onTap: () => _openMembersList(context),
+          ),
+          _HeroStat(
+            icon: Icons.flag,
+            label: 'Chapters',
+            value: metrics.charteredChapters.toString(),
+            color: _grassrootsGreen,
+            onTap: () => _openMembersList(context, showChaptersOnly: true),
+          ),
+        ];
+
+        if (isVeryNarrow) {
+          return Column(
+            children: stats.map((stat) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildHeroStatTile(stat),
+            )).toList(),
+          );
+        }
+
+        if (isNarrow) {
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: _buildHeroStatCard(stats[0])),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildHeroStatCard(stats[1])),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildHeroStatCard(stats[2]),
+            ],
+          );
+        }
+
+        return Row(
+          children: stats.map((stat) => Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: _buildHeroStatCard(stat),
+            ),
+          )).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeroStatCard(_HeroStat stat) {
+    return Card(
+      elevation: 4,
+      color: _unityBlue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: stat.onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: [_unityBlue, stat.color.withOpacity(0.8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(stat.icon, color: Colors.white, size: 24),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                stat.value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                stat.label,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroStatTile(_HeroStat stat) {
+    return Card(
+      elevation: 2,
+      color: _unityBlue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: stat.onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: [_unityBlue, stat.color.withOpacity(0.7)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(stat.icon, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      stat.label,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      stat.value,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCards(BuildContext context, DashboardMetrics metrics) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 480;
-        final crossAxisCount = constraints.maxWidth > 1100
-            ? 4
-            : constraints.maxWidth > 800
-                ? 3
-                : constraints.maxWidth > 600
-                    ? 2
-                    : 1;
+        final crossAxisCount = constraints.maxWidth > 900 ? 4 : constraints.maxWidth > 600 ? 2 : 1;
+
+        final cards = [
+          _ActionCard(
+            title: 'Members with Phones',
+            value: metrics.membersWithPhone,
+            icon: Icons.phone_in_talk,
+            description: 'Ready for outreach',
+            gradient: [_momentumBlue, _justicePurple],
+            onTap: () => _openMembersList(context),
+          ),
+          _ActionCard(
+            title: 'Quick Links',
+            icon: Icons.link,
+            description: 'Shared resources & documents',
+            gradient: [_grassrootsGreen, _momentumBlue],
+            onTap: () => _openQuickLinks(context),
+          ),
+          _ActionCard(
+            title: 'Active Conversations',
+            value: _chatCount,
+            icon: Icons.forum,
+            description: 'Current BlueBubbles chats',
+            gradient: [_sunriseGold, _actionRed],
+            onTap: () => _openBulkMessaging(context),
+          ),
+          _ActionCard(
+            title: 'Total Messages',
+            value: _totalMessages,
+            icon: Icons.message,
+            description: 'All-time messages sent',
+            gradient: [_justicePurple, _momentumBlue],
+            onTap: () => _openBulkMessaging(context),
+          ),
+        ];
 
         if (isCompact) {
           return SizedBox(
-            height: 240,
+            height: 200,
             child: PageView.builder(
               controller: PageController(viewportFraction: 0.88),
               itemCount: cards.length,
               padEnds: false,
               itemBuilder: (context, index) {
-                final card = cards[index];
                 return Padding(
                   padding: EdgeInsets.only(right: index == cards.length - 1 ? 0 : 12),
-                  child: _StatCard(
-                    data: card,
-                    onTap: () => card.onTap(context),
-                    actionLabel: card.actionLabel,
-                    semanticsLabel: card.semanticsLabel,
-                  ),
+                  child: _buildActionCard(cards[index]),
                 );
               },
             ),
@@ -500,36 +565,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: constraints.maxWidth > 800 ? 20 : 16,
-            mainAxisSpacing: constraints.maxWidth > 800 ? 20 : 16,
-            childAspectRatio: crossAxisCount == 1
-                ? 1.2
-                : crossAxisCount == 2
-                    ? 1.28
-                    : 1.34,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: crossAxisCount == 1 ? 2.2 : 1.4,
           ),
           itemCount: cards.length,
-          itemBuilder: (context, index) {
-            final card = cards[index];
-            return _StatCard(
-              data: card,
-              onTap: () => card.onTap(context),
-              actionLabel: card.actionLabel,
-              semanticsLabel: card.semanticsLabel,
-            );
-          },
+          itemBuilder: (context, index) => _buildActionCard(cards[index]),
         );
       },
     );
   }
 
-  Widget _buildInteractiveChart(BuildContext context, _DashboardData data) {
+  Widget _buildActionCard(_ActionCard card) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: card.onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: card.gradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(card.icon, color: Colors.white, size: 28),
+              const Spacer(),
+              if (card.value != null) ...[
+                Text(
+                  _formatNumber(card.value!),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
+              Text(
+                card.title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                card.description,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInteractiveChart(BuildContext context, DashboardMetrics metrics) {
     final theme = Theme.of(context);
 
-    /// Design refresh plan for interactive chart:
-    /// - Support swipeable cards under 480 px so organizers can flip between visualization and insights.
-    /// - Pair the chart with a summary tile highlighting the same dataset for quicker scanning.
-    /// - Provide contextual quick actions to jump from analytics into the related CRM lists.
     final metricLabels = <String, String>{
       'counties': 'Top Counties',
       'districts': 'Top Districts',
@@ -552,27 +657,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     };
 
     final metricValues = <String, Map<String, int>>{
-      'counties': data.counties,
-      'districts': data.districts,
-      'committees': data.committees,
-      'highSchools': data.highSchools,
-      'colleges': data.colleges,
-      'chapters': data.chapters,
-      'chapterStatuses': data.chapterStatuses,
-      'graduationYears': data.graduationYears,
-      'ageBuckets': data.ageBuckets,
-      'sexualOrientations': data.sexualOrientations,
-      'pronouns': data.pronouns,
-      'genders': data.genders,
-      'races': data.races,
-      'languages': data.languages,
-      'communityTypes': data.communityTypes,
-      'industries': data.industries,
-      'educationLevels': data.educationLevels,
-      'registeredVoters': data.registeredVoters,
+      'counties': metrics.membersByCounty,
+      'districts': metrics.membersByDistrict,
+      'committees': metrics.membersByCommittee,
+      'highSchools': metrics.membersByHighSchool,
+      'colleges': metrics.membersByCollege,
+      'chapters': metrics.membersByChapter,
+      'chapterStatuses': metrics.membersByChapterStatus,
+      'graduationYears': metrics.membersByGraduationYear,
+      'ageBuckets': metrics.membersByAgeBucket,
+      'sexualOrientations': metrics.membersBySexualOrientation,
+      'pronouns': metrics.membersByPronoun,
+      'genders': metrics.membersByGender,
+      'races': metrics.membersByRace,
+      'languages': metrics.membersByLanguage,
+      'communityTypes': metrics.membersByCommunityType,
+      'industries': metrics.membersByIndustry,
+      'educationLevels': metrics.membersByEducationLevel,
+      'registeredVoters': metrics.membersByVoterStatus,
     };
 
-    final unsortedMetrics = {'ageBuckets'};
+    final unsortedMetrics = {'ageBuckets', 'graduationYears'};
 
     final selectedData = metricValues[_selectedMetric] ?? const {};
     final entries = selectedData.entries
@@ -584,820 +689,162 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     final topEntries = entries.take(8).toList();
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 480;
-        final isWide = constraints.maxWidth > 900;
-
-        Widget buildDropdown() {
-          return DropdownButton<String>(
-            value: _selectedMetric,
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _selectedMetric = value);
-              }
-            },
-            items: metricLabels.entries
-                .map(
-                  (entry) => DropdownMenuItem<String>(
-                    value: entry.key,
-                    child: Text(entry.value),
-                  ),
-                )
-                .toList(),
-          );
-        }
-
-        if (topEntries.isEmpty) {
-          return Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Member Distribution',
-                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      buildDropdown(),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No data available for ${metricLabels[_selectedMetric] ?? 'selected metric'}.',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => _openMembersList(context),
-                      icon: const Icon(Icons.group_outlined),
-                      label: const Text('View members'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final maxValue = topEntries.fold<int>(0, (prev, element) => element.value > prev ? element.value : prev);
-        final barGroups = List.generate(topEntries.length, (index) {
-          final entry = topEntries[index];
-          return BarChartGroupData(
-            x: index,
-            barRods: [
-              BarChartRodData(
-                toY: entry.value.toDouble(),
-                width: 18,
-                borderRadius: BorderRadius.circular(6),
-                gradient: LinearGradient(
-                  colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                ),
-              ),
-            ],
-          );
-        });
-
-        String formatLabel(String label) {
-          const maxChars = 14;
-          if (label.length <= maxChars) return label;
-          return '${label.substring(0, maxChars - 1)}…';
-        }
-
-        Widget buildChartCard() {
-          return Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Member Distribution',
-                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      buildDropdown(),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    height: isCompact ? 240 : 280,
-                    child: BarChart(
-                      BarChartData(
-                        alignment: BarChartAlignment.spaceAround,
-                        maxY: (maxValue * 1.2).clamp(1, double.infinity).toDouble(),
-                        barGroups: barGroups,
-                        borderData: FlBorderData(show: false),
-                        gridData: FlGridData(show: false),
-                        titlesData: FlTitlesData(
-                          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: !isCompact, // Hide labels on mobile to prevent overlap
-                              reservedSize: 52,
-                              getTitlesWidget: (value, meta) {
-                                final index = value.toInt();
-                                if (index < 0 || index >= topEntries.length) {
-                                  return const SizedBox.shrink();
-                                }
-                                final label = formatLabel(topEntries[index].key);
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(
-                                    label,
-                                    textAlign: TextAlign.center,
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 40,
-                              getTitlesWidget: (value, meta) => Text(
-                                value.toInt().toString(),
-                                style: theme.textTheme.bodySmall,
-                              ),
-                            ),
-                          ),
-                        ),
-                        barTouchData: BarTouchData(
-                          enabled: true,
-                          touchTooltipData: BarTouchTooltipData(
-                            tooltipBgColor: theme.colorScheme.surfaceVariant.withOpacity(0.9),
-                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                              final entry = topEntries[groupIndex];
-                              return BarTooltipItem(
-                                '${entry.key}\n',
-                                theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold) ??
-                                    const TextStyle(fontWeight: FontWeight.bold),
-                                children: [
-                                  TextSpan(
-                                    text: '${entry.value} members',
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => _openMembersList(context),
-                      icon: const Icon(Icons.insights_outlined),
-                      label: const Text('View members in this segment'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        Widget buildSummaryCard() {
-          return Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${metricLabels[_selectedMetric] ?? 'Segment'} Snapshot',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  ...topEntries.mapIndexed(
-                    (index, entry) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6.0),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
-                            child: Text(
-                              '${index + 1}',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  entry.key,
-                                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                                ),
-                                Text(
-                                  '${entry.value} members',
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => _openMembersList(context),
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text('Explore full list'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final chartCard = buildChartCard();
-        final summaryCard = buildSummaryCard();
-
-        if (isCompact) {
-          return SizedBox(
-            height: 360,
-            child: PageView(
-              controller: PageController(viewportFraction: 0.92),
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                chartCard,
-                summaryCard,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _momentumBlue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.bar_chart, color: _momentumBlue),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Member Distribution',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: _unityBlue,
+                    ),
+                  ),
+                ),
+                DropdownButton<String>(
+                  value: _selectedMetric,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedMetric = value);
+                    }
+                  },
+                  items: metricLabels.entries
+                      .map((entry) => DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ))
+                      .toList(),
+                ),
               ],
             ),
-          );
-        }
-
-        if (isWide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: chartCard),
-              const SizedBox(width: 24),
-              SizedBox(width: 320, child: summaryCard),
-            ],
-          );
-        }
-
-        return Column(
-          children: [
-            chartCard,
-            const SizedBox(height: 16),
-            summaryCard,
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildBreakdownRow(BuildContext context, _DashboardData data) {
-    final theme = Theme.of(context);
-
-    /// Design refresh plan for breakdown row:
-    /// - Allow swipe navigation on narrow screens so metrics remain discoverable without endless scrolling.
-    /// - Keep wrap-based layout for desktops but collapse into a single column when necessary.
-    /// - Attach quick-action buttons so organizers can jump straight to segmented member lists.
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 1000;
-        final useCarousel = constraints.maxWidth < 600;
-
-        final breakdowns = [
-          _BreakdownCard(
-            title: 'Top Counties',
-            metricLabel: 'members',
-            data: data.counties,
-            total: data.totalMembers,
-            accentColor: theme.colorScheme.primary,
-            actionLabel: 'View counties',
-            onViewDetails: () => _openCountiesView(context),
-          ),
-          _BreakdownCard(
-            title: 'Top Districts',
-            metricLabel: 'members',
-            data: data.districts,
-            total: data.totalMembers,
-            accentColor: theme.colorScheme.secondary,
-            actionLabel: 'View districts',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Committees',
-            metricLabel: 'members',
-            data: data.committees,
-            total: data.totalMembers,
-            accentColor: theme.colorScheme.tertiary,
-            actionLabel: 'View committees',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Age Distribution',
-            metricLabel: 'members',
-            data: data.ageBuckets,
-            total: data.ageBuckets.values.sum,
-            accentColor: theme.colorScheme.primaryContainer,
-            actionLabel: 'View age segments',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Sexual Orientation',
-            metricLabel: 'responses',
-            data: data.sexualOrientations,
-            total: data.sexualOrientations.values.sum,
-            accentColor: theme.colorScheme.secondaryContainer,
-            actionLabel: 'View responses',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Pronouns',
-            metricLabel: 'responses',
-            data: data.pronouns,
-            total: data.pronouns.values.sum,
-            accentColor: theme.colorScheme.tertiaryContainer,
-            actionLabel: 'View pronoun data',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Gender Identity',
-            metricLabel: 'responses',
-            data: data.genders,
-            total: data.genders.values.sum,
-            accentColor: theme.colorScheme.surfaceVariant,
-            actionLabel: 'View gender data',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Race & Ethnicity',
-            metricLabel: 'responses',
-            data: data.races,
-            total: data.races.values.sum,
-            accentColor: theme.colorScheme.inversePrimary,
-            actionLabel: 'View race data',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Languages',
-            metricLabel: 'speakers',
-            data: data.languages,
-            total: data.languages.values.sum,
-            accentColor: theme.colorScheme.secondaryContainer,
-            actionLabel: 'View languages',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Community Type',
-            metricLabel: 'responses',
-            data: data.communityTypes,
-            total: data.communityTypes.values.sum,
-            accentColor: theme.colorScheme.surfaceVariant,
-            actionLabel: 'View community types',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Industries',
-            metricLabel: 'members',
-            data: data.industries,
-            total: data.industries.values.sum,
-            accentColor: theme.colorScheme.primary,
-            actionLabel: 'View industries',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Education',
-            metricLabel: 'responses',
-            data: data.educationLevels,
-            total: data.educationLevels.values.sum,
-            accentColor: theme.colorScheme.secondary,
-            actionLabel: 'View education data',
-            onViewDetails: () => _openMembersList(context),
-          ),
-          _BreakdownCard(
-            title: 'Voter Registration',
-            metricLabel: 'members',
-            data: data.registeredVoters,
-            total: data.registeredVoters.values.sum,
-            accentColor: theme.colorScheme.errorContainer,
-            actionLabel: 'View voter status',
-            onViewDetails: () => _openMembersList(context),
-          ),
-        ];
-
-        if (useCarousel) {
-          return SizedBox(
-            height: 260,
-            child: PageView.builder(
-              controller: PageController(viewportFraction: 0.9),
-              itemCount: breakdowns.length,
-              itemBuilder: (context, index) => Padding(
-                padding: EdgeInsets.only(right: index == breakdowns.length - 1 ? 0 : 12),
-                child: breakdowns[index],
-              ),
-            ),
-          );
-        }
-
-        if (isWide) {
-          return Wrap(
-            spacing: 24,
-            runSpacing: 24,
-            children: breakdowns
-                .map(
-                  (card) => SizedBox(
-                    width: (constraints.maxWidth - 24) / 2,
-                    child: card,
+            const SizedBox(height: 24),
+            if (topEntries.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Center(
+                  child: Text(
+                    'No data available for ${metricLabels[_selectedMetric] ?? 'selected metric'}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
                   ),
-                )
-                .toList(),
-          );
-        }
-
-        return Column(
-          children: breakdowns
-              .map(
-                (card) => Padding(
-                  padding: const EdgeInsets.only(bottom: 20.0),
-                  child: card,
                 ),
               )
-              .toList(),
-        );
-      },
+            else
+              _buildBarChart(topEntries),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () => _openMembersList(context),
+              icon: const Icon(Icons.insights_outlined, color: _momentumBlue),
+              label: const Text(
+                'View members in this segment',
+                style: TextStyle(color: _momentumBlue),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildRecentMembers(BuildContext context, List<Member> members) {
-    final theme = Theme.of(context);
+  Widget _buildBarChart(List<MapEntry<String, int>> entries) {
+    final maxValue = entries.fold<int>(0, (prev, e) => e.value > prev ? e.value : prev);
 
-    /// Design refresh plan for recent members:
-    /// - Introduce carousel behaviour on mobile so the latest joins are swipeable.
-    /// - Adjust spacing and typography based on width to preserve readability.
-    /// - Provide a direct action for staff to jump into the full members list.
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth;
-        final isNarrow = maxWidth < 600;
-        final isTablet = maxWidth >= 600 && maxWidth < 1024;
-        final EdgeInsetsGeometry containerPadding = isNarrow
-            ? const EdgeInsets.symmetric(horizontal: 16, vertical: 20)
-            : const EdgeInsets.all(24);
-        final TextStyle? titleStyle = (isNarrow ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
-            ?.copyWith(fontWeight: FontWeight.w700);
-        final verticalSpacing = isNarrow ? 12.0 : 16.0;
-
-        Widget buildContent() {
-          if (members.isEmpty) {
-            return Text(
-              'No recent members yet. New sign-ups will appear here automatically.',
-              style: theme.textTheme.bodyMedium,
-              textAlign: isNarrow ? TextAlign.start : TextAlign.center,
-            );
-          }
-
-          if (isNarrow) {
-            return SizedBox(
-              height: 124,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: members.length,
-                padding: EdgeInsets.zero,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, index) => SizedBox(
-                  width: 180,
-                  child: _RecentMemberTile(
-                    member: members[index],
-                    variant: _RecentMemberTileVariant.compact,
-                    margin: EdgeInsets.zero,
-                    showDetails: false,
-                    showTimestamp: true,
+    return SizedBox(
+      height: 280,
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: (maxValue * 1.2).clamp(1, double.infinity).toDouble(),
+          barGroups: List.generate(entries.length, (index) {
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                BarChartRodData(
+                  toY: entries[index].value.toDouble(),
+                  width: 20,
+                  borderRadius: BorderRadius.circular(6),
+                  gradient: const LinearGradient(
+                    colors: [_momentumBlue, _justicePurple],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
                   ),
-                ),
-              ),
-            );
-          }
-
-          if (isTablet) {
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: members.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 3.2,
-              ),
-              itemBuilder: (context, index) => _RecentMemberTile(
-                member: members[index],
-                variant: _RecentMemberTileVariant.medium,
-                margin: EdgeInsets.zero,
-                showTimestamp: true,
-              ),
-            );
-          }
-
-          return Column(
-            children: members
-                .map(
-                  (member) => _RecentMemberTile(
-                    member: member,
-                    variant: _RecentMemberTileVariant.regular,
-                  ),
-                )
-                .toList(),
-          );
-        }
-
-        return Container(
-          padding: containerPadding,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.shadow.withOpacity(0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Newest Members', style: titleStyle),
-              SizedBox(height: verticalSpacing),
-              buildContent(),
-              SizedBox(height: verticalSpacing),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () => _openMembersList(context),
-                  icon: const Icon(Icons.people_alt_outlined),
-                  label: const Text('View all members'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _DashboardData {
-  final int totalMembers;
-  final int contactableMembers;
-  final int optedOutMembers;
-  final int withPhoneMembers;
-  final int chatCount;
-  final int totalMessages;
-  final int weeklyMessages;
-  final Map<String, int> counties;
-  final Map<String, int> districts;
-  final Map<String, int> committees;
-  final Map<String, int> highSchools;
-  final Map<String, int> colleges;
-  final Map<String, int> chapters;
-  final Map<String, int> chapterStatuses;
-  final Map<String, int> graduationYears;
-  final Map<String, int> pronouns;
-  final Map<String, int> genders;
-  final Map<String, int> races;
-  final Map<String, int> languages;
-  final Map<String, int> communityTypes;
-  final Map<String, int> industries;
-  final Map<String, int> educationLevels;
-  final Map<String, int> registeredVoters;
-  final Map<String, int> sexualOrientations;
-  final Map<String, int> ageBuckets;
-  final List<Member> recentMembers;
-
-  const _DashboardData({
-    required this.totalMembers,
-    required this.contactableMembers,
-    required this.optedOutMembers,
-    required this.withPhoneMembers,
-    required this.chatCount,
-    required this.totalMessages,
-    required this.weeklyMessages,
-    required this.counties,
-    required this.districts,
-    required this.committees,
-    required this.highSchools,
-    required this.colleges,
-    required this.chapters,
-    required this.chapterStatuses,
-    required this.graduationYears,
-    required this.pronouns,
-    required this.genders,
-    required this.races,
-    required this.languages,
-    required this.communityTypes,
-    required this.industries,
-    required this.educationLevels,
-    required this.registeredVoters,
-    required this.sexualOrientations,
-    required this.ageBuckets,
-    required this.recentMembers,
-  });
-
-  const _DashboardData.empty()
-      : totalMembers = 0,
-        contactableMembers = 0,
-        optedOutMembers = 0,
-        withPhoneMembers = 0,
-        chatCount = 0,
-        totalMessages = 0,
-        weeklyMessages = 0,
-        counties = const {},
-        districts = const {},
-        committees = const {},
-        highSchools = const {},
-        colleges = const {},
-        chapters = const {},
-        chapterStatuses = const {},
-        graduationYears = const {},
-        pronouns = const {},
-        genders = const {},
-        races = const {},
-        languages = const {},
-        communityTypes = const {},
-        industries = const {},
-        educationLevels = const {},
-        registeredVoters = const {},
-        sexualOrientations = const {},
-        ageBuckets = const {},
-        recentMembers = const [];
-
-  int get countiesRepresented {
-    final filtered = counties.entries
-        .where((entry) => entry.value > 0 && entry.key.trim().toLowerCase() != 'unknown')
-        .length;
-    return filtered;
-  }
-
-  int get charteredChapters {
-    final charteredFromStatuses = chapterStatuses.entries
-        .where((entry) => entry.key.toLowerCase().contains('charter'))
-        .fold<int>(0, (sum, entry) => sum + entry.value);
-
-    if (charteredFromStatuses > 0) {
-      return charteredFromStatuses;
-    }
-
-    final charteredByName = chapters.entries
-        .where((entry) => entry.key.toLowerCase().contains('charter'))
-        .length;
-
-    if (charteredByName > 0) {
-      return charteredByName;
-    }
-
-    return chapters.length;
-  }
-}
-
-class _StatCardData {
-  final String title;
-  final int? value;
-  final IconData icon;
-  final String description;
-  final List<Color> colors;
-  final String actionLabel;
-  final String semanticsLabel;
-  final void Function(BuildContext context) onTap;
-
-  _StatCardData({
-    required this.title,
-    this.value,
-    required this.icon,
-    required this.description,
-    required this.colors,
-    required this.actionLabel,
-    required this.semanticsLabel,
-    required this.onTap,
-  });
-}
-
-class _StatCard extends StatelessWidget {
-  final _StatCardData data;
-  final VoidCallback? onTap;
-  final String? actionLabel;
-  final String? semanticsLabel;
-
-  const _StatCard({
-    required this.data,
-    this.onTap,
-    this.actionLabel,
-    this.semanticsLabel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Semantics(
-      button: onTap != null,
-      label: semanticsLabel ??
-          (data.value != null ? '${data.value} ${data.title}' : data.title),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: data.colors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: data.colors.last.withOpacity(0.25),
-                  blurRadius: 18,
-                  offset: const Offset(0, 12),
                 ),
               ],
+            );
+          }),
+          borderData: FlBorderData(show: false),
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(
+            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 52,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= entries.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final label = entries[index].key;
+                  final displayLabel = label.length > 12 ? '${label.substring(0, 11)}…' : label;
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      displayLabel,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 11, color: _unityBlue),
+                    ),
+                  );
+                },
+              ),
             ),
-            padding: const EdgeInsets.all(20),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isCompact = constraints.maxHeight < 220 || constraints.maxWidth < 220;
-                final valueStyle = (isCompact
-                        ? theme.textTheme.headlineSmall
-                        : theme.textTheme.displaySmall)
-                    ?.copyWith(
-                  color: theme.colorScheme.onPrimary,
-                  fontWeight: FontWeight.bold,
-                );
-                final titleStyle = (isCompact
-                        ? theme.textTheme.titleSmall
-                        : theme.textTheme.titleMedium)
-                    ?.copyWith(
-                  color: theme.colorScheme.onPrimary,
-                  fontWeight: FontWeight.w600,
-                );
-                final bodyStyle = theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onPrimary.withOpacity(0.85),
-                );
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40,
+                getTitlesWidget: (value, meta) => Text(
+                  value.toInt().toString(),
+                  style: const TextStyle(fontSize: 11, color: _unityBlue),
+                ),
+              ),
+            ),
+          ),
+          barTouchData: BarTouchData(
+            enabled: true,
+            touchTooltipData: BarTouchTooltipData(
+              tooltipBgColor: _unityBlue.withOpacity(0.9),
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final entry = entries[groupIndex];
+                return BarTooltipItem(
+                  '${entry.key}\n',
+                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   children: [
-                    Icon(data.icon, color: theme.colorScheme.onPrimary, size: isCompact ? 24 : 28),
-                    const SizedBox(height: 16),
-                    Text(data.title, style: titleStyle),
-                    if (data.value != null) ...[
-                      const SizedBox(height: 8),
-                      Text(data.value!.toString(), style: valueStyle),
-                      const SizedBox(height: 6),
-                    ] else
-                      const SizedBox(height: 12),
-                    Text(data.description, style: bodyStyle),
-                    const Spacer(),
-                    if (onTap != null)
-                      TextButton.icon(
-                        onPressed: onTap,
-                        icon: Icon(Icons.open_in_new, size: 16, color: theme.colorScheme.onPrimary),
-                        label: Text(
-                          actionLabel ?? 'Open details',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: theme.colorScheme.onPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          foregroundColor: theme.colorScheme.onPrimary,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
+                    TextSpan(
+                      text: '${entry.value} members',
+                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12),
+                    ),
                   ],
                 );
               },
@@ -1407,282 +854,234 @@ class _StatCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _BreakdownCard extends StatelessWidget {
-  final String title;
-  final String metricLabel;
-  final Map<String, int> data;
-  final int total;
-  final Color accentColor;
-  final VoidCallback? onViewDetails;
-  final String actionLabel;
+  Widget _buildBreakdownSection(BuildContext context, DashboardMetrics metrics) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 800;
+        final useCarousel = constraints.maxWidth < 600;
 
-  const _BreakdownCard({
-    required this.title,
-    required this.metricLabel,
-    required this.data,
-    required this.total,
-    required this.accentColor,
-    this.onViewDetails,
-    this.actionLabel = 'View details',
-  });
+        final breakdowns = [
+          _BreakdownData(
+            title: 'Donations',
+            icon: Icons.volunteer_activism,
+            color: _grassrootsGreen,
+            items: [
+              _BreakdownItem('Total Donations', metrics.totalDonations.toString()),
+              _BreakdownItem('Total Amount', '\$${_formatNumber(metrics.totalDonationAmount.toInt())}'),
+              _BreakdownItem('This Month', metrics.donationsThisMonth.toString()),
+            ],
+          ),
+          _BreakdownData(
+            title: 'Events & Forms',
+            icon: Icons.event,
+            color: _sunriseGold,
+            items: [
+              _BreakdownItem('Total Events', metrics.totalEvents.toString()),
+              _BreakdownItem('Upcoming', metrics.upcomingEvents.toString()),
+              _BreakdownItem('Form Submissions', metrics.formSubmissionsThisMonth.toString()),
+            ],
+          ),
+          _BreakdownData(
+            title: 'Meetings',
+            icon: Icons.video_camera_front_outlined,
+            color: _momentumBlue,
+            items: [
+              _BreakdownItem('Total Meetings', metrics.totalMeetings.toString()),
+              _BreakdownItem('This Month', metrics.meetingsThisMonth.toString()),
+              _BreakdownItem('Attendance Records', metrics.totalAttendanceRecords.toString()),
+            ],
+          ),
+          _BreakdownData(
+            title: 'Messaging',
+            icon: Icons.message,
+            color: _justicePurple,
+            items: [
+              _BreakdownItem('Total Messages', _formatNumber(_totalMessages)),
+              _BreakdownItem('This Week', _formatNumber(_weeklyMessages)),
+              _BreakdownItem('Active Chats', _chatCount.toString()),
+            ],
+          ),
+        ];
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final topEntries = data.entries
-        .where((entry) => entry.value > 0)
-        .take(6)
-        .toList();
+        if (useCarousel) {
+          return SizedBox(
+            height: 200,
+            child: PageView.builder(
+              controller: PageController(viewportFraction: 0.9),
+              itemCount: breakdowns.length,
+              itemBuilder: (context, index) => Padding(
+                padding: EdgeInsets.only(right: index == breakdowns.length - 1 ? 0 : 12),
+                child: _buildBreakdownCard(breakdowns[index]),
+              ),
+            ),
+          );
+        }
 
-    return Semantics(
-      label: '$title breakdown',
-      button: onViewDetails != null,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: onViewDetails,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.shadow.withOpacity(0.08),
-                  blurRadius: 14,
-                  offset: const Offset(0, 12),
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: breakdowns.map((data) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: _buildBreakdownCard(data),
+              ),
+            )).toList(),
+          );
+        }
+
+        return Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: breakdowns.map((data) => SizedBox(
+            width: (constraints.maxWidth - 16) / 2,
+            child: _buildBreakdownCard(data),
+          )).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildBreakdownCard(_BreakdownData data) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: data.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(data.icon, color: data.color, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    data.title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: _unityBlue,
+                    ),
+                  ),
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      height: 32,
-                      width: 32,
-                      decoration: BoxDecoration(
-                        color: accentColor.withOpacity(0.18),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.insights, color: accentColor),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                if (topEntries.isEmpty)
+            const SizedBox(height: 16),
+            ...data.items.map((item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   Text(
-                    'No data available yet.',
-                    style: theme.textTheme.bodyMedium,
-                  )
-                else
-                  ...topEntries.mapIndexed((index, entry) {
-                    final percentage = total == 0 ? 0.0 : (entry.value / total).clamp(0.0, 1.0);
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: index == topEntries.length - 1 ? 12 : 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  entry.key,
-                                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                              Text('${entry.value} $metricLabel'),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(999),
-                            child: LinearProgressIndicator(
-                              value: percentage,
-                              minHeight: 6,
-                              color: accentColor,
-                              backgroundColor: accentColor.withOpacity(0.1),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                if (onViewDetails != null) ...[
-                  const SizedBox(height: 12),
-                  TextButton.icon(
-                    onPressed: onViewDetails,
-                    icon: const Icon(Icons.search),
-                    label: Text(actionLabel),
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    item.label,
+                    style: TextStyle(
+                      color: _unityBlue.withOpacity(0.7),
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    item.value,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: _unityBlue,
+                      fontSize: 14,
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
+              ),
+            )),
+          ],
         ),
       ),
     );
   }
-}
 
-class _HeaderPill extends StatelessWidget {
-  final String label;
-  final String valueText;
-  final IconData icon;
-  final VoidCallback? onTap;
-  final String? semanticsLabel;
-
-  const _HeaderPill({
-    required this.label,
-    required this.valueText,
-    required this.icon,
-    this.onTap,
-    this.semanticsLabel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildRecentMembers(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Semantics(
-      button: onTap != null,
-      label: semanticsLabel ?? '$valueText $label',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Icon(icon, color: theme.colorScheme.onPrimary),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _grassrootsGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.person_add, color: _grassrootsGreen),
+                ),
+                const SizedBox(width: 12),
                 Text(
-                  '$valueText $label',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.bold,
+                  'Newest Members',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: _unityBlue,
                   ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 20),
+            if (_recentMembers.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: Text(
+                    'No recent members yet',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+              )
+            else
+              ..._recentMembers.map((member) => _buildMemberTile(member)),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () => _openMembersList(context),
+              icon: const Icon(Icons.people_alt_outlined, color: _momentumBlue),
+              label: const Text(
+                'View all members',
+                style: TextStyle(color: _momentumBlue),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
-}
 
-enum _RecentMemberTileVariant { compact, medium, regular }
-
-class _RecentMemberTile extends StatelessWidget {
-  final Member member;
-  final _RecentMemberTileVariant variant;
-  final EdgeInsetsGeometry? margin;
-  final bool showDetails;
-  final bool showTimestamp;
-
-  const _RecentMemberTile({
-    required this.member,
-    this.variant = _RecentMemberTileVariant.regular,
-    this.margin,
-    this.showDetails = true,
-    this.showTimestamp = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildMemberTile(Member member) {
     final theme = Theme.of(context);
     final details = [
       if (member.county != null && member.county!.isNotEmpty) member.county!,
-      if (member.congressionalDistrict != null && member.congressionalDistrict!.isNotEmpty)
+      if (member.congressionalDistrict != null)
         Member.formatDistrictLabel(member.congressionalDistrict) ?? member.congressionalDistrict!,
     ];
 
-    late final BorderRadius borderRadius;
-    late final EdgeInsetsGeometry padding;
-    late final double avatarRadius;
-    late final double horizontalSpacing;
-    TextStyle? nameStyle;
-    TextStyle? avatarTextStyle;
-
-    switch (variant) {
-      case _RecentMemberTileVariant.compact:
-        borderRadius = BorderRadius.circular(12);
-        padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
-        avatarRadius = 16;
-        horizontalSpacing = 8;
-        nameStyle = theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
-        avatarTextStyle = theme.textTheme.titleSmall?.copyWith(
-          color: theme.colorScheme.onPrimaryContainer,
-          fontWeight: FontWeight.w600,
-        );
-        break;
-      case _RecentMemberTileVariant.medium:
-        borderRadius = BorderRadius.circular(14);
-        padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 14);
-        avatarRadius = 20;
-        horizontalSpacing = 12;
-        nameStyle = theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600);
-        avatarTextStyle = theme.textTheme.titleMedium?.copyWith(
-          color: theme.colorScheme.onPrimaryContainer,
-          fontWeight: FontWeight.w600,
-        );
-        break;
-      case _RecentMemberTileVariant.regular:
-        borderRadius = BorderRadius.circular(16);
-        padding = const EdgeInsets.all(16);
-        avatarRadius = 22;
-        horizontalSpacing = 16;
-        nameStyle = theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600);
-        avatarTextStyle = theme.textTheme.titleLarge?.copyWith(
-          color: theme.colorScheme.onPrimaryContainer,
-          fontWeight: FontWeight.w600,
-        );
-        break;
-    }
-
-    final EdgeInsetsGeometry effectiveMargin;
-    switch (variant) {
-      case _RecentMemberTileVariant.compact:
-        effectiveMargin = margin ?? EdgeInsets.zero;
-        break;
-      case _RecentMemberTileVariant.medium:
-        effectiveMargin = margin ?? const EdgeInsets.symmetric(vertical: 6);
-        break;
-      case _RecentMemberTileVariant.regular:
-        effectiveMargin = margin ?? const EdgeInsets.symmetric(vertical: 8);
-        break;
-    }
-
-    final bool shouldShowDetails = showDetails && details.isNotEmpty;
-    final bool shouldShowTimestamp = showTimestamp && member.createdAt != null;
-
     return InkWell(
-      borderRadius: borderRadius,
       onTap: () {
         Navigator.of(context).push(
           ThemeSwitcher.buildPageRoute(
@@ -1692,63 +1091,69 @@ class _RecentMemberTile extends StatelessWidget {
           ),
         );
       },
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        margin: effectiveMargin,
-        padding: padding,
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.45),
-          borderRadius: borderRadius,
+          color: _unityBlue.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: avatarRadius,
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  child: Text(
-                    member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-                    style: avatarTextStyle,
-                  ),
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: _momentumBlue.withOpacity(0.2),
+              child: Text(
+                member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
+                style: const TextStyle(
+                  color: _momentumBlue,
+                  fontWeight: FontWeight.w600,
                 ),
-                SizedBox(width: horizontalSpacing),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        member.name,
-                        style: nameStyle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (shouldShowDetails)
-                        Text(
-                          details.join(' • '),
-                          style: theme.textTheme.bodySmall,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
-            if (shouldShowTimestamp)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  _timeAgo(member.createdAt!),
-                  style: theme.textTheme.labelSmall,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    member.name,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: _unityBlue,
+                    ),
+                  ),
+                  if (details.isNotEmpty)
+                    Text(
+                      details.join(' • '),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: _unityBlue.withOpacity(0.7),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (member.createdAt != null)
+              Text(
+                _timeAgo(member.createdAt!),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: _unityBlue.withOpacity(0.5),
                 ),
               ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatNumber(int number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    }
+    return number.toString();
   }
 
   static String _timeAgo(DateTime date) {
@@ -1764,4 +1169,59 @@ class _RecentMemberTile extends StatelessWidget {
     }
     return 'Just now';
   }
+}
+
+class _HeroStat {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _HeroStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.onTap,
+  });
+}
+
+class _ActionCard {
+  final String title;
+  final int? value;
+  final IconData icon;
+  final String description;
+  final List<Color> gradient;
+  final VoidCallback? onTap;
+
+  const _ActionCard({
+    required this.title,
+    this.value,
+    required this.icon,
+    required this.description,
+    required this.gradient,
+    this.onTap,
+  });
+}
+
+class _BreakdownData {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final List<_BreakdownItem> items;
+
+  const _BreakdownData({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.items,
+  });
+}
+
+class _BreakdownItem {
+  final String label;
+  final String value;
+
+  const _BreakdownItem(this.label, this.value);
 }
