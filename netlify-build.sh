@@ -9,21 +9,66 @@ cd "$REPO_ROOT"
 FLUTTER_ROOT="${FLUTTER_ROOT:-/opt/buildhome/.flutter}"
 FLUTTER_VERSION="${FLUTTER_VERSION:-3.24.4}"
 
+# Download with retry logic
+function download_with_retry() {
+  local url="$1"
+  local output="$2"
+  local max_retries=4
+  local retry_delay=2
+
+  for ((i=1; i<=max_retries; i++)); do
+    echo "Download attempt $i of $max_retries..."
+    if curl -fSL --connect-timeout 30 --max-time 300 -o "$output" "$url"; then
+      echo "Download successful!"
+      return 0
+    fi
+    if [ $i -lt $max_retries ]; then
+      echo "Download failed, retrying in ${retry_delay}s..."
+      sleep $retry_delay
+      retry_delay=$((retry_delay * 2))
+    fi
+  done
+  echo "Download failed after $max_retries attempts"
+  return 1
+}
+
 function ensure_flutter() {
-  if [ ! -d "$FLUTTER_ROOT/.git" ]; then
-    echo "Installing Flutter SDK ($FLUTTER_VERSION) from scratch..."
-    rm -rf "$FLUTTER_ROOT"
-    git clone --branch "$FLUTTER_VERSION" --depth 1 https://github.com/flutter/flutter.git "$FLUTTER_ROOT"
-    return
+  # Check if Flutter is already installed and correct version
+  if [ -f "$FLUTTER_ROOT/bin/flutter" ]; then
+    local installed_version
+    installed_version=$("$FLUTTER_ROOT/bin/flutter" --version 2>/dev/null | head -1 | grep -oP '\d+\.\d+\.\d+' || echo "")
+    if [ "$installed_version" = "$FLUTTER_VERSION" ]; then
+      echo "Flutter SDK $FLUTTER_VERSION already installed."
+      return 0
+    fi
+    echo "Flutter version mismatch (installed: $installed_version, required: $FLUTTER_VERSION). Reinstalling..."
   fi
 
-  if ! git -C "$FLUTTER_ROOT" rev-parse "refs/tags/$FLUTTER_VERSION" >/dev/null 2>&1; then
-    echo "Fetching Flutter tag $FLUTTER_VERSION..."
-    git -C "$FLUTTER_ROOT" fetch --depth 1 origin "refs/tags/$FLUTTER_VERSION:refs/tags/$FLUTTER_VERSION"
+  echo "Installing Flutter SDK ($FLUTTER_VERSION) from Google Storage..."
+  rm -rf "$FLUTTER_ROOT"
+  mkdir -p "$FLUTTER_ROOT"
+
+  # Download Flutter from Google's storage (avoids GitHub DNS issues)
+  local flutter_archive="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+  local flutter_url="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/$flutter_archive"
+  local tmp_archive="/tmp/$flutter_archive"
+
+  echo "Downloading from: $flutter_url"
+  if ! download_with_retry "$flutter_url" "$tmp_archive"; then
+    echo "Error: Failed to download Flutter SDK"
+    exit 1
   fi
 
-  echo "Switching Flutter SDK to $FLUTTER_VERSION..."
-  git -C "$FLUTTER_ROOT" checkout --quiet "refs/tags/$FLUTTER_VERSION" || git -C "$FLUTTER_ROOT" checkout --quiet "$FLUTTER_VERSION"
+  echo "Extracting Flutter SDK..."
+  tar -xf "$tmp_archive" -C "$(dirname "$FLUTTER_ROOT")"
+
+  # The archive extracts to a 'flutter' directory, rename if needed
+  if [ -d "$(dirname "$FLUTTER_ROOT")/flutter" ] && [ "$(dirname "$FLUTTER_ROOT")/flutter" != "$FLUTTER_ROOT" ]; then
+    mv "$(dirname "$FLUTTER_ROOT")/flutter" "$FLUTTER_ROOT"
+  fi
+
+  rm -f "$tmp_archive"
+  echo "Flutter SDK installed successfully!"
 }
 
 ensure_flutter
