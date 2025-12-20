@@ -743,10 +743,14 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
   Widget _buildVerticalBars(List<NameCount> displayData, int maxValue, BoxConstraints constraints) {
     final barWidth = ((constraints.maxWidth - 60) / displayData.length).clamp(14.0, 32.0);
 
+    // Calculate a nice interval for y-axis labels (aim for 4-5 labels)
+    final yAxisInterval = _calculateNiceInterval(maxValue, 4);
+    final adjustedMaxY = ((maxValue / yAxisInterval).ceil() * yAxisInterval * 1.1).clamp(1.0, double.infinity);
+
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
-        maxY: (maxValue * 1.15).clamp(1, double.infinity).toDouble(),
+        maxY: adjustedMaxY,
         barGroups: List.generate(displayData.length, (index) {
           return BarChartGroupData(
             x: index,
@@ -807,12 +811,20 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 30,
+              reservedSize: 40,
+              interval: yAxisInterval,
               getTitlesWidget: (value, meta) {
-                if (value == 0) return const SizedBox.shrink();
-                return Text(
-                  _formatNumber(value.toInt()),
-                  style: const TextStyle(fontSize: 9, color: _unityBlue),
+                // Skip 0 and values very close to max (to avoid cramping at top)
+                if (value == 0 || value > adjustedMaxY * 0.95) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Text(
+                    _formatNumber(value.toInt()),
+                    style: const TextStyle(fontSize: 10, color: _unityBlue),
+                    textAlign: TextAlign.right,
+                  ),
                 );
               },
             ),
@@ -920,6 +932,36 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
       return '${(value / 1000).toStringAsFixed(1)}K';
     }
     return value.toString();
+  }
+
+  /// Calculate a nice round interval for y-axis labels
+  double _calculateNiceInterval(int maxValue, int targetLabels) {
+    if (maxValue <= 0) return 1.0;
+
+    // Calculate raw interval
+    final rawInterval = maxValue / targetLabels;
+
+    // Find the order of magnitude
+    final magnitude = math.pow(10, (math.log(rawInterval) / math.ln10).floor()).toDouble();
+
+    // Calculate normalized value (1-10 range)
+    final normalized = rawInterval / magnitude;
+
+    // Round to nice values (1, 2, 2.5, 5, or 10)
+    double niceNormalized;
+    if (normalized <= 1) {
+      niceNormalized = 1;
+    } else if (normalized <= 2) {
+      niceNormalized = 2;
+    } else if (normalized <= 2.5) {
+      niceNormalized = 2.5;
+    } else if (normalized <= 5) {
+      niceNormalized = 5;
+    } else {
+      niceNormalized = 10;
+    }
+
+    return niceNormalized * magnitude;
   }
 
   Widget _buildEmptyState() {
@@ -1360,6 +1402,7 @@ class LeaderboardWidget extends StatelessWidget {
   final List<dynamic> data; // Can be TopDonor or TopSlackMember
   final bool isDonors;
   final int maxItems;
+  final VoidCallback? onTap;
 
   const LeaderboardWidget({
     super.key,
@@ -1367,6 +1410,7 @@ class LeaderboardWidget extends StatelessWidget {
     required this.data,
     this.isDonors = false,
     this.maxItems = 5,
+    this.onTap,
   });
 
   @override
@@ -1380,39 +1424,43 @@ class LeaderboardWidget extends StatelessWidget {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                itemCount: displayData.length,
-                itemBuilder: (context, index) {
-                  final item = displayData[index];
-                  final name = isDonors
-                      ? (item as TopDonor).name
-                      : (item as TopSlackMember).name;
-                  final value = isDonors
-                      ? '\$${(item as TopDonor).totalDonated.toStringAsFixed(0)}'
-                      : '${(item as TopSlackMember).messageCount} msgs';
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount: displayData.length,
+                  itemBuilder: (context, index) {
+                    final item = displayData[index];
+                    final name = isDonors
+                        ? (item as TopDonor).name
+                        : (item as TopSlackMember).name;
+                    final value = isDonors
+                        ? '\$${(item as TopDonor).totalDonated.toStringAsFixed(0)}'
+                        : '${(item as TopSlackMember).messageCount} msgs';
 
-                  return _buildLeaderboardItem(
-                    rank: index + 1,
-                    name: name,
-                    value: value,
-                  );
-                },
+                    return _buildLeaderboardItem(
+                      rank: index + 1,
+                      name: name,
+                      value: value,
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
