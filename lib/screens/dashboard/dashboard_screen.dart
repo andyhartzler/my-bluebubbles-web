@@ -12,9 +12,14 @@ import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/dashboard_metrics.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/features/committees/models/committee.dart';
+import 'package:bluebubbles/features/committees/screens/committee_workspace_screen.dart';
+import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
+import 'package:bluebubbles/screens/crm/donors_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
+import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/services/crm/dashboard_metrics_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/quick_links_repository.dart';
@@ -468,6 +473,104 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
+  void _openDonorsScreen(BuildContext context) {
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (_) => const TitleBarWrapper(
+          child: DonorsScreen(),
+        ),
+      ),
+    );
+  }
+
+  void _openSubscribersScreen(BuildContext context) {
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (_) => const TitleBarWrapper(
+          child: SubscribersScreen(),
+        ),
+      ),
+    );
+  }
+
+  void _openSlackScreen(BuildContext context) {
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (_) => const TitleBarWrapper(
+          child: SlackManagementScreen(),
+        ),
+      ),
+    );
+  }
+
+  void _openSocialMediaStats(BuildContext context) {
+    // Navigate to Communications committee with Social Media tab
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (_) => TitleBarWrapper(
+          child: CommitteeWorkspaceScreen(
+            committee: CommitteeDefinitions.communications,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Returns the appropriate onTap handler for a given dataSourceKey
+  VoidCallback? _getNavigationForDataSource(String dataSourceKey) {
+    // Slack-related keys
+    if (dataSourceKey.toLowerCase().contains('slack')) {
+      return () => _openSlackScreen(context);
+    }
+
+    // Donor/donation-related keys
+    if (dataSourceKey.toLowerCase().contains('donor') ||
+        dataSourceKey.toLowerCase().contains('donation')) {
+      return () => _openDonorsScreen(context);
+    }
+
+    // Subscriber-related keys
+    if (dataSourceKey.toLowerCase().contains('subscriber')) {
+      return () => _openSubscribersScreen(context);
+    }
+
+    // Chapter-related keys
+    if (dataSourceKey.toLowerCase().contains('chapter')) {
+      return () => _openMembersList(context, showChaptersOnly: true);
+    }
+
+    // Social media / impressions related keys
+    if (dataSourceKey.toLowerCase().contains('social') ||
+        dataSourceKey.toLowerCase().contains('impression')) {
+      return () => _openSocialMediaStats(context);
+    }
+
+    // Member-related keys (default fallback for most stats)
+    if (dataSourceKey.toLowerCase().contains('member') ||
+        dataSourceKey.toLowerCase().contains('age') ||
+        dataSourceKey.toLowerCase().contains('county') ||
+        dataSourceKey.toLowerCase().contains('district') ||
+        dataSourceKey.toLowerCase().contains('committee') ||
+        dataSourceKey.toLowerCase().contains('college') ||
+        dataSourceKey.toLowerCase().contains('highschool') ||
+        dataSourceKey.toLowerCase().contains('graduation') ||
+        dataSourceKey.toLowerCase().contains('education') ||
+        dataSourceKey.toLowerCase().contains('gender') ||
+        dataSourceKey.toLowerCase().contains('pronoun') ||
+        dataSourceKey.toLowerCase().contains('race') ||
+        dataSourceKey.toLowerCase().contains('orientation') ||
+        dataSourceKey.toLowerCase().contains('voter') ||
+        dataSourceKey.toLowerCase().contains('industry') ||
+        dataSourceKey.toLowerCase().contains('referral') ||
+        dataSourceKey.toLowerCase().contains('community')) {
+      return () => _openMembersList(context);
+    }
+
+    // Event-related keys would go to events screen if we have one
+    // For now, just return null (no navigation)
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -713,7 +816,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return StatCardWidget(
           config: config,
           value: value,
-          onTap: () => _openMembersList(context),
+          onTap: _getNavigationForDataSource(config.dataSourceKey),
         );
 
       case DashboardWidgetType.barChart:

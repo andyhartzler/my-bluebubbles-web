@@ -195,13 +195,24 @@ class StatCardWidget extends StatelessWidget {
   String _formatValue(dynamic val) {
     if (val is num) {
       if (val >= 1000000) {
-        return '${(val / 1000000).toStringAsFixed(1)}M';
+        final formatted = val / 1000000;
+        // Show decimal only if not a whole number
+        return formatted == formatted.truncateToDouble()
+            ? '${formatted.toInt()}M'
+            : '${formatted.toStringAsFixed(1)}M';
       } else if (val >= 1000) {
-        return '${(val / 1000).toStringAsFixed(1)}K';
+        final formatted = val / 1000;
+        return formatted == formatted.truncateToDouble()
+            ? '${formatted.toInt()}K'
+            : '${formatted.toStringAsFixed(1)}K';
       }
       if (val is double) {
         if (config.dataSourceKey.contains('Amount') || config.dataSourceKey.contains('Donation')) {
           return '\$${val.toStringAsFixed(0)}';
+        }
+        // If it's a whole number (no decimal or .0), show as integer
+        if (val == val.truncateToDouble()) {
+          return val.toInt().toString();
         }
         return val.toStringAsFixed(1);
       }
