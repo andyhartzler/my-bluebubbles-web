@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
 import '../../../models/crm/dashboard_metrics.dart';
+import '../../../models/crm/member.dart';
 import '../models/dashboard_widget_config.dart';
 
 // Brand colors
@@ -1030,6 +1031,270 @@ class ProgressRingWidget extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Renders a member list widget with profile photos
+class MemberListWidget extends StatelessWidget {
+  final DashboardWidgetConfig config;
+  final List<Member> members;
+  final void Function(Member member)? onMemberTap;
+  final int maxItems;
+
+  const MemberListWidget({
+    super.key,
+    required this.config,
+    required this.members,
+    this.onMemberTap,
+    this.maxItems = 5,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final displayMembers = members.take(maxItems).toList();
+
+    if (displayMembers.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                itemCount: displayMembers.length,
+                itemBuilder: (context, index) {
+                  final member = displayMembers[index];
+                  return _buildMemberItem(context, member, index);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _grassrootsGreen.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(config.icon ?? Icons.person_add, color: _grassrootsGreen, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            config.title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: _unityBlue,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMemberItem(BuildContext context, Member member, int index) {
+    // Calculate how many days ago they joined
+    String joinedText = '';
+    if (member.createdAt != null) {
+      final daysAgo = DateTime.now().difference(member.createdAt!).inDays;
+      if (daysAgo == 0) {
+        joinedText = 'Today';
+      } else if (daysAgo == 1) {
+        joinedText = 'Yesterday';
+      } else if (daysAgo < 7) {
+        joinedText = '$daysAgo days ago';
+      } else if (daysAgo < 30) {
+        final weeks = (daysAgo / 7).floor();
+        joinedText = weeks == 1 ? '1 week ago' : '$weeks weeks ago';
+      } else {
+        final months = (daysAgo / 30).floor();
+        joinedText = months == 1 ? '1 month ago' : '$months months ago';
+      }
+    }
+
+    return InkWell(
+      onTap: onMemberTap != null ? () => onMemberTap!(member) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            // Profile photo or avatar
+            _buildMemberAvatar(member),
+            const SizedBox(width: 12),
+            // Member info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    member.name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _unityBlue,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (member.chapterName != null || member.county != null)
+                    Text(
+                      member.chapterName ?? member.county ?? '',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            // Joined date badge
+            if (joinedText.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _momentumBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  joinedText,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: _momentumBlue,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMemberAvatar(Member member) {
+    final photoUrl = member.primaryProfilePhotoUrl;
+    final size = 44.0;
+
+    // Generate initials for fallback
+    final initials = _getInitials(member.name);
+
+    // Generate a consistent color based on the member's name
+    final colorIndex = member.name.hashCode.abs() % WidgetGradients.all.length;
+    final gradientColors = WidgetGradients.all[colorIndex];
+
+    Widget fallback = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+      ),
+    );
+
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          photoUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallback,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.grey[200],
+              ),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    return fallback;
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) {
+      return parts[0].isNotEmpty ? parts[0][0].toUpperCase() : '?';
+    }
+    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+  }
+
+  Widget _buildEmptyState() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.people_outline, size: 48, color: Colors.grey[400]),
+              const SizedBox(height: 8),
+              Text(
+                'No recent members',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ],
+          ),
         ),
       ),
     );

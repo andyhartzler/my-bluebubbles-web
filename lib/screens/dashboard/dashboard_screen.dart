@@ -258,6 +258,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           gridX: 3,
           gridY: 5,
         ),
+        // Sixth row - Recently joined members
+        DashboardWidgetConfig(
+          id: 'recent_members',
+          type: DashboardWidgetType.memberList,
+          size: DashboardWidgetSize.medium,
+          dataSourceKey: 'recentlyJoinedMembers',
+          title: 'Recently Joined',
+          icon: Icons.person_add,
+          gradientColors: [_grassrootsGreen, _momentumBlue],
+          gridX: 0,
+          gridY: 6,
+        ),
       ],
     );
   }
@@ -416,6 +428,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return DashboardWidgetSize.large;
       case DashboardWidgetType.leaderboard:
       case DashboardWidgetType.trendCard:
+      case DashboardWidgetType.memberList:
         return DashboardWidgetSize.medium;
       case DashboardWidgetType.heatmap:
         return DashboardWidgetSize.hero;
@@ -437,6 +450,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ThemeSwitcher.buildPageRoute(
         builder: (_) => TitleBarWrapper(
           child: MembersListScreen(showChaptersOnly: showChaptersOnly),
+        ),
+      ),
+    );
+  }
+
+  void _openMemberDetail(BuildContext context, Member member) {
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (_) => TitleBarWrapper(
+          child: MemberDetailScreen(member: member),
         ),
       ),
     );
@@ -681,6 +704,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       case DashboardWidgetType.heatmap:
         return Card(
           child: Center(child: Text(config.title)),
+        );
+
+      case DashboardWidgetType.memberList:
+        return MemberListWidget(
+          config: config,
+          members: _recentMembers,
+          onMemberTap: (member) => _openMemberDetail(context, member),
         );
     }
   }
@@ -1187,6 +1217,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return 'Heatmap';
       case DashboardWidgetType.trendCard:
         return 'Trend Card';
+      case DashboardWidgetType.memberList:
+        return 'Member List';
     }
   }
 
@@ -1212,6 +1244,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return Icons.grid_on;
       case DashboardWidgetType.trendCard:
         return Icons.insights;
+      case DashboardWidgetType.memberList:
+        return Icons.people;
     }
   }
 

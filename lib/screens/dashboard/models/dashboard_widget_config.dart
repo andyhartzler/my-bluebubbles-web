@@ -13,6 +13,7 @@ enum DashboardWidgetType {
   sparkline,
   heatmap,
   trendCard,
+  memberList,  // For displaying members with profile photos
 }
 
 /// Size options for widgets
@@ -659,6 +660,17 @@ class DashboardDataSources {
       category: DashboardDataCategory.communications,
       supportedWidgets: [DashboardWidgetType.leaderboard],
       icon: Icons.leaderboard,
+      isDistribution: true,
+    ),
+
+    // Member Lists
+    DashboardDataSource(
+      key: 'recentlyJoinedMembers',
+      label: 'Recently Joined',
+      description: 'Members who recently signed up',
+      category: DashboardDataCategory.members,
+      supportedWidgets: [DashboardWidgetType.memberList],
+      icon: Icons.person_add,
       isDistribution: true,
     ),
   ];
