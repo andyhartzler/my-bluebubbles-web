@@ -3,6 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 import '../../models/job.dart';
 import '../../models/job_analytics.dart';
 import '../../models/job_notification_log.dart';
@@ -1432,6 +1436,25 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // View Member button at the top
+        if (interaction.memberId != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _navigateToMemberProfile(interaction.memberId!),
+                icon: const Icon(Icons.person, size: 18),
+                label: const Text('View Member Profile'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colorScheme.primary,
+                  side: BorderSide(color: colorScheme.primary.withOpacity(0.5)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ),
+
         const Divider(height: 24),
 
         // Journey Timeline
@@ -2486,6 +2509,31 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
     ).then((_) {
       _loadApplicationCount();
     });
+  }
+
+  void _navigateToMemberProfile(String memberId) async {
+    try {
+      final member = await MemberRepository().getMemberById(memberId);
+      if (member != null && mounted) {
+        Navigator.of(context).push(
+          ThemeSwitcher.buildPageRoute(
+            builder: (_) => TitleBarWrapper(
+              child: MemberDetailScreen(member: member),
+            ),
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Member not found')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading member: $e')),
+        );
+      }
+    }
   }
 
   // ============================================================================

@@ -292,12 +292,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Future<void> _loadConfig() async {
     try {
+      // First try to load from database
+      final layoutJson = await _metricsService.fetchDashboardLayout();
+      if (layoutJson != null) {
+        setState(() {
+          _config = DashboardConfig.fromJson(layoutJson);
+        });
+        return;
+      }
+
+      // Fallback to local storage for backwards compatibility
       final prefs = await SharedPreferences.getInstance();
       final configJson = prefs.getString(_prefsKey);
       if (configJson != null) {
+        final config = DashboardConfig.fromJsonString(configJson);
         setState(() {
-          _config = DashboardConfig.fromJsonString(configJson);
+          _config = config;
         });
+        // Migrate to database
+        _saveConfig();
       }
     } catch (e) {
       debugPrint('Error loading dashboard config: $e');
@@ -306,10 +319,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Future<void> _saveConfig() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_prefsKey, _config.toJsonString());
+      // Save to database
+      final success = await _metricsService.saveDashboardLayout(_config.toJson());
+      if (success) {
+        debugPrint('Dashboard layout saved to database');
+      } else {
+        // Fallback to local storage if database save fails
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefsKey, _config.toJsonString());
+        debugPrint('Dashboard layout saved to local storage (fallback)');
+      }
     } catch (e) {
       debugPrint('Error saving dashboard config: $e');
+      // Fallback to local storage
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefsKey, _config.toJsonString());
+      } catch (_) {}
     }
   }
 
