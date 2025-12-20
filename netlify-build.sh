@@ -171,6 +171,6 @@ for var in \
   fi
 done
 
-flutter build web --release "${dart_define_args[@]}"
+flutter build web --release --no-tree-shake-icons "${dart_define_args[@]}"
 
 echo "Build complete! Output in build/web/"
