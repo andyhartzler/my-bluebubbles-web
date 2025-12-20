@@ -536,33 +536,70 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 600;
-        final horizontalPadding = isCompact ? 16.0 : 32.0;
-        final columns = isCompact ? 2 : 4;
+        final isMobile = constraints.maxWidth < 600;
+        final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
+        final horizontalPadding = isMobile ? 12.0 : (isTablet ? 20.0 : 32.0);
+        final columns = isMobile ? 2 : (isTablet ? 3 : 4);
 
         return CustomScrollView(
           physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
           slivers: [
             // Header
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 0),
-              sliver: SliverToBoxAdapter(child: _buildHeader()),
+              padding: EdgeInsets.fromLTRB(horizontalPadding, isMobile ? 12 : 24, horizontalPadding, 0),
+              sliver: SliverToBoxAdapter(child: _buildHeader(isMobile: isMobile)),
             ),
             // Widgets Grid
             SliverPadding(
               padding: EdgeInsets.all(horizontalPadding),
               sliver: SliverToBoxAdapter(
-                child: _buildWidgetsGrid(metrics, columns, constraints.maxWidth),
+                child: _buildWidgetsGrid(metrics, columns, constraints.maxWidth - horizontalPadding * 2),
               ),
             ),
+            // Bottom padding for mobile
+            if (isMobile)
+              const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
           ],
         );
       },
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader({required bool isMobile}) {
     final theme = Theme.of(context);
+
+    if (isMobile) {
+      return Row(
+        children: [
+          Container(
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: _momentumBlue),
+            padding: const EdgeInsets.all(8),
+            child: const Icon(Icons.dashboard_outlined, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Dashboard',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: _unityBlue,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Customize',
+            icon: const Icon(Icons.edit_outlined, color: _unityBlue, size: 22),
+            onPressed: _toggleEditMode,
+          ),
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh, color: _unityBlue, size: 22),
+            onPressed: _load,
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         Container(
@@ -831,21 +868,38 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildEditMode() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+
+    if (isMobile) {
+      // Mobile: Use a bottom sheet for the palette
+      return Container(
+        color: Colors.grey[100],
+        child: Column(
+          children: [
+            _buildEditHeader(isMobile: true),
+            Expanded(child: _buildEditableGrid()),
+          ],
+        ),
+      );
+    }
+
+    // Desktop: Use sidebar layout
     return Container(
       color: Colors.grey[100],
       child: Row(
         children: [
-          // Widget palette
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: _showPalette ? 300 : 0,
-            child: _buildWidgetPalette(),
-          ),
+          // Widget palette - only render when showing
+          if (_showPalette)
+            SizedBox(
+              width: 300,
+              child: _buildWidgetPalette(),
+            ),
           // Main edit area
           Expanded(
             child: Column(
               children: [
-                _buildEditHeader(),
+                _buildEditHeader(isMobile: false),
                 Expanded(child: _buildEditableGrid()),
               ],
             ),
@@ -855,14 +909,289 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildEditHeader() {
+  void _showMobilePalette() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.widgets, color: _unityBlue),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Add Widgets',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _unityBlue,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Categories
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(12),
+                  children: DashboardDataCategory.values.map((category) {
+                    final sources = DashboardDataSources.getByCategory(category);
+                    if (sources.isEmpty) return const SizedBox.shrink();
+
+                    return _buildMobilePaletteCategory(category, sources);
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobilePaletteCategory(DashboardDataCategory category, List<DashboardDataSource> sources) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Text(
+            _getCategoryLabel(category),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: _unityBlue,
+            ),
+          ),
+        ),
+        ...sources.map((source) => _buildMobilePaletteItem(source)),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildMobilePaletteItem(DashboardDataSource source) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: ListTile(
+        dense: true,
+        leading: Icon(source.icon, color: _momentumBlue, size: 22),
+        title: Text(source.label, style: const TextStyle(fontSize: 14)),
+        subtitle: Text(
+          source.description,
+          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: const Icon(Icons.add_circle, color: _grassrootsGreen),
+        onTap: () {
+          Navigator.pop(context);
+          _showWidgetTypeSelector(source);
+        },
+      ),
+    );
+  }
+
+  void _showWidgetTypeSelector(DashboardDataSource source) {
+    if (source.supportedWidgets.length == 1) {
+      _addWidget(source, source.supportedWidgets.first);
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Display "${source.label}" as:',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: source.supportedWidgets.map((type) {
+                return ActionChip(
+                  avatar: Icon(_getWidgetTypeIcon(type), size: 18),
+                  label: Text(_getWidgetTypeLabel(type)),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _addWidget(source, type);
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditHeader({required bool isMobile}) {
+    if (isMobile) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [_unityBlue, Color(0xFF1E2A45)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  // Cancel button
+                  TextButton.icon(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white70, size: 20),
+                    label: const Text('Cancel', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    onPressed: () {
+                      _loadConfig();
+                      _toggleEditMode();
+                    },
+                  ),
+                  const Spacer(),
+                  // Title
+                  const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.edit, color: Colors.white70, size: 18),
+                      SizedBox(width: 6),
+                      Text(
+                        'Editing',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  // Save button - prominent
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _grassrootsGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    onPressed: _toggleEditMode,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Action buttons row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Add widget button
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add Widget'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white54),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: _showMobilePalette,
+                  ),
+                  const SizedBox(width: 12),
+                  // Reset button
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.restore, size: 18),
+                    label: const Text('Reset'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: const BorderSide(color: Colors.white38),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _config = _getDefaultConfig();
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Desktop header
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: const LinearGradient(
+          colors: [_unityBlue, Color(0xFF1E2A45)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -870,39 +1199,83 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ),
       child: Row(
         children: [
+          // Toggle palette button
           IconButton(
-            icon: Icon(_showPalette ? Icons.chevron_left : Icons.chevron_right),
+            icon: Icon(
+              _showPalette ? Icons.chevron_left : Icons.menu,
+              color: Colors.white,
+            ),
             onPressed: () => setState(() => _showPalette = !_showPalette),
             tooltip: _showPalette ? 'Hide palette' : 'Show palette',
           ),
-          const SizedBox(width: 16),
-          const Icon(Icons.edit, color: _momentumBlue),
           const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.edit, color: Colors.white70, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'Edit Mode',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
           const Text(
-            'Customize Dashboard',
+            'Customize your dashboard',
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: _unityBlue,
+              fontSize: 14,
+              color: Colors.white70,
             ),
           ),
           const Spacer(),
+          // Reset button
           TextButton.icon(
-            icon: const Icon(Icons.restore),
-            label: const Text('Reset to Default'),
+            icon: const Icon(Icons.restore, color: Colors.white70, size: 18),
+            label: const Text('Reset', style: TextStyle(color: Colors.white70)),
             onPressed: () {
               setState(() {
                 _config = _getDefaultConfig();
               });
             },
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
+          // Cancel button
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white54),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              _loadConfig();
+              _toggleEditMode();
+            },
+            child: const Text('Cancel'),
+          ),
+          const SizedBox(width: 12),
+          // Save button - prominent
           ElevatedButton.icon(
             icon: const Icon(Icons.check),
-            label: const Text('Done'),
+            label: const Text('Save & Exit', style: TextStyle(fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
               backgroundColor: _grassrootsGreen,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: _toggleEditMode,
           ),
@@ -912,8 +1285,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildWidgetPalette() {
-    if (!_showPalette) return const SizedBox.shrink();
-
     final categories = DashboardDataCategory.values;
 
     return Container(
