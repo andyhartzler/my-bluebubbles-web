@@ -1582,82 +1582,63 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           );
         }
 
-        return ReorderableListView.builder(
+        // Use Wrap layout to match actual dashboard appearance
+        return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          buildDefaultDragHandles: false,
-          proxyDecorator: (child, index, animation) {
-            return AnimatedBuilder(
-              animation: animation,
-              builder: (context, child) {
-                final animValue = Curves.easeInOut.transform(animation.value);
-                final elevation = lerpDouble(0, 8, animValue)!;
-                return Material(
-                  elevation: elevation,
-                  borderRadius: BorderRadius.circular(16),
-                  child: child,
-                );
-              },
-              child: child,
-            );
-          },
-          onReorder: (oldIndex, newIndex) {
-            setState(() {
-              if (newIndex > oldIndex) newIndex--;
-              final widgetsList = List<DashboardWidgetConfig>.from(_config.widgets);
-              final item = widgetsList.removeAt(oldIndex);
-              widgetsList.insert(newIndex, item);
-              // Update grid positions
-              for (int i = 0; i < widgetsList.length; i++) {
-                widgetsList[i] = widgetsList[i].copyWith(gridY: i);
-              }
-              _config = DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList);
-            });
-          },
-          header: Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: _momentumBlue,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(Icons.drag_indicator, size: 14, color: Colors.white),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Instructions
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: _momentumBlue,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(Icons.touch_app, size: 14, color: Colors.white),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isMobile ? 'Tap widgets to edit or reorder' : 'Tap widgets to edit, delete, or reorder them',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  isMobile ? 'Drag the handle to reorder' : 'Drag the blue handle to reorder widgets',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          itemCount: widgets.length,
-          itemBuilder: (context, index) {
-            final widget = widgets[index];
-            final width = _getWidgetWidth(widget, widgetWidth, columns);
-            final height = _getWidgetHeight(widget, widgetHeight);
-
-            return Padding(
-              key: ValueKey(widget.id),
-              padding: const EdgeInsets.only(bottom: 16),
-              child: SizedBox(
-                width: width,
-                height: height,
-                child: _buildEditableWidget(widget, metrics, index),
               ),
-            );
-          },
+              // Wrap layout matching actual dashboard
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: List.generate(widgets.length, (index) {
+                  final widget = widgets[index];
+                  final width = _getWidgetWidth(widget, widgetWidth, columns);
+                  final height = _getWidgetHeight(widget, widgetHeight);
+
+                  return SizedBox(
+                    key: ValueKey(widget.id),
+                    width: width,
+                    height: height,
+                    child: _buildEditableWidget(widget, metrics, index),
+                  );
+                }),
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
   Widget _buildEditableWidget(DashboardWidgetConfig config, DashboardMetrics metrics, int index) {
+    final widgetCount = _config.widgets.length;
+
     return Stack(
       children: [
         // The actual widget
@@ -1665,10 +1646,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           borderRadius: BorderRadius.circular(16),
           child: _buildWidget(config, metrics),
         ),
-        // Tap overlay for editing options (not covering drag handle area)
+        // Tap overlay for editing options
         Positioned.fill(
           child: GestureDetector(
-            onTap: () => _showWidgetOptions(config),
+            onTap: () => _showWidgetOptions(config, index),
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
@@ -1677,29 +1658,55 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ),
         ),
-        // Drag handle - uses ReorderableDragStartListener
+        // Position indicator
         Positioned(
           top: 4,
           left: 4,
-          child: ReorderableDragStartListener(
-            index: index,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _momentumBlue,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _momentumBlue,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              '${index + 1}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
               ),
-              child: const Icon(Icons.drag_indicator, size: 18, color: Colors.white),
             ),
           ),
         ),
+        // Quick reorder buttons
+        if (widgetCount > 1)
+          Positioned(
+            bottom: 4,
+            left: 4,
+            child: Row(
+              children: [
+                if (index > 0)
+                  _buildMiniButton(
+                    icon: Icons.arrow_upward,
+                    tooltip: 'Move up',
+                    onPressed: () => _moveWidget(index, index - 1),
+                  ),
+                if (index < widgetCount - 1)
+                  _buildMiniButton(
+                    icon: Icons.arrow_downward,
+                    tooltip: 'Move down',
+                    onPressed: () => _moveWidget(index, index + 1),
+                  ),
+              ],
+            ),
+          ),
         // Settings button
         Positioned(
           top: 4,
@@ -1740,7 +1747,51 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  void _showWidgetOptions(DashboardWidgetConfig config) {
+  Widget _buildMiniButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(4),
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 2,
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 16, color: _momentumBlue),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _moveWidget(int fromIndex, int toIndex) {
+    setState(() {
+      final widgetsList = List<DashboardWidgetConfig>.from(_config.widgets);
+      final item = widgetsList.removeAt(fromIndex);
+      widgetsList.insert(toIndex, item);
+      // Update grid positions
+      for (int i = 0; i < widgetsList.length; i++) {
+        widgetsList[i] = widgetsList[i].copyWith(gridY: i);
+      }
+      _config = DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList);
+    });
+  }
+
+  void _showWidgetOptions(DashboardWidgetConfig config, [int? index]) {
     final source = DashboardDataSources.getByKey(config.dataSourceKey);
     final currentGradientIndex = WidgetGradients.indexOfColors(config.gradientColors);
 
