@@ -1691,7 +1691,20 @@ class _AddQuestionDialogState extends State<_AddQuestionDialog> {
   String? _selectedType;
 
   @override
+  void initState() {
+    super.initState();
+    // Listen for text changes to update button state without focus loss
+    _textController.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    // Only rebuild if the empty/non-empty state changes
+    setState(() {});
+  }
+
+  @override
   void dispose() {
+    _textController.removeListener(_onTextChanged);
     _textController.dispose();
     super.dispose();
   }
@@ -1764,7 +1777,6 @@ class _AddQuestionDialogState extends State<_AddQuestionDialog> {
               ),
               maxLines: 2,
               autofocus: true,
-              onChanged: (_) => setState(() {}),
             ),
           ],
         ),

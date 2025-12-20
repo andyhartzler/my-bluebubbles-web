@@ -240,10 +240,22 @@ class FormsService {
   }
 
   Future<void> deleteForm(String id) async {
-    await _supabase
-        .from('form_schemas')
-        .delete()
-        .eq('id', id);
+    try {
+      // First delete any submissions for this form to avoid FK constraint errors
+      await _supabase
+          .from('form_submissions')
+          .delete()
+          .eq('form_id', id);
+
+      // Then delete the form
+      await _supabase
+          .from('form_schemas')
+          .delete()
+          .eq('id', id);
+    } catch (e) {
+      print('FormsService.deleteForm: Error deleting form $id: $e');
+      rethrow;
+    }
   }
 
   Future<void> publishForm(String id) async {

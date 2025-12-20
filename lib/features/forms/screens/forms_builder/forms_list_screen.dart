@@ -21,8 +21,18 @@ class _FormsListScreenState extends State<FormsListScreen>
   final _formsService = FormsService();
   String _typeFilter = 'all';
 
+  /// Key to force stream recreation on refresh
+  int _refreshKey = 0;
+
   @override
   bool get wantKeepAlive => true;
+
+  /// Force refresh by incrementing key to recreate stream
+  Future<void> _refreshForms() async {
+    setState(() {
+      _refreshKey++;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +85,8 @@ class _FormsListScreenState extends State<FormsListScreen>
           // Forms List
           Expanded(
             child: StreamBuilder<List<FormSchema>>(
+              // Use key to force stream recreation on refresh
+              key: ValueKey('forms_stream_${_typeFilter}_$_refreshKey'),
               stream: _formsService.watchForms(_typeFilter),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -128,9 +140,7 @@ class _FormsListScreenState extends State<FormsListScreen>
                 }
 
                 return RefreshIndicator(
-                  onRefresh: () async {
-                    setState(() {});
-                  },
+                  onRefresh: _refreshForms,
                   child: ListView.builder(
                     padding: EdgeInsets.all(padding),
                     itemCount: forms.length,
@@ -343,6 +353,8 @@ class _FormsListScreenState extends State<FormsListScreen>
               try {
                 await _formsService.deleteForm(form.id);
                 if (mounted) {
+                  // Refresh the list after deletion
+                  await _refreshForms();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Form deleted'),

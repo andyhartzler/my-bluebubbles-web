@@ -253,10 +253,15 @@ class _CustomQuestionsEditorState extends State<CustomQuestionsEditor> {
                 question: _questions[index],
                 index: index,
                 onChanged: (updated) {
-                  setState(() {
-                    _questions[index] = updated;
-                    _notifyChanged();
-                  });
+                  // Update data without setState to avoid focus loss on text fields
+                  // Only update the internal state and notify parent
+                  _questions[index] = updated;
+                  _notifyChanged();
+                },
+                onStructuralChange: () {
+                  // Only call setState for structural changes (type, required, options)
+                  // that need visual updates
+                  setState(() {});
                 },
                 onRemove: () => _removeQuestion(index),
                 onDuplicate: () => _duplicateQuestion(index),
@@ -272,6 +277,7 @@ class _QuestionCard extends StatefulWidget {
   final CustomQuestionData question;
   final int index;
   final ValueChanged<CustomQuestionData> onChanged;
+  final VoidCallback onStructuralChange;
   final VoidCallback onRemove;
   final VoidCallback onDuplicate;
 
@@ -280,6 +286,7 @@ class _QuestionCard extends StatefulWidget {
     required this.question,
     required this.index,
     required this.onChanged,
+    required this.onStructuralChange,
     required this.onRemove,
     required this.onDuplicate,
   });
@@ -357,6 +364,7 @@ class _QuestionCardState extends State<_QuestionCard> {
 
     final newOptions = List<String>.from(widget.question.options)..add(text);
     widget.onChanged(widget.question.copyWith(options: newOptions));
+    widget.onStructuralChange();
     _optionController.clear();
   }
 
@@ -364,6 +372,7 @@ class _QuestionCardState extends State<_QuestionCard> {
     final newOptions = List<String>.from(widget.question.options)
       ..removeAt(index);
     widget.onChanged(widget.question.copyWith(options: newOptions));
+    widget.onStructuralChange();
   }
 
   @override
@@ -549,6 +558,7 @@ class _QuestionCardState extends State<_QuestionCard> {
                             if (value != null) {
                               widget.onChanged(
                                   widget.question.copyWith(type: value));
+                              widget.onStructuralChange();
                             }
                           },
                         ),
@@ -569,6 +579,7 @@ class _QuestionCardState extends State<_QuestionCard> {
                             onChanged: (value) {
                               widget.onChanged(
                                   widget.question.copyWith(required: value));
+                              widget.onStructuralChange();
                             },
                           ),
                         ],

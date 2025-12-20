@@ -35,6 +35,60 @@ class DashboardMetricsService {
     }
   }
 
+  /// Fetch the saved dashboard layout configuration
+  Future<Map<String, dynamic>?> fetchDashboardLayout() async {
+    final client = _client;
+    if (client == null) return null;
+
+    try {
+      final response = await client
+          .from('crm_dashboard_metrics')
+          .select('dashboard_layout')
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) return null;
+      final layout = response['dashboard_layout'];
+      if (layout == null) return null;
+      return layout is Map<String, dynamic> ? layout : null;
+    } catch (e) {
+      print('[DashboardMetricsService] Error fetching dashboard layout: $e');
+      return null;
+    }
+  }
+
+  /// Save the dashboard layout configuration
+  Future<bool> saveDashboardLayout(Map<String, dynamic> layout) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      // Get the ID of the first row
+      final existingRow = await client
+          .from('crm_dashboard_metrics')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+
+      if (existingRow == null) {
+        // No row exists - this shouldn't happen but handle it
+        print('[DashboardMetricsService] No metrics row found to update layout');
+        return false;
+      }
+
+      // Update the dashboard_layout column
+      await client
+          .from('crm_dashboard_metrics')
+          .update({'dashboard_layout': layout})
+          .eq('id', existingRow['id']);
+
+      return true;
+    } catch (e) {
+      print('[DashboardMetricsService] Error saving dashboard layout: $e');
+      return false;
+    }
+  }
+
   /// Watch the dashboard metrics for real-time updates
   Stream<DashboardMetrics?> watchMetrics() {
     final client = _client;
