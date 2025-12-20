@@ -1287,7 +1287,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CRM Members'),
+        title: const Text('Members'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
