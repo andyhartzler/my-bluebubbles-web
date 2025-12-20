@@ -14,6 +14,7 @@ enum DashboardWidgetType {
   heatmap,
   trendCard,
   memberList,  // For displaying members with profile photos
+  dynamicDistribution,  // Bar chart with dropdown to switch data sources
 }
 
 /// Size options for widgets
@@ -671,6 +672,17 @@ class DashboardDataSources {
       category: DashboardDataCategory.members,
       supportedWidgets: [DashboardWidgetType.memberList],
       icon: Icons.person_add,
+      isDistribution: true,
+    ),
+
+    // Dynamic Distribution Chart
+    DashboardDataSource(
+      key: 'dynamicDistribution',
+      label: 'Distribution Explorer',
+      description: 'Interactive chart with dropdown to explore different member distributions',
+      category: DashboardDataCategory.demographics,
+      supportedWidgets: [DashboardWidgetType.dynamicDistribution],
+      icon: Icons.analytics,
       isDistribution: true,
     ),
   ];

@@ -184,12 +184,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           gridY: 2,
         ),
         DashboardWidgetConfig(
-          id: 'county_chart',
-          type: DashboardWidgetType.barChart,
+          id: 'distribution_explorer',
+          type: DashboardWidgetType.dynamicDistribution,
           size: DashboardWidgetSize.large,
-          dataSourceKey: 'membersByCounty',
-          title: 'Top Counties',
-          icon: Icons.bar_chart,
+          dataSourceKey: 'dynamicDistribution',
+          title: 'Distribution Explorer',
+          icon: Icons.analytics,
+          gradientColors: [_momentumBlue, _justicePurple],
           gridX: 2,
           gridY: 2,
         ),
@@ -432,6 +433,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       case DashboardWidgetType.memberList:
         return DashboardWidgetSize.medium;
       case DashboardWidgetType.heatmap:
+      case DashboardWidgetType.dynamicDistribution:
         return DashboardWidgetSize.hero;
     }
   }
@@ -749,6 +751,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           config: config,
           members: _recentMembers,
           onMemberTap: (member) => _openMemberDetail(context, member),
+        );
+
+      case DashboardWidgetType.dynamicDistribution:
+        return DynamicDistributionChartWidget(
+          config: config,
+          metrics: metrics,
         );
     }
   }
@@ -1804,6 +1812,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return 'Trend Card';
       case DashboardWidgetType.memberList:
         return 'Member List';
+      case DashboardWidgetType.dynamicDistribution:
+        return 'Distribution Explorer';
     }
   }
 
@@ -1831,6 +1841,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return Icons.insights;
       case DashboardWidgetType.memberList:
         return Icons.people;
+      case DashboardWidgetType.dynamicDistribution:
+        return Icons.analytics;
     }
   }
 
