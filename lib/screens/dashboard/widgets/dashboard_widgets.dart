@@ -14,9 +14,20 @@ const _actionRed = Color(0xFFE63946);
 const _justicePurple = Color(0xFF6A1B9A);
 const _grassrootsGreen = Color(0xFF43A047);
 
+// Additional blue variants
+const _deepNavy = Color(0xFF0F4C75);
+const _oceanBlue = Color(0xFF3282B8);
+const _darkSlate = Color(0xFF1B262C);
+const _skyBlue = Color(0xFF5DADE2);
+const _royalBlue = Color(0xFF2E86AB);
+const _midnightBlue = Color(0xFF1A237E);
+const _indigoBlue = Color(0xFF3949AB);
+const _tealBlue = Color(0xFF00838F);
+
 /// Default gradient sets for widgets
 class WidgetGradients {
   static const List<List<Color>> all = [
+    // Brand gradients
     [_unityBlue, _momentumBlue],
     [_momentumBlue, _justicePurple],
     [_grassrootsGreen, _momentumBlue],
@@ -25,9 +36,52 @@ class WidgetGradients {
     [_actionRed, _sunriseGold],
     [_grassrootsGreen, _sunriseGold],
     [_unityBlue, _grassrootsGreen],
+    // Blue variants
+    [_deepNavy, _oceanBlue],
+    [_darkSlate, _oceanBlue],
+    [_unityBlue, _skyBlue],
+    [_royalBlue, _momentumBlue],
+    [_midnightBlue, _indigoBlue],
+    [_tealBlue, _momentumBlue],
+    [_deepNavy, _momentumBlue],
+    [_indigoBlue, _skyBlue],
+  ];
+
+  /// Names for the gradients (for display in UI)
+  static const List<String> names = [
+    'Unity Blue',
+    'Momentum Purple',
+    'Grassroots Teal',
+    'Sunrise Fire',
+    'Purple Heat',
+    'Warm Sunset',
+    'Nature Glow',
+    'Forest Blue',
+    'Deep Ocean',
+    'Slate Ocean',
+    'Sky Gradient',
+    'Royal Momentum',
+    'Midnight Indigo',
+    'Teal Momentum',
+    'Navy Momentum',
+    'Indigo Sky',
   ];
 
   static List<Color> get random => all[math.Random().nextInt(all.length)];
+
+  /// Get gradient index from colors
+  static int? indexOfColors(List<Color> colors) {
+    if (colors.isEmpty) return null;
+    for (int i = 0; i < all.length; i++) {
+      if (all[i].length >= 2 &&
+          colors.length >= 2 &&
+          all[i][0].value == colors[0].value &&
+          all[i][1].value == colors[1].value) {
+        return i;
+      }
+    }
+    return null;
+  }
 }
 
 /// Renders a stat card widget

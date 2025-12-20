@@ -1089,84 +1089,155 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   void _showWidgetOptions(DashboardWidgetConfig config) {
     final source = DashboardDataSources.getByKey(config.dataSourceKey);
+    final currentGradientIndex = WidgetGradients.indexOfColors(config.gradientColors);
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              child: ListView(
+                controller: scrollController,
                 children: [
-                  Icon(config.icon ?? Icons.widgets, color: _momentumBlue),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      config.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                  Row(
+                    children: [
+                      Icon(config.icon ?? Icons.widgets, color: _momentumBlue),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          config.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: _actionRed),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _removeWidget(config.id);
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Display as:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: (source?.supportedWidgets ?? [DashboardWidgetType.statCard]).map((type) {
+                      final isSelected = config.type == type;
+                      return ChoiceChip(
+                        label: Text(_getWidgetTypeLabel(type)),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          if (selected) {
+                            _updateWidget(config.copyWith(
+                              type: type,
+                              size: _getSizeForType(type),
+                            ));
+                            Navigator.pop(context);
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Size:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: DashboardWidgetSize.values.map((size) {
+                      final isSelected = config.size == size;
+                      return ChoiceChip(
+                        label: Text(_getSizeLabel(size)),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          if (selected) {
+                            _updateWidget(config.copyWith(size: size));
+                            Navigator.pop(context);
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Color:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 1.5,
+                    ),
+                    itemCount: WidgetGradients.all.length,
+                    itemBuilder: (context, index) {
+                      final gradient = WidgetGradients.all[index];
+                      final isSelected = currentGradientIndex == index;
+                      return GestureDetector(
+                        onTap: () {
+                          _updateWidget(config.copyWith(gradientColors: gradient));
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: gradient,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: isSelected
+                                ? Border.all(color: Colors.white, width: 3)
+                                : null,
+                            boxShadow: [
+                              BoxShadow(
+                                color: gradient.last.withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: isSelected
+                              ? const Center(
+                                  child: Icon(Icons.check, color: Colors.white, size: 24),
+                                )
+                              : null,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  if (currentGradientIndex != null)
+                    Center(
+                      child: Text(
+                        WidgetGradients.names[currentGradientIndex],
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, color: _actionRed),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _removeWidget(config.id);
-                    },
-                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
-              const SizedBox(height: 16),
-              const Text('Display as:', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: (source?.supportedWidgets ?? [DashboardWidgetType.statCard]).map((type) {
-                  final isSelected = config.type == type;
-                  return ChoiceChip(
-                    label: Text(_getWidgetTypeLabel(type)),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      if (selected) {
-                        _updateWidget(config.copyWith(
-                          type: type,
-                          size: _getSizeForType(type),
-                        ));
-                        Navigator.pop(context);
-                      }
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              const Text('Size:', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: DashboardWidgetSize.values.map((size) {
-                  final isSelected = config.size == size;
-                  return ChoiceChip(
-                    label: Text(_getSizeLabel(size)),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      if (selected) {
-                        _updateWidget(config.copyWith(size: size));
-                        Navigator.pop(context);
-                      }
-                    },
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
