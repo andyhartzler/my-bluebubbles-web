@@ -181,7 +181,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         id: question['id'] as String? ?? _uuid.v4(),
         type: 'section',
         label: question['text'] as String? ?? '',
-        description: question['description'] as String?,
+        help: question['description'] as String?,
       );
     }
 
@@ -249,10 +249,9 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       label: question['text'] as String? ?? '',
       required: question['required'] as bool? ?? false,
       placeholder: question['placeholder'] as String?,
-      helperText: question['helper_text'] as String?,
-      description: question['description'] as String?,
+      help: question['helper_text'] as String? ?? question['description'] as String?,
       options: options,
-      initialValue: question['default_value'],
+      defaultValue: question['default_value'],
       pageNumber: question['page'] as int? ?? 1,
     );
   }
