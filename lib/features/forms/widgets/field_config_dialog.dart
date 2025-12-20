@@ -24,27 +24,25 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
   late TabController _tabController;
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers
+  // Controllers for text fields
   final _labelController = TextEditingController();
   final _placeholderController = TextEditingController();
   final _helpController = TextEditingController();
+
+  // Controllers for numeric fields to avoid glitchiness
+  final _minValueController = TextEditingController();
+  final _maxValueController = TextEditingController();
+  final _initialValueController = TextEditingController();
+  final _stepController = TextEditingController();
+  final _divisionsController = TextEditingController();
+  final _minLinesController = TextEditingController();
+  final _maxLinesController = TextEditingController();
+  final _maxLengthController = TextEditingController();
 
   // Basic properties
   String _fieldType = FormFieldTypes.text;
   bool _required = false;
   bool _enabled = true;
-
-  // Text field properties
-  int? _maxLength;
-  int? _minLines;
-  int? _maxLines;
-
-  // Numeric properties
-  double? _minValue;
-  double? _maxValue;
-  double? _initialValue;
-  double? _step;
-  int? _divisions;
 
   // Date properties
   DateTime? _firstDate;
@@ -71,14 +69,17 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
       _fieldType = field.type;
       _required = field.required;
       _enabled = field.enabled;
-      _maxLength = field.maxLength;
-      _minLines = field.minLines;
-      _maxLines = field.maxLines;
-      _minValue = field.minValue;
-      _maxValue = field.maxValue;
-      _initialValue = field.initialValue;
-      _step = field.step;
-      _divisions = field.divisions;
+
+      // Populate numeric field controllers
+      _maxLengthController.text = field.maxLength?.toString() ?? '';
+      _minLinesController.text = field.minLines?.toString() ?? '';
+      _maxLinesController.text = field.maxLines?.toString() ?? '';
+      _minValueController.text = field.minValue?.toString() ?? '';
+      _maxValueController.text = field.maxValue?.toString() ?? '';
+      _initialValueController.text = field.initialValue?.toString() ?? '';
+      _stepController.text = field.step?.toString() ?? '';
+      _divisionsController.text = field.divisions?.toString() ?? '';
+
       _firstDate = field.firstDate;
       _lastDate = field.lastDate;
       // Create mutable copies of lists (Freezed returns immutable lists)
@@ -94,6 +95,14 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     _labelController.dispose();
     _placeholderController.dispose();
     _helpController.dispose();
+    _minValueController.dispose();
+    _maxValueController.dispose();
+    _initialValueController.dispose();
+    _stepController.dispose();
+    _divisionsController.dispose();
+    _minLinesController.dispose();
+    _maxLinesController.dispose();
+    _maxLengthController.dispose();
     super.dispose();
   }
 
@@ -520,6 +529,7 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
     return Column(
       children: [
         TextFormField(
+          controller: _minValueController,
           decoration: InputDecoration(
             labelText: 'Minimum Value',
             border: const OutlineInputBorder(),
@@ -527,13 +537,10 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           ),
           style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
-          initialValue: _minValue?.toString() ?? '',
-          onChanged: (value) {
-            _minValue = double.tryParse(value);
-          },
         ),
         SizedBox(height: spacing),
         TextFormField(
+          controller: _maxValueController,
           decoration: InputDecoration(
             labelText: 'Maximum Value',
             border: const OutlineInputBorder(),
@@ -541,13 +548,10 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           ),
           style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
-          initialValue: _maxValue?.toString() ?? '',
-          onChanged: (value) {
-            _maxValue = double.tryParse(value);
-          },
         ),
         SizedBox(height: spacing),
         TextFormField(
+          controller: _initialValueController,
           decoration: InputDecoration(
             labelText: 'Initial Value',
             border: const OutlineInputBorder(),
@@ -555,14 +559,11 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           ),
           style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
-          initialValue: _initialValue?.toString() ?? '',
-          onChanged: (value) {
-            _initialValue = double.tryParse(value);
-          },
         ),
         SizedBox(height: spacing),
         if (_fieldType == FormFieldTypes.slider || _fieldType == FormFieldTypes.cupertinoSlider)
           TextFormField(
+            controller: _divisionsController,
             decoration: InputDecoration(
               labelText: 'Divisions',
               border: const OutlineInputBorder(),
@@ -571,14 +572,11 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
             ),
             style: TextStyle(fontSize: isMobile ? 14 : 16),
             keyboardType: TextInputType.number,
-            initialValue: _divisions?.toString() ?? '',
-            onChanged: (value) {
-              _divisions = int.tryParse(value);
-            },
           ),
         if (_fieldType == FormFieldTypes.touchSpin) ...[
           SizedBox(height: spacing),
           TextFormField(
+            controller: _stepController,
             decoration: InputDecoration(
               labelText: 'Step',
               border: const OutlineInputBorder(),
@@ -587,10 +585,6 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
             ),
             style: TextStyle(fontSize: isMobile ? 14 : 16),
             keyboardType: TextInputType.number,
-            initialValue: _step?.toString() ?? '1',
-            onChanged: (value) {
-              _step = double.tryParse(value);
-            },
           ),
         ],
       ],
@@ -658,9 +652,18 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
         ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
         : null;
 
+    // Set defaults if empty
+    if (_minLinesController.text.isEmpty) {
+      _minLinesController.text = '3';
+    }
+    if (_maxLinesController.text.isEmpty) {
+      _maxLinesController.text = '5';
+    }
+
     return Column(
       children: [
         TextFormField(
+          controller: _minLinesController,
           decoration: InputDecoration(
             labelText: 'Minimum Lines',
             border: const OutlineInputBorder(),
@@ -668,13 +671,10 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           ),
           style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
-          initialValue: _minLines?.toString() ?? '3',
-          onChanged: (value) {
-            _minLines = int.tryParse(value);
-          },
         ),
         SizedBox(height: spacing),
         TextFormField(
+          controller: _maxLinesController,
           decoration: InputDecoration(
             labelText: 'Maximum Lines',
             border: const OutlineInputBorder(),
@@ -682,13 +682,10 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           ),
           style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
-          initialValue: _maxLines?.toString() ?? '5',
-          onChanged: (value) {
-            _maxLines = int.tryParse(value);
-          },
         ),
         SizedBox(height: spacing),
         TextFormField(
+          controller: _maxLengthController,
           decoration: InputDecoration(
             labelText: 'Maximum Length',
             border: const OutlineInputBorder(),
@@ -697,10 +694,6 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           ),
           style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
-          initialValue: _maxLength?.toString() ?? '',
-          onChanged: (value) {
-            _maxLength = int.tryParse(value);
-          },
         ),
       ],
     );
@@ -724,9 +717,15 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
         ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
         : null;
 
+    // Set default if empty
+    if (_maxValueController.text.isEmpty) {
+      _maxValueController.text = '5';
+    }
+
     return Column(
       children: [
         TextFormField(
+          controller: _maxValueController,
           decoration: InputDecoration(
             labelText: 'Maximum Rating',
             border: const OutlineInputBorder(),
@@ -735,10 +734,6 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           ),
           style: TextStyle(fontSize: isMobile ? 14 : 16),
           keyboardType: TextInputType.number,
-          initialValue: _maxValue?.toString() ?? '5',
-          onChanged: (value) {
-            _maxValue = double.tryParse(value);
-          },
         ),
       ],
     );
@@ -977,6 +972,16 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
       return;
     }
 
+    // Parse values from controllers
+    final maxLength = int.tryParse(_maxLengthController.text);
+    final minLines = int.tryParse(_minLinesController.text);
+    final maxLines = int.tryParse(_maxLinesController.text);
+    final minValue = double.tryParse(_minValueController.text);
+    final maxValue = double.tryParse(_maxValueController.text);
+    final initialValue = double.tryParse(_initialValueController.text);
+    final step = double.tryParse(_stepController.text);
+    final divisions = int.tryParse(_divisionsController.text);
+
     final field = FormFieldConfig(
       id: widget.existingField?.id ?? const Uuid().v4(),
       type: _fieldType,
@@ -988,14 +993,14 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
       options: _options.isEmpty ? null : _options,
       validatorTypes: _selectedValidators.isEmpty ? null : _selectedValidators,
       validation: _validatorConfigs.isEmpty ? null : _validatorConfigs,
-      maxLength: _maxLength,
-      minLines: _minLines,
-      maxLines: _maxLines,
-      minValue: _minValue,
-      maxValue: _maxValue,
-      initialValue: _initialValue,
-      step: _step,
-      divisions: _divisions,
+      maxLength: maxLength,
+      minLines: minLines,
+      maxLines: maxLines,
+      minValue: minValue,
+      maxValue: maxValue,
+      initialValue: initialValue,
+      step: step,
+      divisions: divisions,
       firstDate: _firstDate,
       lastDate: _lastDate,
     );

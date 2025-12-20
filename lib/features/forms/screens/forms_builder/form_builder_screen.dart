@@ -1,3 +1,5 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/form_schema.dart';
@@ -243,6 +245,38 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
           .toList();
     }
 
+    // Parse conditional logic
+    String? conditionalFieldId;
+    String? conditionalOperator;
+    dynamic conditionalValue;
+    List<Map<String, dynamic>>? conditions;
+
+    final conditionData = question['condition'];
+    if (conditionData is Map<String, dynamic>) {
+      if (conditionData['and'] is List) {
+        // Complex AND conditions
+        final andConditions = conditionData['and'] as List;
+        conditions = andConditions
+            .whereType<Map<String, dynamic>>()
+            .map((c) => {
+                  'field': c['field'],
+                  'value': c['value'],
+                  'operator': c['operator'] ?? 'equals',
+                })
+            .toList();
+        if (conditions.isNotEmpty) {
+          conditionalFieldId = conditions.first['field'] as String?;
+          conditionalValue = conditions.first['value'];
+          conditionalOperator = conditions.first['operator'] as String? ?? 'equals';
+        }
+      } else if (conditionData['field'] != null) {
+        // Simple condition
+        conditionalFieldId = conditionData['field'] as String?;
+        conditionalValue = conditionData['value'];
+        conditionalOperator = conditionData['operator'] as String? ?? 'equals';
+      }
+    }
+
     return FormFieldConfig(
       id: question['id'] as String? ?? _uuid.v4(),
       type: fieldType,
@@ -253,6 +287,11 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
       options: options,
       defaultValue: question['default_value'],
       pageNumber: question['page'] as int? ?? 1,
+      conditionalFieldId: conditionalFieldId,
+      conditionalOperator: conditionalOperator,
+      conditionalValue: conditionalValue,
+      conditions: conditions,
+      fileConfig: question['file_config'] as Map<String, dynamic>?,
     );
   }
 
@@ -629,7 +668,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               ),
             const SizedBox(height: 16),
 
-            // Fields List
+            // Fields List with drag-and-drop reordering
             if (_fields.isEmpty)
               Center(
                 child: Padding(
@@ -647,7 +686,38 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                 ),
               )
             else
-              ..._fields.map((field) => _buildFieldCard(field, isMobile: isMobile)).toList(),
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                proxyDecorator: (child, index, animation) {
+                  return AnimatedBuilder(
+                    animation: animation,
+                    builder: (context, child) {
+                      final animValue = Curves.easeInOut.transform(animation.value);
+                      final elevation = lerpDouble(0, 8, animValue)!;
+                      return Material(
+                        elevation: elevation,
+                        borderRadius: BorderRadius.circular(12),
+                        child: child,
+                      );
+                    },
+                    child: child,
+                  );
+                },
+                onReorder: (oldIndex, newIndex) {
+                  setState(() {
+                    if (newIndex > oldIndex) newIndex--;
+                    final item = _fields.removeAt(oldIndex);
+                    _fields.insert(newIndex, item);
+                  });
+                },
+                itemCount: _fields.length,
+                itemBuilder: (context, index) {
+                  final field = _fields[index];
+                  return _buildFieldCard(field, isMobile: isMobile, index: index, key: ValueKey(field.id));
+                },
+              ),
 
             const SizedBox(height: 24),
 
@@ -819,10 +889,14 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
     );
   }
 
-  Widget _buildFieldCard(FormFieldConfig field, {bool isMobile = false}) {
+  Widget _buildFieldCard(FormFieldConfig field, {bool isMobile = false, int index = 0, Key? key}) {
+    final hasCondition = field.conditionalFieldId != null ||
+        (field.conditions != null && field.conditions!.isNotEmpty);
+
     // On mobile, use a more compact layout
     if (isMobile) {
       return Card(
+        key: key,
         margin: const EdgeInsets.only(bottom: 12),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -831,6 +905,19 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
             children: [
               Row(
                 children: [
+                  // Drag handle
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade100,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(Icons.drag_indicator, size: 18, color: Colors.blue.shade700),
+                    ),
+                  ),
                   Icon(_getFieldIcon(field.type), size: 20),
                   const SizedBox(width: 8),
                   Expanded(
@@ -870,6 +957,27 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
                             '${field.validatorTypes!.length} validator(s)',
                             style: TextStyle(fontSize: 11, color: Colors.blue[700]),
                           ),
+                        // Conditional logic indicator
+                        if (hasCondition)
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.call_split, size: 12, color: Colors.purple.shade700),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Conditional',
+                                  style: TextStyle(fontSize: 10, color: Colors.purple.shade700, fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -893,9 +1001,28 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
 
     // Desktop layout
     return Card(
+      key: key,
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: Icon(_getFieldIcon(field.type)),
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            ReorderableDragStartListener(
+              index: index,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.drag_indicator, size: 20, color: Colors.blue.shade700),
+              ),
+            ),
+            Icon(_getFieldIcon(field.type)),
+          ],
+        ),
         title: Text(field.label),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -905,6 +1032,27 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               Text(
                 '${field.validatorTypes!.length} validator(s)',
                 style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+              ),
+            // Conditional logic indicator
+            if (hasCondition)
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade100,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.call_split, size: 14, color: Colors.purple.shade700),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Conditional: Shows when ${field.conditionalFieldId ?? "condition"} = ${field.conditionalValue ?? "..."}',
+                      style: TextStyle(fontSize: 11, color: Colors.purple.shade700, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
               ),
           ],
         ),
