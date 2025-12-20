@@ -175,7 +175,7 @@ class _DonorsScreenState extends State<DonorsScreen> {
             await Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => DonorDetailScreen(
-                  donorId: donor.id,
+                  donorId: donor.id ?? '',
                   initialDonor: donor,
                 ),
               ),
@@ -249,8 +249,8 @@ class _DonorsScreenState extends State<DonorsScreen> {
       chips.add(_buildPillChip(Icons.account_balance, districtLabel));
     }
 
-    if (donor.member != null) {
-      chips.add(_buildPillChip(Icons.link, donor.member!.name ?? donor.member!.id ?? 'Linked member'));
+    if (donor.memberId != null) {
+      chips.add(_buildPillChip(Icons.link, 'Linked member'));
     }
 
     return Card(
@@ -451,8 +451,8 @@ class _DonorsScreenState extends State<DonorsScreen> {
               children: [
                 if (countyLabel != null) _buildPillChip(Icons.location_city, countyLabel),
                 if (districtLabel != null) _buildPillChip(Icons.account_balance, districtLabel),
-                if (donor.member != null)
-                  _buildPillChip(Icons.link, donor.member!.name ?? donor.member!.id ?? 'Linked member'),
+                if (donor.memberId != null)
+                  _buildPillChip(Icons.link, 'Linked member'),
                 if (donor.isRecurringDonor == true)
                   _buildPillChip(Icons.autorenew, 'Recurring donor'),
               ],
@@ -465,7 +465,7 @@ class _DonorsScreenState extends State<DonorsScreen> {
                   await Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => DonorDetailScreen(
-                        donorId: donor.id,
+                        donorId: donor.id ?? '',
                         initialDonor: donor,
                       ),
                     ),
