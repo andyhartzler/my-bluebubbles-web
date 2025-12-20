@@ -883,6 +883,10 @@ class _QuestionEditDialogState extends State<_QuestionEditDialog> {
   late List<Map<String, dynamic>> _options;
   final _uuid = const Uuid();
 
+  // Store controllers for each option to prevent recreation on rebuild
+  final Map<String, TextEditingController> _optionLabelControllers = {};
+  final Map<String, TextEditingController> _optionValueControllers = {};
+
   @override
   void initState() {
     super.initState();
@@ -895,6 +899,14 @@ class _QuestionEditDialogState extends State<_QuestionEditDialog> {
     _options = List<Map<String, dynamic>>.from(
       (widget.question['options'] as List?)?.cast<Map<String, dynamic>>() ?? [],
     );
+
+    // Initialize controllers for existing options
+    for (final option in _options) {
+      final id = option['id'] as String? ?? _uuid.v4();
+      option['id'] = id;
+      _optionLabelControllers[id] = TextEditingController(text: option['label'] as String? ?? '');
+      _optionValueControllers[id] = TextEditingController(text: option['value'] as String? ?? '');
+    }
   }
 
   @override
@@ -904,6 +916,13 @@ class _QuestionEditDialogState extends State<_QuestionEditDialog> {
     _placeholderController.dispose();
     _helperTextController.dispose();
     _defaultValueController.dispose();
+    // Dispose option controllers
+    for (final controller in _optionLabelControllers.values) {
+      controller.dispose();
+    }
+    for (final controller in _optionValueControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -1010,6 +1029,9 @@ class _QuestionEditDialogState extends State<_QuestionEditDialog> {
                 const SizedBox(height: 8),
                 ...List.generate(_options.length, (index) {
                   final option = _options[index];
+                  final optionId = option['id'] as String;
+                  final labelController = _optionLabelControllers[optionId]!;
+                  final valueController = _optionValueControllers[optionId]!;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
@@ -1021,17 +1043,17 @@ class _QuestionEditDialogState extends State<_QuestionEditDialog> {
                               border: OutlineInputBorder(),
                               isDense: true,
                             ),
-                            controller: TextEditingController(
-                              text: option['label'] as String? ?? '',
-                            ),
+                            controller: labelController,
                             onChanged: (value) {
                               _options[index]['label'] = value;
-                              // Auto-generate value from label if empty
-                              if ((_options[index]['value'] as String? ?? '').isEmpty) {
-                                _options[index]['value'] = value
+                              // Auto-generate value from label if value field is empty
+                              if (valueController.text.isEmpty) {
+                                final autoValue = value
                                     .toLowerCase()
                                     .replaceAll(RegExp(r'\s+'), '_')
                                     .replaceAll(RegExp(r'[^a-z0-9_]'), '');
+                                valueController.text = autoValue;
+                                _options[index]['value'] = autoValue;
                               }
                             },
                           ),
@@ -1044,9 +1066,7 @@ class _QuestionEditDialogState extends State<_QuestionEditDialog> {
                               border: OutlineInputBorder(),
                               isDense: true,
                             ),
-                            controller: TextEditingController(
-                              text: option['value'] as String? ?? '',
-                            ),
+                            controller: valueController,
                             onChanged: (value) {
                               _options[index]['value'] = value;
                             },
@@ -1054,7 +1074,7 @@ class _QuestionEditDialogState extends State<_QuestionEditDialog> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () => setState(() => _options.removeAt(index)),
+                          onPressed: () => _removeOption(index, optionId),
                         ),
                       ],
                     ),
@@ -1100,12 +1120,26 @@ class _QuestionEditDialogState extends State<_QuestionEditDialog> {
   }
 
   void _addOption() {
+    final newId = _uuid.v4();
+    _optionLabelControllers[newId] = TextEditingController();
+    _optionValueControllers[newId] = TextEditingController();
     setState(() {
       _options.add({
-        'id': _uuid.v4(),
+        'id': newId,
         'label': '',
         'value': '',
       });
+    });
+  }
+
+  void _removeOption(int index, String optionId) {
+    // Dispose controllers for this option
+    _optionLabelControllers[optionId]?.dispose();
+    _optionValueControllers[optionId]?.dispose();
+    _optionLabelControllers.remove(optionId);
+    _optionValueControllers.remove(optionId);
+    setState(() {
+      _options.removeAt(index);
     });
   }
 }
