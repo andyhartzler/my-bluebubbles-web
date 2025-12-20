@@ -476,7 +476,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _openDonorsScreen(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (_) => const TitleBarWrapper(
+        builder: (_) => TitleBarWrapper(
           child: DonorsScreen(),
         ),
       ),
@@ -486,7 +486,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _openSubscribersScreen(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (_) => const TitleBarWrapper(
+        builder: (_) => TitleBarWrapper(
           child: SubscribersScreen(),
         ),
       ),
@@ -496,7 +496,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _openSlackScreen(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (_) => const TitleBarWrapper(
+        builder: (_) => TitleBarWrapper(
           child: SlackManagementScreen(),
         ),
       ),

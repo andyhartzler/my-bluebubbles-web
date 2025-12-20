@@ -384,8 +384,8 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
                   _fieldType = value!;
                   // Reset type-specific properties
                   _options = [];
-                  _minValue = null;
-                  _maxValue = null;
+                  _minValueController.clear();
+                  _maxValueController.clear();
                 });
               },
             );

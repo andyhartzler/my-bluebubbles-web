@@ -10,6 +10,7 @@ import '../../models/identity_config.dart';
 import '../../services/forms_service.dart';
 import '../../services/form_templates_service.dart';
 import '../../widgets/field_config_dialog.dart';
+import '../../widgets/rich_text_description_editor.dart';
 
 class FormBuilderScreen extends StatefulWidget {
   final String? formId; // null for new form
@@ -29,8 +30,10 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   final _formsService = FormsService();
   final _uuid = const Uuid();
   final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
   final _slugController = TextEditingController();
+
+  // Description is handled by rich text editor
+  String _descriptionContent = '';
   final _maxSubmissionsController = TextEditingController();
   final _confirmationEmailController = TextEditingController();
   final _notificationEmailsController = TextEditingController();
@@ -160,7 +163,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
 
     setState(() {
       _titleController.text = template.name;
-      _descriptionController.text = template.description ?? '';
+      _descriptionContent = template.description ?? '';
       _fields = fields;
 
       // Apply template settings
@@ -298,7 +301,6 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
   @override
   void dispose() {
     _titleController.dispose();
-    _descriptionController.dispose();
     _slugController.dispose();
     _maxSubmissionsController.dispose();
     _confirmationEmailController.dispose();
@@ -316,7 +318,7 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
 
       setState(() {
         _titleController.text = form.title;
-        _descriptionController.text = form.description ?? '';
+        _descriptionContent = form.description ?? '';
         _formType = form.formType;
         // Create a mutable copy of the fields list (Freezed returns immutable lists)
         _fields = List.from(form.schema.fields);
@@ -382,13 +384,15 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
+            RichTextDescriptionEditor(
+              key: ValueKey('description_$_descriptionContent'),
+              initialContent: _descriptionContent,
+              label: 'Description (optional)',
+              placeholder: 'Enter form description... (supports bold, italic, underline, and links)',
+              minHeight: 80,
+              onChanged: (content) {
+                _descriptionContent = content;
+              },
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -1325,9 +1329,9 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         // Create new
         await _formsService.createForm(
           title: _titleController.text,
-          description: _descriptionController.text.isEmpty
+          description: _descriptionContent.isEmpty
               ? null
-              : _descriptionController.text,
+              : _descriptionContent,
           formType: _formType,
           schema: schema,
           status: publish ? 'active' : 'draft',
@@ -1349,9 +1353,9 @@ class _FormBuilderScreenState extends State<FormBuilderScreen> {
         await _formsService.updateForm(
           widget.formId!,
           title: _titleController.text,
-          description: _descriptionController.text.isEmpty
+          description: _descriptionContent.isEmpty
               ? null
-              : _descriptionController.text,
+              : _descriptionContent,
           schema: schema,
           status: publish ? 'active' : null,
           opensAt: _opensAt,
