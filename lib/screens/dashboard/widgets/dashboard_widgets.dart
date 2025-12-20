@@ -690,19 +690,20 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
                 Icon(Icons.arrow_drop_down, color: _momentumBlue, size: 20),
               ],
             ),
+            color: _unityBlue,
             itemBuilder: (context) => _distributionOptions.map((opt) {
               return PopupMenuItem<String>(
                 value: opt.$1,
                 child: Row(
                   children: [
-                    Icon(opt.$3, size: 18, color: _momentumBlue),
+                    Icon(opt.$3, size: 18, color: opt.$1 == _selectedKey ? _grassrootsGreen : Colors.white70),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         opt.$2,
                         style: TextStyle(
                           fontWeight: opt.$1 == _selectedKey ? FontWeight.bold : FontWeight.normal,
-                          color: opt.$1 == _selectedKey ? _momentumBlue : _unityBlue,
+                          color: opt.$1 == _selectedKey ? Colors.white : Colors.white.withOpacity(0.9),
                         ),
                       ),
                     ),
@@ -773,27 +774,28 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 55,
+              reservedSize: 70,
               getTitlesWidget: (value, meta) {
                 final index = value.toInt();
                 if (index < 0 || index >= displayData.length) {
                   return const SizedBox.shrink();
                 }
                 final label = displayData[index].name;
-                final maxLen = displayData.length > 6 ? 5 : 8;
+                // Show more of the label for readability
+                final maxLen = displayData.length > 8 ? 8 : 12;
                 final displayLabel = label.length > maxLen
                     ? '${label.substring(0, maxLen - 1)}…'
                     : label;
                 return Padding(
-                  padding: const EdgeInsets.only(top: 6),
+                  padding: const EdgeInsets.only(top: 8),
                   child: RotatedBox(
                     quarterTurns: -1,
                     child: Text(
                       displayLabel,
                       style: const TextStyle(
-                        fontSize: 9,
+                        fontSize: 11,
                         color: _unityBlue,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

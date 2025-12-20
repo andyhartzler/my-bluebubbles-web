@@ -1421,117 +1421,163 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildWidgetPalette() {
-    final categories = DashboardDataCategory.values
-        .where((c) => DashboardDataSources.getByCategory(c).isNotEmpty)
-        .toList();
+    try {
+      final categories = DashboardDataCategory.values
+          .where((c) => DashboardDataSources.getByCategory(c).isNotEmpty)
+          .toList();
 
-    return Container(
-      key: const ValueKey('widget_palette'),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(right: BorderSide(color: Colors.grey[300]!)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: _unityBlue,
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.widgets, color: Colors.white),
-                SizedBox(width: 12),
-                Text(
-                  'Add Widgets',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              key: const ValueKey('palette_list'),
-              padding: const EdgeInsets.all(12),
-              itemCount: categories.length,
-              itemBuilder: (context, index) {
-                final category = categories[index];
-                final sources = DashboardDataSources.getByCategory(category);
-
-                return Theme(
-                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                  child: ExpansionTile(
-                    key: ValueKey('category_${category.name}'),
-                    title: Text(
-                      _getCategoryLabel(category),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
+      return Container(
+        key: const ValueKey('widget_palette'),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(right: BorderSide(color: Colors.grey[300]!)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: _unityBlue,
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.widgets, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text(
+                    'Add Widgets',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                    initiallyExpanded: index == 0,
-                    children: sources.map((source) {
-                      return _buildPaletteItem(source);
-                    }).toList(),
                   ),
-                );
-              },
+                ],
+              ),
             ),
+            Expanded(
+              child: ListView.builder(
+                key: const ValueKey('palette_list'),
+                padding: const EdgeInsets.all(12),
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  try {
+                    final category = categories[index];
+                    final sources = DashboardDataSources.getByCategory(category);
+
+                    return Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        key: ValueKey('category_${category.name}'),
+                        title: Text(
+                          _getCategoryLabel(category),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        initiallyExpanded: index == 0,
+                        children: sources.map((source) {
+                          return _buildPaletteItem(source);
+                        }).toList(),
+                      ),
+                    );
+                  } catch (e) {
+                    return ListTile(
+                      leading: const Icon(Icons.error_outline, color: Colors.red),
+                      title: const Text('Error loading category'),
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      // Return error state for the entire palette
+      return Container(
+        key: const ValueKey('widget_palette_error'),
+        color: Colors.white,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+              const SizedBox(height: 16),
+              const Text('Error loading widget palette'),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => setState(() {}),
+                child: const Text('Retry'),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        ),
+      );
+    }
   }
 
   Widget _buildPaletteItem(DashboardDataSource source) {
-    return Card(
-      key: ValueKey('palette_${source.key}'),
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: ListTile(
-        dense: true,
-        leading: Icon(source.icon, color: _momentumBlue, size: 20),
-        title: Text(
-          source.label,
-          style: const TextStyle(fontSize: 13),
+    try {
+      return Card(
+        key: ValueKey('palette_${source.key}'),
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ListTile(
+          dense: true,
+          leading: Icon(source.icon, color: _momentumBlue, size: 20),
+          title: Text(
+            source.label,
+            style: const TextStyle(fontSize: 13),
+          ),
+          subtitle: Text(
+            source.description,
+            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: source.supportedWidgets.isEmpty
+              ? const SizedBox.shrink()
+              : source.supportedWidgets.length == 1
+                  ? IconButton(
+                      icon: const Icon(Icons.add_circle, color: _grassrootsGreen),
+                      tooltip: 'Add widget',
+                      onPressed: () => _addWidget(source, source.supportedWidgets.first),
+                    )
+                  : PopupMenuButton<DashboardWidgetType>(
+                      icon: const Icon(Icons.add_circle_outline, color: _grassrootsGreen),
+                      tooltip: 'Add as...',
+                      onSelected: (type) => _addWidget(source, type),
+                      itemBuilder: (context) {
+                        return source.supportedWidgets.map((type) {
+                          return PopupMenuItem<DashboardWidgetType>(
+                            value: type,
+                            child: Row(
+                              children: [
+                                Icon(_getWidgetTypeIcon(type), size: 18),
+                                const SizedBox(width: 8),
+                                Text(_getWidgetTypeLabel(type)),
+                              ],
+                            ),
+                          );
+                        }).toList();
+                      },
+                    ),
         ),
-        subtitle: Text(
-          source.description,
-          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+      );
+    } catch (e) {
+      // Return error placeholder instead of crashing
+      return Card(
+        key: ValueKey('palette_error_${source.key}'),
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ListTile(
+          dense: true,
+          leading: const Icon(Icons.error_outline, color: Colors.red, size: 20),
+          title: Text(source.label, style: const TextStyle(fontSize: 13)),
+          subtitle: Text('Error loading', style: TextStyle(fontSize: 11, color: Colors.red[300])),
         ),
-        trailing: source.supportedWidgets.length == 1
-            ? IconButton(
-                icon: const Icon(Icons.add_circle, color: _grassrootsGreen),
-                tooltip: 'Add widget',
-                onPressed: () => _addWidget(source, source.supportedWidgets.first),
-              )
-            : PopupMenuButton<DashboardWidgetType>(
-                icon: const Icon(Icons.add_circle_outline, color: _grassrootsGreen),
-                tooltip: 'Add as...',
-                onSelected: (type) => _addWidget(source, type),
-                itemBuilder: (context) {
-                  return source.supportedWidgets.map((type) {
-                    return PopupMenuItem<DashboardWidgetType>(
-                      value: type,
-                      child: Row(
-                        children: [
-                          Icon(_getWidgetTypeIcon(type), size: 18),
-                          const SizedBox(width: 8),
-                          Text(_getWidgetTypeLabel(type)),
-                        ],
-                      ),
-                    );
-                  }).toList();
-                },
-              ),
-      ),
-    );
+      );
+    }
   }
 
   Widget _buildEditableGrid() {
