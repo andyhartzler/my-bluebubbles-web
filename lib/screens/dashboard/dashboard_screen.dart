@@ -1071,71 +1071,127 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildEditHeader({required bool isMobile}) {
     if (isMobile) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          gradient: const LinearGradient(
+            colors: [_unityBlue, Color(0xFF1E2A45)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.3),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.close, color: _actionRed),
-              onPressed: _toggleEditMode,
-              tooltip: 'Cancel',
-            ),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'Edit Dashboard',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: _unityBlue,
-                ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  // Cancel button
+                  TextButton.icon(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white70, size: 20),
+                    label: const Text('Cancel', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    onPressed: () {
+                      _loadConfig();
+                      _toggleEditMode();
+                    },
+                  ),
+                  const Spacer(),
+                  // Title
+                  const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.edit, color: Colors.white70, size: 18),
+                      SizedBox(width: 6),
+                      Text(
+                        'Editing',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  // Save button - prominent
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _grassrootsGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    onPressed: _toggleEditMode,
+                  ),
+                ],
               ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.restore),
-              onPressed: () {
-                setState(() {
-                  _config = _getDefaultConfig();
-                });
-              },
-              tooltip: 'Reset',
-            ),
-            IconButton(
-              icon: const Icon(Icons.add_circle, color: _grassrootsGreen),
-              onPressed: _showMobilePalette,
-              tooltip: 'Add Widget',
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _grassrootsGreen,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              const SizedBox(height: 8),
+              // Action buttons row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Add widget button
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add Widget'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white54),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: _showMobilePalette,
+                  ),
+                  const SizedBox(width: 12),
+                  // Reset button
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.restore, size: 18),
+                    label: const Text('Reset'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: const BorderSide(color: Colors.white38),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _config = _getDefaultConfig();
+                      });
+                    },
+                  ),
+                ],
               ),
-              onPressed: _toggleEditMode,
-              child: const Text('Done'),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
 
     // Desktop header
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: const LinearGradient(
+          colors: [_unityBlue, Color(0xFF1E2A45)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1143,39 +1199,83 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ),
       child: Row(
         children: [
+          // Toggle palette button
           IconButton(
-            icon: Icon(_showPalette ? Icons.chevron_left : Icons.chevron_right),
+            icon: Icon(
+              _showPalette ? Icons.chevron_left : Icons.menu,
+              color: Colors.white,
+            ),
             onPressed: () => setState(() => _showPalette = !_showPalette),
             tooltip: _showPalette ? 'Hide palette' : 'Show palette',
           ),
-          const SizedBox(width: 16),
-          const Icon(Icons.edit, color: _momentumBlue),
           const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.edit, color: Colors.white70, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'Edit Mode',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
           const Text(
-            'Customize Dashboard',
+            'Customize your dashboard',
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: _unityBlue,
+              fontSize: 14,
+              color: Colors.white70,
             ),
           ),
           const Spacer(),
+          // Reset button
           TextButton.icon(
-            icon: const Icon(Icons.restore),
-            label: const Text('Reset to Default'),
+            icon: const Icon(Icons.restore, color: Colors.white70, size: 18),
+            label: const Text('Reset', style: TextStyle(color: Colors.white70)),
             onPressed: () {
               setState(() {
                 _config = _getDefaultConfig();
               });
             },
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
+          // Cancel button
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white54),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              _loadConfig();
+              _toggleEditMode();
+            },
+            child: const Text('Cancel'),
+          ),
+          const SizedBox(width: 12),
+          // Save button - prominent
           ElevatedButton.icon(
             icon: const Icon(Icons.check),
-            label: const Text('Done'),
+            label: const Text('Save & Exit', style: TextStyle(fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
               backgroundColor: _grassrootsGreen,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: _toggleEditMode,
           ),
