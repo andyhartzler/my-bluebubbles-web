@@ -60,12 +60,7 @@ function ensure_flutter() {
   fi
 
   echo "Extracting Flutter SDK..."
-  tar -xf "$tmp_archive" -C "$(dirname "$FLUTTER_ROOT")"
-
-  # The archive extracts to a 'flutter' directory, rename if needed
-  if [ -d "$(dirname "$FLUTTER_ROOT")/flutter" ] && [ "$(dirname "$FLUTTER_ROOT")/flutter" != "$FLUTTER_ROOT" ]; then
-    mv "$(dirname "$FLUTTER_ROOT")/flutter" "$FLUTTER_ROOT"
-  fi
+  tar -xf "$tmp_archive" -C "$FLUTTER_ROOT" --strip-components=1
 
   rm -f "$tmp_archive"
   echo "Flutter SDK installed successfully!"
