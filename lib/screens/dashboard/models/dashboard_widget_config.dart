@@ -19,13 +19,14 @@ enum DashboardWidgetType {
 
 /// Size options for widgets
 enum DashboardWidgetSize {
-  mini,    // 1x0.5 on grid (half height of small)
-  small,   // 1x1 on grid
-  medium,  // 2x1 on grid
-  large,   // 2x2 on grid
-  wide,    // 3x1 on grid
-  tall,    // 1x2 on grid
-  hero,    // 3x2 on grid
+  mini,       // 1x0.5 on grid (half height of small)
+  small,      // 1x1 on grid
+  medium,     // 2x1 on grid
+  large,      // 2x2 on grid
+  wide,       // 3x1 on grid
+  tall,       // 1x2 on grid
+  hero,       // 3x2 on grid
+  mobileFull, // Full width on mobile with tall proportions (like tall but full width)
 }
 
 /// Data source categories
@@ -55,6 +56,9 @@ class DashboardWidgetConfig {
   final int gridY;
   final bool visible;
   final Map<String, dynamic> options;
+  /// Optional swipe row ID - widgets with the same swipeRowId will be grouped
+  /// into a horizontal swipeable row on mobile
+  final String? swipeRowId;
 
   const DashboardWidgetConfig({
     required this.id,
@@ -69,6 +73,7 @@ class DashboardWidgetConfig {
     this.gridY = 0,
     this.visible = true,
     this.options = const {},
+    this.swipeRowId,
   });
 
   DashboardWidgetConfig copyWith({
@@ -84,6 +89,8 @@ class DashboardWidgetConfig {
     int? gridY,
     bool? visible,
     Map<String, dynamic>? options,
+    String? swipeRowId,
+    bool clearSwipeRowId = false,
   }) {
     return DashboardWidgetConfig(
       id: id ?? this.id,
@@ -98,6 +105,7 @@ class DashboardWidgetConfig {
       gridY: gridY ?? this.gridY,
       visible: visible ?? this.visible,
       options: options ?? this.options,
+      swipeRowId: clearSwipeRowId ? null : (swipeRowId ?? this.swipeRowId),
     );
   }
 
@@ -115,6 +123,7 @@ class DashboardWidgetConfig {
     'gridY': gridY,
     'visible': visible,
     'options': options,
+    'swipeRowId': swipeRowId,
   };
 
   factory DashboardWidgetConfig.fromJson(Map<String, dynamic> json) {
@@ -157,6 +166,7 @@ class DashboardWidgetConfig {
       gridY: json['gridY'] as int? ?? 0,
       visible: visible,
       options: json['options'] as Map<String, dynamic>? ?? {},
+      swipeRowId: json['swipeRowId'] as String?,
     );
   }
 
@@ -172,7 +182,8 @@ class DashboardWidgetConfig {
         return 2;
       case DashboardWidgetSize.wide:
       case DashboardWidgetSize.hero:
-        return 3;
+      case DashboardWidgetSize.mobileFull:
+        return 3; // mobileFull uses full width (same grid units as hero/wide)
     }
   }
 
@@ -186,7 +197,8 @@ class DashboardWidgetConfig {
         return 1;
       case DashboardWidgetSize.tall:
       case DashboardWidgetSize.large:
-        return 2;
+      case DashboardWidgetSize.mobileFull:
+        return 2; // mobileFull uses tall proportions (2 grid units height)
       case DashboardWidgetSize.hero:
         return 2;
     }

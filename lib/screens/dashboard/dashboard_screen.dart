@@ -86,8 +86,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _showPalette = false;
   int? _dragHoverIndex; // Track where a dragged widget would be inserted
 
-  // Dashboard configuration
-  DashboardConfig _config = _getDefaultConfig();
+  // Dashboard configuration - separate configs for mobile and desktop
+  DashboardConfig _desktopConfig = _getDefaultConfig();
+  DashboardConfig _mobileConfig = _getDefaultMobileConfig();
+
+  // Track which layout we're currently editing/viewing
+  bool _isMobileLayout = false;
+
+  // Active config getter (returns mobile or desktop based on current screen)
+  DashboardConfig get _config => _isMobileLayout ? _mobileConfig : _desktopConfig;
 
   @override
   void initState() {
@@ -299,45 +306,232 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
+  /// Default mobile config with swipeable stat card rows
+  static DashboardConfig _getDefaultMobileConfig() {
+    return DashboardConfig(
+      id: 'default_mobile',
+      name: 'Mobile Dashboard',
+      columns: 2,
+      widgets: [
+        // Swipeable stat card row 1 (key stats)
+        DashboardWidgetConfig(
+          id: 'mobile_members',
+          type: DashboardWidgetType.statCard,
+          size: DashboardWidgetSize.small,
+          dataSourceKey: 'totalMembers',
+          title: 'Members',
+          icon: Icons.people_alt,
+          gradientColors: [_unityBlue, _momentumBlue],
+          gridX: 0,
+          gridY: 0,
+          swipeRowId: 'stats_row_1',
+        ),
+        DashboardWidgetConfig(
+          id: 'mobile_subscribers',
+          type: DashboardWidgetType.statCard,
+          size: DashboardWidgetSize.small,
+          dataSourceKey: 'totalSubscribers',
+          title: 'Subscribers',
+          icon: Icons.email,
+          gradientColors: [_justicePurple, _actionRed],
+          gridX: 1,
+          gridY: 0,
+          swipeRowId: 'stats_row_1',
+        ),
+        DashboardWidgetConfig(
+          id: 'mobile_donors',
+          type: DashboardWidgetType.statCard,
+          size: DashboardWidgetSize.small,
+          dataSourceKey: 'totalDonors',
+          title: 'Donors',
+          icon: Icons.volunteer_activism,
+          gradientColors: [_actionRed, _sunriseGold],
+          gridX: 2,
+          gridY: 0,
+          swipeRowId: 'stats_row_1',
+        ),
+        DashboardWidgetConfig(
+          id: 'mobile_chapters',
+          type: DashboardWidgetType.statCard,
+          size: DashboardWidgetSize.small,
+          dataSourceKey: 'totalCharteredChapters',
+          title: 'Chapters',
+          icon: Icons.flag,
+          gradientColors: [_grassrootsGreen, _momentumBlue],
+          gridX: 3,
+          gridY: 0,
+          swipeRowId: 'stats_row_1',
+        ),
+        DashboardWidgetConfig(
+          id: 'mobile_new_month',
+          type: DashboardWidgetType.statCard,
+          size: DashboardWidgetSize.small,
+          dataSourceKey: 'newMembersThisMonth',
+          title: 'New This Month',
+          icon: Icons.trending_up,
+          gradientColors: [_grassrootsGreen, _sunriseGold],
+          gridX: 4,
+          gridY: 0,
+          swipeRowId: 'stats_row_1',
+        ),
+        // Distribution Explorer - mobileFull size (tall proportions, full width)
+        DashboardWidgetConfig(
+          id: 'mobile_distribution',
+          type: DashboardWidgetType.dynamicDistribution,
+          size: DashboardWidgetSize.mobileFull,
+          dataSourceKey: 'dynamicDistribution',
+          title: 'Distribution Explorer',
+          icon: Icons.analytics,
+          gradientColors: [_momentumBlue, _justicePurple],
+          gridX: 0,
+          gridY: 1,
+        ),
+        // Growth chart - mobileFull size
+        DashboardWidgetConfig(
+          id: 'mobile_growth',
+          type: DashboardWidgetType.lineChart,
+          size: DashboardWidgetSize.mobileFull,
+          dataSourceKey: 'membersJoinedByMonth',
+          title: 'Member Growth',
+          icon: Icons.show_chart,
+          gridX: 0,
+          gridY: 2,
+        ),
+        // More stats in swipeable row 2
+        DashboardWidgetConfig(
+          id: 'mobile_counties',
+          type: DashboardWidgetType.progressRing,
+          size: DashboardWidgetSize.small,
+          dataSourceKey: 'totalUniqueCounties',
+          title: 'Counties',
+          subtitle: '/ 114',
+          icon: Icons.map_outlined,
+          gradientColors: [_sunriseGold, _actionRed],
+          gridX: 0,
+          gridY: 3,
+          swipeRowId: 'stats_row_2',
+        ),
+        DashboardWidgetConfig(
+          id: 'mobile_slack',
+          type: DashboardWidgetType.statCard,
+          size: DashboardWidgetSize.small,
+          dataSourceKey: 'totalSlackMessages',
+          title: 'Slack Messages',
+          icon: Icons.chat,
+          gradientColors: [_justicePurple, _momentumBlue],
+          gridX: 1,
+          gridY: 3,
+          swipeRowId: 'stats_row_2',
+        ),
+        DashboardWidgetConfig(
+          id: 'mobile_donations',
+          type: DashboardWidgetType.statCard,
+          size: DashboardWidgetSize.small,
+          dataSourceKey: 'totalDonationsAmount',
+          title: 'Total Raised',
+          icon: Icons.attach_money,
+          gradientColors: [_grassrootsGreen, _unityBlue],
+          gridX: 2,
+          gridY: 3,
+          swipeRowId: 'stats_row_2',
+        ),
+        DashboardWidgetConfig(
+          id: 'mobile_age',
+          type: DashboardWidgetType.statCard,
+          size: DashboardWidgetSize.small,
+          dataSourceKey: 'averageMemberAge',
+          title: 'Avg Age',
+          icon: Icons.cake,
+          gradientColors: [_momentumBlue, _justicePurple],
+          gridX: 3,
+          gridY: 3,
+          swipeRowId: 'stats_row_2',
+        ),
+        // Community type pie chart
+        DashboardWidgetConfig(
+          id: 'mobile_community',
+          type: DashboardWidgetType.pieChart,
+          size: DashboardWidgetSize.mobileFull,
+          dataSourceKey: 'membersByCommunityType',
+          title: 'Community Type',
+          icon: Icons.pie_chart,
+          gridX: 0,
+          gridY: 4,
+        ),
+      ],
+    );
+  }
+
+  /// Update config setter to work with mobile/desktop separation
+  void _setConfig(DashboardConfig config) {
+    if (_isMobileLayout) {
+      _mobileConfig = config;
+    } else {
+      _desktopConfig = config;
+    }
+  }
+
   Future<void> _loadConfig() async {
     try {
-      debugPrint('[DashboardScreen] Loading config from database...');
-      // First try to load from database
-      final layoutJson = await _metricsService.fetchDashboardLayout();
-      if (layoutJson != null) {
-        debugPrint('[DashboardScreen] Parsing layout JSON with ${layoutJson['widgets']?.length ?? 0} widgets');
+      debugPrint('[DashboardScreen] Loading configs from database...');
+
+      // Load both desktop and mobile layouts in parallel
+      final results = await Future.wait([
+        _metricsService.fetchDashboardLayout(),
+        _metricsService.fetchDashboardLayoutMobile(),
+      ]);
+
+      final desktopLayoutJson = results[0];
+      final mobileLayoutJson = results[1];
+
+      // Parse desktop layout
+      if (desktopLayoutJson != null) {
+        debugPrint('[DashboardScreen] Parsing desktop layout JSON with ${desktopLayoutJson['widgets']?.length ?? 0} widgets');
         try {
-          final config = DashboardConfig.fromJson(layoutJson);
-          debugPrint('[DashboardScreen] Successfully parsed config: ${config.widgets.length} widgets');
-          setState(() {
-            _config = config;
-          });
+          final config = DashboardConfig.fromJson(desktopLayoutJson);
+          debugPrint('[DashboardScreen] Successfully parsed desktop config: ${config.widgets.length} widgets');
+          _desktopConfig = config;
         } catch (parseError, stackTrace) {
-          _logDetailedParseError('DashboardConfig.fromJson', parseError, stackTrace, layoutJson);
-          // Try to continue with default config
-          setState(() {
-            _config = _getDefaultConfig();
-          });
+          _logDetailedParseError('DashboardConfig.fromJson (desktop)', parseError, stackTrace, desktopLayoutJson);
+          _desktopConfig = _getDefaultConfig();
         }
-        return;
+      } else {
+        // Fallback to local storage for backwards compatibility
+        debugPrint('[DashboardScreen] No desktop database layout, checking SharedPreferences...');
+        final prefs = await SharedPreferences.getInstance();
+        final configJson = prefs.getString(_prefsKey);
+        if (configJson != null) {
+          try {
+            final config = DashboardConfig.fromJsonString(configJson);
+            debugPrint('[DashboardScreen] Loaded desktop from SharedPreferences: ${config.widgets.length} widgets');
+            _desktopConfig = config;
+            // Migrate to database
+            _metricsService.saveDashboardLayout(_desktopConfig.toJson());
+          } catch (parseError, stackTrace) {
+            _logDetailedParseError('DashboardConfig.fromJsonString', parseError, stackTrace, configJson);
+          }
+        }
       }
 
-      // Fallback to local storage for backwards compatibility
-      debugPrint('[DashboardScreen] No database layout, checking SharedPreferences...');
-      final prefs = await SharedPreferences.getInstance();
-      final configJson = prefs.getString(_prefsKey);
-      if (configJson != null) {
+      // Parse mobile layout
+      if (mobileLayoutJson != null) {
+        debugPrint('[DashboardScreen] Parsing mobile layout JSON with ${mobileLayoutJson['widgets']?.length ?? 0} widgets');
         try {
-          final config = DashboardConfig.fromJsonString(configJson);
-          debugPrint('[DashboardScreen] Loaded from SharedPreferences: ${config.widgets.length} widgets');
-          setState(() {
-            _config = config;
-          });
-          // Migrate to database
-          _saveConfig();
+          final config = DashboardConfig.fromJson(mobileLayoutJson);
+          debugPrint('[DashboardScreen] Successfully parsed mobile config: ${config.widgets.length} widgets');
+          _mobileConfig = config;
         } catch (parseError, stackTrace) {
-          _logDetailedParseError('DashboardConfig.fromJsonString', parseError, stackTrace, configJson);
+          _logDetailedParseError('DashboardConfig.fromJson (mobile)', parseError, stackTrace, mobileLayoutJson);
+          _mobileConfig = _getDefaultMobileConfig();
         }
+      } else {
+        // No mobile layout saved yet, use default
+        debugPrint('[DashboardScreen] No mobile layout in database, using default mobile config');
+        _mobileConfig = _getDefaultMobileConfig();
+      }
+
+      if (mounted) {
+        setState(() {});
       }
     } catch (e, stackTrace) {
       _logDetailedParseError('_loadConfig', e, stackTrace, null);
@@ -414,23 +608,34 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Future<void> _saveConfig() async {
     try {
-      // Save to database
-      final success = await _metricsService.saveDashboardLayout(_config.toJson());
-      if (success) {
-        debugPrint('Dashboard layout saved to database');
+      // Save to appropriate database column based on mobile/desktop
+      if (_isMobileLayout) {
+        final success = await _metricsService.saveDashboardLayoutMobile(_mobileConfig.toJson());
+        if (success) {
+          debugPrint('Mobile dashboard layout saved to database');
+        } else {
+          debugPrint('Failed to save mobile dashboard layout to database');
+        }
       } else {
-        // Fallback to local storage if database save fails
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_prefsKey, _config.toJsonString());
-        debugPrint('Dashboard layout saved to local storage (fallback)');
+        final success = await _metricsService.saveDashboardLayout(_desktopConfig.toJson());
+        if (success) {
+          debugPrint('Desktop dashboard layout saved to database');
+        } else {
+          // Fallback to local storage if database save fails
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_prefsKey, _desktopConfig.toJsonString());
+          debugPrint('Desktop dashboard layout saved to local storage (fallback)');
+        }
       }
     } catch (e) {
       debugPrint('Error saving dashboard config: $e');
-      // Fallback to local storage
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_prefsKey, _config.toJsonString());
-      } catch (_) {}
+      // Fallback to local storage for desktop only
+      if (!_isMobileLayout) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_prefsKey, _desktopConfig.toJsonString());
+        } catch (_) {}
+      }
     }
   }
 
@@ -540,23 +745,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       for (int i = 0; i < widgetsList.length; i++) {
         widgetsList[i] = widgetsList[i].copyWith(gridY: i);
       }
-      _config = DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList);
+      _setConfig(DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList));
     });
   }
 
   void _removeWidget(String widgetId) {
     setState(() {
-      _config = _config.copyWith(
+      _setConfig(_config.copyWith(
         widgets: _config.widgets.where((w) => w.id != widgetId).toList(),
-      );
+      ));
     });
   }
 
   void _updateWidget(DashboardWidgetConfig updated) {
     setState(() {
-      _config = _config.copyWith(
+      _setConfig(_config.copyWith(
         widgets: _config.widgets.map((w) => w.id == updated.id ? updated : w).toList(),
-      );
+      ));
     });
   }
 
@@ -785,6 +990,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final horizontalPadding = isMobile ? 12.0 : (isTablet ? 20.0 : 32.0);
         final columns = isMobile ? 2 : (isTablet ? 3 : 4);
 
+        // Set the layout mode based on screen size (post-frame to avoid setState during build)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _isMobileLayout != isMobile) {
+            setState(() {
+              _isMobileLayout = isMobile;
+            });
+          }
+        });
+
         return CustomScrollView(
           physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
           slivers: [
@@ -793,11 +1007,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               padding: EdgeInsets.fromLTRB(horizontalPadding, isMobile ? 12 : 24, horizontalPadding, 0),
               sliver: SliverToBoxAdapter(child: _buildHeader(isMobile: isMobile)),
             ),
-            // Widgets Grid
+            // Widgets Grid - use swipeable rows on mobile
             SliverPadding(
               padding: EdgeInsets.all(horizontalPadding),
               sliver: SliverToBoxAdapter(
-                child: _buildWidgetsGrid(metrics, columns, constraints.maxWidth - horizontalPadding * 2),
+                child: isMobile
+                    ? _buildMobileWidgetsGrid(metrics, constraints.maxWidth - horizontalPadding * 2)
+                    : _buildWidgetsGrid(metrics, columns, constraints.maxWidth - horizontalPadding * 2),
               ),
             ),
             // Bottom padding for mobile
@@ -910,6 +1126,112 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           child: _buildWidget(widget, metrics),
         );
       }).toList(),
+    );
+  }
+
+  /// Build mobile-optimized grid with swipeable horizontal rows
+  Widget _buildMobileWidgetsGrid(DashboardMetrics metrics, double maxWidth) {
+    final widgetWidth = maxWidth * 0.42; // Each swipeable card is ~42% of width
+    final widgetHeight = widgetWidth * 0.9;
+    final fullWidgetHeight = maxWidth * 0.75; // Height for full-width widgets (tall proportions)
+
+    // Sort widgets by position
+    final sortedWidgets = List<DashboardWidgetConfig>.from(_config.widgets)
+      ..sort((a, b) {
+        if (a.gridY != b.gridY) return a.gridY.compareTo(b.gridY);
+        return a.gridX.compareTo(b.gridX);
+      });
+
+    // Group widgets: swipeable rows vs standalone
+    final List<Widget> rows = [];
+    final Map<String, List<DashboardWidgetConfig>> swipeRows = {};
+    final List<DashboardWidgetConfig> standaloneWidgets = [];
+
+    for (final widget in sortedWidgets) {
+      if (widget.swipeRowId != null) {
+        swipeRows.putIfAbsent(widget.swipeRowId!, () => []).add(widget);
+      } else {
+        standaloneWidgets.add(widget);
+      }
+    }
+
+    // Build in order: process widgets in their gridY order
+    final processedSwipeRows = <String>{};
+
+    for (final widget in sortedWidgets) {
+      if (widget.swipeRowId != null) {
+        // Check if we've already processed this swipe row
+        if (!processedSwipeRows.contains(widget.swipeRowId)) {
+          processedSwipeRows.add(widget.swipeRowId!);
+          final rowWidgets = swipeRows[widget.swipeRowId]!;
+          rows.add(_buildSwipeableRow(rowWidgets, metrics, widgetWidth, widgetHeight));
+        }
+      } else {
+        // Standalone widget - use full width for mobileFull size
+        final isMobileFull = widget.size == DashboardWidgetSize.mobileFull ||
+            widget.size == DashboardWidgetSize.hero ||
+            widget.size == DashboardWidgetSize.large;
+        final height = isMobileFull ? fullWidgetHeight : widgetHeight;
+
+        rows.add(SizedBox(
+          width: maxWidth,
+          height: height,
+          child: _buildWidget(widget, metrics),
+        ));
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: rows.map((row) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: row,
+      )).toList(),
+    );
+  }
+
+  /// Build a horizontally swipeable row of widgets
+  Widget _buildSwipeableRow(List<DashboardWidgetConfig> widgets, DashboardMetrics metrics,
+      double widgetWidth, double widgetHeight) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Page indicator dots above the row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Swipe to see more',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[500],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.swipe, size: 14, color: Colors.grey[400]),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: widgetHeight,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            itemCount: widgets.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final widget = widgets[index];
+              return SizedBox(
+                width: widgetWidth,
+                height: widgetHeight,
+                child: _buildWidget(widget, metrics),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -1147,6 +1469,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildEditMode() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
+
+    // Set the layout mode based on screen size (post-frame to avoid setState during build)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _isMobileLayout != isMobile) {
+        setState(() {
+          _isMobileLayout = isMobile;
+        });
+      }
+    });
 
     // Wrap entire edit mode in error boundary for detailed error capture
     return DashboardErrorBoundary(
@@ -1560,7 +1891,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                     onPressed: () {
                       setState(() {
-                        _config = _getDefaultConfig();
+                        // Reset to appropriate default based on current layout
+                        _setConfig(_isMobileLayout ? _getDefaultMobileConfig() : _getDefaultConfig());
                       });
                     },
                   ),
@@ -1638,7 +1970,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             label: const Text('Reset', style: TextStyle(color: Colors.white70)),
             onPressed: () {
               setState(() {
-                _config = _getDefaultConfig();
+                // Reset to appropriate default based on current layout
+                _setConfig(_isMobileLayout ? _getDefaultMobileConfig() : _getDefaultConfig());
               });
             },
           ),
@@ -2373,7 +2706,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       for (int i = 0; i < widgetsList.length; i++) {
         widgetsList[i] = widgetsList[i].copyWith(gridY: i);
       }
-      _config = DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList);
+      _setConfig(DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList));
     });
     _saveConfig();
   }
@@ -2390,7 +2723,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       for (int i = 0; i < widgetsList.length; i++) {
         widgetsList[i] = widgetsList[i].copyWith(gridY: i);
       }
-      _config = DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList);
+      _setConfig(DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList));
     });
     _saveConfig();
   }
