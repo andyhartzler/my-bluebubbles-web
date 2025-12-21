@@ -89,6 +89,59 @@ class DashboardMetricsService {
     }
   }
 
+  /// Fetch the saved mobile dashboard layout configuration
+  Future<Map<String, dynamic>?> fetchDashboardLayoutMobile() async {
+    final client = _client;
+    if (client == null) return null;
+
+    try {
+      final response = await client
+          .from('crm_dashboard_metrics')
+          .select('dashboard_layout_mobile')
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) return null;
+      final layout = response['dashboard_layout_mobile'];
+      if (layout == null) return null;
+      return layout is Map<String, dynamic> ? layout : null;
+    } catch (e) {
+      print('[DashboardMetricsService] Error fetching mobile dashboard layout: $e');
+      return null;
+    }
+  }
+
+  /// Save the mobile dashboard layout configuration
+  Future<bool> saveDashboardLayoutMobile(Map<String, dynamic> layout) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      // Get the ID of the first row
+      final existingRow = await client
+          .from('crm_dashboard_metrics')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+
+      if (existingRow == null) {
+        print('[DashboardMetricsService] No metrics row found to update mobile layout');
+        return false;
+      }
+
+      // Update the dashboard_layout_mobile column
+      await client
+          .from('crm_dashboard_metrics')
+          .update({'dashboard_layout_mobile': layout})
+          .eq('id', existingRow['id']);
+
+      return true;
+    } catch (e) {
+      print('[DashboardMetricsService] Error saving mobile dashboard layout: $e');
+      return false;
+    }
+  }
+
   /// Watch the dashboard metrics for real-time updates
   Stream<DashboardMetrics?> watchMetrics() {
     final client = _client;
