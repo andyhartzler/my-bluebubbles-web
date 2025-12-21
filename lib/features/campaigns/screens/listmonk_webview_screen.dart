@@ -35,6 +35,7 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
   String? _error;
   int _loginAttempts = 0;
   static const int _maxLoginAttempts = 3;
+  bool _showCredentials = true; // Start with credentials visible for web
 
   @override
   void initState() {
@@ -363,6 +364,12 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
     await _initialize();
   }
 
+  void _toggleCredentials() {
+    setState(() {
+      _showCredentials = !_showCredentials;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -372,6 +379,15 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          if (!_isInitializing && kIsWeb)
+            IconButton(
+              icon: Icon(
+                Icons.key,
+                color: _showCredentials ? Colors.amber : Colors.white,
+              ),
+              onPressed: _toggleCredentials,
+              tooltip: _showCredentials ? 'Hide login credentials' : 'Show login credentials',
+            ),
           if (!_isInitializing)
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -440,8 +456,11 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
 
     // Platform-specific view
     if (kIsWeb) {
-      // Web: Use iframe with Basic Auth (no CORS issues!)
-      return const Iframe(src: '$_listmonkUrl/admin');
+      // Web: Use iframe - credentials banner is toggled via key icon in header
+      return Iframe(
+        src: '$_listmonkUrl/admin',
+        showCredentials: _showCredentials,
+      );
     } else if (_controller != null) {
       // Mobile/Desktop: Use WebView with JS auto-login
       return Stack(

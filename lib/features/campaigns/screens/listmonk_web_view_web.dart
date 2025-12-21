@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
-import 'dart:async';
 
 /// Web-specific iframe widget for Listmonk
 ///
@@ -9,8 +8,13 @@ import 'dart:async';
 /// so this widget loads the plain URL and shows a credentials banner for manual login.
 class Iframe extends StatefulWidget {
   final String src;
+  final bool showCredentials;
 
-  const Iframe({super.key, required this.src});
+  const Iframe({
+    super.key,
+    required this.src,
+    this.showCredentials = false,
+  });
 
   @override
   State<Iframe> createState() => _IframeState();
@@ -22,9 +26,6 @@ class _IframeState extends State<Iframe> {
   bool _isRegistered = false;
   String _statusMessage = 'Loading Listmonk...';
   String? _errorMessage;
-  bool _showLoginHelp = false;
-  bool _helpDismissed = false;
-  Timer? _loginCheckTimer;
   final String _username = 'admin';
   final String _password = 'fucktrump67';
 
@@ -32,12 +33,6 @@ class _IframeState extends State<Iframe> {
   void initState() {
     super.initState();
     _registerIframe();
-  }
-
-  @override
-  void dispose() {
-    _loginCheckTimer?.cancel();
-    super.dispose();
   }
 
   void _registerIframe() {
@@ -67,9 +62,6 @@ class _IframeState extends State<Iframe> {
             _statusMessage = 'Logged in successfully';
             _isLoading = false;
           });
-
-          // Multi-layer detection strategy
-          _startLoginDetection();
         }
       });
 
@@ -106,42 +98,6 @@ class _IframeState extends State<Iframe> {
         });
       }
     }
-  }
-
-  void _startLoginDetection() {
-    // Show credentials immediately for all browsers since embedded credentials
-    // are blocked by modern browsers - users need to login manually
-    if (!_helpDismissed) {
-      _loginCheckTimer = Timer(const Duration(milliseconds: 500), () {
-        debugPrint('📧 Listmonk: Showing credentials banner for manual login');
-        if (mounted && !_helpDismissed) {
-          setState(() {
-            _showLoginHelp = true;
-          });
-        }
-      });
-    }
-  }
-
-  void _dismissHelp() {
-    setState(() {
-      _showLoginHelp = false;
-      _helpDismissed = true;
-    });
-    debugPrint('📧 Listmonk: User dismissed credentials banner');
-  }
-
-  void _showHelp() {
-    setState(() {
-      _showLoginHelp = true;
-      _helpDismissed = false;
-    });
-    debugPrint('📧 Listmonk: User requested credentials banner');
-  }
-
-  void _openInNewTab() {
-    html.window.open(widget.src, '_blank');
-    debugPrint('📧 Listmonk: Opened in new tab');
   }
 
   @override
@@ -225,8 +181,8 @@ class _IframeState extends State<Iframe> {
             ),
           ),
 
-        // Login credentials banner
-        if (_showLoginHelp && !_isLoading)
+        // Login credentials banner (controlled by parent via widget.showCredentials)
+        if (widget.showCredentials && !_isLoading)
           Positioned(
             top: 0,
             left: 0,
@@ -324,56 +280,7 @@ class _IframeState extends State<Iframe> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Open in new tab button
-                    IconButton(
-                      icon: const Icon(Icons.open_in_new, size: 20),
-                      onPressed: _openInNewTab,
-                      color: Colors.blue[700],
-                      tooltip: 'Open in new tab',
-                    ),
-                    // Close button
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: _dismissHelp,
-                      color: Colors.blue[700],
-                      tooltip: 'Dismiss',
-                    ),
                   ],
-                ),
-              ),
-            ),
-          ),
-
-        // Always-visible "Show Login Help" button when banner is dismissed
-        if (!_showLoginHelp && !_isLoading)
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Material(
-              elevation: 2,
-              borderRadius: BorderRadius.circular(20),
-              color: Colors.blue[700],
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: _showHelp,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.help_outline, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Show Login Credentials',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),
