@@ -48,6 +48,19 @@ double? _parseDouble(dynamic value) {
   return null;
 }
 
+/// Safely coerce a dynamic value to bool, handling int values from database
+bool? _coerceBool(dynamic value) {
+  if (value == null) return null;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.trim().toLowerCase();
+    if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+    if (lower == 'false' || lower == '0' || lower == 'no') return false;
+  }
+  return null;
+}
+
 class Event {
   final String? id;
   final String title;
@@ -252,13 +265,13 @@ class Event {
       locationTwoAddress: json['location_two_address'] as String?,
       locationThreeName: json['location_three_name'] as String?,
       locationThreeAddress: json['location_three_address'] as String?,
-      multipleLocations: json['multiple_locations'] as bool? ?? false,
-      hideAddressBeforeRsvp: json['hide_address_before_rsvp'] as bool? ?? false,
+      multipleLocations: _coerceBool(json['multiple_locations']) ?? false,
+      hideAddressBeforeRsvp: _coerceBool(json['hide_address_before_rsvp']) ?? false,
       eventType: json['event_type'] as String?,
-      rsvpEnabled: json['rsvp_enabled'] as bool? ?? true,
+      rsvpEnabled: _coerceBool(json['rsvp_enabled']) ?? true,
       rsvpDeadline: _parseDateTime(json['rsvp_deadline'], fieldName: 'rsvp_deadline'),
       maxAttendees: _parseInt(json['max_attendees']),
-      checkinEnabled: json['checkin_enabled'] as bool? ?? false,
+      checkinEnabled: _coerceBool(json['checkin_enabled']) ?? false,
       status: json['status'] as String? ?? 'draft',
       createdBy: json['created_by'] as String?,
       createdAt: _parseDateTime(json['created_at'], fieldName: 'created_at'),
@@ -465,14 +478,14 @@ class EventAttendee {
       rsvpStatus: json['rsvp_status'] as String? ?? 'attending',
       guestCount: _parseInt(json['guest_count']),
       notes: json['notes'] as String?,
-      checkedIn: json['checked_in'] as bool? ?? false,
+      checkedIn: _coerceBool(json['checked_in']) ?? false,
       checkedInAt: _parseDateTime(json['checked_in_at'], fieldName: 'checked_in_at'),
       checkedInBy: json['checked_in_by'] as String?,
       rsvpAt: _parseDateTime(json['rsvp_at'], required: true, fieldName: 'rsvp_at')!,
       updatedAt: _parseDateTime(json['updated_at'], required: true, fieldName: 'updated_at')!,
       member: member,
       totalDonated: _parseDouble(json['total_donated']),
-      isRecurringDonor: json['is_recurring_donor'] as bool?,
+      isRecurringDonor: _coerceBool(json['is_recurring_donor']),
     );
   }
 }

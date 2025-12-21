@@ -85,8 +85,21 @@ class Chapter {
       lastUpdated: json['last_updated'] != null
           ? DateTime.tryParse(json['last_updated'] as String)
           : null,
-      isChartered: (json['is_chartered'] as bool?) ?? false,
+      isChartered: _coerceBool(json['is_chartered']) ?? false,
     );
+  }
+
+  /// Safely coerce a dynamic value to bool, handling int values from database
+  static bool? _coerceBool(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final lower = value.trim().toLowerCase();
+      if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+      if (lower == 'false' || lower == '0' || lower == 'no') return false;
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {

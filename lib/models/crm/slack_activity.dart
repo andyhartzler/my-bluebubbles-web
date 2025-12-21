@@ -20,6 +20,19 @@ DateTime? _parseDate(dynamic value) {
   return null;
 }
 
+/// Safely coerce a dynamic value to bool, handling int values from database
+bool? _coerceBool(dynamic value) {
+  if (value == null) return null;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.trim().toLowerCase();
+    if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+    if (lower == 'false' || lower == '0' || lower == 'no') return false;
+  }
+  return null;
+}
+
 class SlackProfile {
   SlackProfile({
     this.slackUserId,
@@ -210,7 +223,7 @@ class SlackUnmatchedUser {
       displayName: json['slack_display_name'] as String?,
       realName: json['slack_real_name'] as String?,
       notes: json['notes'] as String?,
-      manuallyRejected: json['manually_rejected'] as bool? ?? false,
+      manuallyRejected: _coerceBool(json['manually_rejected']) ?? false,
       createdAt: _parseDate(json['created_at']),
     );
   }

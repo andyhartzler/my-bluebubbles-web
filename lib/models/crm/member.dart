@@ -379,14 +379,14 @@ class Member {
       desireToLead: _normalizeText(json['desire_to_lead']),
       hoursPerWeek: _normalizeText(json['hours_per_week']),
       educationLevel: _normalizeText(json['education_level']),
-      registeredVoter: json['registered_voter'] as bool?,
+      registeredVoter: _normalizeBool(json['registered_voter']),
       inSchool: _normalizeText(json['in_school']),
       schoolName: _normalizeText(json['school_name']),
       highSchool: _normalizeText(json['high_school']),
       college: _normalizeText(json['college']),
       employed: _normalizeText(json['employed']),
       industry: _normalizeText(json['industry']),
-      hispanicLatino: json['hispanic_latino'] as bool?,
+      hispanicLatino: _normalizeBool(json['hispanic_latino']),
       accommodations: _normalizeText(json['accommodations']),
       communityType: _normalizeText(json['community_type']),
       languages: _normalizeText(json['languages']),
@@ -394,7 +394,7 @@ class Member {
       lastContacted: json['last_contacted'] != null
           ? DateTime.parse(json['last_contacted'] as String)
           : null,
-      optOut: json['opt_out'] as bool? ?? false,
+      optOut: _normalizeBool(json['opt_out']) ?? false,
       committee: committees,
       notes: _normalizeText(json['notes']),
       introSentAt: json['intro_sent_at'] != null

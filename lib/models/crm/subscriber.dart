@@ -83,7 +83,7 @@ class Subscriber {
       optinDate: _parseDate(json['optin_date']),
       tags: json['tags'] as String?,
       subscriptionStatus: json['subscription_status'] as String?,
-      subscribed: json['subscribed'] as bool?,
+      subscribed: _coerceBool(json['subscribed']),
       memberId: json['member_id'] as String?,
       donorId: json['donor_id'] as String?,
       source: json['source'] as String?,
@@ -146,6 +146,19 @@ class Subscriber {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Safely coerce a dynamic value to bool, handling int values from database
+  static bool? _coerceBool(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final lower = value.trim().toLowerCase();
+      if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+      if (lower == 'false' || lower == '0' || lower == 'no') return false;
+    }
+    return null;
   }
 }
 
