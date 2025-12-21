@@ -19,6 +19,7 @@ enum DashboardWidgetType {
 
 /// Size options for widgets
 enum DashboardWidgetSize {
+  mini,    // 1x0.5 on grid (half height of small)
   small,   // 1x1 on grid
   medium,  // 2x1 on grid
   large,   // 2x2 on grid
@@ -125,10 +126,26 @@ class DashboardWidgetConfig {
       );
     }
 
+    // Handle visible field - can be bool or int (from database)
+    bool visible = true;
+    final visibleValue = json['visible'];
+    if (visibleValue is bool) {
+      visible = visibleValue;
+    } else if (visibleValue is int) {
+      visible = visibleValue != 0;
+    }
+
+    // Handle size index safely - mini was added as index 0, so we need to
+    // handle existing data that used the old enum indices
+    int sizeIndex = json['size'] as int? ?? 1; // Default to small (index 1 now)
+    if (sizeIndex >= DashboardWidgetSize.values.length) {
+      sizeIndex = 1; // Default to small if out of range
+    }
+
     return DashboardWidgetConfig(
       id: json['id'] as String,
       type: DashboardWidgetType.values[json['type'] as int? ?? 0],
-      size: DashboardWidgetSize.values[json['size'] as int? ?? 0],
+      size: DashboardWidgetSize.values[sizeIndex],
       dataSourceKey: json['dataSourceKey'] as String,
       title: json['title'] as String,
       subtitle: json['subtitle'] as String?,
@@ -138,7 +155,7 @@ class DashboardWidgetConfig {
           .toList() ?? [],
       gridX: json['gridX'] as int? ?? 0,
       gridY: json['gridY'] as int? ?? 0,
-      visible: json['visible'] as bool? ?? true,
+      visible: visible,
       options: json['options'] as Map<String, dynamic>? ?? {},
     );
   }
@@ -146,6 +163,7 @@ class DashboardWidgetConfig {
   /// Get the width in grid units
   int get gridWidth {
     switch (size) {
+      case DashboardWidgetSize.mini:
       case DashboardWidgetSize.small:
       case DashboardWidgetSize.tall:
         return 1;
@@ -158,9 +176,10 @@ class DashboardWidgetConfig {
     }
   }
 
-  /// Get the height in grid units
+  /// Get the height in grid units (returns 1 for mini, but actual render uses 0.5 multiplier)
   int get gridHeight {
     switch (size) {
+      case DashboardWidgetSize.mini:
       case DashboardWidgetSize.small:
       case DashboardWidgetSize.medium:
       case DashboardWidgetSize.wide:
@@ -171,6 +190,11 @@ class DashboardWidgetConfig {
       case DashboardWidgetSize.hero:
         return 2;
     }
+  }
+
+  /// Get the actual height multiplier for rendering (mini is 0.5, others use gridHeight)
+  double get heightMultiplier {
+    return size == DashboardWidgetSize.mini ? 0.5 : gridHeight.toDouble();
   }
 }
 
