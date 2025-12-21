@@ -832,8 +832,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   double _getWidgetHeight(DashboardWidgetConfig widget, double unitHeight) {
-    final spanHeight = widget.gridHeight;
-    return unitHeight * spanHeight + (spanHeight - 1) * 16;
+    // Use heightMultiplier for proper mini widget support (0.5 height)
+    final spanHeight = widget.heightMultiplier;
+    // For mini widgets (0.5), no gap adjustment needed
+    final gapAdjustment = spanHeight >= 1 ? (spanHeight.floor() - 1) * 16.0 : 0.0;
+    return unitHeight * spanHeight + gapAdjustment;
   }
 
   Widget _buildWidget(DashboardWidgetConfig config, DashboardMetrics metrics) {
@@ -2431,6 +2434,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   String _getSizeLabel(DashboardWidgetSize size) {
     switch (size) {
+      case DashboardWidgetSize.mini:
+        return 'Mini';
       case DashboardWidgetSize.small:
         return 'Small';
       case DashboardWidgetSize.medium:
