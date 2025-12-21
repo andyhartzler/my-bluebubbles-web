@@ -29,6 +29,7 @@ import 'package:bluebubbles/screens/dashboard/widgets/quick_links_dialog.dart';
 
 import 'models/dashboard_widget_config.dart';
 import 'widgets/dashboard_widgets.dart';
+import 'widgets/dashboard_error_boundary.dart';
 
 // Brand colors
 const _unityBlue = Color(0xFF273351);
@@ -300,29 +301,115 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Future<void> _loadConfig() async {
     try {
+      debugPrint('[DashboardScreen] Loading config from database...');
       // First try to load from database
       final layoutJson = await _metricsService.fetchDashboardLayout();
       if (layoutJson != null) {
-        setState(() {
-          _config = DashboardConfig.fromJson(layoutJson);
-        });
+        debugPrint('[DashboardScreen] Parsing layout JSON with ${layoutJson['widgets']?.length ?? 0} widgets');
+        try {
+          final config = DashboardConfig.fromJson(layoutJson);
+          debugPrint('[DashboardScreen] Successfully parsed config: ${config.widgets.length} widgets');
+          setState(() {
+            _config = config;
+          });
+        } catch (parseError, stackTrace) {
+          _logDetailedParseError('DashboardConfig.fromJson', parseError, stackTrace, layoutJson);
+          // Try to continue with default config
+          setState(() {
+            _config = _getDefaultConfig();
+          });
+        }
         return;
       }
 
       // Fallback to local storage for backwards compatibility
+      debugPrint('[DashboardScreen] No database layout, checking SharedPreferences...');
       final prefs = await SharedPreferences.getInstance();
       final configJson = prefs.getString(_prefsKey);
       if (configJson != null) {
-        final config = DashboardConfig.fromJsonString(configJson);
-        setState(() {
-          _config = config;
-        });
-        // Migrate to database
-        _saveConfig();
+        try {
+          final config = DashboardConfig.fromJsonString(configJson);
+          debugPrint('[DashboardScreen] Loaded from SharedPreferences: ${config.widgets.length} widgets');
+          setState(() {
+            _config = config;
+          });
+          // Migrate to database
+          _saveConfig();
+        } catch (parseError, stackTrace) {
+          _logDetailedParseError('DashboardConfig.fromJsonString', parseError, stackTrace, configJson);
+        }
       }
-    } catch (e) {
-      debugPrint('Error loading dashboard config: $e');
+    } catch (e, stackTrace) {
+      _logDetailedParseError('_loadConfig', e, stackTrace, null);
     }
+  }
+
+  void _logDetailedParseError(String context, Object error, StackTrace stackTrace, dynamic data) {
+    final buffer = StringBuffer();
+    buffer.writeln('');
+    buffer.writeln('╔══════════════════════════════════════════════════════════════════════════════');
+    buffer.writeln('║ DASHBOARD CONFIG PARSING ERROR');
+    buffer.writeln('╠══════════════════════════════════════════════════════════════════════════════');
+    buffer.writeln('║ Context: $context');
+    buffer.writeln('║ Error Type: ${error.runtimeType}');
+    buffer.writeln('║ Error Message: $error');
+    buffer.writeln('║');
+
+    // Check for type casting errors
+    final errorStr = error.toString();
+    if (errorStr.contains("type 'int' is not a subtype of type 'bool")) {
+      buffer.writeln('║ ⚠️  TYPE CASTING ERROR: int -> bool');
+      buffer.writeln('║');
+      buffer.writeln('║ This typically happens when:');
+      buffer.writeln('║   1. Database stores boolean as 0/1 integer');
+      buffer.writeln('║   2. JSON field expected bool but got int');
+      buffer.writeln('║');
+
+      // Try to find the specific field
+      if (data is Map) {
+        buffer.writeln('║ Checking data fields for int values that should be bool:');
+        _checkForIntBoolFields(data, buffer, '  ');
+      }
+    }
+
+    buffer.writeln('║');
+    buffer.writeln('║ STACK TRACE (first 15 frames):');
+    final stackLines = stackTrace.toString().split('\n').take(15);
+    for (final line in stackLines) {
+      if (line.contains('package:bluebubbles')) {
+        buffer.writeln('║ >>> $line');
+      } else {
+        buffer.writeln('║     $line');
+      }
+    }
+
+    buffer.writeln('║');
+    buffer.writeln('╚══════════════════════════════════════════════════════════════════════════════');
+    debugPrint(buffer.toString());
+  }
+
+  void _checkForIntBoolFields(Map<dynamic, dynamic> data, StringBuffer buffer, String indent) {
+    data.forEach((key, value) {
+      if (value is int && (value == 0 || value == 1)) {
+        // Likely a boolean field stored as int
+        final boolFieldNames = ['visible', 'required', 'enabled', 'active', 'is_'];
+        final keyStr = key.toString().toLowerCase();
+        for (final boolName in boolFieldNames) {
+          if (keyStr.contains(boolName)) {
+            buffer.writeln('║ $indent⚠️  "$key": $value (likely should be bool)');
+            break;
+          }
+        }
+      } else if (value is Map) {
+        buffer.writeln('║ $indent"$key": {nested}');
+        _checkForIntBoolFields(value as Map<dynamic, dynamic>, buffer, '$indent  ');
+      } else if (value is List && value.isNotEmpty && value.first is Map) {
+        buffer.writeln('║ $indent"$key": [${value.length} items]');
+        if (value.isNotEmpty) {
+          _checkForIntBoolFields(value.first as Map<dynamic, dynamic>, buffer, '$indent  ');
+        }
+      }
+    });
   }
 
   Future<void> _saveConfig() async {
@@ -1061,42 +1148,155 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
 
-    if (isMobile) {
-      // Mobile: Use a bottom sheet for the palette
-      return Container(
-        color: Colors.grey[100],
+    // Wrap entire edit mode in error boundary for detailed error capture
+    return DashboardErrorBoundary(
+      contextName: 'Dashboard Edit Mode',
+      child: Builder(
+        builder: (context) {
+          try {
+            if (isMobile) {
+              // Mobile: Use a bottom sheet for the palette
+              return Container(
+                color: Colors.grey[100],
+                child: Column(
+                  children: [
+                    _buildEditHeader(isMobile: true),
+                    Expanded(child: _buildEditableGrid()),
+                  ],
+                ),
+              );
+            }
+
+            // Desktop: Use sidebar layout
+            return Container(
+              color: Colors.grey[100],
+              child: Row(
+                children: [
+                  // Widget palette - only render when showing
+                  if (_showPalette)
+                    SizedBox(
+                      width: 300,
+                      child: _buildWidgetPaletteSafe(),
+                    ),
+                  // Main edit area
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _buildEditHeader(isMobile: false),
+                        Expanded(child: _buildEditableGrid()),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          } catch (e, stackTrace) {
+            debugPrint('[DashboardScreen] Error in _buildEditMode: $e');
+            debugPrint('[DashboardScreen] Stack trace: $stackTrace');
+            return _buildEditModeError(e.toString());
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildEditModeError(String error) {
+    return Container(
+      color: Colors.grey[100],
+      padding: const EdgeInsets.all(24),
+      child: Center(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _buildEditHeader(isMobile: true),
-            Expanded(child: _buildEditableGrid()),
+            Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+            const SizedBox(height: 16),
+            const Text(
+              'Error loading edit mode',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SelectableText(
+                error,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  color: Colors.red[700],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Check the browser console for detailed diagnostics',
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _toggleEditMode,
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Exit Edit Mode'),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Safe version of _buildWidgetPalette with error handling and logging
+  Widget _buildWidgetPaletteSafe() {
+    try {
+      debugPrint('[DashboardScreen] Building widget palette...');
+      return _buildWidgetPalette();
+    } catch (e, stackTrace) {
+      debugPrint('');
+      debugPrint('╔══════════════════════════════════════════════════════════════════════════════');
+      debugPrint('║ WIDGET PALETTE ERROR');
+      debugPrint('╠══════════════════════════════════════════════════════════════════════════════');
+      debugPrint('║ Error: $e');
+      debugPrint('║');
+      debugPrint('║ Stack trace:');
+      for (final line in stackTrace.toString().split('\n').take(20)) {
+        if (line.contains('package:bluebubbles')) {
+          debugPrint('║ >>> $line');
+        } else {
+          debugPrint('║     $line');
+        }
+      }
+      debugPrint('╚══════════════════════════════════════════════════════════════════════════════');
+      debugPrint('');
+
+      return Container(
+        width: 300,
+        color: Colors.white,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+              const SizedBox(height: 16),
+              const Text('Error loading palette'),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SelectableText(
+                  e.toString(),
+                  style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() {}),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
       );
     }
-
-    // Desktop: Use sidebar layout
-    return Container(
-      color: Colors.grey[100],
-      child: Row(
-        children: [
-          // Widget palette - only render when showing
-          if (_showPalette)
-            SizedBox(
-              width: 300,
-              child: _buildWidgetPalette(),
-            ),
-          // Main edit area
-          Expanded(
-            child: Column(
-              children: [
-                _buildEditHeader(isMobile: false),
-                Expanded(child: _buildEditableGrid()),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showMobilePalette() {
@@ -2341,6 +2541,75 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         ),
                       ),
                     ),
+                  // Background color selection for widgets with white backgrounds
+                  if (_widgetSupportsBackgroundColor(config.type)) ...[
+                    const SizedBox(height: 20),
+                    const Text('Background:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 6,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        childAspectRatio: 1.0,
+                      ),
+                      itemCount: WidgetBackgrounds.solidColors.length,
+                      itemBuilder: (context, index) {
+                        final color = WidgetBackgrounds.solidColors[index] ?? Colors.white;
+                        final currentBgIndex = config.options['backgroundColorIndex'] as int? ?? 0;
+                        final isSelected = currentBgIndex == index;
+                        return GestureDetector(
+                          onTap: () {
+                            final newOptions = Map<String, dynamic>.from(config.options);
+                            newOptions['backgroundColorIndex'] = index;
+                            _updateWidget(config.copyWith(options: newOptions));
+                            Navigator.pop(context);
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? _momentumBlue : Colors.grey[300]!,
+                                width: isSelected ? 3 : 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: isSelected
+                                ? Center(
+                                    child: Icon(
+                                      Icons.check,
+                                      color: index == WidgetBackgrounds.solidColors.length - 1
+                                          ? Colors.white
+                                          : _momentumBlue,
+                                      size: 20,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: Text(
+                        WidgetBackgrounds.colorNames[config.options['backgroundColorIndex'] as int? ?? 0],
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                 ],
               ),
@@ -2349,6 +2618,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         );
       },
     );
+  }
+
+  /// Check if widget type supports background color customization
+  bool _widgetSupportsBackgroundColor(DashboardWidgetType type) {
+    switch (type) {
+      case DashboardWidgetType.barChart:
+      case DashboardWidgetType.lineChart:
+      case DashboardWidgetType.pieChart:
+      case DashboardWidgetType.donutChart:
+      case DashboardWidgetType.leaderboard:
+      case DashboardWidgetType.progressRing:
+      case DashboardWidgetType.memberList:
+      case DashboardWidgetType.dynamicDistribution:
+        return true;
+      case DashboardWidgetType.statCard:
+      case DashboardWidgetType.trendCard:
+      case DashboardWidgetType.sparkline:
+      case DashboardWidgetType.heatmap:
+        return false;
+    }
   }
 
   String _getCategoryLabel(DashboardDataCategory category) {
