@@ -1486,8 +1486,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           })
           .toList();
 
-      return Container(
-        key: ValueKey('widget_palette_${_isEditMode}_${_showPalette}'),
+      return RepaintBoundary(
+        child: Container(
+        key: const ValueKey('widget_palette'),
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(right: BorderSide(color: Colors.grey[300]!)),
@@ -1553,6 +1554,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ],
         ),
+      ),
       );
     } catch (e) {
       // Return error state for the entire palette
@@ -1632,11 +1634,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       );
 
       // Wrap in Draggable for drag-and-drop functionality
-      // Store values locally to avoid closure issues
+      // Store values locally to avoid closure issues in feedback widget
       final sourceIcon = source.icon;
       final sourceLabel = source.label;
+      final sourceKey = source.key;
 
       return Draggable<_PaletteDragData>(
+        key: ValueKey('draggable_palette_$sourceKey'),
         data: _PaletteDragData(source: source, type: defaultType),
         feedback: Material(
           elevation: 8,
@@ -1821,6 +1825,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final height = _getWidgetHeight(widget, widgetHeight);
 
       // Make the widget draggable for reordering
+      // Store widget info locally to avoid closure issues
+      final widgetLabel = DashboardDataSources.getByKey(widget.dataSourceKey)?.label ?? widget.dataSourceKey;
+      final widgetIcon = DashboardDataSources.getByKey(widget.dataSourceKey)?.icon ?? Icons.widgets;
+
       items.add(
         LongPressDraggable<_WidgetReorderData>(
           key: ValueKey('draggable_${widget.id}'),
@@ -1831,9 +1839,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             elevation: 12,
             borderRadius: BorderRadius.circular(16),
             child: Container(
-              width: width * 0.9,
-              height: height * 0.9,
+              width: width * 0.8,
+              height: 80,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: _momentumBlue, width: 3),
                 boxShadow: [
@@ -1844,9 +1854,22 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ),
                 ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: _buildWidget(widget, metrics),
+              child: Row(
+                children: [
+                  Icon(widgetIcon, color: _momentumBlue, size: 32),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      widgetLabel,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _unityBlue,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1875,10 +1898,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
         ),
       );
-    }
 
-    // Add a final drop zone at the end
-    items.add(_buildReorderDropZone(widgets.length, widgetWidth));
+      // Add drop zone after each widget
+      items.add(_buildReorderDropZone(i + 1, widgetWidth));
+    }
 
     return Wrap(
       spacing: 16,
@@ -1890,16 +1913,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _buildReorderDropZone(int insertIndex, double widgetWidth) {
     return DragTarget<Object>(
+      key: ValueKey('drop_zone_$insertIndex'),
       onWillAcceptWithDetails: (details) {
         // Accept both palette items and widget reorders
-        return details.data is _PaletteDragData || details.data is _WidgetReorderData;
+        final data = details.data;
+        return data is _PaletteDragData || data is _WidgetReorderData;
       },
       onAcceptWithDetails: (details) {
-        if (details.data is _PaletteDragData) {
-          final data = details.data as _PaletteDragData;
+        final data = details.data;
+        if (data is _PaletteDragData) {
           _addWidgetAtIndex(data.source, data.type, insertIndex);
-        } else if (details.data is _WidgetReorderData) {
-          final data = details.data as _WidgetReorderData;
+        } else if (data is _WidgetReorderData) {
           _reorderWidgetToIndex(data.fromIndex, insertIndex);
         }
         setState(() => _dragHoverIndex = null);
