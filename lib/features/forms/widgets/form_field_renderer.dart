@@ -20,15 +20,6 @@ class FormFieldRenderer extends StatelessWidget {
     required this.formKey,
   }) : super(key: key);
 
-  /// Safely parses a dynamic value as bool, handling int (0/1) from database
-  bool _parseBool(dynamic value) {
-    if (value == null) return false;
-    if (value is bool) return value;
-    if (value is int) return value != 0;
-    if (value is String) return value.toLowerCase() == 'true' || value == '1';
-    return false;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -432,7 +423,7 @@ class FormFieldRenderer extends StatelessWidget {
       title: Text(config.label),
       subtitle: config.help != null ? Text(config.help!) : null,
       enabled: config.enabled,
-      initialValue: _parseBool(config.defaultValue),
+      initialValue: config.defaultValue as bool? ?? false,
     );
   }
 
@@ -651,7 +642,7 @@ class FormFieldRenderer extends StatelessWidget {
         children: [
           FormBuilderCupertinoCheckbox(
             name: config.id,
-            initialValue: _parseBool(config.defaultValue),
+            initialValue: config.defaultValue as bool? ?? false,
             enabled: config.enabled,
             validator: config.required
                 ? (value) {
@@ -705,7 +696,7 @@ class FormFieldRenderer extends StatelessWidget {
           ),
           FormBuilderCupertinoSwitch(
             name: config.id,
-            initialValue: _parseBool(config.defaultValue),
+            initialValue: config.defaultValue as bool? ?? false,
             enabled: config.enabled,
           ),
         ],
