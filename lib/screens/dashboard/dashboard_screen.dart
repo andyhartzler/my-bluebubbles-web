@@ -3070,6 +3070,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return 'Tall';
       case DashboardWidgetSize.hero:
         return 'Hero';
+      case DashboardWidgetSize.mobileFull:
+        return 'Mobile Full';
     }
   }
 
