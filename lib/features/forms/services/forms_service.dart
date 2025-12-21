@@ -241,17 +241,28 @@ class FormsService {
 
   Future<void> deleteForm(String id) async {
     try {
+      // Use privileged client to bypass RLS for deletion
+      final client = _readClient;
+
       // First delete any submissions for this form to avoid FK constraint errors
-      await _supabase
+      await client
           .from('form_submissions')
           .delete()
           .eq('form_id', id);
 
+      // Delete any conditional logic related to this form's fields
+      await client
+          .from('form_conditional_logic')
+          .delete()
+          .eq('form_id', id);
+
       // Then delete the form
-      await _supabase
+      await client
           .from('form_schemas')
           .delete()
           .eq('id', id);
+
+      print('FormsService.deleteForm: Successfully deleted form $id');
     } catch (e) {
       print('FormsService.deleteForm: Error deleting form $id: $e');
       rethrow;
