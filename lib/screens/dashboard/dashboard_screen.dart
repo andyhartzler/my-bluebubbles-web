@@ -1889,7 +1889,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildReorderDropZone(int insertIndex, double widgetWidth) {
-    return DragTarget<dynamic>(
+    return DragTarget<Object>(
       onWillAcceptWithDetails: (details) {
         // Accept both palette items and widget reorders
         return details.data is _PaletteDragData || details.data is _WidgetReorderData;
