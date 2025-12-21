@@ -42,6 +42,19 @@ int? _parseInt(dynamic value) {
   return null;
 }
 
+/// Safely coerce a dynamic value to bool, handling int values from database
+bool? _coerceBool(dynamic value) {
+  if (value == null) return null;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.trim().toLowerCase();
+    if (lower == 'true' || lower == '1' || lower == 'yes') return true;
+    if (lower == 'false' || lower == '0' || lower == 'no') return false;
+  }
+  return null;
+}
+
 class Meeting {
   final String id;
   final DateTime meetingDate;
@@ -602,7 +615,7 @@ class MeetingAttendance {
     final guestEmail = json['guest_email'] as String?;
     final guestPhone = json['guest_phone'] as String?;
     final notes = json['notes'] as String?;
-    final checkedIn = json['checked_in'] as bool?;
+    final checkedIn = _coerceBool(json['checked_in']);
     final meetingId = json['meeting_id'] as String? ?? json['event_id'] as String?;
 
     return MeetingAttendance(
@@ -624,7 +637,7 @@ class MeetingAttendance {
       zoomEmail: json['zoom_email'] as String?,
       matchedBy: json['matched_by'] as String?,
       createdAt: _parseDateTime(json['created_at']),
-      isHost: json['is_host'] as bool?,
+      isHost: _coerceBool(json['is_host']),
       member: member,
       meeting: meetingRef,
       meetingTitle: meetingTitle,
