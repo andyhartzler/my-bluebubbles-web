@@ -3,6 +3,47 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'job.freezed.dart';
 part 'job.g.dart';
 
+/// Converter that safely handles bool values from Supabase (which may return int)
+class SafeBoolConverter implements JsonConverter<bool, dynamic> {
+  const SafeBoolConverter();
+
+  @override
+  bool fromJson(dynamic json) {
+    if (json == null) return false;
+    if (json is bool) return json;
+    if (json is num) return json != 0;
+    if (json is String) {
+      final lower = json.toLowerCase();
+      if (lower == 'true' || lower == '1') return true;
+    }
+    return false;
+  }
+
+  @override
+  dynamic toJson(bool object) => object;
+}
+
+/// Converter for nullable bool values from Supabase
+class SafeNullableBoolConverter implements JsonConverter<bool?, dynamic> {
+  const SafeNullableBoolConverter();
+
+  @override
+  bool? fromJson(dynamic json) {
+    if (json == null) return null;
+    if (json is bool) return json;
+    if (json is num) return json != 0;
+    if (json is String) {
+      final lower = json.toLowerCase();
+      if (lower == 'true' || lower == '1') return true;
+      if (lower == 'false' || lower == '0') return false;
+    }
+    return null;
+  }
+
+  @override
+  dynamic toJson(bool? object) => object;
+}
+
 /// Custom question types for job applications
 enum CustomQuestionType {
   @JsonValue('text')
@@ -24,7 +65,7 @@ class CustomQuestion with _$CustomQuestion {
     required String id,
     required String question,
     @Default(CustomQuestionType.text) CustomQuestionType type,
-    @Default(false) bool required,
+    @SafeBoolConverter() @Default(false) bool required,
     @Default([]) List<String> options,
     @Default(0) int order,
   }) = _CustomQuestion;
@@ -51,7 +92,7 @@ class Job with _$Job {
     @JsonKey(name: 'location_type') String? locationType,
 
     // Compensation
-    @JsonKey(name: 'is_paid') @Default(false) bool isPaid,
+    @JsonKey(name: 'is_paid') @SafeBoolConverter() @Default(false) bool isPaid,
     @JsonKey(name: 'salary_range') String? salaryRange,
     @JsonKey(name: 'hourly_rate') String? hourlyRate,
 
@@ -81,7 +122,7 @@ class Job with _$Job {
 
     // SEO & Display
     String? slug,
-    @Default(false) bool featured,
+    @SafeBoolConverter() @Default(false) bool featured,
     List<String>? tags,
 
     // Application Tracking
@@ -93,18 +134,18 @@ class Job with _$Job {
     @Default([]) List<CustomQuestion> customQuestions,
 
     // Resume & Cover Letter Options
-    @JsonKey(name: 'resume_enabled') bool? resumeEnabled,
-    @JsonKey(name: 'resume_required') bool? resumeRequired,
-    @JsonKey(name: 'cover_letter_enabled') bool? coverLetterEnabled,
-    @JsonKey(name: 'cover_letter_required') bool? coverLetterRequired,
+    @JsonKey(name: 'resume_enabled') @SafeNullableBoolConverter() bool? resumeEnabled,
+    @JsonKey(name: 'resume_required') @SafeNullableBoolConverter() bool? resumeRequired,
+    @JsonKey(name: 'cover_letter_enabled') @SafeNullableBoolConverter() bool? coverLetterEnabled,
+    @JsonKey(name: 'cover_letter_required') @SafeNullableBoolConverter() bool? coverLetterRequired,
 
     // References Options
-    @JsonKey(name: 'references_enabled') @Default(false) bool referencesEnabled,
-    @JsonKey(name: 'references_required') @Default(false) bool referencesRequired,
+    @JsonKey(name: 'references_enabled') @SafeBoolConverter() @Default(false) bool referencesEnabled,
+    @JsonKey(name: 'references_required') @SafeBoolConverter() @Default(false) bool referencesRequired,
     @JsonKey(name: 'references_count') @Default(2) int referencesCount,
 
     // External Application Option
-    @JsonKey(name: 'use_external_apply') @Default(false) bool useExternalApply,
+    @JsonKey(name: 'use_external_apply') @SafeBoolConverter() @Default(false) bool useExternalApply,
   }) = _Job;
 
   factory Job.fromJson(Map<String, dynamic> json) => _$JobFromJson(json);

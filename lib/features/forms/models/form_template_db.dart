@@ -1,5 +1,18 @@
 import 'dart:convert';
 
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Model for form templates stored in the database
 /// These templates can include variable placeholders like {{chapter_name}}
 class FormTemplateDb {
@@ -45,8 +58,8 @@ class FormTemplateDb {
       icon: json['icon'] as String?,
       schema: _parseJsonField(json['schema']),
       settings: _parseJsonField(json['settings']),
-      isPublic: json['is_public'] as bool? ?? false,
-      isSystem: json['is_system'] as bool? ?? false,
+      isPublic: _coerceBool(json['is_public']),
+      isSystem: _coerceBool(json['is_system']),
       useCount: json['use_count'] as int? ?? 0,
     );
   }

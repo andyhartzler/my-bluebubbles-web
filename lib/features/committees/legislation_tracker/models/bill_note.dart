@@ -1,5 +1,18 @@
 import 'package:flutter/material.dart';
 
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Represents a note on a tracked bill
 class BillNote {
   final String id;
@@ -41,8 +54,8 @@ class BillNote {
       authorId: json['author_id'] as String,
       content: json['content'] as String,
       noteType: json['note_type'] as String? ?? 'general',
-      isPinned: json['is_pinned'] as bool? ?? false,
-      isInternal: json['is_internal'] as bool? ?? true,
+      isPinned: _coerceBool(json['is_pinned']),
+      isInternal: _coerceBool(json['is_internal'], defaultValue: true),
       mentionedMemberIds: _parseStringList(json['mentioned_member_ids']),
       authorName: json['author_name'] as String?,
       authorAvatarUrl: json['author_avatar_url'] as String?,

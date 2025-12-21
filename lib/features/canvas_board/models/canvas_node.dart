@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Types of nodes that can be placed on the canvas
 enum CanvasNodeType {
   member,
@@ -107,7 +120,7 @@ class CanvasNode {
       imageUrl: json['image_url'] as String?,
       imageThumbnailUrl: json['image_thumbnail_url'] as String?,
       zIndex: json['z_index'] as int? ?? 0,
-      isLocked: json['is_locked'] as bool? ?? false,
+      isLocked: _coerceBool(json['is_locked']),
       label: json['label'] as String?,
       metadata: metadata,
       createdAt: json['created_at'] != null

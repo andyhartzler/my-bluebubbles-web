@@ -1,5 +1,18 @@
 import 'legislator.dart';
 
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Represents a sponsor of a bill
 /// CAPTURES ALL Open States API v3 BillSponsorship fields
 class BillSponsor {
@@ -80,7 +93,7 @@ class BillSponsor {
       openstatesSponsorshipId: json['openstates_sponsorship_id'] as String?,
       name: json['name'] as String,
       entityType: json['entity_type'] as String? ?? 'person',
-      isPrimary: json['is_primary'] as bool? ?? false,
+      isPrimary: _coerceBool(json['is_primary']),
       sponsorshipClassification: json['sponsorship_classification'] as String?,
       openstatesPersonId: json['openstates_person_id'] as String?,
       party: json['party'] as String?,

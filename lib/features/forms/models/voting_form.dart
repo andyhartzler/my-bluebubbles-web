@@ -4,6 +4,46 @@ import 'form_field_config.dart';
 part 'voting_form.freezed.dart';
 part 'voting_form.g.dart';
 
+/// Converter that safely handles bool values from Supabase (which may return int)
+class SafeBoolConverter implements JsonConverter<bool, dynamic> {
+  const SafeBoolConverter();
+
+  @override
+  bool fromJson(dynamic json) {
+    if (json == null) return false;
+    if (json is bool) return json;
+    if (json is num) return json != 0;
+    if (json is String) {
+      final lower = json.toLowerCase();
+      if (lower == 'true' || lower == '1') return true;
+    }
+    return false;
+  }
+
+  @override
+  dynamic toJson(bool object) => object;
+}
+
+/// Converter for bool with default true
+class SafeBoolTrueConverter implements JsonConverter<bool, dynamic> {
+  const SafeBoolTrueConverter();
+
+  @override
+  bool fromJson(dynamic json) {
+    if (json == null) return true;
+    if (json is bool) return json;
+    if (json is num) return json != 0;
+    if (json is String) {
+      final lower = json.toLowerCase();
+      if (lower == 'false' || lower == '0') return false;
+    }
+    return true;
+  }
+
+  @override
+  dynamic toJson(bool object) => object;
+}
+
 // VotingForm is actually stored in form_schemas table with form_type='vote'
 // This is a convenience wrapper around the schema
 @freezed
@@ -29,7 +69,7 @@ class VotingForm with _$VotingForm {
     @JsonKey(name: 'voting_starts_at') DateTime? votingStartsAt,
     @JsonKey(name: 'voting_ends_at') DateTime? votingEndsAt,
     @JsonKey(name: 'eligible_members') Map<String, dynamic>? eligibleMembers,
-    @JsonKey(name: 'results_public') @Default(false) bool resultsPublic,
+    @JsonKey(name: 'results_public') @SafeBoolConverter() @Default(false) bool resultsPublic,
     @JsonKey(name: 'results_data') Map<String, dynamic>? resultsData,
 
     // Page management
@@ -49,8 +89,8 @@ class VotingForm with _$VotingForm {
     @JsonKey(name: 'max_submissions') int? maxSubmissions,
 
     // Access control
-    @JsonKey(name: 'require_login') @Default(false) bool requireLogin,
-    @JsonKey(name: 'one_submission_per_user') @Default(true) bool oneSubmissionPerUser,
+    @JsonKey(name: 'require_login') @SafeBoolConverter() @Default(false) bool requireLogin,
+    @JsonKey(name: 'one_submission_per_user') @SafeBoolTrueConverter() @Default(true) bool oneSubmissionPerUser,
 
     // Email settings
     @JsonKey(name: 'confirmation_email_template') String? confirmationEmailTemplate,
@@ -60,7 +100,7 @@ class VotingForm with _$VotingForm {
     @JsonKey(name: 'supporting_documents') List<Map<String, dynamic>>? supportingDocuments,
 
     // Executive Committee Only - restricts voting to executive committee members
-    @JsonKey(name: 'executive_only') @Default(false) bool executiveOnly,
+    @JsonKey(name: 'executive_only') @SafeBoolConverter() @Default(false) bool executiveOnly,
 
     // Committee association - ties vote to a specific committee
     String? committee,

@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Represents an alert/notification for legislation activity
 class LegislationAlert {
   final String id;
@@ -41,10 +54,10 @@ class LegislationAlert {
       title: json['title'] as String,
       description: json['description'] as String?,
       severity: json['severity'] as String? ?? 'info',
-      isRead: json['is_read'] as bool? ?? false,
+      isRead: _coerceBool(json['is_read']),
       readBy: json['read_by'] as String?,
       readAt: _parseDate(json['read_at']),
-      isDismissed: json['is_dismissed'] as bool? ?? false,
+      isDismissed: _coerceBool(json['is_dismissed']),
       dismissedBy: json['dismissed_by'] as String?,
       dismissedAt: _parseDate(json['dismissed_at']),
       metadata: json['metadata'] as Map<String, dynamic>?,

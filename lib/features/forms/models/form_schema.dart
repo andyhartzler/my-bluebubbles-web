@@ -2,6 +2,19 @@ import 'dart:convert';
 import 'form_field_config.dart';
 import 'identity_config.dart';
 
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// FormSchema model - manually implemented to handle flexible schema parsing
 class FormSchema {
   final String id;
@@ -151,7 +164,7 @@ class FormSchema {
           ? null
           : DateTime.parse(json['voting_ends_at'] as String),
       eligibleMembers: json['eligible_members'] as Map<String, dynamic>?,
-      resultsPublic: (json['results_public'] as bool?) ?? false,
+      resultsPublic: _coerceBool(json['results_public']),
       resultsData: json['results_data'] as Map<String, dynamic>?,
       pageCount: (json['page_count'] as num?)?.toInt() ?? 1,
       templateId: json['template_id'] as String?,
@@ -164,12 +177,12 @@ class FormSchema {
           ? null
           : DateTime.parse(json['closes_at'] as String),
       maxSubmissions: (json['max_submissions'] as num?)?.toInt(),
-      requireLogin: (json['require_login'] as bool?) ?? false,
-      oneSubmissionPerUser: (json['one_submission_per_user'] as bool?) ?? false,
+      requireLogin: _coerceBool(json['require_login']),
+      oneSubmissionPerUser: _coerceBool(json['one_submission_per_user']),
       confirmationEmailTemplate: json['confirmation_email_template'] as String?,
       notificationEmails: notificationEmails,
       supportingDocuments: supportingDocuments,
-      publicForm: (json['public_form'] as bool?) ?? false,
+      publicForm: _coerceBool(json['public_form']),
       previewText: json['preview_text'] as String?,
     );
   }

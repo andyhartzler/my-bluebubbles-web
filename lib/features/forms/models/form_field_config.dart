@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Comprehensive form field configuration supporting all flutter_form_builder field types
 class FormFieldConfig {
   final String id;
@@ -256,7 +269,7 @@ class FormFieldConfig {
       label: (json['label'] ?? json['text']) as String,
       placeholder: json['placeholder'] as String?,
       help: (json['help'] ?? json['helper_text'] ?? json['description']) as String?,
-      required: json['required'] as bool? ?? false,
+      required: _coerceBool(json['required']),
       options: options,
       validation: json['validation'] as Map<String, dynamic>?,
       validatorTypes: validatorTypes,
@@ -283,8 +296,8 @@ class FormFieldConfig {
                         json['initial_start_date'] != null ? DateTime.tryParse(json['initial_start_date'] as String) : null,
       initialEndDate: json['initialEndDate'] != null ? DateTime.tryParse(json['initialEndDate'] as String) :
                       json['initial_end_date'] != null ? DateTime.tryParse(json['initial_end_date'] as String) : null,
-      isFilterOnline: json['isFilterOnline'] as bool? ?? json['is_filter_online'] as bool? ?? false,
-      showClearButton: json['showClearButton'] as bool? ?? json['show_clear_button'] as bool? ?? false,
+      isFilterOnline: _coerceBool(json['isFilterOnline'] ?? json['is_filter_online']),
+      showClearButton: _coerceBool(json['showClearButton'] ?? json['show_clear_button']),
       signatureHeight: (json['signatureHeight'] as num?)?.toDouble() ?? (json['signature_height'] as num?)?.toDouble(),
       signatureWidth: (json['signatureWidth'] as num?)?.toDouble() ?? (json['signature_width'] as num?)?.toDouble(),
       signatureBackgroundColor: json['signatureBackgroundColor'] as String? ?? json['signature_background_color'] as String?,
@@ -295,27 +308,27 @@ class FormFieldConfig {
       debounceDuration: (json['debounceDuration'] as num?)?.toInt() ?? (json['debounce_duration'] as num?)?.toInt(),
       activeColor: json['activeColor'] as String? ?? json['active_color'] as String?,
       inactiveColor: json['inactiveColor'] as String? ?? json['inactive_color'] as String?,
-      useCupertinoStyle: json['useCupertinoStyle'] as bool? ?? json['use_cupertino_style'] as bool? ?? false,
+      useCupertinoStyle: _coerceBool(json['useCupertinoStyle'] ?? json['use_cupertino_style']),
       chipShape: json['chipShape'] as String? ?? json['chip_shape'] as String?,
-      allowMultipleSelection: json['allowMultipleSelection'] as bool? ?? json['allow_multiple_selection'] as bool? ?? false,
+      allowMultipleSelection: _coerceBool(json['allowMultipleSelection'] ?? json['allow_multiple_selection']),
       allowedExtensions: allowedExtensions,
-      allowMultipleFiles: json['allowMultipleFiles'] as bool? ?? json['allow_multiple_files'] as bool? ?? false,
+      allowMultipleFiles: _coerceBool(json['allowMultipleFiles'] ?? json['allow_multiple_files']),
       maxFileSizeMB: (json['maxFileSizeMB'] as num?)?.toInt() ?? (json['max_file_size_mb'] as num?)?.toInt(),
       fileTypeFilter: json['fileTypeFilter'] as String? ?? json['file_type_filter'] as String?,
       maxImages: (json['maxImages'] as num?)?.toInt() ?? (json['max_images'] as num?)?.toInt(),
       imageQuality: (json['imageQuality'] as num?)?.toDouble() ?? (json['image_quality'] as num?)?.toDouble(),
       maxImageWidth: (json['maxImageWidth'] as num?)?.toInt() ?? (json['max_image_width'] as num?)?.toInt(),
       maxImageHeight: (json['maxImageHeight'] as num?)?.toInt() ?? (json['max_image_height'] as num?)?.toInt(),
-      allowCamera: json['allowCamera'] as bool? ?? json['allow_camera'] as bool? ?? false,
-      allowGallery: json['allowGallery'] as bool? ?? json['allow_gallery'] as bool? ?? false,
+      allowCamera: _coerceBool(json['allowCamera'] ?? json['allow_camera']),
+      allowGallery: _coerceBool(json['allowGallery'] ?? json['allow_gallery']),
       conditionalFieldId: conditionalFieldId,
       conditionalOperator: conditionalOperator,
       conditionalValue: conditionalValue,
       conditions: conditions,
       fileConfig: fileConfig,
-      showWhenConditionMet: json['showWhenConditionMet'] as bool? ?? json['show_when_condition_met'] as bool? ?? true,
+      showWhenConditionMet: _coerceBool(json['showWhenConditionMet'] ?? json['show_when_condition_met'], defaultValue: true),
       pageNumber: (json['pageNumber'] as num?)?.toInt() ?? (json['page_number'] as num?)?.toInt() ?? (json['page'] as num?)?.toInt(),
-      enabled: json['enabled'] as bool? ?? true,
+      enabled: _coerceBool(json['enabled'], defaultValue: true),
       defaultValue: json['defaultValue'] ?? json['default_value'],
       prefixText: json['prefixText'] as String? ?? json['prefix_text'] as String?,
       suffixText: json['suffixText'] as String? ?? json['suffix_text'] as String?,

@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Represents a bill version or document (fiscal note, committee report, etc.)
 /// CAPTURES ALL Open States API v3 BillDocumentOrVersion fields
 class BillDocument {
@@ -64,9 +77,9 @@ class BillDocument {
       links: _parseLinks(json['links']),
       primaryLink: json['primary_link'] as String?,
       primaryMediaType: json['primary_media_type'] as String?,
-      isNew: json['is_new'] as bool? ?? false,
+      isNew: _coerceBool(json['is_new']),
       firstSeenAt: _parseDate(json['first_seen_at']),
-      isReviewed: json['is_reviewed'] as bool? ?? false,
+      isReviewed: _coerceBool(json['is_reviewed']),
       reviewedBy: json['reviewed_by'] as String?,
       reviewedAt: _parseDate(json['reviewed_at']),
       reviewNotes: json['review_notes'] as String?,
