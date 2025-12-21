@@ -1581,117 +1581,138 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildPaletteItem(DashboardDataSource source) {
-    try {
-      // Determine the widget type to use for dragging (use first supported or statCard as default)
-      final defaultType = source.supportedWidgets.isNotEmpty
-          ? source.supportedWidgets.first
-          : DashboardWidgetType.statCard;
+    // Determine the widget type to use for dragging (use first supported or statCard as default)
+    final defaultType = source.supportedWidgets.isNotEmpty
+        ? source.supportedWidgets.first
+        : DashboardWidgetType.statCard;
 
-      final card = Card(
-        key: ValueKey('palette_${source.key}'),
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: ListTile(
-          dense: true,
-          leading: Icon(source.icon, color: _momentumBlue, size: 20),
-          title: Text(
-            source.label,
-            style: const TextStyle(fontSize: 13),
-          ),
-          subtitle: Text(
-            source.description,
-            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: source.supportedWidgets.isEmpty
-              ? const SizedBox.shrink()
-              : source.supportedWidgets.length == 1
-                  ? IconButton(
-                      icon: const Icon(Icons.add_circle, color: _grassrootsGreen),
-                      tooltip: 'Add widget',
-                      onPressed: () => _addWidget(source, source.supportedWidgets.first),
-                    )
-                  : PopupMenuButton<DashboardWidgetType>(
-                      icon: const Icon(Icons.add_circle_outline, color: _grassrootsGreen),
-                      tooltip: 'Add as...',
-                      onSelected: (type) => _addWidget(source, type),
-                      itemBuilder: (context) {
-                        return source.supportedWidgets.map((type) {
-                          return PopupMenuItem<DashboardWidgetType>(
-                            value: type,
-                            child: Row(
-                              children: [
-                                Icon(_getWidgetTypeIcon(type), size: 18),
-                                const SizedBox(width: 8),
-                                Text(_getWidgetTypeLabel(type)),
-                              ],
-                            ),
-                          );
-                        }).toList();
-                      },
+    // Store values locally to avoid closure issues
+    final sourceIcon = source.icon;
+    final sourceLabel = source.label;
+    final sourceDescription = source.description;
+    final sourceKey = source.key;
+    final supportedWidgets = source.supportedWidgets;
+
+    // Simple card without complex trailing widgets that can cause overlay issues
+    final card = Card(
+      key: ValueKey('palette_card_$sourceKey'),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: InkWell(
+        onTap: () {
+          // If multiple widget types, show a simple dialog
+          if (supportedWidgets.length > 1) {
+            _showWidgetTypeDialog(source);
+          } else {
+            // Single type or no types - just add directly
+            _addWidget(source, defaultType);
+          }
+        },
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Icon(sourceIcon, color: _momentumBlue, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      sourceLabel,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                     ),
-        ),
-      );
-
-      // Wrap in Draggable for drag-and-drop functionality
-      // Store values locally to avoid closure issues in feedback widget
-      final sourceIcon = source.icon;
-      final sourceLabel = source.label;
-      final sourceKey = source.key;
-
-      return Draggable<_PaletteDragData>(
-        key: ValueKey('draggable_palette_$sourceKey'),
-        data: _PaletteDragData(source: source, type: defaultType),
-        feedback: Material(
-          elevation: 8,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: 200,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _momentumBlue, width: 2),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(sourceIcon, color: _momentumBlue, size: 20),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    sourceLabel,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: _unityBlue,
+                    Text(
+                      sourceDescription,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              // Simple add icon without tooltip to avoid overlay issues
+              Icon(
+                supportedWidgets.length > 1 ? Icons.add_circle_outline : Icons.add_circle,
+                color: _grassrootsGreen,
+                size: 24,
+              ),
+            ],
           ),
         ),
-        childWhenDragging: Opacity(
-          opacity: 0.5,
-          child: card,
+      ),
+    );
+
+    // Wrap in Draggable for drag-and-drop functionality
+    return Draggable<_PaletteDragData>(
+      key: ValueKey('draggable_palette_$sourceKey'),
+      data: _PaletteDragData(source: source, type: defaultType),
+      feedback: Material(
+        elevation: 8,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 200,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _momentumBlue, width: 2),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(sourceIcon, color: _momentumBlue, size: 20),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  sourceLabel,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _unityBlue,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+      childWhenDragging: Opacity(
+        opacity: 0.5,
         child: card,
-      );
-    } catch (e) {
-      // Return error placeholder instead of crashing
-      return Card(
-        key: ValueKey('palette_error_${source.key}'),
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: ListTile(
-          dense: true,
-          leading: const Icon(Icons.error_outline, color: Colors.red, size: 20),
-          title: Text(source.label, style: const TextStyle(fontSize: 13)),
-          subtitle: Text('Error loading', style: TextStyle(fontSize: 11, color: Colors.red[300])),
+      ),
+      child: card,
+    );
+  }
+
+  void _showWidgetTypeDialog(DashboardDataSource source) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Add ${source.label}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: source.supportedWidgets.map((type) {
+            return ListTile(
+              leading: Icon(_getWidgetTypeIcon(type)),
+              title: Text(_getWidgetTypeLabel(type)),
+              onTap: () {
+                Navigator.of(dialogContext).pop();
+                _addWidget(source, type);
+              },
+            );
+          }).toList(),
         ),
-      );
-    }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildEditableGrid() {

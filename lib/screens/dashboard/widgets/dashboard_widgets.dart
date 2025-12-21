@@ -232,7 +232,7 @@ class BarChartWidget extends StatelessWidget {
     super.key,
     required this.config,
     required this.data,
-    this.maxItems = 8,
+    this.maxItems = 20,
   });
 
   @override
@@ -309,43 +309,8 @@ class BarChartWidget extends StatelessWidget {
         titlesData: FlTitlesData(
           topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 60,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index < 0 || index >= displayData.length) {
-                  return const SizedBox.shrink();
-                }
-                final label = displayData[index].name;
-                // Use full name with tooltip for overflow
-                return Tooltip(
-                  message: label,
-                  waitDuration: const Duration(milliseconds: 300),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: RotatedBox(
-                      quarterTurns: -1,
-                      child: SizedBox(
-                        width: 50,
-                        child: Text(
-                          label,
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: _unityBlue,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+          // X-axis labels removed - hover/tap on bars to see names in tooltip
+          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -729,10 +694,10 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
   }
 
   Widget _buildChart(List<NameCount> rawData, BoxConstraints constraints) {
-    // Sort and limit data
+    // Sort and limit data - show up to 20 bars for comprehensive view
     final sortedData = List<NameCount>.from(rawData)
       ..sort((a, b) => b.count.compareTo(a.count));
-    final displayData = sortedData.take(10).toList();
+    final displayData = sortedData.take(20).toList();
 
     if (displayData.isEmpty) {
       return _buildEmptyState();
@@ -784,43 +749,8 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
         titlesData: FlTitlesData(
           topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 70,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index < 0 || index >= displayData.length) {
-                  return const SizedBox.shrink();
-                }
-                final label = displayData[index].name;
-                // Use full name - Tooltip provides full name on hover/long-press
-                return Tooltip(
-                  message: label,
-                  waitDuration: const Duration(milliseconds: 300),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: RotatedBox(
-                      quarterTurns: -1,
-                      child: SizedBox(
-                        width: 60, // Max height when rotated
-                        child: Text(
-                          label,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: _unityBlue,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+          // X-axis labels removed - hover/tap on bars to see names in tooltip
+          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
