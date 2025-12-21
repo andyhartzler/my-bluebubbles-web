@@ -1875,10 +1875,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
         ),
       );
-    }
 
-    // Add a final drop zone at the end
-    items.add(_buildReorderDropZone(widgets.length, widgetWidth));
+      // Add drop zone after each widget
+      items.add(_buildReorderDropZone(i + 1, widgetWidth));
+    }
 
     return Wrap(
       spacing: 16,
