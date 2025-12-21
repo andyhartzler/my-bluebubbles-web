@@ -48,6 +48,14 @@ class _PaletteDragData {
   const _PaletteDragData({required this.source, required this.type});
 }
 
+/// Data class for reordering existing widgets
+class _WidgetReorderData {
+  final int fromIndex;
+  final DashboardWidgetConfig config;
+
+  const _WidgetReorderData({required this.fromIndex, required this.config});
+}
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -1468,11 +1476,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildWidgetPalette() {
     try {
       final categories = DashboardDataCategory.values
-          .where((c) => DashboardDataSources.getByCategory(c).isNotEmpty)
+          .where((c) {
+            try {
+              return DashboardDataSources.getByCategory(c).isNotEmpty;
+            } catch (e) {
+              debugPrint('Error checking category $c: $e');
+              return false;
+            }
+          })
           .toList();
 
       return Container(
-        key: const ValueKey('widget_palette'),
+        key: ValueKey('widget_palette_${_isEditMode}_${_showPalette}'),
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(right: BorderSide(color: Colors.grey[300]!)),
@@ -1617,6 +1632,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       );
 
       // Wrap in Draggable for drag-and-drop functionality
+      // Store values locally to avoid closure issues
+      final sourceIcon = source.icon;
+      final sourceLabel = source.label;
+
       return Draggable<_PaletteDragData>(
         data: _PaletteDragData(source: source, type: defaultType),
         feedback: Material(
@@ -1633,11 +1652,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(source.icon, color: _momentumBlue, size: 20),
+                Icon(sourceIcon, color: _momentumBlue, size: 20),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    source.label,
+                    sourceLabel,
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -1794,72 +1813,72 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final items = <Widget>[];
 
     // Add a drop zone at the beginning
-    items.add(_buildDropZone(0, widgetWidth));
+    items.add(_buildReorderDropZone(0, widgetWidth));
 
     for (int i = 0; i < widgets.length; i++) {
       final widget = widgets[i];
       final width = _getWidgetWidth(widget, widgetWidth, columns);
       final height = _getWidgetHeight(widget, widgetHeight);
 
-      // Add the widget wrapped in a DragTarget for reordering
+      // Make the widget draggable for reordering
       items.add(
-        DragTarget<_PaletteDragData>(
-          onWillAcceptWithDetails: (details) => true,
-          onAcceptWithDetails: (details) {
-            // Insert after this widget
-            _addWidgetAtIndex(details.data.source, details.data.type, i + 1);
-          },
-          onMove: (details) {
-            if (_dragHoverIndex != i + 1) {
-              setState(() => _dragHoverIndex = i + 1);
-            }
-          },
-          onLeave: (data) {
-            if (_dragHoverIndex == i + 1) {
-              setState(() => _dragHoverIndex = null);
-            }
-          },
-          builder: (context, candidateData, rejectedData) {
-            final isHovering = candidateData.isNotEmpty;
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                SizedBox(
-                  key: ValueKey(widget.id),
-                  width: width,
-                  height: height,
-                  child: _buildEditableWidget(widget, metrics, i),
-                ),
-                // Show drop indicator when hovering
-                if (isHovering)
-                  Positioned(
-                    right: -12,
-                    top: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 4,
-                      decoration: BoxDecoration(
-                        color: _momentumBlue,
-                        borderRadius: BorderRadius.circular(2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _momentumBlue.withOpacity(0.5),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                    ),
+        LongPressDraggable<_WidgetReorderData>(
+          key: ValueKey('draggable_${widget.id}'),
+          data: _WidgetReorderData(fromIndex: i, config: widget),
+          delay: const Duration(milliseconds: 150),
+          hapticFeedbackOnStart: true,
+          feedback: Material(
+            elevation: 12,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: width * 0.9,
+              height: height * 0.9,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _momentumBlue, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: _momentumBlue.withOpacity(0.3),
+                    blurRadius: 20,
+                    spreadRadius: 4,
                   ),
-              ],
-            );
-          },
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: _buildWidget(widget, metrics),
+              ),
+            ),
+          ),
+          childWhenDragging: Opacity(
+            opacity: 0.3,
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _momentumBlue.withOpacity(0.5),
+                    width: 2,
+                    style: BorderStyle.solid,
+                  ),
+                  color: Colors.grey.withOpacity(0.1),
+                ),
+              ),
+            ),
+          ),
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: _buildEditableWidget(widget, metrics, i),
+          ),
         ),
       );
     }
 
     // Add a final drop zone at the end
-    items.add(_buildDropZone(widgets.length, widgetWidth));
+    items.add(_buildReorderDropZone(widgets.length, widgetWidth));
 
     return Wrap(
       spacing: 16,
@@ -1869,11 +1888,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildDropZone(int insertIndex, double widgetWidth) {
-    return DragTarget<_PaletteDragData>(
-      onWillAcceptWithDetails: (details) => true,
+  Widget _buildReorderDropZone(int insertIndex, double widgetWidth) {
+    return DragTarget<Object>(
+      onWillAcceptWithDetails: (details) {
+        // Accept both palette items and widget reorders
+        return details.data is _PaletteDragData || details.data is _WidgetReorderData;
+      },
       onAcceptWithDetails: (details) {
-        _addWidgetAtIndex(details.data.source, details.data.type, insertIndex);
+        if (details.data is _PaletteDragData) {
+          final data = details.data as _PaletteDragData;
+          _addWidgetAtIndex(data.source, data.type, insertIndex);
+        } else if (details.data is _WidgetReorderData) {
+          final data = details.data as _WidgetReorderData;
+          _reorderWidgetToIndex(data.fromIndex, insertIndex);
+        }
         setState(() => _dragHoverIndex = null);
       },
       onMove: (details) {
@@ -1888,20 +1916,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       },
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty || _dragHoverIndex == insertIndex;
+        final isPaletteItem = candidateData.any((d) => d is _PaletteDragData);
+        final isReorder = candidateData.any((d) => d is _WidgetReorderData);
 
-        // Show minimal indicator when not hovering, expanded when hovering
+        // Show expanded drop zone when dragging
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
-          width: isHovering ? widgetWidth * 0.5 : 8,
-          height: isHovering ? 100 : 60,
-          margin: EdgeInsets.symmetric(horizontal: isHovering ? 8 : 0),
+          width: isHovering ? widgetWidth * 0.4 : 8,
+          height: isHovering ? 80 : 60,
+          margin: EdgeInsets.symmetric(horizontal: isHovering ? 4 : 0),
           decoration: BoxDecoration(
-            color: isHovering ? _momentumBlue.withOpacity(0.15) : Colors.transparent,
+            color: isHovering
+                ? (isReorder ? _grassrootsGreen.withOpacity(0.15) : _momentumBlue.withOpacity(0.15))
+                : Colors.transparent,
             border: Border.all(
-              color: isHovering ? _momentumBlue : Colors.grey.withOpacity(0.3),
+              color: isHovering
+                  ? (isReorder ? _grassrootsGreen : _momentumBlue)
+                  : Colors.grey.withOpacity(0.3),
               width: isHovering ? 2 : 1,
-              strokeAlign: BorderSide.strokeAlignCenter,
             ),
             borderRadius: BorderRadius.circular(isHovering ? 12 : 4),
           ),
@@ -1910,13 +1943,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.add, color: _momentumBlue, size: 24),
-                      const SizedBox(height: 4),
+                      Icon(
+                        isReorder ? Icons.swap_vert : Icons.add,
+                        color: isReorder ? _grassrootsGreen : _momentumBlue,
+                        size: 20,
+                      ),
+                      const SizedBox(height: 2),
                       Text(
-                        'Drop here',
+                        isReorder ? 'Drop here' : 'Add here',
                         style: TextStyle(
-                          color: _momentumBlue,
-                          fontSize: 12,
+                          color: isReorder ? _grassrootsGreen : _momentumBlue,
+                          fontSize: 10,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1978,28 +2015,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ),
         ),
-        // Quick reorder buttons
-        if (widgetCount > 1)
-          Positioned(
-            bottom: 4,
-            left: 4,
+        // Drag handle indicator
+        Positioned(
+          bottom: 4,
+          left: 4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(6),
+            ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (index > 0)
-                  _buildMiniButton(
-                    icon: Icons.arrow_upward,
-                    tooltip: 'Move up',
-                    onPressed: () => _moveWidget(index, index - 1),
+                const Icon(Icons.drag_indicator, color: Colors.white, size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  'Hold to drag',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
                   ),
-                if (index < widgetCount - 1)
-                  _buildMiniButton(
-                    icon: Icons.arrow_downward,
-                    tooltip: 'Move down',
-                    onPressed: () => _moveWidget(index, index + 1),
-                  ),
+                ),
               ],
             ),
           ),
+        ),
         // Settings button
         Positioned(
           top: 4,
@@ -2072,16 +2114,37 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _moveWidget(int fromIndex, int toIndex) {
+    if (fromIndex == toIndex) return;
     setState(() {
       final widgetsList = List<DashboardWidgetConfig>.from(_config.widgets);
       final item = widgetsList.removeAt(fromIndex);
-      widgetsList.insert(toIndex, item);
+      // Adjust toIndex if needed after removal
+      final adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
+      widgetsList.insert(adjustedTo.clamp(0, widgetsList.length), item);
       // Update grid positions
       for (int i = 0; i < widgetsList.length; i++) {
         widgetsList[i] = widgetsList[i].copyWith(gridY: i);
       }
       _config = DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList);
     });
+    _saveConfig();
+  }
+
+  void _reorderWidgetToIndex(int fromIndex, int toIndex) {
+    if (fromIndex == toIndex || fromIndex == toIndex - 1) return;
+    setState(() {
+      final widgetsList = List<DashboardWidgetConfig>.from(_config.widgets);
+      final item = widgetsList.removeAt(fromIndex);
+      // Adjust target index after removal
+      final adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
+      widgetsList.insert(adjustedTo.clamp(0, widgetsList.length), item);
+      // Update grid positions
+      for (int i = 0; i < widgetsList.length; i++) {
+        widgetsList[i] = widgetsList[i].copyWith(gridY: i);
+      }
+      _config = DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList);
+    });
+    _saveConfig();
   }
 
   void _showWidgetOptions(DashboardWidgetConfig config, [int? index]) {

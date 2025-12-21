@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
-import 'dart:async';
 
-/// Web-specific iframe widget for Listmonk with robust authentication handling
+/// Web-specific iframe widget for Listmonk
 ///
-/// Multi-layer authentication strategy:
-/// 1. Tries HTTP Basic Auth in URL (works in Safari)
-/// 2. Detects browser type and shows credentials proactively for Chrome
-/// 3. Provides always-visible "Show Login Help" button as ultimate fallback
-/// 4. Multiple detection methods with timeouts
+/// Modern browsers block embedded credentials in URLs (e.g., https://user:pass@host/)
+/// so this widget loads the plain URL and shows a credentials banner for manual login.
 class Iframe extends StatefulWidget {
   final String src;
+  final bool showCredentials;
 
-  const Iframe({super.key, required this.src});
+  const Iframe({
+    super.key,
+    required this.src,
+    this.showCredentials = false,
+  });
 
   @override
   State<Iframe> createState() => _IframeState();
@@ -21,17 +22,12 @@ class Iframe extends StatefulWidget {
 
 class _IframeState extends State<Iframe> {
   String? _iframeId;
-  html.IFrameElement? _iframe;
   bool _isLoading = true;
   bool _isRegistered = false;
   String _statusMessage = 'Loading Listmonk...';
   String? _errorMessage;
-  bool _showLoginHelp = false;
-  bool _helpDismissed = false;
-  Timer? _loginCheckTimer;
-  Timer? _fallbackTimer;
-  String _username = 'admin';
-  String _password = 'fucktrump67';
+  final String _username = 'admin';
+  final String _password = 'fucktrump67';
 
   @override
   void initState() {
@@ -39,34 +35,17 @@ class _IframeState extends State<Iframe> {
     _registerIframe();
   }
 
-  @override
-  void dispose() {
-    _loginCheckTimer?.cancel();
-    _fallbackTimer?.cancel();
-    super.dispose();
-  }
-
-  /// Detect if this is Safari (which supports Basic Auth in iframes)
-  bool get _isSafari {
-    final userAgent = html.window.navigator.userAgent.toLowerCase();
-    return userAgent.contains('safari') && !userAgent.contains('chrome');
-  }
-
   void _registerIframe() {
     try {
       // Create unique iframe ID
       final iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
 
-      // Parse original URL and build authenticated URL
-      final uri = Uri.parse(widget.src);
-      final baseHost = uri.host;
-      final path = uri.path;
-      final authenticatedUrl = 'https://$_username:$_password@$baseHost$path';
-
-      debugPrint('📧 Listmonk: Browser detection - Safari: $_isSafari');
+      // Use the plain URL - embedded credentials are blocked by modern browsers
+      // Users will need to login manually using the credentials banner
+      debugPrint('📧 Listmonk: Loading without embedded credentials (blocked by browsers)');
 
       final iframe = html.IFrameElement()
-        ..src = authenticatedUrl
+        ..src = widget.src
         ..style.border = 'none'
         ..style.width = '100%'
         ..style.height = '100%'
@@ -74,8 +53,6 @@ class _IframeState extends State<Iframe> {
         ..setAttribute('allowfullscreen', 'true')
         ..setAttribute('loading', 'eager')
         ..setAttribute('referrerpolicy', 'no-referrer');
-
-      _iframe = iframe;
 
       // Handle iframe load event
       iframe.onLoad.listen((_) {
@@ -85,9 +62,6 @@ class _IframeState extends State<Iframe> {
             _statusMessage = 'Logged in successfully';
             _isLoading = false;
           });
-
-          // Multi-layer detection strategy
-          _startLoginDetection();
         }
       });
 
@@ -124,54 +98,6 @@ class _IframeState extends State<Iframe> {
         });
       }
     }
-  }
-
-  void _startLoginDetection() {
-    // Strategy 1: For non-Safari browsers, show credentials immediately
-    // (we know Basic Auth won't work)
-    if (!_isSafari && !_helpDismissed) {
-      _loginCheckTimer = Timer(const Duration(seconds: 1), () {
-        debugPrint('📧 Listmonk: Showing credentials for non-Safari browser');
-        if (mounted && !_helpDismissed) {
-          setState(() {
-            _showLoginHelp = true;
-          });
-        }
-      });
-    }
-
-    // Strategy 2: Ultimate fallback - always show after 5 seconds if not dismissed
-    // This ensures help is NEVER silently hidden when user needs it
-    _fallbackTimer = Timer(const Duration(seconds: 5), () {
-      debugPrint('📧 Listmonk: Fallback timer - ensuring credentials are available');
-      if (mounted && !_showLoginHelp && !_helpDismissed) {
-        debugPrint('⚠️ Listmonk: Auto-showing credentials banner (fallback)');
-        setState(() {
-          _showLoginHelp = true;
-        });
-      }
-    });
-  }
-
-  void _dismissHelp() {
-    setState(() {
-      _showLoginHelp = false;
-      _helpDismissed = true;
-    });
-    debugPrint('📧 Listmonk: User dismissed credentials banner');
-  }
-
-  void _showHelp() {
-    setState(() {
-      _showLoginHelp = true;
-      _helpDismissed = false;
-    });
-    debugPrint('📧 Listmonk: User requested credentials banner');
-  }
-
-  void _openInNewTab() {
-    html.window.open(widget.src, '_blank');
-    debugPrint('📧 Listmonk: Opened in new tab');
   }
 
   @override
@@ -255,8 +181,8 @@ class _IframeState extends State<Iframe> {
             ),
           ),
 
-        // Login credentials banner
-        if (_showLoginHelp && !_isLoading)
+        // Login credentials banner (controlled by parent via widget.showCredentials)
+        if (widget.showCredentials && !_isLoading)
           Positioned(
             top: 0,
             left: 0,
@@ -354,56 +280,7 @@ class _IframeState extends State<Iframe> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Open in new tab button
-                    IconButton(
-                      icon: const Icon(Icons.open_in_new, size: 20),
-                      onPressed: _openInNewTab,
-                      color: Colors.blue[700],
-                      tooltip: 'Open in new tab',
-                    ),
-                    // Close button
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: _dismissHelp,
-                      color: Colors.blue[700],
-                      tooltip: 'Dismiss',
-                    ),
                   ],
-                ),
-              ),
-            ),
-          ),
-
-        // Always-visible "Show Login Help" button when banner is dismissed
-        if (!_showLoginHelp && !_isLoading)
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Material(
-              elevation: 2,
-              borderRadius: BorderRadius.circular(20),
-              color: Colors.blue[700],
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: _showHelp,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.help_outline, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Show Login Credentials',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),

@@ -65,6 +65,8 @@ class JobNotificationTemplate with _$JobNotificationTemplate {
         return 'Job Applicant';
       case 'job_subscriber':
         return 'Job Subscribers';
+      case 'executive_team':
+        return 'Executive Team';
       default:
         return recipientType;
     }
@@ -140,6 +142,7 @@ class JobNotificationTemplate with _$JobNotificationTemplate {
     'job_submitter',
     'job_applicant',
     'job_subscriber',
+    'executive_team',
   ];
 
   /// Get recipient type label
@@ -151,6 +154,8 @@ class JobNotificationTemplate with _$JobNotificationTemplate {
         return 'Job Applicant';
       case 'job_subscriber':
         return 'Job Subscribers';
+      case 'executive_team':
+        return 'Executive Team';
       default:
         return type;
     }
