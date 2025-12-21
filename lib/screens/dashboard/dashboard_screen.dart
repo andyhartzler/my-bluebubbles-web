@@ -2341,6 +2341,75 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         ),
                       ),
                     ),
+                  // Background color selection for widgets with white backgrounds
+                  if (_widgetSupportsBackgroundColor(config.type)) ...[
+                    const SizedBox(height: 20),
+                    const Text('Background:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 6,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        childAspectRatio: 1.0,
+                      ),
+                      itemCount: WidgetBackgrounds.solidColors.length,
+                      itemBuilder: (context, index) {
+                        final color = WidgetBackgrounds.solidColors[index] ?? Colors.white;
+                        final currentBgIndex = config.options['backgroundColorIndex'] as int? ?? 0;
+                        final isSelected = currentBgIndex == index;
+                        return GestureDetector(
+                          onTap: () {
+                            final newOptions = Map<String, dynamic>.from(config.options);
+                            newOptions['backgroundColorIndex'] = index;
+                            _updateWidget(config.copyWith(options: newOptions));
+                            Navigator.pop(context);
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? _momentumBlue : Colors.grey[300]!,
+                                width: isSelected ? 3 : 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: isSelected
+                                ? Center(
+                                    child: Icon(
+                                      Icons.check,
+                                      color: index == WidgetBackgrounds.solidColors.length - 1
+                                          ? Colors.white
+                                          : _momentumBlue,
+                                      size: 20,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: Text(
+                        WidgetBackgrounds.colorNames[config.options['backgroundColorIndex'] as int? ?? 0],
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                 ],
               ),
@@ -2349,6 +2418,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         );
       },
     );
+  }
+
+  /// Check if widget type supports background color customization
+  bool _widgetSupportsBackgroundColor(DashboardWidgetType type) {
+    switch (type) {
+      case DashboardWidgetType.barChart:
+      case DashboardWidgetType.lineChart:
+      case DashboardWidgetType.pieChart:
+      case DashboardWidgetType.donutChart:
+      case DashboardWidgetType.leaderboard:
+      case DashboardWidgetType.progressRing:
+      case DashboardWidgetType.memberList:
+      case DashboardWidgetType.dynamicDistribution:
+        return true;
+      case DashboardWidgetType.statCard:
+      case DashboardWidgetType.trendCard:
+      case DashboardWidgetType.sparkline:
+      case DashboardWidgetType.heatmap:
+        return false;
+    }
   }
 
   String _getCategoryLabel(DashboardDataCategory category) {

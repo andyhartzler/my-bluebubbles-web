@@ -84,6 +84,68 @@ class WidgetGradients {
   }
 }
 
+/// Background color options for widgets with white backgrounds
+class WidgetBackgrounds {
+  /// Solid background colors (null = white/default)
+  static const List<Color?> solidColors = [
+    null,  // White (default)
+    Color(0xFFF8F9FA),  // Light gray
+    Color(0xFFE3F2FD),  // Light blue
+    Color(0xFFE8F5E9),  // Light green
+    Color(0xFFFFF3E0),  // Light orange
+    Color(0xFFFCE4EC),  // Light pink
+    Color(0xFFF3E5F5),  // Light purple
+    Color(0xFFE0F7FA),  // Light cyan
+    Color(0xFFFFFDE7),  // Light yellow
+    Color(0xFFEFEBE9),  // Light brown
+    Color(0xFFECEFF1),  // Blue gray
+    Color(0xFF263238),  // Dark slate (for dark mode look)
+  ];
+
+  static const List<String> colorNames = [
+    'White',
+    'Light Gray',
+    'Light Blue',
+    'Light Green',
+    'Light Orange',
+    'Light Pink',
+    'Light Purple',
+    'Light Cyan',
+    'Light Yellow',
+    'Light Brown',
+    'Blue Gray',
+    'Dark Slate',
+  ];
+
+  /// Get color by index from options value
+  static Color? getColorFromIndex(int? index) {
+    if (index == null || index < 0 || index >= solidColors.length) return null;
+    return solidColors[index];
+  }
+
+  /// Get background color from widget options
+  static Color getBackgroundColor(Map<String, dynamic> options) {
+    final index = options['backgroundColorIndex'] as int?;
+    return getColorFromIndex(index) ?? Colors.white;
+  }
+
+  /// Check if using dark background
+  static bool isDarkBackground(Map<String, dynamic> options) {
+    final index = options['backgroundColorIndex'] as int?;
+    return index == solidColors.length - 1; // Dark slate
+  }
+
+  /// Get text color based on background
+  static Color getTextColor(Map<String, dynamic> options) {
+    return isDarkBackground(options) ? Colors.white : _unityBlue;
+  }
+
+  /// Get secondary text color based on background
+  static Color getSecondaryTextColor(Map<String, dynamic> options) {
+    return isDarkBackground(options) ? Colors.white70 : Colors.grey[600]!;
+  }
+}
+
 /// Renders a stat card widget
 class StatCardWidget extends StatelessWidget {
   final DashboardWidgetConfig config;
@@ -293,6 +355,7 @@ class BarChartWidget extends StatelessWidget {
     final sortedData = List<NameCount>.from(data)
       ..sort((a, b) => b.count.compareTo(a.count));
     final displayData = sortedData.take(maxItems).toList();
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
 
     if (displayData.isEmpty) {
       return _buildEmptyState();
@@ -304,7 +367,7 @@ class BarChartWidget extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -648,6 +711,7 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
       orElse: () => _distributionOptions.first,
     );
     final data = _getDataForKey(_selectedKey);
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(widget.config.options);
 
     return Card(
       elevation: 4,
@@ -655,7 +719,7 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -1019,9 +1083,11 @@ class _PieChartWidgetState extends State<PieChartWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(widget.config.options);
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: backgroundColor,
       child: LayoutBuilder(
         builder: (context, constraints) {
           return _buildResponsiveChart(constraints);
@@ -1036,6 +1102,8 @@ class _PieChartWidgetState extends State<PieChartWidget> {
     final isCompact = width < 250 || height < 200;
     final isLarge = width >= 400 && height >= 300;
     final isMedium = !isCompact && !isLarge;
+    final textColor = WidgetBackgrounds.getTextColor(widget.config.options);
+    final secondaryTextColor = WidgetBackgrounds.getSecondaryTextColor(widget.config.options);
 
     // Dynamic maxItems based on size
     final maxItems = isCompact ? 5 : (isLarge ? 12 : 8);
@@ -1316,6 +1384,8 @@ class LineChartWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
+
     if (data.isEmpty) {
       return _buildEmptyState();
     }
@@ -1331,7 +1401,7 @@ class LineChartWidget extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -1519,6 +1589,7 @@ class LeaderboardWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayData = data.take(maxItems).toList();
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
 
     if (displayData.isEmpty) {
       return _buildEmptyState();
@@ -1533,7 +1604,7 @@ class LeaderboardWidget extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: backgroundColor,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -1705,6 +1776,10 @@ class ProgressRingWidget extends StatelessWidget {
     final colors = config.gradientColors.isNotEmpty
         ? config.gradientColors
         : [_momentumBlue, _justicePurple];
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
+    final isDark = WidgetBackgrounds.isDarkBackground(config.options);
+    final textColor = WidgetBackgrounds.getTextColor(config.options);
+    final secondaryTextColor = WidgetBackgrounds.getSecondaryTextColor(config.options);
 
     return Card(
       elevation: 4,
@@ -1712,7 +1787,7 @@ class ProgressRingWidget extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -1728,7 +1803,7 @@ class ProgressRingWidget extends StatelessWidget {
                       CircularProgressIndicator(
                         value: percentage,
                         strokeWidth: 10,
-                        backgroundColor: colors.first.withOpacity(0.1),
+                        backgroundColor: colors.first.withOpacity(isDark ? 0.3 : 0.1),
                         valueColor: AlwaysStoppedAnimation<Color>(colors.first),
                       ),
                       Center(
@@ -1747,7 +1822,7 @@ class ProgressRingWidget extends StatelessWidget {
                               suffix ?? '/ $total',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[600],
+                                color: secondaryTextColor,
                               ),
                             ),
                           ],
@@ -1761,10 +1836,10 @@ class ProgressRingWidget extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               config.title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
-                color: _unityBlue,
+                color: textColor,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1802,6 +1877,7 @@ class MemberListWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayMembers = members.take(maxItems).toList();
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
 
     if (displayMembers.isEmpty) {
       return _buildEmptyState();
@@ -1813,7 +1889,7 @@ class MemberListWidget extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
