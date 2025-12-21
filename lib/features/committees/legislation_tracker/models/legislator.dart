@@ -1,6 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Model representing a Missouri state legislator
 class Legislator {
   final String id;
@@ -146,7 +159,7 @@ class Legislator {
       termEndDate: json['term_end_date'] != null
           ? DateTime.parse(json['term_end_date'] as String)
           : null,
-      isCurrent: json['is_current'] as bool? ?? true,
+      isCurrent: _coerceBool(json['is_current'], defaultValue: true),
       billsSponsoredCount: json['bills_sponsored_count'] as int? ?? 0,
       billsCosponsoredCount: json['bills_cosponsored_count'] as int? ?? 0,
       lastScrapedAt: json['last_scraped_at'] != null

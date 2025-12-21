@@ -1,6 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Question type enum matching the database structure
 enum QuestionType {
   text,
@@ -34,7 +47,7 @@ class CustomQuestionData {
       id: json['id'] as String? ?? const Uuid().v4(),
       question: json['question'] as String? ?? '',
       type: _parseType(json['type']),
-      required: json['required'] as bool? ?? false,
+      required: _coerceBool(json['required']),
       options: (json['options'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??

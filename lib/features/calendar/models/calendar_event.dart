@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Event status
 enum EventStatus {
   confirmed,
@@ -97,14 +110,14 @@ class CalendarEvent {
       description: json['description'] as String?,
       startTime: DateTime.parse(json['start_time'] as String),
       endTime: DateTime.parse(json['end_time'] as String),
-      isAllDay: json['is_all_day'] as bool? ?? false,
+      isAllDay: _coerceBool(json['is_all_day']),
       location: json['location'] as String?,
       meetingLink: json['meeting_link'] as String?,
       zoomMeetingId: json['zoom_meeting_id'] as String?,
       eventType: json['event_type'] as String?,
       committeeName: json['committee_name'] as String?,
       colorId: json['color_id'] as String?,
-      isRecurring: json['is_recurring'] as bool? ?? false,
+      isRecurring: _coerceBool(json['is_recurring']),
       recurrenceRule: json['recurrence_rule'] as String?,
       organizerEmail: json['organizer_email'] as String?,
       organizerName: json['organizer_name'] as String?,

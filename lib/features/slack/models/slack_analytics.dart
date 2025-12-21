@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Model for cached analytics metrics
 class SlackAnalyticsMetric {
   const SlackAnalyticsMetric({
@@ -158,7 +171,7 @@ class UserActivity {
       slackUserId: json['slack_user_id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Unknown',
       memberId: json['member_id']?.toString(),
-      isLinked: json['is_linked'] as bool? ?? false,
+      isLinked: _coerceBool(json['is_linked']),
       messageCount: (json['message_count'] as num?)?.toInt() ?? 0,
     );
   }

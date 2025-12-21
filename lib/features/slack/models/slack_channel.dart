@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Model representing a Slack channel with its committee mapping
 class SlackChannel {
   const SlackChannel({
@@ -16,8 +29,8 @@ class SlackChannel {
       slackChannelId: json['slack_channel_id']?.toString() ?? '',
       slackChannelName: json['slack_channel_name']?.toString() ?? '',
       committeeName: json['committee_name']?.toString() ?? '',
-      isActive: json['is_active'] as bool? ?? true,
-      archiveMessages: json['archive_messages'] as bool? ?? true,
+      isActive: _coerceBool(json['is_active'], defaultValue: true),
+      archiveMessages: _coerceBool(json['archive_messages'], defaultValue: true),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -65,7 +78,7 @@ class SlackArchiveStatus {
           : null,
       totalMessagesArchived:
           (json['total_messages_archived'] as num?)?.toInt() ?? 0,
-      archiveInProgress: json['archive_in_progress'] as bool? ?? false,
+      archiveInProgress: _coerceBool(json['archive_in_progress']),
     );
   }
 

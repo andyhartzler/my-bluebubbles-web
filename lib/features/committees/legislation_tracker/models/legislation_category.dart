@@ -1,5 +1,18 @@
 import 'package:flutter/material.dart';
 
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Represents a category for organizing tracked legislation
 class LegislationCategory {
   final String id;
@@ -31,7 +44,7 @@ class LegislationCategory {
       color: json['color'] as String?,
       icon: json['icon'] as String?,
       sortOrder: json['sort_order'] as int? ?? 0,
-      isActive: json['is_active'] as bool? ?? true,
+      isActive: _coerceBool(json['is_active'], defaultValue: true),
     );
   }
 

@@ -1,6 +1,19 @@
 import 'package:flutter/material.dart';
 import 'talking_point.dart';
 
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Represents a bill being tracked by the Policy & Advocacy committee
 /// CAPTURES ALL Open States API v3 Bill fields
 class TrackedBill {
@@ -265,13 +278,13 @@ class TrackedBill {
       latestPassageDate: _parseDate(json['latest_passage_date']),
       openstatesCreatedAt: _parseDate(json['openstates_created_at']),
       openstatesUpdatedAt: _parseDate(json['openstates_updated_at']),
-      passedLower: json['passed_lower'] as bool? ?? false,
+      passedLower: _coerceBool(json['passed_lower']),
       passedLowerDate: _parseDate(json['passed_lower_date']),
-      passedUpper: json['passed_upper'] as bool? ?? false,
+      passedUpper: _coerceBool(json['passed_upper']),
       passedUpperDate: _parseDate(json['passed_upper_date']),
-      signedByGovernor: json['signed_by_governor'] as bool? ?? false,
+      signedByGovernor: _coerceBool(json['signed_by_governor']),
       signedDate: _parseDate(json['signed_date']),
-      vetoed: json['vetoed'] as bool? ?? false,
+      vetoed: _coerceBool(json['vetoed']),
       vetoDate: _parseDate(json['veto_date']),
       openstatesUrl: json['openstates_url'] as String?,
       sources: _parseMapList(json['sources']),
@@ -293,7 +306,7 @@ class TrackedBill {
       categories: _parseStringList(json['categories']),
       tags: _parseStringList(json['tags']),
       addedBy: json['added_by'] as String?,
-      isArchived: json['is_archived'] as bool? ?? false,
+      isArchived: _coerceBool(json['is_archived']),
       archivedAt: _parseDate(json['archived_at']),
       archivedReason: json['archived_reason'] as String?,
       lastSyncedAt: _parseDate(json['last_synced_at']),
@@ -317,7 +330,7 @@ class TrackedBill {
       aiAnalyzedAt: _parseDate(json['ai_analyzed_at']),
       aiAnalysisVersion: json['ai_analysis_version'] as String?,
       aiAnalysisError: json['ai_analysis_error'] as String?,
-      aiAnalysisPending: json['ai_analysis_pending'] as bool? ?? false,
+      aiAnalysisPending: _coerceBool(json['ai_analysis_pending']),
       aiTalkingPoints: _parseTalkingPoints(json['ai_talking_points']),
       aiCallToAction: json['ai_call_to_action'] as String?,
       aiTwitterPosts: _parseTwitterPosts(json['ai_twitter_posts']),

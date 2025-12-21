@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Identity configuration for forms with automatic person tracking
 /// Every form automatically includes these identity fields at the start:
 /// Phone -> Name -> Email -> Zip Code
@@ -55,7 +68,7 @@ class IdentityFieldConfig {
     return IdentityFieldConfig(
       key: json['key'] as String,
       label: json['label'] as String,
-      required: json['required'] as bool? ?? true,
+      required: _coerceBool(json['required'], defaultValue: true),
       helpText: json['help_text'] as String?,
     );
   }
@@ -150,7 +163,7 @@ class IdentityConfig {
 
   factory IdentityConfig.fromJson(Map<String, dynamic> json) {
     return IdentityConfig(
-      enabled: json['enabled'] as bool? ?? true,
+      enabled: _coerceBool(json['enabled'], defaultValue: true),
       phoneField: json['phone_field'] != null
           ? IdentityFieldConfig.fromJson(json['phone_field'] as Map<String, dynamic>)
           : IdentityConfig.standard().phoneField,

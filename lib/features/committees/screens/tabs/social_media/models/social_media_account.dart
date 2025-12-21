@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Represents a connected social media account
 class SocialMediaAccount {
   final String id;
@@ -32,7 +45,7 @@ class SocialMediaAccount {
       platform: json['platform'] as String,
       accountName: json['account_name'] as String,
       accountId: json['account_id'] as String?,
-      isActive: json['is_active'] as bool? ?? true,
+      isActive: _coerceBool(json['is_active'], defaultValue: true),
       lastSyncedAt: json['last_synced_at'] != null
           ? DateTime.parse(json['last_synced_at'] as String)
           : null,

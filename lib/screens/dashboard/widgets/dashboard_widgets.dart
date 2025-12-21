@@ -309,32 +309,36 @@ class StatCardWidget extends StatelessWidget {
 
   String _formatValue(dynamic val) {
     if (val is num) {
-      if (val >= 1000000) {
-        final formatted = val / 1000000;
-        // Show decimal only if not a whole number
-        return formatted == formatted.truncateToDouble()
-            ? '${formatted.toInt()}M'
-            : '${formatted.toStringAsFixed(1)}M';
-      } else if (val >= 1000) {
-        final formatted = val / 1000;
-        return formatted == formatted.truncateToDouble()
-            ? '${formatted.toInt()}K'
-            : '${formatted.toStringAsFixed(1)}K';
+      // For monetary values, show full amount with dollar sign and commas, no decimals
+      if (config.dataSourceKey.contains('Amount') || config.dataSourceKey.contains('Donation')) {
+        return '\$${_formatWithCommas(val.toInt())}';
       }
+      // For all other numbers, show full value with commas (no K/M abbreviation)
       if (val is double) {
-        if (config.dataSourceKey.contains('Amount') || config.dataSourceKey.contains('Donation')) {
-          return '\$${val.toStringAsFixed(0)}';
-        }
-        // If it's a whole number (no decimal or .0), show as integer
+        // If it's a whole number (no decimal or .0), show as integer with commas
         if (val == val.truncateToDouble()) {
-          return val.toInt().toString();
+          return _formatWithCommas(val.toInt());
         }
         return val.toStringAsFixed(1);
       }
-      return val.toString();
+      return _formatWithCommas(val.toInt());
     }
-    return val?.toString() ?? '0';
+    return val?.toString() ?? '-';
   }
+
+  /// Format number with comma separators (e.g., 1500 -> "1,500")
+  String _formatWithCommas(int value) {
+    final str = value.toString();
+    final result = StringBuffer();
+    for (int i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) {
+        result.write(',');
+      }
+      result.write(str[i]);
+    }
+    return result.toString();
+  }
+
 }
 
 /// Renders a bar chart widget with horizontal scrolling for mobile
@@ -546,10 +550,16 @@ class BarChartWidget extends StatelessWidget {
   }
 
   String _formatNumber(int value) {
-    if (value >= 1000) {
-      return '${(value / 1000).toStringAsFixed(1)}K';
+    // Show full numbers with commas instead of abbreviated K/M
+    final str = value.toString();
+    final result = StringBuffer();
+    for (int i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) {
+        result.write(',');
+      }
+      result.write(str[i]);
     }
-    return value.toString();
+    return result.toString();
   }
 
   Widget _buildHeader() {
@@ -822,9 +832,11 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
 
     final maxValue = displayData.fold<int>(0, (prev, e) => e.count > prev ? e.count : prev);
     final isSmall = constraints.maxWidth < 280;
+    // Use horizontal bars for mobileFull size (like tall layout but full width)
+    final isMobileFull = widget.config.size == DashboardWidgetSize.mobileFull;
 
-    // Use horizontal bars for small screens
-    if (isSmall) {
+    // Use horizontal bars for small screens OR mobileFull size
+    if (isSmall || isMobileFull) {
       return _buildHorizontalBars(displayData, maxValue);
     }
 
@@ -993,10 +1005,16 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
   }
 
   String _formatNumber(int value) {
-    if (value >= 1000) {
-      return '${(value / 1000).toStringAsFixed(1)}K';
+    // Show full numbers with commas instead of abbreviated K/M
+    final str = value.toString();
+    final result = StringBuffer();
+    for (int i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) {
+        result.write(',');
+      }
+      result.write(str[i]);
     }
-    return value.toString();
+    return result.toString();
   }
 
   /// Calculate a nice round interval for y-axis labels

@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Represents a vote on a bill
 /// CAPTURES ALL Open States API v3 VoteEvent fields
 class BillVote {
@@ -103,9 +116,9 @@ class BillVote {
       votesDetail: _parseVoteDetails(json['votes_detail']),
       sources: _parseMapList(json['sources']),
       extras: json['extras'] as Map<String, dynamic>?,
-      isNew: json['is_new'] as bool? ?? false,
+      isNew: _coerceBool(json['is_new']),
       firstSeenAt: _parseDate(json['first_seen_at']),
-      isRead: json['is_read'] as bool? ?? false,
+      isRead: _coerceBool(json['is_read']),
       readBy: json['read_by'] as String?,
       readAt: _parseDate(json['read_at']),
     );

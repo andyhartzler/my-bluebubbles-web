@@ -1,3 +1,16 @@
+/// Helper to safely coerce values to bool (handles Supabase returning int for bool)
+bool _coerceBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
 /// Model for a meeting invitee
 class MeetingInvitee {
   final String id;
@@ -36,11 +49,11 @@ class MeetingInvitee {
       phone: json['phone'] as String?,
       name: json['name'] as String?,
       memberId: json['member_id'] as String?,
-      emailSent: json['email_sent'] as bool? ?? false,
+      emailSent: _coerceBool(json['email_sent']),
       emailSentAt: json['email_sent_at'] != null
           ? DateTime.parse(json['email_sent_at'] as String).toLocal()
           : null,
-      smsSent: json['sms_sent'] as bool? ?? false,
+      smsSent: _coerceBool(json['sms_sent']),
       smsSentAt: json['sms_sent_at'] != null
           ? DateTime.parse(json['sms_sent_at'] as String).toLocal()
           : null,
