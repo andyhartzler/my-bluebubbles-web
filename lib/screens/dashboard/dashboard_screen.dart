@@ -712,9 +712,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     setState(() {
       _isEditMode = !_isEditMode;
       if (_isEditMode) {
+        // Reset to start before animating forward (fixes layout issues on re-entry)
+        if (_flipController.value != 0.0) {
+          _flipController.value = 0.0;
+        }
         _flipController.forward();
         _showPalette = true;
       } else {
+        // Reset to end before animating reverse (fixes layout issues on re-entry)
+        if (_flipController.value != 1.0) {
+          _flipController.value = 1.0;
+        }
         _flipController.reverse();
         _showPalette = false;
         _saveConfig();
@@ -921,24 +929,36 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _flipAnimation,
-      builder: (context, child) {
-        final angle = _flipAnimation.value * math.pi;
-        final isBack = angle > math.pi / 2;
+    // Wrap in LayoutBuilder to get explicit constraints before the animation
+    // This prevents "RenderBox was not laid out" errors on subsequent edit mode entries
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          child: RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _flipAnimation,
+              builder: (context, child) {
+                final angle = _flipAnimation.value * math.pi;
+                final isBack = angle > math.pi / 2;
 
-        return Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.001)
-            ..rotateY(angle),
-          child: isBack
-              ? Transform(
+                return Transform(
                   alignment: Alignment.center,
-                  transform: Matrix4.identity()..rotateY(math.pi),
-                  child: _buildEditMode(),
-                )
-              : _buildViewMode(),
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.001)
+                    ..rotateY(angle),
+                  child: isBack
+                      ? Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()..rotateY(math.pi),
+                          child: _buildEditMode(),
+                        )
+                      : _buildViewMode(),
+                );
+              },
+            ),
+          ),
         );
       },
     );
