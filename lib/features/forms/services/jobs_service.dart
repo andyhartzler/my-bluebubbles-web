@@ -13,6 +13,34 @@ class JobsService {
   final _supabase = Supabase.instance.client;
   final _crmService = CRMSupabaseService();
 
+  /// Sanitize JSON from Supabase to handle integer booleans (0/1 -> false/true)
+  /// This is needed because Supabase sometimes returns integers for boolean fields
+  static Map<String, dynamic> _sanitizeJobJson(Map<String, dynamic> json) {
+    final result = Map<String, dynamic>.from(json);
+
+    // List of boolean fields that may come as integers from Supabase
+    const boolFields = [
+      'is_paid',
+      'featured',
+      'resume_enabled',
+      'resume_required',
+      'cover_letter_enabled',
+      'cover_letter_required',
+      'references_enabled',
+      'references_required',
+      'use_external_apply',
+    ];
+
+    for (final field in boolFields) {
+      final value = result[field];
+      if (value is int) {
+        result[field] = value != 0;
+      }
+    }
+
+    return result;
+  }
+
   /// Wait for CRM service to be initialized (with timeout)
   Future<void> _ensureInitialized() async {
     // Wait up to 5 seconds for CRM to initialize
@@ -55,14 +83,18 @@ class JobsService {
               .from('jobs')
               .select()
               .order('created_at', ascending: false);
-          jobs = (response as List).map((json) => Job.fromJson(json)).toList();
+          jobs = (response as List)
+              .map((json) => Job.fromJson(_sanitizeJobJson(json as Map<String, dynamic>)))
+              .toList();
         } else {
           final response = await _readClient
               .from('jobs')
               .select()
               .eq('status', statusFilter)
               .order('created_at', ascending: false);
-          jobs = (response as List).map((json) => Job.fromJson(json)).toList();
+          jobs = (response as List)
+              .map((json) => Job.fromJson(_sanitizeJobJson(json as Map<String, dynamic>)))
+              .toList();
         }
         if (!controller.isClosed) {
           controller.add(jobs);
@@ -135,7 +167,7 @@ class JobsService {
         .eq('id', id)
         .single();
 
-    return Job.fromJson(response);
+    return Job.fromJson(_sanitizeJobJson(response));
   }
 
   Future<void> approveJob(String id) async {
@@ -592,14 +624,18 @@ class JobsService {
           .from('jobs')
           .select()
           .order('created_at', ascending: false);
-      jobs = (response as List).map((json) => Job.fromJson(json)).toList();
+      jobs = (response as List)
+          .map((json) => Job.fromJson(_sanitizeJobJson(json as Map<String, dynamic>)))
+          .toList();
     } else {
       final response = await _readClient
           .from('jobs')
           .select()
           .eq('status', statusFilter)
           .order('created_at', ascending: false);
-      jobs = (response as List).map((json) => Job.fromJson(json)).toList();
+      jobs = (response as List)
+          .map((json) => Job.fromJson(_sanitizeJobJson(json as Map<String, dynamic>)))
+          .toList();
     }
 
     // Fetch application counts for each job
