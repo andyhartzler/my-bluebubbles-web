@@ -661,7 +661,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _fetchChatCount(),
         _fetchMessageCount(),
         _fetchMessageCount(after: weeklySince),
-        _memberRepo.getRecentMembers(limit: 5),
+        _memberRepo.getRecentMembers(limit: 25),
       ]);
 
       final metrics = results[0] as DashboardMetrics?;
@@ -2976,6 +2976,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                   ],
                   const SizedBox(height: 24),
+                  // Swipe Row options (mobile only)
+                  if (_isMobileLayout) ...[
+                    const Text('Swipe Row:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    _buildSwipeRowOptions(config),
+                    const SizedBox(height: 24),
+                  ],
                 ],
               ),
             );
@@ -2983,6 +2990,267 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         );
       },
     );
+  }
+
+  /// Build swipe row options for mobile widget customization
+  Widget _buildSwipeRowOptions(DashboardWidgetConfig config) {
+    // Get all existing swipe row IDs
+    final existingRows = _getExistingSwipeRows();
+    final currentRowId = config.swipeRowId;
+    final isInSwipeRow = currentRowId != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Current status
+        if (isInSwipeRow)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: _momentumBlue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _momentumBlue.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.swipe, size: 18, color: _momentumBlue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'In swipe row: ${_getSwipeRowDisplayName(currentRowId)}',
+                    style: const TextStyle(fontSize: 13, color: _momentumBlue),
+                  ),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.close, size: 16),
+                  label: const Text('Remove'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: _actionRed,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: () {
+                    _removeWidgetFromSwipeRow(config);
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              'Not in a swipe row',
+              style: TextStyle(fontSize: 13, color: Colors.grey[600], fontStyle: FontStyle.italic),
+            ),
+          ),
+
+        // Existing rows to join
+        if (existingRows.isNotEmpty) ...[
+          const Text('Add to existing row:', style: TextStyle(fontSize: 13)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: existingRows.map((rowId) {
+              final isCurrentRow = rowId == currentRowId;
+              final rowSize = _getSwipeRowSize(rowId);
+              return ActionChip(
+                avatar: Icon(
+                  isCurrentRow ? Icons.check : Icons.add,
+                  size: 16,
+                  color: isCurrentRow ? _grassrootsGreen : _momentumBlue,
+                ),
+                label: Text(
+                  '${_getSwipeRowDisplayName(rowId)} (${_getSizeLabel(rowSize)})',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isCurrentRow ? _grassrootsGreen : null,
+                  ),
+                ),
+                backgroundColor: isCurrentRow ? _grassrootsGreen.withOpacity(0.1) : null,
+                onPressed: isCurrentRow ? null : () {
+                  _addWidgetToSwipeRow(config, rowId);
+                  Navigator.pop(context);
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Create new row button
+        OutlinedButton.icon(
+          icon: const Icon(Icons.add_circle_outline, size: 18),
+          label: const Text('Create new swipe row'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _grassrootsGreen,
+            side: const BorderSide(color: _grassrootsGreen),
+          ),
+          onPressed: () {
+            Navigator.pop(context);
+            _showCreateSwipeRowDialog(config);
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Get list of existing swipe row IDs
+  List<String> _getExistingSwipeRows() {
+    final rowIds = <String>{};
+    for (final widget in _mobileConfig.widgets) {
+      if (widget.swipeRowId != null) {
+        rowIds.add(widget.swipeRowId!);
+      }
+    }
+    return rowIds.toList()..sort();
+  }
+
+  /// Get display name for a swipe row
+  String _getSwipeRowDisplayName(String rowId) {
+    // Count widgets in this row for the display name
+    final widgetCount = _mobileConfig.widgets.where((w) => w.swipeRowId == rowId).length;
+    // Try to make a friendlier name
+    if (rowId.startsWith('stats_row_')) {
+      final num = rowId.replaceFirst('stats_row_', '');
+      return 'Stats Row $num ($widgetCount items)';
+    }
+    if (rowId.startsWith('swipe_row_')) {
+      final num = rowId.replaceFirst('swipe_row_', '');
+      return 'Swipe Row $num ($widgetCount items)';
+    }
+    return '$rowId ($widgetCount items)';
+  }
+
+  /// Get the size of widgets in a swipe row
+  DashboardWidgetSize _getSwipeRowSize(String rowId) {
+    final rowWidgets = _mobileConfig.widgets.where((w) => w.swipeRowId == rowId).toList();
+    if (rowWidgets.isEmpty) return DashboardWidgetSize.small;
+    return rowWidgets.first.size;
+  }
+
+  /// Add a widget to an existing swipe row (with size matching)
+  void _addWidgetToSwipeRow(DashboardWidgetConfig config, String rowId) {
+    if (!mounted) return;
+
+    // Get the size of widgets in the target row
+    final targetSize = _getSwipeRowSize(rowId);
+
+    setState(() {
+      final updatedWidget = config.copyWith(
+        swipeRowId: rowId,
+        size: targetSize, // Match the size of other widgets in the row
+      );
+      final widgetsList = _mobileConfig.widgets.map((w) =>
+        w.id == config.id ? updatedWidget : w
+      ).toList();
+      _mobileConfig = _mobileConfig.copyWith(widgets: widgetsList);
+    });
+    _saveConfig();
+  }
+
+  /// Remove a widget from its swipe row
+  void _removeWidgetFromSwipeRow(DashboardWidgetConfig config) {
+    if (!mounted) return;
+
+    setState(() {
+      final updatedWidget = config.copyWith(clearSwipeRowId: true);
+      final widgetsList = _mobileConfig.widgets.map((w) =>
+        w.id == config.id ? updatedWidget : w
+      ).toList();
+      _mobileConfig = _mobileConfig.copyWith(widgets: widgetsList);
+    });
+    _saveConfig();
+  }
+
+  /// Show dialog to create a new swipe row
+  void _showCreateSwipeRowDialog(DashboardWidgetConfig config) {
+    // Generate a new unique row ID
+    final existingRows = _getExistingSwipeRows();
+    int nextNum = 1;
+    while (existingRows.contains('swipe_row_$nextNum')) {
+      nextNum++;
+    }
+    final newRowId = 'swipe_row_$nextNum';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.swipe, color: _momentumBlue),
+            SizedBox(width: 12),
+            Text('Create Swipe Row'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This will create a new swipe row containing "${config.title}".',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _momentumBlue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 18, color: _momentumBlue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'The widget\'s current size (${_getSizeLabel(config.size)}) will be the row size. Other widgets added to this row will be resized to match.',
+                      style: const TextStyle(fontSize: 12, color: _momentumBlue),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.check),
+            label: const Text('Create Row'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _grassrootsGreen,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _createNewSwipeRow(config, newRowId);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Create a new swipe row with the given widget
+  void _createNewSwipeRow(DashboardWidgetConfig config, String rowId) {
+    if (!mounted) return;
+
+    setState(() {
+      // The widget keeps its current size (which becomes the row's size)
+      final updatedWidget = config.copyWith(swipeRowId: rowId);
+      final widgetsList = _mobileConfig.widgets.map((w) =>
+        w.id == config.id ? updatedWidget : w
+      ).toList();
+      _mobileConfig = _mobileConfig.copyWith(widgets: widgetsList);
+    });
+    _saveConfig();
   }
 
   /// Check if widget type supports background color customization
