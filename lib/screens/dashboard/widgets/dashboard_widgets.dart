@@ -1600,7 +1600,7 @@ class LeaderboardWidget extends StatelessWidget {
     required this.config,
     required this.data,
     this.isDonors = false,
-    this.maxItems = 5,
+    this.maxItems = 25,
     this.onTap,
   });
 
@@ -1889,7 +1889,7 @@ class MemberListWidget extends StatelessWidget {
     required this.config,
     required this.members,
     this.onMemberTap,
-    this.maxItems = 5,
+    this.maxItems = 25,
   });
 
   @override
