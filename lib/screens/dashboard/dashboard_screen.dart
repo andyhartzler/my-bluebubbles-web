@@ -708,6 +708,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _toggleEditMode() {
+    if (!mounted) return;
     setState(() {
       _isEditMode = !_isEditMode;
       if (_isEditMode) {
@@ -726,6 +727,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _addWidgetAtIndex(DashboardDataSource source, DashboardWidgetType type, int index) {
+    if (!mounted) return;
     final newWidget = DashboardWidgetConfig(
       id: _uuid.v4(),
       type: type,
@@ -750,6 +752,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _removeWidget(String widgetId) {
+    if (!mounted) return;
     setState(() {
       _setConfig(_config.copyWith(
         widgets: _config.widgets.where((w) => w.id != widgetId).toList(),
@@ -758,9 +761,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _updateWidget(DashboardWidgetConfig updated) {
+    if (!mounted) return;
     setState(() {
+      final currentWidgets = _config.widgets;
       _setConfig(_config.copyWith(
-        widgets: _config.widgets.map((w) => w.id == updated.id ? updated : w).toList(),
+        widgets: currentWidgets.map((w) => w.id == updated.id ? updated : w).toList(),
       ));
     });
   }
@@ -2695,9 +2700,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _moveWidget(int fromIndex, int toIndex) {
+    if (!mounted) return;
     if (fromIndex == toIndex) return;
+    final currentWidgets = _config.widgets;
+    if (fromIndex < 0 || fromIndex >= currentWidgets.length) return;
     setState(() {
-      final widgetsList = List<DashboardWidgetConfig>.from(_config.widgets);
+      final widgetsList = List<DashboardWidgetConfig>.from(currentWidgets);
       final item = widgetsList.removeAt(fromIndex);
       // Adjust toIndex if needed after removal
       final adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
@@ -2712,9 +2720,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _reorderWidgetToIndex(int fromIndex, int toIndex) {
+    if (!mounted) return;
     if (fromIndex == toIndex || fromIndex == toIndex - 1) return;
+    final currentWidgets = _config.widgets;
+    if (fromIndex < 0 || fromIndex >= currentWidgets.length) return;
     setState(() {
-      final widgetsList = List<DashboardWidgetConfig>.from(_config.widgets);
+      final widgetsList = List<DashboardWidgetConfig>.from(currentWidgets);
       final item = widgetsList.removeAt(fromIndex);
       // Adjust target index after removal
       final adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
@@ -2729,6 +2740,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _showWidgetOptions(DashboardWidgetConfig config, [int? index]) {
+    if (!mounted) return;
     final source = DashboardDataSources.getByKey(config.dataSourceKey);
     final currentGradientIndex = WidgetGradients.indexOfColors(config.gradientColors);
 
