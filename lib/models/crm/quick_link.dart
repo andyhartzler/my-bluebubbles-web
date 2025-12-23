@@ -81,7 +81,8 @@ class QuickLink {
   final bool isActive;
   final String? notes;
 
-  bool get hasStorageReference => (storagePath ?? '').isNotEmpty;
+  bool get hasStorageReference =>
+      (storagePath ?? '').isNotEmpty || (storageUrl ?? '').isNotEmpty;
 
   bool get hasExternalUrl => (externalUrl ?? '').trim().isNotEmpty;
 
