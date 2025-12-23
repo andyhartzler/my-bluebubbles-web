@@ -613,8 +613,21 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
 
         // Focusin event - fires when any element receives focus
         // This helps detect keyboard interactions that might freeze navigation
+        // BUT we skip refresh if focus is going to an input element to prevent
+        // the text input focus loss bug
         html.document.on['focusin'].listen((event) {
           if (mounted) {
+            // Check if the focused element is an input - if so, don't refresh
+            // This prevents focus loss when users click on text fields
+            final target = event.target;
+            if (target is html.Element) {
+              final tagName = target.tagName.toLowerCase();
+              // Skip refresh for input elements (text fields, textareas, etc.)
+              if (tagName == 'input' || tagName == 'textarea' ||
+                  target.getAttribute('contenteditable') == 'true') {
+                return;
+              }
+            }
             // Light refresh when focus changes (don't be too aggressive)
             _refreshPWAState(aggressive: false);
           }
@@ -834,33 +847,26 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     }
   }
 
-  /// Check if a text input (TextField, TextFormField, EditableText) is currently focused
-  /// Returns true if user is actively typing in a text field
+  /// Check if a text input is currently focused by checking the HTML DOM
+  /// This is more reliable than checking Flutter widget types since it works
+  /// even in production builds where class names are minified
   bool _isTextInputFocused() {
-    final focusNode = FocusManager.instance.primaryFocus;
-    if (focusNode == null) return false;
+    if (!kIsWeb) return false;
 
-    // Check the context of the focused node for text input widgets
-    final context = focusNode.context;
-    if (context == null) return false;
-
-    // Walk up the widget tree to find if we're inside a text input
-    bool isTextInput = false;
-    context.visitAncestorElements((element) {
-      final widget = element.widget;
-      // Check for common text input widgets
-      if (widget.runtimeType.toString().contains('TextField') ||
-          widget.runtimeType.toString().contains('TextFormField') ||
-          widget.runtimeType.toString().contains('EditableText') ||
-          widget.runtimeType.toString().contains('CupertinoTextField') ||
-          widget.runtimeType.toString().contains('SearchBar')) {
-        isTextInput = true;
-        return false; // Stop visiting
+    // Check the active HTML element directly - most reliable approach
+    final activeElement = html.document.activeElement;
+    if (activeElement != null) {
+      final tagName = activeElement.tagName.toLowerCase();
+      if (tagName == 'input' || tagName == 'textarea') {
+        return true;
       }
-      return true; // Continue visiting
-    });
+      // Check for contenteditable elements (used by some rich text editors)
+      if (activeElement.getAttribute('contenteditable') == 'true') {
+        return true;
+      }
+    }
 
-    return isTextInput;
+    return false;
   }
 
   /// Handle app lifecycle changes - force rebuild when resuming from background
