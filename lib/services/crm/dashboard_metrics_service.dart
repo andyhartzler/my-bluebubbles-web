@@ -92,18 +92,34 @@ class DashboardMetricsService {
   /// Fetch the saved mobile dashboard layout configuration
   Future<Map<String, dynamic>?> fetchDashboardLayoutMobile() async {
     final client = _client;
-    if (client == null) return null;
+    if (client == null) {
+      print('[DashboardMetricsService] fetchDashboardLayoutMobile: client is null');
+      return null;
+    }
 
     try {
+      print('[DashboardMetricsService] fetchDashboardLayoutMobile: Fetching from database...');
+
       final response = await client
           .from('crm_dashboard_metrics')
           .select('dashboard_layout_mobile')
           .limit(1)
           .maybeSingle();
 
-      if (response == null) return null;
+      if (response == null) {
+        print('[DashboardMetricsService] fetchDashboardLayoutMobile: No row found');
+        return null;
+      }
+
       final layout = response['dashboard_layout_mobile'];
-      if (layout == null) return null;
+      if (layout == null) {
+        print('[DashboardMetricsService] fetchDashboardLayoutMobile: Layout is null (not set yet)');
+        return null;
+      }
+
+      final widgetCount = (layout is Map) ? (layout['widgets'] as List?)?.length ?? 0 : 0;
+      print('[DashboardMetricsService] fetchDashboardLayoutMobile: Loaded layout with $widgetCount widgets');
+
       return layout is Map<String, dynamic> ? layout : null;
     } catch (e) {
       print('[DashboardMetricsService] Error fetching mobile dashboard layout: $e');
@@ -114,9 +130,14 @@ class DashboardMetricsService {
   /// Save the mobile dashboard layout configuration
   Future<bool> saveDashboardLayoutMobile(Map<String, dynamic> layout) async {
     final client = _client;
-    if (client == null) return false;
+    if (client == null) {
+      print('[DashboardMetricsService] saveDashboardLayoutMobile: client is null');
+      return false;
+    }
 
     try {
+      print('[DashboardMetricsService] saveDashboardLayoutMobile: Fetching existing row...');
+
       // Get the ID of the first row
       final existingRow = await client
           .from('crm_dashboard_metrics')
@@ -129,15 +150,20 @@ class DashboardMetricsService {
         return false;
       }
 
+      final rowId = existingRow['id'];
+      print('[DashboardMetricsService] saveDashboardLayoutMobile: Updating row $rowId with ${layout['widgets']?.length ?? 0} widgets');
+
       // Update the dashboard_layout_mobile column
       await client
           .from('crm_dashboard_metrics')
           .update({'dashboard_layout_mobile': layout})
-          .eq('id', existingRow['id']);
+          .eq('id', rowId);
 
+      print('[DashboardMetricsService] saveDashboardLayoutMobile: Update completed successfully');
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('[DashboardMetricsService] Error saving mobile dashboard layout: $e');
+      print('[DashboardMetricsService] Stack trace: $stackTrace');
       return false;
     }
   }

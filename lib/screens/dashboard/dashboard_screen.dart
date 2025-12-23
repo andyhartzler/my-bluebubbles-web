@@ -624,28 +624,37 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Future<void> _saveConfig() async {
+    // Determine screen width for logging
+    final screenWidth = MediaQuery.of(context).size.width;
+    debugPrint('[DashboardScreen] _saveConfig called - isMobile: $_isMobileLayout, screenWidth: $screenWidth');
+
     try {
       // Save to appropriate database column based on mobile/desktop
       if (_isMobileLayout) {
-        final success = await _metricsService.saveDashboardLayoutMobile(_mobileConfig.toJson());
+        final configJson = _mobileConfig.toJson();
+        debugPrint('[DashboardScreen] Saving mobile layout with ${_mobileConfig.widgets.length} widgets');
+        final success = await _metricsService.saveDashboardLayoutMobile(configJson);
         if (success) {
-          debugPrint('Mobile dashboard layout saved to database');
+          debugPrint('[DashboardScreen] ✓ Mobile dashboard layout saved to database');
         } else {
-          debugPrint('Failed to save mobile dashboard layout to database');
+          debugPrint('[DashboardScreen] ✗ Failed to save mobile dashboard layout to database');
         }
       } else {
-        final success = await _metricsService.saveDashboardLayout(_desktopConfig.toJson());
+        final configJson = _desktopConfig.toJson();
+        debugPrint('[DashboardScreen] Saving desktop layout with ${_desktopConfig.widgets.length} widgets');
+        final success = await _metricsService.saveDashboardLayout(configJson);
         if (success) {
-          debugPrint('Desktop dashboard layout saved to database');
+          debugPrint('[DashboardScreen] ✓ Desktop dashboard layout saved to database');
         } else {
           // Fallback to local storage if database save fails
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_prefsKey, _desktopConfig.toJsonString());
-          debugPrint('Desktop dashboard layout saved to local storage (fallback)');
+          debugPrint('[DashboardScreen] Desktop dashboard layout saved to local storage (fallback)');
         }
       }
-    } catch (e) {
-      debugPrint('Error saving dashboard config: $e');
+    } catch (e, stackTrace) {
+      debugPrint('[DashboardScreen] Error saving dashboard config: $e');
+      debugPrint('[DashboardScreen] Stack trace: $stackTrace');
       // Fallback to local storage for desktop only
       if (!_isMobileLayout) {
         try {
@@ -754,6 +763,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   void _toggleEditMode() {
     if (!mounted) return;
+    final wasEditMode = _isEditMode;
     setState(() {
       _isEditMode = !_isEditMode;
       if (_isEditMode) {
@@ -770,9 +780,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         }
         _flipController.reverse();
         _showPalette = false;
-        _saveConfig();
       }
     });
+    // Save config AFTER setState completes, and only when exiting edit mode
+    if (wasEditMode && !_isEditMode) {
+      _saveConfig();
+    }
   }
 
   void _addWidget(DashboardDataSource source, DashboardWidgetType type) {
