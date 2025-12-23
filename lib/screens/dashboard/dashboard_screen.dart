@@ -715,6 +715,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
             // Create new metrics with enriched slack members
             metrics = DashboardMetrics(
+              id: metrics.id,
+              createdAt: metrics.createdAt,
+              updatedAt: metrics.updatedAt,
               totalMembers: metrics.totalMembers,
               totalMembersWithPhone: metrics.totalMembersWithPhone,
               totalSubscribers: metrics.totalSubscribers,
