@@ -87,6 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   late Animation<double> _flipAnimation;
   bool _showPalette = false;
   int? _dragHoverIndex; // Track where a dragged widget would be inserted
+  bool _isDragging = false; // Track active drag to prevent rebuilds mid-gesture
 
   // Dashboard configuration - separate configs for mobile and desktop
   DashboardConfig _desktopConfig = _getDefaultConfig();
@@ -2265,6 +2266,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return Draggable<_PaletteDragData>(
       key: ValueKey('draggable_palette_$sourceKey'),
       data: _PaletteDragData(source: source, type: defaultType),
+      onDragStarted: () {
+        if (mounted) _isDragging = true;
+      },
+      onDragEnd: (_) {
+        if (mounted) _isDragging = false;
+      },
+      onDraggableCanceled: (_, __) {
+        if (mounted) _isDragging = false;
+      },
+      onDragCompleted: () {
+        if (mounted) _isDragging = false;
+      },
       feedback: Material(
         elevation: 8,
         borderRadius: BorderRadius.circular(12),
@@ -2350,7 +2363,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           return DragTarget<_PaletteDragData>(
             onWillAcceptWithDetails: (details) => true,
             onAcceptWithDetails: (details) {
+              if (!mounted) return;
               _addWidgetAtIndex(details.data.source, details.data.type, 0);
+              _isDragging = false;
             },
             builder: (context, candidateData, rejectedData) {
               final isHovering = candidateData.isNotEmpty;
@@ -2468,71 +2483,93 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final widgetIcon = DashboardDataSources.getByKey(widget.dataSourceKey)?.icon ?? Icons.widgets;
 
       items.add(
-        LongPressDraggable<_WidgetReorderData>(
-          key: ValueKey('draggable_${widget.id}'),
-          data: _WidgetReorderData(fromIndex: i, config: widget),
-          delay: const Duration(milliseconds: 150),
-          hapticFeedbackOnStart: true,
-          feedback: Material(
-            elevation: 12,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              width: width * 0.8,
-              height: 80,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _momentumBlue, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: _momentumBlue.withOpacity(0.3),
-                    blurRadius: 20,
-                    spreadRadius: 4,
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(widgetIcon, color: _momentumBlue, size: 32),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      widgetLabel,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: _unityBlue,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          childWhenDragging: Opacity(
-            opacity: 0.3,
-            child: SizedBox(
-              width: width,
-              height: height,
+        RepaintBoundary(
+          child: LongPressDraggable<_WidgetReorderData>(
+            key: ValueKey('draggable_${widget.id}'),
+            data: _WidgetReorderData(fromIndex: i, config: widget),
+            delay: const Duration(milliseconds: 150),
+            hapticFeedbackOnStart: true,
+            onDragStarted: () {
+              if (mounted) {
+                _isDragging = true;
+              }
+            },
+            onDragEnd: (_) {
+              if (mounted) {
+                _isDragging = false;
+              }
+            },
+            onDraggableCanceled: (_, __) {
+              if (mounted) {
+                _isDragging = false;
+              }
+            },
+            onDragCompleted: () {
+              if (mounted) {
+                _isDragging = false;
+              }
+            },
+            feedback: Material(
+              elevation: 12,
+              borderRadius: BorderRadius.circular(16),
               child: Container(
+                width: width * 0.8,
+                height: 80,
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _momentumBlue.withOpacity(0.5),
-                    width: 2,
-                    style: BorderStyle.solid,
-                  ),
-                  color: Colors.grey.withOpacity(0.1),
+                  border: Border.all(color: _momentumBlue, width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _momentumBlue.withOpacity(0.3),
+                      blurRadius: 20,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(widgetIcon, color: _momentumBlue, size: 32),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        widgetLabel,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _unityBlue,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: _buildEditableWidget(widget, metrics, i),
+            childWhenDragging: Opacity(
+              opacity: 0.3,
+              child: SizedBox(
+                width: width,
+                height: height,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _momentumBlue.withOpacity(0.5),
+                      width: 2,
+                      style: BorderStyle.solid,
+                    ),
+                    color: Colors.grey.withOpacity(0.1),
+                  ),
+                ),
+              ),
+            ),
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: _buildEditableWidget(widget, metrics, i),
+            ),
           ),
         ),
       );
@@ -2558,13 +2595,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return data is _PaletteDragData || data is _WidgetReorderData;
       },
       onAcceptWithDetails: (details) {
+        // Ensure widget is still mounted before handling drop
+        if (!mounted) return;
         final data = details.data;
         if (data is _PaletteDragData) {
           _addWidgetAtIndex(data.source, data.type, insertIndex);
         } else if (data is _WidgetReorderData) {
           _reorderWidgetToIndex(data.fromIndex, insertIndex);
         }
-        // Note: Removed setState(() => _dragHoverIndex = null) as we no longer track hover via state
+        // Reset drag state after drop
+        _isDragging = false;
       },
       // Removed onMove/onLeave setState calls that were causing RenderBox layout errors
       // The DragTarget's candidateData already tracks hover state without needing _dragHoverIndex
@@ -2622,8 +2662,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildEditableWidget(DashboardWidgetConfig config, DashboardMetrics metrics, int index) {
-    final widgetCount = _config.widgets.length;
-
     return Stack(
       children: [
         // The actual widget
@@ -2631,10 +2669,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           borderRadius: BorderRadius.circular(16),
           child: _buildWidget(config, metrics),
         ),
-        // Tap overlay for editing options
+        // Tap overlay for editing options - use translucent behavior to not block parent gestures
         Positioned.fill(
           child: GestureDetector(
-            onTap: () => _showWidgetOptions(config, index),
+            behavior: HitTestBehavior.translucent,
+            onTap: () {
+              // Ignore taps while dragging to prevent gesture conflicts
+              if (_isDragging || !mounted) return;
+              _showWidgetOptions(config, index);
+            },
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
@@ -2707,7 +2750,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             elevation: 2,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () => _showWidgetOptions(config),
+              onTap: () {
+                if (_isDragging || !mounted) return;
+                _showWidgetOptions(config);
+              },
               child: Container(
                 padding: const EdgeInsets.all(6),
                 child: const Icon(Icons.settings, size: 14, color: _momentumBlue),
@@ -2725,7 +2771,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             elevation: 2,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () => _removeWidget(config.id),
+              onTap: () {
+                if (_isDragging || !mounted) return;
+                _removeWidget(config.id);
+              },
               child: Container(
                 padding: const EdgeInsets.all(6),
                 child: const Icon(Icons.close, size: 14, color: _actionRed),
