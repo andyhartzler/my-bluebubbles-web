@@ -1642,11 +1642,15 @@ class LeaderboardWidget extends StatelessWidget {
                     final value = isDonors
                         ? '\$${(item as TopDonor).totalDonated.toStringAsFixed(0)}'
                         : '${(item as TopSlackMember).messageCount} msgs';
+                    final profilePhotoUrl = isDonors
+                        ? null
+                        : (item as TopSlackMember).profilePhotoUrl;
 
                     return _buildLeaderboardItem(
                       rank: index + 1,
                       name: name,
                       value: value,
+                      profilePhotoUrl: profilePhotoUrl,
                     );
                   },
                 ),
@@ -1688,6 +1692,7 @@ class LeaderboardWidget extends StatelessWidget {
     required int rank,
     required String name,
     required String value,
+    String? profilePhotoUrl,
   }) {
     final rankColors = [_sunriseGold, Colors.grey[400]!, Color(0xFFCD7F32)];
     final rankColor = rank <= 3 ? rankColors[rank - 1] : Colors.grey[300]!;
@@ -1696,9 +1701,10 @@ class LeaderboardWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
+          // Rank badge
           Container(
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             decoration: BoxDecoration(
               color: rankColor.withOpacity(0.2),
               shape: BoxShape.circle,
@@ -1706,18 +1712,21 @@ class LeaderboardWidget extends StatelessWidget {
             ),
             child: Center(
               child: rank <= 3
-                  ? Icon(Icons.emoji_events, size: 14, color: rankColor)
+                  ? Icon(Icons.emoji_events, size: 12, color: rankColor)
                   : Text(
                       '$rank',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
                         color: Colors.grey[600],
                       ),
                     ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
+          // Profile photo avatar
+          _buildMemberAvatar(name, profilePhotoUrl),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               name,
@@ -1747,6 +1756,76 @@ class LeaderboardWidget extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Build member avatar with photo or initials fallback
+  Widget _buildMemberAvatar(String name, String? photoUrl) {
+    const size = 32.0;
+
+    // Generate initials for fallback
+    final parts = name.trim().split(RegExp(r'\s+'));
+    final initials = parts.length >= 2
+        ? '${parts.first[0]}${parts.last[0]}'.toUpperCase()
+        : (name.isNotEmpty ? name[0].toUpperCase() : '?');
+
+    // Generate a consistent color based on the name
+    final colorIndex = name.hashCode.abs() % WidgetGradients.all.length;
+    final gradientColors = WidgetGradients.all[colorIndex];
+
+    Widget fallback = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          photoUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallback,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.grey[200],
+              ),
+              child: const Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    return fallback;
   }
 
   Widget _buildEmptyState() {
@@ -2133,6 +2212,156 @@ class MemberListWidget extends StatelessWidget {
               Text(
                 'No recent members',
                 style: TextStyle(color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Quick Links Button Widget - navigates to the Quick Links page
+class QuickLinksButtonWidget extends StatelessWidget {
+  final DashboardWidgetConfig config;
+  final VoidCallback? onTap;
+  final int linkCount;
+
+  const QuickLinksButtonWidget({
+    super.key,
+    required this.config,
+    this.onTap,
+    this.linkCount = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Stack(
+            children: [
+              // Background gradient accent
+              Positioned(
+                right: -30,
+                bottom: -30,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: config.gradientColors.isNotEmpty
+                          ? config.gradientColors
+                          : [_momentumBlue, _unityBlue],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                ),
+              ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header row
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: config.gradientColors.isNotEmpty
+                                  ? config.gradientColors
+                                  : [_momentumBlue, _unityBlue],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            config.icon ?? Icons.link,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                config.title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  color: _unityBlue,
+                                ),
+                              ),
+                              if (config.subtitle != null && config.subtitle!.isNotEmpty)
+                                Text(
+                                  config.subtitle!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: _unityBlue.withOpacity(0.6),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    // Bottom section with count and action
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        if (linkCount > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _momentumBlue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '$linkCount resources',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _momentumBlue,
+                              ),
+                            ),
+                          )
+                        else
+                          const SizedBox(),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _unityBlue.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward,
+                            color: _unityBlue,
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

@@ -500,12 +500,14 @@ class TopSlackMember {
   final String name;
   final String? email;
   final int messageCount;
+  final String? profilePhotoUrl;
 
   const TopSlackMember({
     required this.id,
     required this.name,
     this.email,
     required this.messageCount,
+    this.profilePhotoUrl,
   });
 
   factory TopSlackMember.fromJson(Map<String, dynamic> json) {
@@ -514,6 +516,18 @@ class TopSlackMember {
       name: json['name']?.toString() ?? '',
       email: json['email']?.toString(),
       messageCount: DashboardMetrics._parseInt(json['message_count']) ?? 0,
+      profilePhotoUrl: json['profile_photo_url']?.toString(),
+    );
+  }
+
+  /// Create a copy with updated profile photo URL
+  TopSlackMember copyWith({String? profilePhotoUrl}) {
+    return TopSlackMember(
+      id: id,
+      name: name,
+      email: email,
+      messageCount: messageCount,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
     );
   }
 }

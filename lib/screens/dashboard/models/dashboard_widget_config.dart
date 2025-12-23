@@ -15,6 +15,7 @@ enum DashboardWidgetType {
   trendCard,
   memberList,  // For displaying members with profile photos
   dynamicDistribution,  // Bar chart with dropdown to switch data sources
+  quickLinksButton,  // Button that navigates to Quick Links page
 }
 
 /// Size options for widgets
@@ -40,6 +41,7 @@ enum DashboardDataCategory {
   geography,
   growth,
   engagement,
+  resources,  // Quick links, documents, tools
 }
 
 /// Single widget configuration
@@ -720,6 +722,17 @@ class DashboardDataSources {
       supportedWidgets: [DashboardWidgetType.dynamicDistribution],
       icon: Icons.analytics,
       isDistribution: true,
+    ),
+
+    // Quick Links
+    DashboardDataSource(
+      key: 'quickLinks',
+      label: 'Quick Links',
+      description: 'Access important links, documents, and resources',
+      category: DashboardDataCategory.resources,
+      supportedWidgets: [DashboardWidgetType.quickLinksButton],
+      icon: Icons.link,
+      isDistribution: false,
     ),
   ];
 
