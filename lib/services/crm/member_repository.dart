@@ -400,6 +400,48 @@ class MemberRepository {
     }
   }
 
+  /// Get profile photo URLs for members by their email addresses
+  /// Returns a map of email -> profile photo URL
+  Future<Map<String, String>> getMemberPhotosByEmails(List<String> emails) async {
+    if (!_isReady || emails.isEmpty) return {};
+
+    try {
+      // Filter out null/empty emails and lowercase for matching
+      final validEmails = emails
+          .where((e) => e.isNotEmpty)
+          .map((e) => e.toLowerCase())
+          .toList();
+
+      if (validEmails.isEmpty) return {};
+
+      final response = await _readClient
+          .from('members')
+          .select('email, profile_photos')
+          .inFilter('email', validEmails);
+
+      final Map<String, String> result = {};
+      for (final row in response as List<dynamic>) {
+        final email = row['email']?.toString().toLowerCase();
+        if (email == null || email.isEmpty) continue;
+
+        final profilePhotos = row['profile_photos'];
+        if (profilePhotos == null) continue;
+
+        // Parse the profile photos to get the primary photo URL
+        final photos = MemberProfilePhoto.parseList(profilePhotos);
+        final primaryPhoto = photos.firstWhereOrNull((p) => p.isPrimary) ?? photos.firstOrNull;
+        if (primaryPhoto?.publicUrl != null) {
+          result[email] = primaryPhoto!.publicUrl!;
+        }
+      }
+
+      return result;
+    } catch (e) {
+      print('❌ Error fetching member photos by emails: $e');
+      return {};
+    }
+  }
+
   /// Get all unique counties (for filter UI)
   Future<List<String>> getUniqueCounties() async {
     if (!_isReady) return [];

@@ -26,6 +26,7 @@ import 'package:bluebubbles/services/crm/quick_links_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/screens/dashboard/widgets/quick_links_dialog.dart';
+import 'package:bluebubbles/screens/dashboard/quick_links_screen.dart';
 
 import 'models/dashboard_widget_config.dart';
 import 'widgets/dashboard_widgets.dart';
@@ -76,6 +77,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   int _chatCount = 0;
   int _totalMessages = 0;
   int _weeklyMessages = 0;
+  int _quickLinksCount = 0;
   bool _loading = true;
   String? _error;
 
@@ -108,6 +110,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
     _loadConfig();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Update mobile layout flag when screen size changes
+    // This replaces the problematic addPostFrameCallback calls that were
+    // causing RenderBox layout errors due to callback accumulation
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+    if (_isMobileLayout != isMobile) {
+      // Use post-frame callback only on actual changes to avoid setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _isMobileLayout != isMobile) {
+          setState(() {
+            _isMobileLayout = isMobile;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -662,13 +684,106 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _fetchMessageCount(),
         _fetchMessageCount(after: weeklySince),
         _memberRepo.getRecentMembers(limit: 25),
+        _quickLinksRepo.countQuickLinks(),
       ]);
 
-      final metrics = results[0] as DashboardMetrics?;
+      var metrics = results[0] as DashboardMetrics?;
       final chatCount = (results[1] as int?) ?? 0;
       final totalMessages = (results[2] as int?) ?? 0;
       final weeklyMessages = (results[3] as int?) ?? 0;
       final recentMembers = (results[4] as List<Member>?) ?? [];
+      final quickLinksCount = (results[5] as int?) ?? 0;
+
+      // Enrich top slack members with profile photos from member records
+      if (metrics != null && metrics.top50SlackMembers.isNotEmpty) {
+        final slackEmails = metrics.top50SlackMembers
+            .where((m) => m.email != null && m.email!.isNotEmpty)
+            .map((m) => m.email!)
+            .toList();
+
+        if (slackEmails.isNotEmpty) {
+          final photoMap = await _memberRepo.getMemberPhotosByEmails(slackEmails);
+          if (photoMap.isNotEmpty) {
+            final enrichedSlackMembers = metrics.top50SlackMembers.map((member) {
+              if (member.email == null || member.email!.isEmpty) return member;
+              final photoUrl = photoMap[member.email!.toLowerCase()];
+              if (photoUrl != null) {
+                return member.copyWith(profilePhotoUrl: photoUrl);
+              }
+              return member;
+            }).toList();
+
+            // Create new metrics with enriched slack members
+            metrics = DashboardMetrics(
+              totalMembers: metrics.totalMembers,
+              totalMembersWithPhone: metrics.totalMembersWithPhone,
+              totalSubscribers: metrics.totalSubscribers,
+              totalDonors: metrics.totalDonors,
+              totalChapters: metrics.totalChapters,
+              totalCharteredChapters: metrics.totalCharteredChapters,
+              totalCollegeChapters: metrics.totalCollegeChapters,
+              totalHighschoolChapters: metrics.totalHighschoolChapters,
+              totalCountyChapters: metrics.totalCountyChapters,
+              totalUniqueColleges: metrics.totalUniqueColleges,
+              totalUniqueHighSchools: metrics.totalUniqueHighSchools,
+              totalUniqueCounties: metrics.totalUniqueCounties,
+              totalUniqueCongressionalDistricts: metrics.totalUniqueCongressionalDistricts,
+              totalUniqueHouseDistricts: metrics.totalUniqueHouseDistricts,
+              totalUniqueSenateDistricts: metrics.totalUniqueSenateDistricts,
+              totalDonationsAmount: metrics.totalDonationsAmount,
+              totalDonationCount: metrics.totalDonationCount,
+              averageDonationAmount: metrics.averageDonationAmount,
+              totalRecurringDonors: metrics.totalRecurringDonors,
+              donationsThisMonth: metrics.donationsThisMonth,
+              donationsThisYear: metrics.donationsThisYear,
+              top5Donors: metrics.top5Donors,
+              totalSlackMessages: metrics.totalSlackMessages,
+              slackMessagesThisMonth: metrics.slackMessagesThisMonth,
+              totalSocialImpressions: metrics.totalSocialImpressions,
+              top50SlackMembers: enrichedSlackMembers,
+              age14To17Count: metrics.age14To17Count,
+              age18To21Count: metrics.age18To21Count,
+              age22To25Count: metrics.age22To25Count,
+              age26To30Count: metrics.age26To30Count,
+              age31To36Count: metrics.age31To36Count,
+              ageUnknownCount: metrics.ageUnknownCount,
+              averageMemberAge: metrics.averageMemberAge,
+              newMembersThisWeek: metrics.newMembersThisWeek,
+              newMembersThisMonth: metrics.newMembersThisMonth,
+              newMembersThisYear: metrics.newMembersThisYear,
+              newSubscribersThisMonth: metrics.newSubscribersThisMonth,
+              membersJoinedByMonth: metrics.membersJoinedByMonth,
+              totalCampaigns: metrics.totalCampaigns,
+              campaignsSent: metrics.campaignsSent,
+              totalEmailsSent: metrics.totalEmailsSent,
+              totalEmailsOpened: metrics.totalEmailsOpened,
+              totalEmailsClicked: metrics.totalEmailsClicked,
+              averageOpenRate: metrics.averageOpenRate,
+              averageClickRate: metrics.averageClickRate,
+              totalEvents: metrics.totalEvents,
+              upcomingEvents: metrics.upcomingEvents,
+              totalEventAttendees: metrics.totalEventAttendees,
+              membersByCounty: metrics.membersByCounty,
+              membersByCongressionalDistrict: metrics.membersByCongressionalDistrict,
+              membersByHouseDistrict: metrics.membersByHouseDistrict,
+              membersBySenateDistrict: metrics.membersBySenateDistrict,
+              membersByCommunityType: metrics.membersByCommunityType,
+              membersByAge: metrics.membersByAge,
+              membersByCollege: metrics.membersByCollege,
+              membersByHighSchool: metrics.membersByHighSchool,
+              membersByGraduationYear: metrics.membersByGraduationYear,
+              membersByEducationLevel: metrics.membersByEducationLevel,
+              membersByInSchoolStatus: metrics.membersByInSchoolStatus,
+              membersByChapter: metrics.membersByChapter,
+              membersByChapterStatus: metrics.membersByChapterStatus,
+              membersByChapterPosition: metrics.membersByChapterPosition,
+              membersByCommittee: metrics.membersByCommittee,
+              membersByGenderIdentity: metrics.membersByGenderIdentity,
+              membersByRace: metrics.membersByRace,
+            );
+          }
+        }
+      }
 
       if (!mounted) return;
 
@@ -678,6 +793,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _totalMessages = totalMessages;
         _weeklyMessages = weeklyMessages;
         _recentMembers = recentMembers;
+        _quickLinksCount = quickLinksCount;
         _loading = false;
       });
     } catch (e) {
@@ -796,6 +912,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       case DashboardWidgetType.heatmap:
       case DashboardWidgetType.dynamicDistribution:
         return DashboardWidgetSize.hero;
+      case DashboardWidgetType.quickLinksButton:
+        return DashboardWidgetSize.small;
     }
   }
 
@@ -817,6 +935,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ),
       ),
     );
+  }
+
+  void _openQuickLinksPage(BuildContext context) {
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (_) => const QuickLinksScreen(),
+      ),
+    ).then((_) {
+      // Refresh quick links count when returning from the page
+      _quickLinksRepo.countQuickLinks().then((count) {
+        if (mounted) {
+          setState(() => _quickLinksCount = count);
+        }
+      });
+    });
   }
 
   void _openMemberDetail(BuildContext context, Member member) {
@@ -1015,14 +1148,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final horizontalPadding = isMobile ? 12.0 : (isTablet ? 20.0 : 32.0);
         final columns = isMobile ? 2 : (isTablet ? 3 : 4);
 
-        // Set the layout mode based on screen size (post-frame to avoid setState during build)
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _isMobileLayout != isMobile) {
-            setState(() {
-              _isMobileLayout = isMobile;
-            });
-          }
-        });
+        // Layout mode is now updated in didChangeDependencies to prevent
+        // callback accumulation that was causing RenderBox layout errors
 
         return CustomScrollView(
           physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
@@ -1373,6 +1500,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           config: config,
           metrics: metrics,
         );
+
+      case DashboardWidgetType.quickLinksButton:
+        return QuickLinksButtonWidget(
+          config: config,
+          linkCount: _quickLinksCount,
+          onTap: () => _openQuickLinksPage(context),
+        );
     }
   }
 
@@ -1495,14 +1629,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
 
-    // Set the layout mode based on screen size (post-frame to avoid setState during build)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _isMobileLayout != isMobile) {
-        setState(() {
-          _isMobileLayout = isMobile;
-        });
-      }
-    });
+    // Layout mode is now updated in didChangeDependencies to prevent
+    // callback accumulation that was causing RenderBox layout errors
 
     // Wrap entire edit mode in error boundary for detailed error capture
     return DashboardErrorBoundary(
@@ -3269,6 +3397,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       case DashboardWidgetType.trendCard:
       case DashboardWidgetType.sparkline:
       case DashboardWidgetType.heatmap:
+      case DashboardWidgetType.quickLinksButton:
         return false;
     }
   }
@@ -3293,6 +3422,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return 'Growth';
       case DashboardDataCategory.engagement:
         return 'Engagement';
+      case DashboardDataCategory.resources:
+        return 'Resources';
     }
   }
 
@@ -3322,6 +3453,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return 'Member List';
       case DashboardWidgetType.dynamicDistribution:
         return 'Distribution Explorer';
+      case DashboardWidgetType.quickLinksButton:
+        return 'Quick Links';
     }
   }
 
@@ -3351,6 +3484,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return Icons.people;
       case DashboardWidgetType.dynamicDistribution:
         return Icons.analytics;
+      case DashboardWidgetType.quickLinksButton:
+        return Icons.link;
     }
   }
 
