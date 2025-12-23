@@ -116,20 +116,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Update mobile layout flag when screen size changes
-    // This replaces the problematic addPostFrameCallback calls that were
-    // causing RenderBox layout errors due to callback accumulation
+    // We update directly here since didChangeDependencies is called after
+    // the widget tree is in a valid state. No addPostFrameCallback needed
+    // as that was causing RenderBox layout errors from callback accumulation.
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
-    if (_isMobileLayout != isMobile) {
-      // Use post-frame callback only on actual changes to avoid setState during build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _isMobileLayout != isMobile) {
-          setState(() {
-            _isMobileLayout = isMobile;
-          });
-        }
-      });
-    }
+    // Only update if the value actually changed - this won't trigger rebuild
+    // during the same frame since we're just updating the field
+    _isMobileLayout = isMobile;
   }
 
   @override
@@ -2570,20 +2564,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         } else if (data is _WidgetReorderData) {
           _reorderWidgetToIndex(data.fromIndex, insertIndex);
         }
-        setState(() => _dragHoverIndex = null);
+        // Note: Removed setState(() => _dragHoverIndex = null) as we no longer track hover via state
       },
-      onMove: (details) {
-        if (_dragHoverIndex != insertIndex) {
-          setState(() => _dragHoverIndex = insertIndex);
-        }
-      },
-      onLeave: (data) {
-        if (_dragHoverIndex == insertIndex) {
-          setState(() => _dragHoverIndex = null);
-        }
-      },
+      // Removed onMove/onLeave setState calls that were causing RenderBox layout errors
+      // The DragTarget's candidateData already tracks hover state without needing _dragHoverIndex
       builder: (context, candidateData, rejectedData) {
-        final isHovering = candidateData.isNotEmpty || _dragHoverIndex == insertIndex;
+        // Use candidateData.isNotEmpty directly - no need for _dragHoverIndex
+        final isHovering = candidateData.isNotEmpty;
         final isPaletteItem = candidateData.any((d) => d is _PaletteDragData);
         final isReorder = candidateData.any((d) => d is _WidgetReorderData);
 
