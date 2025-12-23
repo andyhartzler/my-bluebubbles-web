@@ -111,6 +111,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Update mobile layout flag when screen size changes
+    // This replaces the problematic addPostFrameCallback calls that were
+    // causing RenderBox layout errors due to callback accumulation
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+    if (_isMobileLayout != isMobile) {
+      // Use post-frame callback only on actual changes to avoid setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _isMobileLayout != isMobile) {
+          setState(() {
+            _isMobileLayout = isMobile;
+          });
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _flipController.dispose();
     super.dispose();
@@ -1015,14 +1035,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final horizontalPadding = isMobile ? 12.0 : (isTablet ? 20.0 : 32.0);
         final columns = isMobile ? 2 : (isTablet ? 3 : 4);
 
-        // Set the layout mode based on screen size (post-frame to avoid setState during build)
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _isMobileLayout != isMobile) {
-            setState(() {
-              _isMobileLayout = isMobile;
-            });
-          }
-        });
+        // Layout mode is now updated in didChangeDependencies to prevent
+        // callback accumulation that was causing RenderBox layout errors
 
         return CustomScrollView(
           physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
@@ -1495,14 +1509,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
 
-    // Set the layout mode based on screen size (post-frame to avoid setState during build)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _isMobileLayout != isMobile) {
-        setState(() {
-          _isMobileLayout = isMobile;
-        });
-      }
-    });
+    // Layout mode is now updated in didChangeDependencies to prevent
+    // callback accumulation that was causing RenderBox layout errors
 
     // Wrap entire edit mode in error boundary for detailed error capture
     return DashboardErrorBoundary(
