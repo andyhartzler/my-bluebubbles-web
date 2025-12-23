@@ -179,7 +179,8 @@ class QuickLinksRepository {
     Map<String, dynamic>? upload;
 
     if (removeExistingFile || file != null) {
-      if (link.hasStorageReference) {
+      // Only remove from storage if we have a storagePath (not just storageUrl)
+      if ((link.storagePath ?? '').isNotEmpty) {
         await removeStorageReference(
           link.storageBucket ?? storageBucket,
           link.storagePath!,
@@ -210,7 +211,8 @@ class QuickLinksRepository {
 
   Future<void> deleteQuickLink(QuickLink link) async {
     if (!isReady || link.id.isEmpty) return;
-    if (link.hasStorageReference) {
+    // Only remove from storage if we have a storagePath (not just storageUrl)
+    if ((link.storagePath ?? '').isNotEmpty) {
       await removeStorageReference(
         link.storageBucket ?? storageBucket,
         link.storagePath!,
@@ -344,6 +346,12 @@ class QuickLinksRepository {
     bool force = false,
   }) async {
     if (!link.hasStorageReference) {
+      return link;
+    }
+
+    // If we only have storageUrl (public URL) but no storagePath,
+    // we can't generate a signed URL - just return the link as-is
+    if ((link.storagePath ?? '').isEmpty) {
       return link;
     }
 
