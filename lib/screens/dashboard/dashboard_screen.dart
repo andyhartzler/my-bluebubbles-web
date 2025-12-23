@@ -1286,7 +1286,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   /// Build a horizontally swipeable row of widgets
   Widget _buildSwipeableRow(List<DashboardWidgetConfig> widgets, DashboardMetrics metrics,
-      double widgetWidth, double widgetHeight) {
+      double baseWidgetWidth, double baseWidgetHeight) {
+    // Determine row height based on the largest widget in the row
+    double rowHeight = baseWidgetHeight;
+    for (final widget in widgets) {
+      final isLarge = widget.size == DashboardWidgetSize.large ||
+          widget.size == DashboardWidgetSize.hero ||
+          widget.size == DashboardWidgetSize.mobileFull;
+      if (isLarge) {
+        // Use a taller height for rows containing large widgets
+        rowHeight = baseWidgetHeight * 1.8;
+        break;
+      } else if (widget.size == DashboardWidgetSize.medium) {
+        // Medium widgets get slightly more height
+        rowHeight = math.max(rowHeight, baseWidgetHeight * 1.3);
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1308,7 +1324,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: widgetHeight,
+          height: rowHeight,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1317,9 +1333,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final widget = widgets[index];
+              // Calculate width based on widget size
+              double itemWidth = baseWidgetWidth;
+              if (widget.size == DashboardWidgetSize.large ||
+                  widget.size == DashboardWidgetSize.hero ||
+                  widget.size == DashboardWidgetSize.mobileFull) {
+                itemWidth = baseWidgetWidth * 1.8; // Larger width for large widgets
+              } else if (widget.size == DashboardWidgetSize.medium) {
+                itemWidth = baseWidgetWidth * 1.3; // Slightly larger for medium
+              }
               return SizedBox(
-                width: widgetWidth,
-                height: widgetHeight,
+                width: itemWidth,
+                height: rowHeight,
                 child: _buildWidget(widget, metrics),
               );
             },
@@ -3243,17 +3268,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return rowWidgets.first.size;
   }
 
-  /// Add a widget to an existing swipe row (with size matching)
+  /// Add a widget to an existing swipe row (preserving its size)
   void _addWidgetToSwipeRow(DashboardWidgetConfig config, String rowId) {
     if (!mounted) return;
 
-    // Get the size of widgets in the target row
-    final targetSize = _getSwipeRowSize(rowId);
-
+    // Preserve the widget's original size - the swipe row will adapt to show
+    // widgets of different sizes (small, medium, large all supported)
     setState(() {
       final updatedWidget = config.copyWith(
         swipeRowId: rowId,
-        size: targetSize, // Match the size of other widgets in the row
+        // Don't change size - keep widget's original size
       );
       final widgetsList = _mobileConfig.widgets.map((w) =>
         w.id == config.id ? updatedWidget : w
