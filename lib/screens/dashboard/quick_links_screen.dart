@@ -358,12 +358,15 @@ class _QuickLinksScreenState extends State<QuickLinksScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: (value) => setState(() => _searchQuery = value),
+              style: const TextStyle(color: _unityBlue), // Dark text on white background
+              cursorColor: _momentumBlue,
               decoration: InputDecoration(
                 hintText: 'Search resources...',
+                hintStyle: TextStyle(color: _unityBlue.withOpacity(0.5)),
                 prefixIcon: const Icon(Icons.search, color: _momentumBlue),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: Icon(Icons.clear, color: _unityBlue.withOpacity(0.5)),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
