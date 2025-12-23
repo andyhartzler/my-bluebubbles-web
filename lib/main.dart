@@ -770,6 +770,12 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     }
     _lastPWARefresh = now;
 
+    // Check if a text input is currently focused - if so, skip the refresh
+    // to prevent focus loss during typing (fixes app-wide text input focus bug)
+    if (_isTextInputFocused()) {
+      return;
+    }
+
     // Force immediate rebuild
     if (mounted) {
       setState(() {});
@@ -784,16 +790,16 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     // Schedule a delayed rebuild to catch any race conditions
     // iOS PWA sometimes needs a moment to fully restore touch handling
     Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
+      if (mounted && !_isTextInputFocused()) {
         setState(() {});
       }
     });
 
     // Additional delayed rebuild for more stubborn cases
     Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
+      if (mounted && !_isTextInputFocused()) {
         setState(() {});
-        // Unfocus any active elements to reset keyboard state
+        // Only unfocus if no text input is focused
         FocusManager.instance.primaryFocus?.unfocus();
       }
     });
@@ -802,7 +808,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     // iOS Safari PWA can take up to 500ms+ to fully restore touch handling
     if (aggressive) {
       Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
+        if (mounted && !_isTextInputFocused()) {
           setState(() {});
           // Dispatch another resize to force layout recalculation
           if (kIsWeb) {
@@ -812,20 +818,49 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       });
 
       Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) {
+        if (mounted && !_isTextInputFocused()) {
           setState(() {});
-          // Clear any lingering focus
+          // Only clear focus if no text input is active
           FocusManager.instance.primaryFocus?.unfocus();
         }
       });
 
       // Final rebuild at 1 second for the most stubborn cases
       Future.delayed(const Duration(milliseconds: 1000), () {
-        if (mounted) {
+        if (mounted && !_isTextInputFocused()) {
           setState(() {});
         }
       });
     }
+  }
+
+  /// Check if a text input (TextField, TextFormField, EditableText) is currently focused
+  /// Returns true if user is actively typing in a text field
+  bool _isTextInputFocused() {
+    final focusNode = FocusManager.instance.primaryFocus;
+    if (focusNode == null) return false;
+
+    // Check the context of the focused node for text input widgets
+    final context = focusNode.context;
+    if (context == null) return false;
+
+    // Walk up the widget tree to find if we're inside a text input
+    bool isTextInput = false;
+    context.visitAncestorElements((element) {
+      final widget = element.widget;
+      // Check for common text input widgets
+      if (widget.runtimeType.toString().contains('TextField') ||
+          widget.runtimeType.toString().contains('TextFormField') ||
+          widget.runtimeType.toString().contains('EditableText') ||
+          widget.runtimeType.toString().contains('CupertinoTextField') ||
+          widget.runtimeType.toString().contains('SearchBar')) {
+        isTextInput = true;
+        return false; // Stop visiting
+      }
+      return true; // Continue visiting
+    });
+
+    return isTextInput;
   }
 
   /// Handle app lifecycle changes - force rebuild when resuming from background

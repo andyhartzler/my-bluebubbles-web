@@ -2222,6 +2222,7 @@ class MemberListWidget extends StatelessWidget {
 }
 
 /// Quick Links Button Widget - navigates to the Quick Links page
+/// Styled to match StatCardWidget with gradient background
 class QuickLinksButtonWidget extends StatelessWidget {
   final DashboardWidgetConfig config;
   final VoidCallback? onTap;
@@ -2236,137 +2237,158 @@ class QuickLinksButtonWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
+    final colors = config.gradientColors.isNotEmpty
+        ? config.gradientColors
+        : WidgetGradients.all[0];
+
+    final isMini = config.size == DashboardWidgetSize.mini;
 
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isMini ? 12 : 16)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
-          child: Stack(
+          padding: EdgeInsets.all(isMini ? 12 : 20),
+          child: isMini ? _buildMiniLayout() : _buildStandardLayout(),
+        ),
+      ),
+    );
+  }
+
+  /// Compact horizontal layout for mini size
+  Widget _buildMiniLayout() {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            config.icon ?? Icons.link,
+            color: Colors.white,
+            size: 18,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Background gradient accent
-              Positioned(
-                right: -30,
-                bottom: -30,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: config.gradientColors.isNotEmpty
-                          ? config.gradientColors
-                          : [_momentumBlue, _unityBlue],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
+              Text(
+                config.title,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
                 ),
-              ),
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header row
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: config.gradientColors.isNotEmpty
-                                  ? config.gradientColors
-                                  : [_momentumBlue, _unityBlue],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            config.icon ?? Icons.link,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                config.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                  color: _unityBlue,
-                                ),
-                              ),
-                              if (config.subtitle != null && config.subtitle!.isNotEmpty)
-                                Text(
-                                  config.subtitle!,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: _unityBlue.withOpacity(0.6),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    // Bottom section with count and action
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        if (linkCount > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: _momentumBlue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '$linkCount resources',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: _momentumBlue,
-                              ),
-                            ),
-                          )
-                        else
-                          const SizedBox(),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: _unityBlue.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.arrow_forward,
-                            color: _unityBlue,
-                            size: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
-      ),
+        if (linkCount > 0)
+          Text(
+            '$linkCount',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          )
+        else
+          const Icon(
+            Icons.arrow_forward,
+            color: Colors.white,
+            size: 20,
+          ),
+      ],
+    );
+  }
+
+  /// Standard vertical layout for small and larger sizes
+  Widget _buildStandardLayout() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                config.icon ?? Icons.link,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_forward,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ],
+        ),
+        const Spacer(),
+        if (linkCount > 0)
+          Text(
+            '$linkCount',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              height: 1.1,
+            ),
+          ),
+        const SizedBox(height: 4),
+        Text(
+          config.title,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.9),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        if (config.subtitle != null)
+          Text(
+            config.subtitle!,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 12,
+            ),
+          )
+        else if (linkCount > 0)
+          Text(
+            'resources available',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 12,
+            ),
+          ),
+      ],
     );
   }
 }

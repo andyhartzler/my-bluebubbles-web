@@ -599,7 +599,7 @@ class _QuickLinksScreenState extends State<QuickLinksScreen> {
 
   Widget _buildSocialMediaCard(QuickLink link) {
     return Material(
-      color: Colors.white,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       elevation: 2,
       child: InkWell(
@@ -608,7 +608,15 @@ class _QuickLinksScreenState extends State<QuickLinksScreen> {
         onLongPress: () => _editLink(link),
         child: Tooltip(
           message: link.title,
-          child: Padding(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_unityBlue, _momentumBlue],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
             padding: const EdgeInsets.all(8),
             child: link.iconUrl != null && link.iconUrl!.isNotEmpty
                 ? ClipRRect(
@@ -629,7 +637,7 @@ class _QuickLinksScreenState extends State<QuickLinksScreen> {
   Widget _buildIconPlaceholder(QuickLink link) {
     return Container(
       decoration: BoxDecoration(
-        color: _momentumBlue.withOpacity(0.1),
+        color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Center(
@@ -638,7 +646,7 @@ class _QuickLinksScreenState extends State<QuickLinksScreen> {
           style: const TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: _momentumBlue,
+            color: Colors.white,
           ),
         ),
       ),
@@ -665,16 +673,30 @@ class _QuickLinksScreenState extends State<QuickLinksScreen> {
   Widget _buildLinkCard(QuickLink link) {
     final hasFile = link.hasStorageReference;
     final hasExternalUrl = link.hasExternalUrl;
+    final isGoverningDoc = link.normalizedCategory == 'governing_documents';
+    final isWebsite = link.normalizedCategory == 'websites' || link.normalizedCategory == 'website';
+    final needsGradientBg = isWebsite;
 
     return Material(
-      color: Colors.white,
+      color: needsGradientBg ? Colors.transparent : Colors.white,
       borderRadius: BorderRadius.circular(12),
       elevation: 2,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => _openLink(link),
+        onTap: isGoverningDoc && hasFile && hasExternalUrl ? null : () => _openLink(link),
         onLongPress: () => _editLink(link),
-        child: Padding(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: needsGradientBg
+                ? const LinearGradient(
+                    colors: [_unityBlue, _momentumBlue],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: needsGradientBg ? null : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
@@ -683,7 +705,9 @@ class _QuickLinksScreenState extends State<QuickLinksScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: _getCategoryColor(link.normalizedCategory).withOpacity(0.1),
+                  color: needsGradientBg
+                      ? Colors.white.withOpacity(0.2)
+                      : _getCategoryColor(link.normalizedCategory).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: link.iconUrl != null && link.iconUrl!.isNotEmpty
@@ -694,14 +718,14 @@ class _QuickLinksScreenState extends State<QuickLinksScreen> {
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Icon(
                             _getLinkIcon(link),
-                            color: _getCategoryColor(link.normalizedCategory),
+                            color: needsGradientBg ? Colors.white : _getCategoryColor(link.normalizedCategory),
                             size: 24,
                           ),
                         ),
                       )
                     : Icon(
                         _getLinkIcon(link),
-                        color: _getCategoryColor(link.normalizedCategory),
+                        color: needsGradientBg ? Colors.white : _getCategoryColor(link.normalizedCategory),
                         size: 24,
                       ),
               ),
@@ -714,10 +738,10 @@ class _QuickLinksScreenState extends State<QuickLinksScreen> {
                   children: [
                     Text(
                       link.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: _unityBlue,
+                        color: needsGradientBg ? Colors.white : _unityBlue,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -727,63 +751,167 @@ class _QuickLinksScreenState extends State<QuickLinksScreen> {
                         link.description!,
                         style: TextStyle(
                           fontSize: 12,
-                          color: _unityBlue.withOpacity(0.6),
+                          color: needsGradientBg ? Colors.white70 : _unityBlue.withOpacity(0.6),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        if (hasFile) ...[
-                          Icon(Icons.attach_file, size: 14, color: _grassrootsGreen),
-                          const SizedBox(width: 4),
-                          Text(
-                            'File',
-                            style: TextStyle(fontSize: 11, color: _grassrootsGreen),
+                    // For governing documents with both file and URL, show action buttons
+                    if (isGoverningDoc && hasFile && hasExternalUrl)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          _buildMiniActionButton(
+                            icon: Icons.description,
+                            label: 'View Google Doc',
+                            color: _momentumBlue,
+                            onTap: () => _openExternalUrl(link.externalUrl!),
                           ),
-                          const SizedBox(width: 8),
-                        ],
-                        if (hasExternalUrl) ...[
-                          Icon(Icons.open_in_new, size: 14, color: _momentumBlue),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Link',
-                            style: TextStyle(fontSize: 11, color: _momentumBlue),
+                          _buildMiniActionButton(
+                            icon: Icons.picture_as_pdf,
+                            label: 'View PDF',
+                            color: _actionRed,
+                            onTap: () => _openStorageFile(link),
                           ),
                         ],
-                      ],
-                    ),
+                      )
+                    else
+                      Row(
+                        children: [
+                          if (hasFile) ...[
+                            Icon(Icons.attach_file, size: 14, color: needsGradientBg ? Colors.white70 : _grassrootsGreen),
+                            const SizedBox(width: 4),
+                            Text(
+                              'File',
+                              style: TextStyle(fontSize: 11, color: needsGradientBg ? Colors.white70 : _grassrootsGreen),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (hasExternalUrl) ...[
+                            Icon(Icons.open_in_new, size: 14, color: needsGradientBg ? Colors.white70 : _momentumBlue),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Link',
+                              style: TextStyle(fontSize: 11, color: needsGradientBg ? Colors.white70 : _momentumBlue),
+                            ),
+                          ],
+                        ],
+                      ),
                   ],
                 ),
               ),
-              // Action buttons
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 20),
-                    color: _unityBlue.withOpacity(0.5),
-                    onPressed: () => _copyLink(link),
-                    tooltip: 'Copy link',
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                    padding: EdgeInsets.zero,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 20),
-                    color: _unityBlue.withOpacity(0.5),
-                    onPressed: () => _editLink(link),
-                    tooltip: 'Edit',
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                    padding: EdgeInsets.zero,
-                  ),
-                ],
-              ),
+              // Action buttons (only show if not showing dual buttons for governing docs)
+              if (!(isGoverningDoc && hasFile && hasExternalUrl))
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.copy, size: 20),
+                      color: needsGradientBg ? Colors.white70 : _unityBlue.withOpacity(0.5),
+                      onPressed: () => _copyLink(link),
+                      tooltip: 'Copy link',
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: EdgeInsets.zero,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 20),
+                      color: needsGradientBg ? Colors.white70 : _unityBlue.withOpacity(0.5),
+                      onPressed: () => _editLink(link),
+                      tooltip: 'Edit',
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
+                )
+              else
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  color: _unityBlue.withOpacity(0.5),
+                  onPressed: () => _editLink(link),
+                  tooltip: 'Edit',
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  padding: EdgeInsets.zero,
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildMiniActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openExternalUrl(String url) async {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) {
+      _showMessage('No URL available.');
+      return;
+    }
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || (!uri.hasScheme && !uri.isScheme('file'))) {
+      final resolved = Uri.tryParse('https://$trimmed');
+      if (resolved == null) {
+        _showMessage('Unable to open link: $trimmed');
+        return;
+      }
+      await launchUrl(resolved, mode: LaunchMode.externalApplication);
+      return;
+    }
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openStorageFile(QuickLink link) async {
+    // Get the storage URL for the PDF
+    final storageUrl = link.storageUrl;
+    if (storageUrl == null || storageUrl.isEmpty) {
+      _showMessage('No PDF file available.');
+      return;
+    }
+
+    final uri = Uri.tryParse(storageUrl);
+    if (uri == null) {
+      _showMessage('Unable to open PDF.');
+      return;
+    }
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Color _getCategoryColor(String category) {
