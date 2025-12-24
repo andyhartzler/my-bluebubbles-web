@@ -290,7 +290,10 @@ class SubscriberRepository {
     if (emails.isEmpty) return subscribers;
 
     try {
-      final response = await _readClient
+      // Use the standard Supabase client (not service role) to avoid web auth issues
+      // This query works with authenticated RLS policies
+      final client = _supabase.isInitialized ? _supabase.client : _readClient;
+      final response = await client
           .from('event_attendees')
           .select('email')
           .inFilter('email', emails);
