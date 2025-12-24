@@ -422,25 +422,35 @@ class MemberRepository {
 
       final response = await client
           .from('members')
-          .select('email, profile_photos')
+          .select('email, profile_pictures')
           .inFilter('email', validEmails);
 
-      debugPrint('[MemberRepository] Got ${(response as List).length} members with photos');
+      debugPrint('[MemberRepository] Got ${(response as List).length} members with profile_pictures data');
 
       final Map<String, String> result = {};
       for (final row in response as List<dynamic>) {
         final email = row['email']?.toString().toLowerCase();
         if (email == null || email.isEmpty) continue;
 
-        final profilePhotos = row['profile_photos'];
-        if (profilePhotos == null) continue;
+        final profilePictures = row['profile_pictures'];
+        if (profilePictures == null) continue;
 
-        // Parse the profile photos to get the primary photo URL
-        final photos = MemberProfilePhoto.parseList(profilePhotos);
-        final primaryPhoto = photos.firstWhereOrNull((p) => p.isPrimary) ?? photos.firstOrNull;
-        if (primaryPhoto?.publicUrl != null) {
-          result[email] = primaryPhoto!.publicUrl!;
-          debugPrint('[MemberRepository] Found photo for $email');
+        debugPrint('[MemberRepository] Raw profile_pictures for $email: $profilePictures');
+
+        // Parse the profile pictures to get the primary photo URL
+        final photos = MemberProfilePhoto.parseList(profilePictures);
+        debugPrint('[MemberRepository] Parsed ${photos.length} photos for $email');
+
+        if (photos.isEmpty) continue;
+
+        // Try to find primary photo, otherwise use first one
+        final primaryPhoto = photos.firstWhereOrNull((p) => p.isPrimary) ?? photos.first;
+        final url = primaryPhoto.publicUrl;
+        debugPrint('[MemberRepository] Photo URL for $email: $url');
+
+        if (url != null && url.isNotEmpty) {
+          result[email] = url;
+          debugPrint('[MemberRepository] ✓ Added photo for $email');
         }
       }
 
