@@ -366,31 +366,6 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Email Campaigns'),
-        backgroundColor: const Color(0xFF273351),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          if (!_isInitializing)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _refresh,
-              tooltip: 'Refresh',
-            ),
-          if (!_isInitializing)
-            IconButton(
-              icon: const Icon(Icons.open_in_new),
-              onPressed: () {
-                if (kIsWeb) {
-                  // Use dart:html for web
-                  _openInNewTab();
-                }
-              },
-              tooltip: 'Open in new tab',
-            ),
-        ],
-      ),
       body: _buildBody(),
     );
   }
