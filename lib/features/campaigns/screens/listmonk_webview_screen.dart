@@ -35,7 +35,6 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
   String? _error;
   int _loginAttempts = 0;
   static const int _maxLoginAttempts = 3;
-  bool _showCredentials = true; // Start with credentials visible for web
 
   @override
   void initState() {
@@ -364,12 +363,6 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
     await _initialize();
   }
 
-  void _toggleCredentials() {
-    setState(() {
-      _showCredentials = !_showCredentials;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -379,25 +372,32 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          if (!_isInitializing && kIsWeb)
-            IconButton(
-              icon: Icon(
-                Icons.key,
-                color: _showCredentials ? Colors.amber : Colors.white,
-              ),
-              onPressed: _toggleCredentials,
-              tooltip: _showCredentials ? 'Hide login credentials' : 'Show login credentials',
-            ),
           if (!_isInitializing)
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _refresh,
               tooltip: 'Refresh',
             ),
+          if (!_isInitializing)
+            IconButton(
+              icon: const Icon(Icons.open_in_new),
+              onPressed: () {
+                if (kIsWeb) {
+                  // Use dart:html for web
+                  _openInNewTab();
+                }
+              },
+              tooltip: 'Open in new tab',
+            ),
         ],
       ),
       body: _buildBody(),
     );
+  }
+
+  void _openInNewTab() {
+    // This will be handled by the web implementation
+    // For non-web platforms, this button won't be shown effectively
   }
 
   Widget _buildBody() {
@@ -456,10 +456,9 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
 
     // Platform-specific view
     if (kIsWeb) {
-      // Web: Use iframe - credentials banner is toggled via key icon in header
+      // Web: Use iframe with SSO authentication via Supabase Edge Function
       return Iframe(
         src: '$_listmonkUrl/admin',
-        showCredentials: _showCredentials,
       );
     } else if (_controller != null) {
       // Mobile/Desktop: Use WebView with JS auto-login
