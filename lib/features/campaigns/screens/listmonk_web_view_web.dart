@@ -37,6 +37,7 @@ class _IframeState extends State<Iframe> {
   String _statusMessage = 'Initializing...';
   String? _errorMessage;
   String? _authUrl;
+  String? _listmonkUsername;
   String? _listmonkPassword;
   int _retryCount = 0;
   static const int _maxRetries = 3;
@@ -76,12 +77,17 @@ class _IframeState extends State<Iframe> {
             // Try accessing properties directly
             try {
               final type = (jsData as dynamic).type;
-              final source = (jsData as dynamic).source;
               if (type != null) {
                 data = {
                   'type': type.toString(),
-                  'source': source?.toString(),
                 };
+                // Try to get additional fields if present
+                try {
+                  final success = (jsData as dynamic).success;
+                  final reason = (jsData as dynamic).reason;
+                  if (success != null) data['success'] = success;
+                  if (reason != null) data['reason'] = reason.toString();
+                } catch (_) {}
               }
             } catch (_) {
               return;
@@ -92,35 +98,39 @@ class _IframeState extends State<Iframe> {
         if (data == null) return;
 
         final type = data['type'] as String?;
-        final source = data['source'] as String?;
 
-        // Only handle messages from Listmonk
-        if (source != 'listmonk') return;
-
-        debugPrint('📧 Listmonk: Received message type: $type');
+        debugPrint('📧 Listmonk message received: $type');
 
         switch (type) {
-          case 'listmonk-needs-login':
-            debugPrint('📧 Listmonk: Login requested, sending credentials...');
+          case 'MOYD_LOGIN_PAGE_READY':
+            // Listmonk login page is ready and waiting for credentials
+            debugPrint('📧 Listmonk login page ready, sending credentials...');
             _sendCredentialsToListmonk();
             break;
 
-          case 'listmonk-authenticated':
-            debugPrint('📧 Listmonk: Authentication successful!');
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-                _errorMessage = null;
-              });
-            }
-            break;
+          case 'MOYD_LOGIN_RESULT':
+            // Login attempt completed
+            final success = data['success'] as bool? ?? false;
+            final reason = data['reason'] as String?;
 
-          case 'listmonk-login-failed':
-            debugPrint('📧 Listmonk: Login failed');
-            if (mounted) {
-              setState(() {
-                _errorMessage = 'Login failed. Please try again.';
-              });
+            if (success) {
+              debugPrint('📧 Listmonk login successful!');
+              // Don't hide loading yet - page will redirect to dashboard
+            } else if (reason == 'already_logged_in') {
+              debugPrint('📧 Already logged in to Listmonk');
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _errorMessage = null;
+                });
+              }
+            } else {
+              debugPrint('📧 Listmonk login failed: $reason');
+              if (mounted) {
+                setState(() {
+                  _errorMessage = 'Login failed: ${reason ?? 'Unknown error'}';
+                });
+              }
             }
             break;
         }
@@ -146,27 +156,32 @@ class _IframeState extends State<Iframe> {
 
     if (_listmonkPassword == null || _listmonkPassword!.isEmpty) {
       debugPrint('📧 Listmonk: Error - Password not available');
-      // Try to get password again
+      // Try to get credentials again
       _getAuthToken().then((result) {
-        if (result != null && result['password'] != null) {
-          _listmonkPassword = result['password'] as String?;
-          _sendCredentialsToListmonk();
+        if (result != null) {
+          final credentials = result['credentials'] as Map<String, dynamic>?;
+          if (credentials != null) {
+            _listmonkUsername = credentials['username'] as String?;
+            _listmonkPassword = credentials['password'] as String?;
+            _sendCredentialsToListmonk();
+          }
         }
       });
       return;
     }
 
-    debugPrint('📧 Listmonk: Sending credentials via postMessage...');
+    debugPrint('📧 Sending credentials to Listmonk...');
 
     try {
+      // Message type MUST be 'MOYD_LOGIN_CREDENTIALS' to match Listmonk's handler
       _iframe!.contentWindow!.postMessage({
-        'type': 'listmonk-credentials',
-        'username': 'admin',
+        'type': 'MOYD_LOGIN_CREDENTIALS',
+        'username': _listmonkUsername ?? 'admin',
         'password': _listmonkPassword,
       }, _listmonkBaseUrl);
 
       _credentialsSent = true;
-      debugPrint('📧 Listmonk: Credentials sent successfully');
+      debugPrint('📧 Credentials sent to iframe');
 
       if (mounted) {
         setState(() {
@@ -193,8 +208,13 @@ class _IframeState extends State<Iframe> {
       final authResult = await _getAuthToken();
 
       if (authResult != null) {
-        // Store password for postMessage flow
-        _listmonkPassword = authResult['password'] as String?;
+        // Get credentials from response (nested in 'credentials' object)
+        final credentials = authResult['credentials'] as Map<String, dynamic>?;
+        if (credentials != null) {
+          _listmonkUsername = credentials['username'] as String?;
+          _listmonkPassword = credentials['password'] as String?;
+          debugPrint('📧 Listmonk: Credentials received from Edge Function');
+        }
 
         final ssoUrl = authResult['listmonk_url'] as String?;
 
@@ -203,7 +223,7 @@ class _IframeState extends State<Iframe> {
           debugPrint('📧 Listmonk: SSO URL received');
           _registerIframe(_authUrl!);
         } else {
-          // No SSO URL but we have password - load admin and wait for postMessage
+          // No SSO URL but we have credentials - load admin and wait for postMessage
           debugPrint('📧 Listmonk: No SSO URL, using postMessage flow only');
           _registerIframe(_listmonkAdminUrl);
         }
@@ -268,7 +288,7 @@ class _IframeState extends State<Iframe> {
       if (data != null) {
         debugPrint('📧 Listmonk: Auth data received');
         debugPrint('📧 Listmonk: Has token: ${data['token'] != null}');
-        debugPrint('📧 Listmonk: Has password: ${data['password'] != null}');
+        debugPrint('📧 Listmonk: Has credentials: ${data['credentials'] != null}');
         debugPrint('📧 Listmonk: Has listmonk_url: ${data['listmonk_url'] != null}');
         return data;
       }
