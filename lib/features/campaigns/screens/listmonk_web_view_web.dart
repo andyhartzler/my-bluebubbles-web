@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Web-specific iframe widget for Listmonk
+/// Web-specific iframe widget for Listmonk with SSO authentication
 ///
-/// Modern browsers block embedded credentials in URLs (e.g., https://user:pass@host/)
-/// so this widget loads the plain URL and shows a credentials banner for manual login.
+/// This widget automatically authenticates users with Listmonk via a
+/// Supabase Edge Function that generates SSO tokens for logged-in CRM users.
 class Iframe extends StatefulWidget {
   final String src;
-  final bool showCredentials;
+  final bool showCredentials; // Kept for backward compatibility, but unused with SSO
 
   const Iframe({
     super.key,
@@ -21,64 +22,149 @@ class Iframe extends StatefulWidget {
 }
 
 class _IframeState extends State<Iframe> {
+  // Listmonk configuration
+  static const String _listmonkBaseUrl = 'https://mail.moyd.app';
+  static const String _listmonkAdminUrl = '$_listmonkBaseUrl/admin';
+
+  // State
   String? _iframeId;
+  html.IFrameElement? _iframe;
   bool _isLoading = true;
   bool _isRegistered = false;
-  String _statusMessage = 'Loading Listmonk...';
+  bool _isAuthenticating = false;
+  String _statusMessage = 'Initializing...';
   String? _errorMessage;
-  final String _username = 'admin';
-  final String _password = 'fucktrump67';
+  String? _authUrl;
+  int _retryCount = 0;
+  static const int _maxRetries = 3;
 
   @override
   void initState() {
     super.initState();
-    _registerIframe();
+    _initializeAuth();
   }
 
-  void _registerIframe() {
+  /// Initialize authentication flow
+  Future<void> _initializeAuth() async {
+    setState(() {
+      _isLoading = true;
+      _isAuthenticating = true;
+      _statusMessage = 'Authenticating with Listmonk...';
+      _errorMessage = null;
+    });
+
     try {
+      // Get SSO token from Supabase Edge Function
+      final authResult = await _getAuthToken();
+
+      if (authResult != null && authResult['listmonk_url'] != null) {
+        _authUrl = authResult['listmonk_url'];
+        debugPrint('📧 Listmonk: SSO URL received');
+        _registerIframe(_authUrl!);
+
+        setState(() {
+          _statusMessage = 'Loading email campaigns...';
+          _isAuthenticating = false;
+        });
+      } else {
+        // SSO failed - show error but still try to load
+        debugPrint('📧 Listmonk: No SSO token received, loading without auth');
+        _registerIframe(_listmonkAdminUrl);
+
+        setState(() {
+          _statusMessage = 'Loading...';
+          _errorMessage = 'Auto-login failed. You may need to log in manually.';
+          _isAuthenticating = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('📧 Listmonk: Auth error: $e');
+
+      // Load iframe anyway - user can log in manually
+      _registerIframe(_listmonkAdminUrl);
+
+      setState(() {
+        _statusMessage = 'Loading...';
+        _errorMessage = 'Auto-login unavailable. Please log in manually.';
+        _isAuthenticating = false;
+      });
+    }
+  }
+
+  /// Get SSO authentication token from Supabase Edge Function
+  Future<Map<String, dynamic>?> _getAuthToken() async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Check if user is authenticated
+      final session = supabase.auth.currentSession;
+      if (session == null) {
+        debugPrint('📧 Listmonk: No active CRM session');
+        return null;
+      }
+
+      debugPrint('📧 Listmonk: Requesting SSO token from Edge Function...');
+
+      // Call the Edge Function
+      final response = await supabase.functions.invoke(
+        'listmonk-auth',
+        body: {},
+      );
+
+      if (response.status != 200) {
+        debugPrint('📧 Listmonk: Edge function error: ${response.status}');
+        debugPrint('📧 Listmonk: Response: ${response.data}');
+        return null;
+      }
+
+      final data = response.data as Map<String, dynamic>?;
+
+      if (data != null && data['token'] != null) {
+        debugPrint('📧 Listmonk: SSO token received successfully');
+        return data;
+      }
+
+      debugPrint('📧 Listmonk: No token in response');
+      return null;
+    } catch (e) {
+      debugPrint('📧 Listmonk: Failed to get auth token: $e');
+      return null;
+    }
+  }
+
+  /// Register the iframe with the platform view registry
+  void _registerIframe(String url) {
+    try {
+      debugPrint('📧 Listmonk: Loading iframe with URL: $url');
+
       // Create unique iframe ID
       final iframeId = 'listmonk-iframe-${DateTime.now().millisecondsSinceEpoch}';
 
-      // Use the plain URL - embedded credentials are blocked by modern browsers
-      // Users will need to login manually using the credentials banner
-      debugPrint('📧 Listmonk: Loading without embedded credentials (blocked by browsers)');
-
-      final iframe = html.IFrameElement()
-        ..src = widget.src
+      _iframe = html.IFrameElement()
+        ..src = url
         ..style.border = 'none'
         ..style.width = '100%'
         ..style.height = '100%'
         ..allow = 'clipboard-read; clipboard-write'
         ..setAttribute('allowfullscreen', 'true')
-        ..setAttribute('loading', 'eager')
-        ..setAttribute('referrerpolicy', 'no-referrer');
+        ..setAttribute('loading', 'eager');
 
       // Handle iframe load event
-      iframe.onLoad.listen((_) {
-        debugPrint('📧 Listmonk: Iframe loaded');
-        if (mounted) {
-          setState(() {
-            _statusMessage = 'Logged in successfully';
-            _isLoading = false;
-          });
-        }
+      _iframe!.onLoad.listen((_) {
+        debugPrint('📧 Listmonk: Iframe loaded successfully');
+        _handleIframeLoaded();
       });
 
-      iframe.onError.listen((event) {
-        if (mounted) {
-          debugPrint('📧 Listmonk: Load error: $event');
-          setState(() {
-            _isLoading = false;
-            _errorMessage = 'Failed to load Email Campaigns';
-          });
-        }
+      // Handle iframe errors
+      _iframe!.onError.listen((event) {
+        debugPrint('📧 Listmonk: Iframe error: $event');
+        _handleIframeError();
       });
 
       // Register the view factory
       ui_web.platformViewRegistry.registerViewFactory(
         iframeId,
-        (int viewId) => iframe,
+        (int viewId) => _iframe!,
       );
 
       debugPrint('📧 Listmonk: Iframe registered');
@@ -100,10 +186,74 @@ class _IframeState extends State<Iframe> {
     }
   }
 
+  /// Handle successful iframe load
+  void _handleIframeLoaded() {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+      _statusMessage = '';
+    });
+
+    // Clear error after successful load (user might have logged in manually)
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && _errorMessage != null) {
+        setState(() {
+          _errorMessage = null;
+        });
+      }
+    });
+  }
+
+  /// Handle iframe load error
+  void _handleIframeError() {
+    if (!mounted) return;
+
+    if (_retryCount < _maxRetries) {
+      _retryCount++;
+      debugPrint('📧 Listmonk: Retrying... ($_retryCount/$_maxRetries)');
+
+      setState(() {
+        _statusMessage = 'Retrying... ($_retryCount/$_maxRetries)';
+      });
+
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          _refresh();
+        }
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load Listmonk. Please try again or open in new tab.';
+      });
+    }
+  }
+
+  /// Refresh the iframe and re-authenticate
+  void _refresh() {
+    setState(() {
+      _isLoading = true;
+      _isRegistered = false;
+      _iframeId = null;
+      _statusMessage = 'Refreshing...';
+      _errorMessage = null;
+      _retryCount = 0;
+    });
+
+    // Re-authenticate and reload
+    _initializeAuth();
+  }
+
+  /// Open Listmonk in a new tab
+  void _openInNewTab() {
+    html.window.open(_listmonkAdminUrl, '_blank');
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show error if registration failed
-    if (_errorMessage != null) {
+    if (_errorMessage != null && !_isLoading && !_isRegistered) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -117,19 +267,24 @@ class _IframeState extends State<Iframe> {
             Text(
               _errorMessage!,
               style: const TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _errorMessage = null;
-                  _isLoading = true;
-                  _statusMessage = 'Loading Listmonk...';
-                });
-                _registerIframe();
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _refresh,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _openInNewTab,
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Open in new tab'),
+                ),
+              ],
             ),
           ],
         ),
@@ -140,20 +295,32 @@ class _IframeState extends State<Iframe> {
     if (!_isRegistered || _iframeId == null) {
       return Container(
         color: Colors.white,
-        child: const Center(
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Initializing Email Campaigns...'),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 24),
+              Text(
+                _statusMessage,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (_isAuthenticating) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Connecting to email campaign manager...',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       );
     }
 
-    // Show iframe with loading overlay, credentials banner, and help button
+    // Show iframe with loading overlay and error banner
     return Stack(
       children: [
         // Iframe
@@ -181,107 +348,43 @@ class _IframeState extends State<Iframe> {
             ),
           ),
 
-        // Login credentials banner (controlled by parent via widget.showCredentials)
-        if (widget.showCredentials && !_isLoading)
+        // Error banner (shown when SSO fails but iframe loaded)
+        if (_errorMessage != null && !_isLoading)
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: Material(
-              elevation: 4,
-              color: Colors.blue[50],
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.key, color: Colors.blue[700], size: 28),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Please use these credentials to login below',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: Colors.blue[900],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.blue.shade200),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    SizedBox(
-                                      width: 80,
-                                      child: Text(
-                                        'Username:',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                          color: Colors.grey[700],
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: SelectableText(
-                                        _username,
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 13,
-                                          color: Colors.blue[900],
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    SizedBox(
-                                      width: 80,
-                                      child: Text(
-                                        'Password:',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                          color: Colors.grey[700],
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: SelectableText(
-                                        _password,
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 13,
-                                          color: Colors.blue[900],
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: Colors.orange.shade100,
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber, color: Colors.orange.shade800),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _errorMessage!,
+                      style: TextStyle(color: Colors.orange.shade900),
                     ),
-                  ],
-                ),
+                  ),
+                  TextButton(
+                    onPressed: _openInNewTab,
+                    child: Text(
+                      'Open in new tab',
+                      style: TextStyle(color: Colors.orange.shade900),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      setState(() {
+                        _errorMessage = null;
+                      });
+                    },
+                    iconSize: 20,
+                    color: Colors.orange.shade800,
+                  ),
+                ],
               ),
             ),
           ),
