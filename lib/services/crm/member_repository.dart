@@ -414,10 +414,18 @@ class MemberRepository {
 
       if (validEmails.isEmpty) return {};
 
-      final response = await _readClient
+      debugPrint('[MemberRepository] Fetching photos for ${validEmails.length} emails');
+
+      // Use Supabase.instance.client directly to ensure proper auth headers
+      // The _readClient getter may return service role client which can have issues
+      final client = Supabase.instance.client;
+
+      final response = await client
           .from('members')
           .select('email, profile_photos')
           .inFilter('email', validEmails);
+
+      debugPrint('[MemberRepository] Got ${(response as List).length} members with photos');
 
       final Map<String, String> result = {};
       for (final row in response as List<dynamic>) {
@@ -432,12 +440,15 @@ class MemberRepository {
         final primaryPhoto = photos.firstWhereOrNull((p) => p.isPrimary) ?? photos.firstOrNull;
         if (primaryPhoto?.publicUrl != null) {
           result[email] = primaryPhoto!.publicUrl!;
+          debugPrint('[MemberRepository] Found photo for $email');
         }
       }
 
+      debugPrint('[MemberRepository] Returning ${result.length} photo URLs');
       return result;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ Error fetching member photos by emails: $e');
+      debugPrint('[MemberRepository] Stack trace: $stackTrace');
       return {};
     }
   }
