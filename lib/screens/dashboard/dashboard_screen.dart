@@ -700,14 +700,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       // Enrich top slack members with profile photos from member records
       if (metrics != null && metrics.top50SlackMembers.isNotEmpty) {
+        debugPrint('[DashboardScreen] Enriching ${metrics.top50SlackMembers.length} slack members with photos...');
+
         final slackEmails = metrics.top50SlackMembers
             .where((m) => m.email != null && m.email!.isNotEmpty)
             .map((m) => m.email!)
             .toList();
 
+        debugPrint('[DashboardScreen] Found ${slackEmails.length} slack members with emails');
+        if (slackEmails.isNotEmpty) {
+          debugPrint('[DashboardScreen] Sample emails: ${slackEmails.take(3).join(', ')}');
+        }
+
         if (slackEmails.isNotEmpty) {
           final photoMap = await _memberRepo.getMemberPhotosByEmails(slackEmails);
+          debugPrint('[DashboardScreen] Photo map returned ${photoMap.length} matches');
+
           if (photoMap.isNotEmpty) {
+            debugPrint('[DashboardScreen] Sample photo matches: ${photoMap.keys.take(3).join(', ')}');
             final enrichedSlackMembers = metrics.top50SlackMembers.map((member) {
               if (member.email == null || member.email!.isEmpty) return member;
               final photoUrl = photoMap[member.email!.toLowerCase()];
@@ -717,9 +727,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               return member;
             }).toList();
 
+            // Count how many got enriched
+            final enrichedCount = enrichedSlackMembers.where((m) => m.profilePhotoUrl != null).length;
+            debugPrint('[DashboardScreen] Enriched $enrichedCount slack members with photos');
+
             // Create new metrics with enriched slack members using copyWith
             metrics = metrics.copyWith(top50SlackMembers: enrichedSlackMembers);
           }
+        } else {
+          debugPrint('[DashboardScreen] No slack members have email addresses');
         }
       }
 
