@@ -115,7 +115,15 @@ class _IframeState extends State<Iframe> {
 
             if (success) {
               debugPrint('📧 Listmonk login successful!');
-              // Don't hide loading yet - page will redirect to dashboard
+              // Hide loading overlay after a short delay to allow page redirect
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (mounted) {
+                  setState(() {
+                    _isLoading = false;
+                    _errorMessage = null;
+                  });
+                }
+              });
             } else if (reason == 'already_logged_in') {
               debugPrint('📧 Already logged in to Listmonk');
               if (mounted) {
@@ -128,9 +136,21 @@ class _IframeState extends State<Iframe> {
               debugPrint('📧 Listmonk login failed: $reason');
               if (mounted) {
                 setState(() {
+                  _isLoading = false;
                   _errorMessage = 'Login failed: ${reason ?? 'Unknown error'}';
                 });
               }
+            }
+            break;
+
+          case 'MOYD_DASHBOARD_READY':
+            // Dashboard has fully loaded - reliable signal to hide loading
+            debugPrint('📧 Listmonk dashboard ready!');
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _errorMessage = null;
+              });
             }
             break;
         }

@@ -250,12 +250,6 @@ class FormsService {
           .delete()
           .eq('form_id', id);
 
-      // Delete any conditional logic related to this form's fields
-      await client
-          .from('form_conditional_logic')
-          .delete()
-          .eq('form_id', id);
-
       // Then delete the form
       await client
           .from('form_schemas')
