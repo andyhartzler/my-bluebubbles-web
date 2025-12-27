@@ -15,6 +15,7 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/screens/committee_workspace_screen.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
+import 'package:bluebubbles/features/ai_assistant/screens/ai_assistant_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/donors_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
@@ -963,6 +964,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
+  void _openAIAssistant(BuildContext context) {
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (_) => TitleBarWrapper(
+          child: const AIAssistantScreen(),
+        ),
+      ),
+    );
+  }
+
   /// Returns the appropriate onTap handler for a given dataSourceKey
   VoidCallback? _getNavigationForDataSource(String dataSourceKey) {
     // Slack-related keys
@@ -1157,6 +1168,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ),
           IconButton(
+            tooltip: 'AI Assistant',
+            icon: const Icon(Icons.psychology_outlined, color: _unityBlue, size: 22),
+            onPressed: () => _openAIAssistant(context),
+          ),
+          IconButton(
             tooltip: 'Customize',
             icon: const Icon(Icons.edit_outlined, color: _unityBlue, size: 22),
             onPressed: _toggleEditMode,
@@ -1197,6 +1213,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
             ],
           ),
+        ),
+        IconButton(
+          tooltip: 'AI Assistant',
+          icon: const Icon(Icons.psychology_outlined, color: _unityBlue),
+          onPressed: () => _openAIAssistant(context),
         ),
         IconButton(
           tooltip: 'Customize Dashboard',
