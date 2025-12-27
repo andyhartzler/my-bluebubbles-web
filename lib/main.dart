@@ -71,6 +71,9 @@ import 'package:universal_io/io.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'package:bluebubbles/screens/crm/member_detail/email_history_provider.dart';
+import 'package:bluebubbles/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:bluebubbles/features/ai_assistant/screens/ai_assistant_screen.dart';
+import 'package:bluebubbles/features/ai_assistant/screens/knowledge_admin_screen.dart';
 import 'package:windows_taskbar/windows_taskbar.dart';
 
 bool isAuthing = false;
@@ -324,6 +327,9 @@ class Main extends StatelessWidget {
         ChangeNotifierProvider<EmailHistoryProvider>(
           create: (_) => EmailHistoryProvider(),
         ),
+        ChangeNotifierProvider<AIAssistantProvider>(
+          create: (_) => AIAssistantProvider(),
+        ),
       ],
       child: AdaptiveTheme(
         light: lightTheme.copyWith(
@@ -352,6 +358,8 @@ class Main extends StatelessWidget {
           getPages: [
             GetPage(name: '/auth/callback', page: AuthCallbackScreen.new),
             GetPage(name: '/crm/donors', page: () => const DonorsListScreen()),
+            GetPage(name: '/ai-assistant', page: () => const AIAssistantScreen()),
+            GetPage(name: '/ai-assistant/admin', page: () => const KnowledgeAdminScreen()),
           ],
           home: SupabaseAuthGate(child: Home()),
           shortcuts: {
