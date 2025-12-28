@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:postgrest/postgrest.dart' show CountOption;
 import '../models/chat_session.dart';
 import '../models/chat_message.dart';
 import '../models/source_document.dart';
@@ -30,17 +31,16 @@ class AIAssistantService {
     bool includeArchived = false,
     int limit = 50,
   }) async {
-    var query = _supabase
-        .from('knowledge_chat_sessions')
-        .select()
+    final baseQuery = _supabase.from('knowledge_chat_sessions').select();
+
+    final filteredQuery = includeArchived
+        ? baseQuery
+        : baseQuery.eq('is_archived', false);
+
+    final response = await filteredQuery
         .order('updated_at', ascending: false)
         .limit(limit);
 
-    if (!includeArchived) {
-      query = query.eq('is_archived', false);
-    }
-
-    final response = await query;
     return (response as List)
         .map((json) => ChatSession.fromJson(json))
         .toList();
@@ -218,9 +218,10 @@ class AIAssistantService {
     // Get query count
     final queryCountResponse = await _supabase
         .from('knowledge_usage_log')
-        .select('id', const FetchOptions(count: CountOption.exact, head: true))
+        .select('id')
         .eq('operation', 'query')
-        .gte('created_at', startOfMonth.toIso8601String());
+        .gte('created_at', startOfMonth.toIso8601String())
+        .count(CountOption.exact);
 
     return KnowledgeStats(
       totalDocuments: total,
