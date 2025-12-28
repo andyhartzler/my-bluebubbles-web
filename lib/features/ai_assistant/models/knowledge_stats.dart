@@ -30,12 +30,12 @@ class KnowledgeStats with _$KnowledgeStats {
 @freezed
 class TableConfig with _$TableConfig {
   const factory TableConfig({
-    required String tableName,
-    @Default(false) bool isEnabled,
-    @Default(false) bool isDiscovered,
-    @Default(false) bool triggerInstalled,
+    @JsonKey(name: 'table_name') required String tableName,
+    @JsonKey(name: 'is_enabled') @Default(false) bool isEnabled,
+    @JsonKey(name: 'is_discovered') @Default(false) bool isDiscovered,
+    @JsonKey(name: 'trigger_installed') @Default(false) bool triggerInstalled,
     @JsonKey(name: 'last_full_sync_at') DateTime? lastSyncAt,
-    int? rowCount,
+    @JsonKey(name: 'row_count') int? rowCount,
   }) = _TableConfig;
 
   factory TableConfig.fromJson(Map<String, dynamic> json) =>

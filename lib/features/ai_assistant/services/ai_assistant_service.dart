@@ -161,67 +161,92 @@ class AIAssistantService {
 
   /// Get knowledge base statistics
   Future<KnowledgeStats> getStats() async {
-    // Get document counts by status
-    final docsResponse = await _supabase
-        .from('knowledge_documents')
-        .select('source_type, source_table, embedding_status');
-
-    final docs = docsResponse as List;
-
-    int total = docs.length;
+    int total = 0;
     int pending = 0;
     int failed = 0;
     final byTable = <String, int>{};
     final byType = <String, int>{};
+    double totalCostCents = 0;
 
-    for (final doc in docs) {
-      final status = doc['embedding_status'] as String?;
-      final table = doc['source_table'] as String?;
-      final type = doc['source_type'] as String?;
+    // Get document counts by status
+    try {
+      final docsResponse = await _supabase
+          .from('knowledge_documents')
+          .select('source_type, source_table, embedding_status');
 
-      if (status == 'pending') pending++;
-      if (status == 'failed') failed++;
+      final docs = docsResponse as List;
+      total = docs.length;
 
-      if (table != null) {
-        byTable[table] = (byTable[table] ?? 0) + 1;
+      for (final doc in docs) {
+        final status = doc['embedding_status'] as String?;
+        final table = doc['source_table'] as String?;
+        final type = doc['source_type'] as String?;
+
+        if (status == 'pending') pending++;
+        if (status == 'failed') failed++;
+
+        if (table != null) {
+          byTable[table] = (byTable[table] ?? 0) + 1;
+        }
+        if (type != null) {
+          byType[type] = (byType[type] ?? 0) + 1;
+        }
       }
-      if (type != null) {
-        byType[type] = (byType[type] ?? 0) + 1;
-      }
+    } catch (e) {
+      print('Error fetching document stats: $e');
     }
 
     // Get usage for current month
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1);
 
-    final usageResponse = await _supabase
-        .from('knowledge_usage_log')
-        .select('estimated_cost_cents')
-        .gte('created_at', startOfMonth.toIso8601String());
+    try {
+      final usageResponse = await _supabase
+          .from('knowledge_usage_log')
+          .select('estimated_cost_cents')
+          .gte('created_at', startOfMonth.toIso8601String());
 
-    final usage = usageResponse as List;
-    final totalCostCents = usage.fold<double>(
-      0,
-      (sum, row) => sum + ((row['estimated_cost_cents'] as num?)?.toDouble() ?? 0),
-    );
+      final usage = usageResponse as List;
+      totalCostCents = usage.fold<double>(
+        0,
+        (sum, row) => sum + ((row['estimated_cost_cents'] as num?)?.toDouble() ?? 0),
+      );
+    } catch (e) {
+      print('Error fetching usage stats: $e');
+    }
 
     // Get table configs
-    final configResponse = await _supabase
-        .from('knowledge_table_config')
-        .select()
-        .order('table_name');
+    List<TableConfig> configs = [];
+    try {
+      final configResponse = await _supabase
+          .from('knowledge_table_config')
+          .select('table_name, is_enabled, is_discovered, trigger_installed, last_full_sync_at, row_count');
 
-    final configs = (configResponse as List)
-        .map((c) => TableConfig.fromJson(c as Map<String, dynamic>))
-        .toList();
+      configs = (configResponse as List)
+          .map((c) => TableConfig.fromJson(c as Map<String, dynamic>))
+          .toList();
+
+      // Sort by table_name locally
+      configs.sort((a, b) => a.tableName.compareTo(b.tableName));
+    } catch (e) {
+      // Table might not exist yet, continue with empty configs
+      print('Error fetching table configs: $e');
+    }
 
     // Get query count
-    final queryCountResponse = await _supabase
-        .from('knowledge_usage_log')
-        .select('id')
-        .eq('operation', 'query')
-        .gte('created_at', startOfMonth.toIso8601String())
-        .count(CountOption.exact);
+    int totalQueries = 0;
+    try {
+      final queryCountResponse = await _supabase
+          .from('knowledge_usage_log')
+          .select('id')
+          .eq('operation', 'query')
+          .gte('created_at', startOfMonth.toIso8601String())
+          .count(CountOption.exact);
+
+      totalQueries = queryCountResponse.count ?? 0;
+    } catch (e) {
+      print('Error fetching query count: $e');
+    }
 
     return KnowledgeStats(
       totalDocuments: total,
@@ -230,7 +255,7 @@ class AIAssistantService {
       documentsByTable: byTable,
       documentsByType: byType,
       monthlyUsageDollars: totalCostCents / 100,
-      totalQueries: queryCountResponse.count ?? 0,
+      totalQueries: totalQueries,
       tableConfigs: configs,
     );
   }
