@@ -4,6 +4,11 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/chat_message.dart';
 import 'source_card.dart';
 
+// Brand colors matching dashboard theme
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+const _sunriseGold = Color(0xFFFDB813);
+
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool showSources;
@@ -25,13 +30,21 @@ class ChatMessageBubble extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (!isUser) ...[
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: colorScheme.primaryContainer,
-            child: Icon(
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_momentumBlue, _unityBlue],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
               Icons.psychology,
               size: 20,
-              color: colorScheme.onPrimaryContainer,
+              color: Colors.white,
             ),
           ),
           const SizedBox(width: 12),
@@ -48,7 +61,7 @@ class ChatMessageBubble extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: isUser
-                      ? colorScheme.primary
+                      ? _unityBlue
                       : colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(20),
@@ -56,11 +69,18 @@ class ChatMessageBubble extends StatelessWidget {
                     bottomLeft: Radius.circular(isUser ? 20 : 4),
                     bottomRight: Radius.circular(isUser ? 4 : 20),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 5,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: isUser
                     ? SelectableText(
                         message.content,
-                        style: TextStyle(color: colorScheme.onPrimary),
+                        style: const TextStyle(color: Colors.white),
                       )
                     : MarkdownBody(
                         data: message.content,
@@ -105,13 +125,17 @@ class ChatMessageBubble extends StatelessWidget {
 
         if (isUser) ...[
           const SizedBox(width: 12),
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: colorScheme.secondaryContainer,
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _sunriseGold,
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Icon(
               Icons.person,
               size: 20,
-              color: colorScheme.onSecondaryContainer,
+              color: _unityBlue,
             ),
           ),
         ],

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+// Brand colors matching dashboard theme
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 class TypingIndicator extends StatefulWidget {
   const TypingIndicator({super.key});
 
@@ -34,13 +38,21 @@ class _TypingIndicatorState extends State<TypingIndicator>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: colorScheme.primaryContainer,
-          child: Icon(
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [_momentumBlue, _unityBlue],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(
             Icons.psychology,
             size: 20,
-            color: colorScheme.onPrimaryContainer,
+            color: Colors.white,
           ),
         ),
         const SizedBox(width: 12),
@@ -73,7 +85,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: colorScheme.primary.withOpacity(0.7),
+                          color: _momentumBlue.withOpacity(0.7),
                           shape: BoxShape.circle,
                         ),
                       ),

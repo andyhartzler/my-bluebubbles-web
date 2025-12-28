@@ -120,8 +120,8 @@ class AIAssistantService {
   Future<QueryResponse> query({
     required String query,
     String? sessionId,
-    int matchCount = 10,
-    double threshold = 0.65,
+    int matchCount = 15,
+    double threshold = 0.4,
   }) async {
     final userId = _supabase.auth.currentUser?.id;
 

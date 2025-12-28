@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/source_document.dart';
 
+// Brand colors matching dashboard theme
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+const _sunriseGold = Color(0xFFFDB813);
+const _actionRed = Color(0xFFE63946);
+const _justicePurple = Color(0xFF6A1B9A);
+const _grassrootsGreen = Color(0xFF43A047);
+
 class SourceCard extends StatelessWidget {
   final SourceDocument source;
 
@@ -69,41 +77,41 @@ class SourceCard extends StatelessWidget {
     // First check table name for more specific icons
     switch (table) {
       case 'members':
-        return (Icons.person, Colors.blue);
+        return (Icons.person, _momentumBlue);
       case 'chapters':
-        return (Icons.groups, Colors.green);
+        return (Icons.groups, _grassrootsGreen);
       case 'subscribers':
-        return (Icons.email, Colors.orange);
+        return (Icons.email, _sunriseGold);
       case 'donors':
-        return (Icons.volunteer_activism, Colors.pink);
+        return (Icons.volunteer_activism, _actionRed);
       case 'donations':
-        return (Icons.payments, Colors.green);
+        return (Icons.payments, _grassrootsGreen);
       case 'campaigns':
-        return (Icons.campaign, Colors.purple);
+        return (Icons.campaign, _justicePurple);
       case 'events':
-        return (Icons.event, Colors.teal);
+        return (Icons.event, _momentumBlue);
       case 'jobs':
-        return (Icons.work, Colors.indigo);
+        return (Icons.work, _unityBlue);
       case 'meetings':
-        return (Icons.meeting_room, Colors.cyan);
+        return (Icons.meeting_room, _momentumBlue);
       case 'legislation_tracked_bills':
-        return (Icons.gavel, Colors.brown);
+        return (Icons.gavel, _unityBlue);
       case 'form_schemas':
-        return (Icons.description, Colors.amber);
+        return (Icons.description, _sunriseGold);
       case 'slack_messages':
-        return (Icons.chat, Colors.deepPurple);
+        return (Icons.chat, _justicePurple);
       case 'calendar_events':
-        return (Icons.calendar_today, Colors.red);
+        return (Icons.calendar_today, _actionRed);
     }
 
     // Fall back to type
     switch (type) {
       case 'database':
-        return (Icons.storage, Colors.blue);
+        return (Icons.storage, _momentumBlue);
       case 'storage_file':
-        return (Icons.insert_drive_file, Colors.orange);
+        return (Icons.insert_drive_file, _sunriseGold);
       default:
-        return (Icons.article, Colors.grey);
+        return (Icons.article, _unityBlue);
     }
   }
 }

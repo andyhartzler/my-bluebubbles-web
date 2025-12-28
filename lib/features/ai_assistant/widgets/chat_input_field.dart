@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+// Brand colors matching dashboard theme
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 class ChatInputField extends StatefulWidget {
   final Function(String) onSend;
   final bool isEnabled;
@@ -106,10 +110,10 @@ class _ChatInputFieldState extends State<ChatInputField> {
                 icon: const Icon(Icons.send_rounded),
                 style: IconButton.styleFrom(
                   backgroundColor: _hasText && widget.isEnabled
-                      ? colorScheme.primary
+                      ? _momentumBlue
                       : colorScheme.surfaceContainerHighest,
                   foregroundColor: _hasText && widget.isEnabled
-                      ? colorScheme.onPrimary
+                      ? Colors.white
                       : colorScheme.onSurfaceVariant.withOpacity(0.5),
                 ),
               ),
