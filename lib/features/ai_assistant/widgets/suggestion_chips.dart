@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+// Brand colors matching dashboard theme
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 class SuggestionChips extends StatelessWidget {
   final List<String> suggestions;
   final Function(String) onTap;
@@ -23,11 +27,17 @@ class SuggestionChips extends StatelessWidget {
         return ActionChip(
           label: Text(suggestion),
           onPressed: () => onTap(suggestion),
-          backgroundColor: colorScheme.surfaceContainerHighest,
-          side: BorderSide(color: colorScheme.outline.withOpacity(0.3)),
+          backgroundColor: _momentumBlue.withOpacity(0.1),
+          side: BorderSide(color: _momentumBlue.withOpacity(0.3)),
           labelStyle: TextStyle(
-            color: colorScheme.onSurfaceVariant,
+            color: _unityBlue,
             fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+          avatar: Icon(
+            Icons.arrow_forward_ios,
+            size: 12,
+            color: _momentumBlue,
           ),
         );
       }).toList(),

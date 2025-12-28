@@ -6,6 +6,14 @@ import '../widgets/chat_input_field.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/suggestion_chips.dart';
 
+// Brand colors matching dashboard theme
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+const _sunriseGold = Color(0xFFFDB813);
+const _actionRed = Color(0xFFE63946);
+const _justicePurple = Color(0xFF6A1B9A);
+const _grassrootsGreen = Color(0xFF43A047);
+
 class AIAssistantScreen extends StatefulWidget {
   const AIAssistantScreen({super.key});
 
@@ -54,13 +62,31 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: _unityBlue,
+        foregroundColor: Colors.white,
+        elevation: 0,
         title: Consumer<AIAssistantProvider>(
           builder: (context, provider, _) {
             final title = provider.currentSession?.title ?? 'AI Assistant';
-            return Text(
-              title,
-              style: const TextStyle(fontSize: 18),
-              overflow: TextOverflow.ellipsis,
+            return Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _momentumBlue.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.psychology, size: 20, color: _momentumBlue),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             );
           },
         ),
@@ -170,20 +196,57 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.psychology_outlined,
-              size: 80,
-              color: theme.colorScheme.primary.withOpacity(0.5),
+            // AI Avatar with gradient background
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [_momentumBlue, _unityBlue],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: _momentumBlue.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.psychology_outlined,
+                size: 50,
+                color: Colors.white,
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             Text(
               'Ask me anything about MOYD!',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: _unityBlue,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: _momentumBlue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Powered by AI Knowledge Base',
+                style: TextStyle(
+                  color: _momentumBlue,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             Text(
               'I can help you find information about members, chapters, campaigns, events, legislation, and more.',
               style: theme.textTheme.bodyMedium?.copyWith(
