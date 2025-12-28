@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 // Brand colors matching dashboard theme
 const _unityBlue = Color(0xFF273351);
@@ -76,29 +77,37 @@ class _ChatInputFieldState extends State<ChatInputField> {
                   color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(24),
                 ),
-                child: TextField(
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  enabled: widget.isEnabled,
-                  maxLines: 5,
-                  minLines: 1,
-                  textInputAction: TextInputAction.newline,
-                  keyboardType: TextInputType.multiline,
-                  decoration: InputDecoration(
-                    hintText: widget.isEnabled
-                        ? 'Ask about members, chapters, campaigns...'
-                        : 'Thinking...',
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 14,
-                    ),
-                  ),
-                  onSubmitted: (_) {
-                    if (_hasText && widget.isEnabled) {
-                      _handleSend();
+                child: KeyboardListener(
+                  focusNode: FocusNode(),
+                  onKeyEvent: (event) {
+                    // Send on Enter without Shift
+                    if (event is KeyDownEvent &&
+                        event.logicalKey == LogicalKeyboardKey.enter &&
+                        !HardwareKeyboard.instance.isShiftPressed) {
+                      if (_hasText && widget.isEnabled) {
+                        _handleSend();
+                      }
                     }
                   },
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    enabled: widget.isEnabled,
+                    maxLines: 5,
+                    minLines: 1,
+                    textInputAction: TextInputAction.newline,
+                    keyboardType: TextInputType.multiline,
+                    decoration: InputDecoration(
+                      hintText: widget.isEnabled
+                          ? 'Ask about members, chapters, campaigns...'
+                          : 'Thinking...',
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

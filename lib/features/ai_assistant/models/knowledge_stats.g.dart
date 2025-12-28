@@ -45,22 +45,22 @@ Map<String, dynamic> _$$KnowledgeStatsImplToJson(
 
 _$TableConfigImpl _$$TableConfigImplFromJson(Map<String, dynamic> json) =>
     _$TableConfigImpl(
-      tableName: json['tableName'] as String,
-      isEnabled: json['isEnabled'] as bool? ?? false,
-      isDiscovered: json['isDiscovered'] as bool? ?? false,
-      triggerInstalled: json['triggerInstalled'] as bool? ?? false,
+      tableName: json['table_name'] as String,
+      isEnabled: json['is_enabled'] as bool? ?? false,
+      isDiscovered: json['is_discovered'] as bool? ?? false,
+      triggerInstalled: json['trigger_installed'] as bool? ?? false,
       lastSyncAt: json['last_full_sync_at'] == null
           ? null
           : DateTime.parse(json['last_full_sync_at'] as String),
-      rowCount: (json['rowCount'] as num?)?.toInt(),
+      rowCount: (json['row_count'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$TableConfigImplToJson(_$TableConfigImpl instance) =>
     <String, dynamic>{
-      'tableName': instance.tableName,
-      'isEnabled': instance.isEnabled,
-      'isDiscovered': instance.isDiscovered,
-      'triggerInstalled': instance.triggerInstalled,
+      'table_name': instance.tableName,
+      'is_enabled': instance.isEnabled,
+      'is_discovered': instance.isDiscovered,
+      'trigger_installed': instance.triggerInstalled,
       'last_full_sync_at': instance.lastSyncAt?.toIso8601String(),
-      'rowCount': instance.rowCount,
+      'row_count': instance.rowCount,
     };
