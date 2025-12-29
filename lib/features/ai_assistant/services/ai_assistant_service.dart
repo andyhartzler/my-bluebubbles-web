@@ -323,7 +323,7 @@ class AIAssistantService {
     try {
       final configResponse = await _supabase
           .from('knowledge_table_config')
-          .select('table_name, is_enabled, is_discovered, trigger_installed, last_full_sync_at, row_count');
+          .select('table_name, is_enabled, is_discovered, trigger_installed, last_full_sync_at');
 
       configs = (configResponse as List)
           .map((c) => TableConfig.fromJson(c as Map<String, dynamic>))
