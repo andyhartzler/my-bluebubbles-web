@@ -4,6 +4,9 @@ import 'source_document.dart';
 part 'chat_message.freezed.dart';
 part 'chat_message.g.dart';
 
+/// Feedback state for AI responses
+enum FeedbackState { none, positive, negative }
+
 @freezed
 class ChatMessage with _$ChatMessage {
   const factory ChatMessage({
@@ -14,6 +17,8 @@ class ChatMessage with _$ChatMessage {
     required String content,
     @JsonKey(name: 'source_documents') @Default([]) List<SourceDocument> sourceDocuments,
     @JsonKey(name: 'tokens_used') Map<String, dynamic>? tokensUsed,
+    @JsonKey(includeFromJson: false, includeToJson: false)
+    @Default(FeedbackState.none) FeedbackState feedbackState,
   }) = _ChatMessage;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>

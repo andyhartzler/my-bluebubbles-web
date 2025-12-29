@@ -27,6 +27,8 @@ mixin _$SourceDocument {
   String? get sourceTable => throw _privateConstructorUsedError;
   String? get title => throw _privateConstructorUsedError;
   double? get similarity => throw _privateConstructorUsedError;
+  @JsonKey(name: 'retrieval_method')
+  String? get retrievalMethod => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -45,7 +47,8 @@ abstract class $SourceDocumentCopyWith<$Res> {
       @JsonKey(name: 'source_type') String sourceType,
       @JsonKey(name: 'source_table') String? sourceTable,
       String? title,
-      double? similarity});
+      double? similarity,
+      @JsonKey(name: 'retrieval_method') String? retrievalMethod});
 }
 
 /// @nodoc
@@ -66,6 +69,7 @@ class _$SourceDocumentCopyWithImpl<$Res, $Val extends SourceDocument>
     Object? sourceTable = freezed,
     Object? title = freezed,
     Object? similarity = freezed,
+    Object? retrievalMethod = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -88,6 +92,10 @@ class _$SourceDocumentCopyWithImpl<$Res, $Val extends SourceDocument>
           ? _value.similarity
           : similarity // ignore: cast_nullable_to_non_nullable
               as double?,
+      retrievalMethod: freezed == retrievalMethod
+          ? _value.retrievalMethod
+          : retrievalMethod // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -105,7 +113,8 @@ abstract class _$$SourceDocumentImplCopyWith<$Res>
       @JsonKey(name: 'source_type') String sourceType,
       @JsonKey(name: 'source_table') String? sourceTable,
       String? title,
-      double? similarity});
+      double? similarity,
+      @JsonKey(name: 'retrieval_method') String? retrievalMethod});
 }
 
 /// @nodoc
@@ -124,6 +133,7 @@ class __$$SourceDocumentImplCopyWithImpl<$Res>
     Object? sourceTable = freezed,
     Object? title = freezed,
     Object? similarity = freezed,
+    Object? retrievalMethod = freezed,
   }) {
     return _then(_$SourceDocumentImpl(
       id: null == id
@@ -146,6 +156,10 @@ class __$$SourceDocumentImplCopyWithImpl<$Res>
           ? _value.similarity
           : similarity // ignore: cast_nullable_to_non_nullable
               as double?,
+      retrievalMethod: freezed == retrievalMethod
+          ? _value.retrievalMethod
+          : retrievalMethod // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -158,7 +172,8 @@ class _$SourceDocumentImpl implements _SourceDocument {
       @JsonKey(name: 'source_type') required this.sourceType,
       @JsonKey(name: 'source_table') this.sourceTable,
       this.title,
-      this.similarity});
+      this.similarity,
+      @JsonKey(name: 'retrieval_method') this.retrievalMethod});
 
   factory _$SourceDocumentImpl.fromJson(Map<String, dynamic> json) =>
       _$$SourceDocumentImplFromJson(json);
@@ -175,10 +190,13 @@ class _$SourceDocumentImpl implements _SourceDocument {
   final String? title;
   @override
   final double? similarity;
+  @override
+  @JsonKey(name: 'retrieval_method')
+  final String? retrievalMethod;
 
   @override
   String toString() {
-    return 'SourceDocument(id: $id, sourceType: $sourceType, sourceTable: $sourceTable, title: $title, similarity: $similarity)';
+    return 'SourceDocument(id: $id, sourceType: $sourceType, sourceTable: $sourceTable, title: $title, similarity: $similarity, retrievalMethod: $retrievalMethod)';
   }
 
   @override
@@ -193,13 +211,15 @@ class _$SourceDocumentImpl implements _SourceDocument {
                 other.sourceTable == sourceTable) &&
             (identical(other.title, title) || other.title == title) &&
             (identical(other.similarity, similarity) ||
-                other.similarity == similarity));
+                other.similarity == similarity) &&
+            (identical(other.retrievalMethod, retrievalMethod) ||
+                other.retrievalMethod == retrievalMethod));
   }
 
   @JsonKey(ignore: true)
   @override
   int get hashCode =>
-      Object.hash(runtimeType, id, sourceType, sourceTable, title, similarity);
+      Object.hash(runtimeType, id, sourceType, sourceTable, title, similarity, retrievalMethod);
 
   @JsonKey(ignore: true)
   @override
@@ -222,7 +242,8 @@ abstract class _SourceDocument implements SourceDocument {
       @JsonKey(name: 'source_type') required final String sourceType,
       @JsonKey(name: 'source_table') final String? sourceTable,
       final String? title,
-      final double? similarity}) = _$SourceDocumentImpl;
+      final double? similarity,
+      @JsonKey(name: 'retrieval_method') final String? retrievalMethod}) = _$SourceDocumentImpl;
 
   factory _SourceDocument.fromJson(Map<String, dynamic> json) =
       _$SourceDocumentImpl.fromJson;
@@ -239,6 +260,9 @@ abstract class _SourceDocument implements SourceDocument {
   String? get title;
   @override
   double? get similarity;
+  @override
+  @JsonKey(name: 'retrieval_method')
+  String? get retrievalMethod;
   @override
   @JsonKey(ignore: true)
   _$$SourceDocumentImplCopyWith<_$SourceDocumentImpl> get copyWith =>

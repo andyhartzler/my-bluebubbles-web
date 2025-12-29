@@ -4,6 +4,7 @@ import '../models/chat_session.dart';
 import '../models/chat_message.dart';
 import '../models/source_document.dart';
 import '../models/knowledge_stats.dart';
+import '../models/query_response.dart';
 
 class AIAssistantService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -117,7 +118,7 @@ class AIAssistantService {
   // ============================================
 
   /// Send a query to the AI assistant
-  Future<QueryResponse> query({
+  Future<EnhancedQueryResponse> query({
     required String query,
     String? sessionId,
     int matchCount = 15,
@@ -145,14 +146,81 @@ class AIAssistantService {
 
     final data = response.data as Map<String, dynamic>;
 
-    return QueryResponse(
+    // Parse enhanced response fields
+    QueryIntent? intent;
+    if (data['intent'] != null) {
+      try {
+        intent = QueryIntent.fromJson(data['intent'] as Map<String, dynamic>);
+      } catch (_) {}
+    }
+
+    MemoriesUsed? memoriesUsed;
+    if (data['memories_used'] != null) {
+      try {
+        memoriesUsed = MemoriesUsed.fromJson(data['memories_used'] as Map<String, dynamic>);
+      } catch (_) {}
+    }
+
+    return EnhancedQueryResponse(
       response: data['response'] as String,
       sources: (data['sources'] as List? ?? [])
           .map((s) => SourceDocument.fromJson(s as Map<String, dynamic>))
           .toList(),
+      intent: intent,
+      memoriesUsed: memoriesUsed,
       inputTokens: data['usage']?['input_tokens'] as int? ?? 0,
       outputTokens: data['usage']?['output_tokens'] as int? ?? 0,
     );
+  }
+
+  // ============================================
+  // FEEDBACK
+  // ============================================
+
+  /// Submit feedback for a response
+  Future<void> submitFeedback({
+    required String sessionId,
+    required String messageId,
+    required String query,
+    required String response,
+    required String feedbackType, // 'positive', 'negative', 'regenerate'
+    List<Map<String, dynamic>>? sourcesUsed,
+    String? comment,
+  }) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+
+      // Calculate feedback score
+      double feedbackScore;
+      switch (feedbackType) {
+        case 'positive':
+          feedbackScore = 1.0;
+          break;
+        case 'negative':
+          feedbackScore = -1.0;
+          break;
+        case 'regenerate':
+          feedbackScore = -0.5;
+          break;
+        default:
+          feedbackScore = 0.0;
+      }
+
+      await _supabase.from('ai_feedback').insert({
+        'session_id': sessionId,
+        'message_id': messageId,
+        'user_id': userId,
+        'query': query,
+        'response': response,
+        'sources_used': sourcesUsed,
+        'feedback_type': feedbackType,
+        'feedback_score': feedbackScore,
+        'feedback_comment': comment,
+      });
+    } catch (e) {
+      print('Failed to submit feedback: $e');
+      // Don't throw - feedback is non-critical
+    }
   }
 
   // ============================================
@@ -327,16 +395,20 @@ class AIAssistantService {
   }
 }
 
-/// Response from AI query
-class QueryResponse {
+/// Enhanced response from AI query with memory and intent data
+class EnhancedQueryResponse {
   final String response;
   final List<SourceDocument> sources;
+  final QueryIntent? intent;
+  final MemoriesUsed? memoriesUsed;
   final int inputTokens;
   final int outputTokens;
 
-  QueryResponse({
+  EnhancedQueryResponse({
     required this.response,
     required this.sources,
+    this.intent,
+    this.memoriesUsed,
     required this.inputTokens,
     required this.outputTokens,
   });

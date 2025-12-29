@@ -11,6 +11,7 @@ class SourceDocument with _$SourceDocument {
     @JsonKey(name: 'source_table') String? sourceTable,
     String? title,
     double? similarity,
+    @JsonKey(name: 'retrieval_method') String? retrievalMethod,
   }) = _SourceDocument;
 
   factory SourceDocument.fromJson(Map<String, dynamic> json) =>

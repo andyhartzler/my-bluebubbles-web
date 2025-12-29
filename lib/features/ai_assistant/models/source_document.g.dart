@@ -13,6 +13,7 @@ _$SourceDocumentImpl _$$SourceDocumentImplFromJson(Map<String, dynamic> json) =>
       sourceTable: json['source_table'] as String?,
       title: json['title'] as String?,
       similarity: (json['similarity'] as num?)?.toDouble(),
+      retrievalMethod: json['retrieval_method'] as String?,
     );
 
 Map<String, dynamic> _$$SourceDocumentImplToJson(
@@ -23,4 +24,5 @@ Map<String, dynamic> _$$SourceDocumentImplToJson(
       'source_table': instance.sourceTable,
       'title': instance.title,
       'similarity': instance.similarity,
+      'retrieval_method': instance.retrievalMethod,
     };

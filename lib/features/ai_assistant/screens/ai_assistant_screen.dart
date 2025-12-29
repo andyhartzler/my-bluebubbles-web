@@ -5,6 +5,7 @@ import '../widgets/chat_message_bubble.dart';
 import '../widgets/chat_input_field.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/suggestion_chips.dart';
+import '../widgets/memory_indicator.dart';
 
 // Brand colors matching dashboard theme
 const _unityBlue = Color(0xFF273351);
@@ -91,6 +92,23 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
           },
         ),
         actions: [
+          // Memory indicator
+          Consumer<AIAssistantProvider>(
+            builder: (context, provider, _) {
+              final memories = provider.lastMemoriesUsed;
+              if (memories == null || memories.total == 0) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: MemoryIndicator(
+                  sessionMemories: memories.session,
+                  userMemories: memories.user,
+                  orgMemories: memories.org,
+                ),
+              );
+            },
+          ),
           // New chat button
           IconButton(
             icon: const Icon(Icons.add_comment_outlined),
@@ -287,6 +305,19 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
             message: message,
             showSources: message.role == 'assistant' &&
                          message.sourceDocuments.isNotEmpty,
+            onFeedback: message.role == 'assistant'
+                ? (messageId, feedbackType) {
+                    provider.submitFeedback(
+                      messageId: messageId,
+                      feedbackType: feedbackType,
+                    );
+                  }
+                : null,
+            onRegenerate: message.role == 'assistant' && isLast
+                ? (messageId) {
+                    provider.regenerateResponse(messageId);
+                  }
+                : null,
           ),
         );
       },
