@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/chat_message.dart';
 import 'source_card.dart';
+import 'feedback_buttons.dart';
 
 // Brand colors matching dashboard theme
 const _unityBlue = Color(0xFF273351);
@@ -12,11 +13,15 @@ const _sunriseGold = Color(0xFFFDB813);
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool showSources;
+  final void Function(String messageId, String feedbackType)? onFeedback;
+  final void Function(String messageId)? onRegenerate;
 
   const ChatMessageBubble({
     super.key,
     required this.message,
     this.showSources = false,
+    this.onFeedback,
+    this.onRegenerate,
   });
 
   @override
@@ -105,6 +110,18 @@ class ChatMessageBubble extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Feedback buttons
+                    if (onFeedback != null)
+                      FeedbackButtons(
+                        currentState: message.feedbackState,
+                        onPositive: () => onFeedback!(message.id, 'positive'),
+                        onNegative: () => onFeedback!(message.id, 'negative'),
+                        onRegenerate: onRegenerate != null
+                            ? () => onRegenerate!(message.id)
+                            : null,
+                        showRegenerate: onRegenerate != null,
+                      ),
+                    const SizedBox(width: 8),
                     _ActionButton(
                       icon: Icons.copy_outlined,
                       tooltip: 'Copy',

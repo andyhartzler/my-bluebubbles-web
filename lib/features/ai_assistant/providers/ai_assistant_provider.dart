@@ -3,6 +3,7 @@ import '../services/ai_assistant_service.dart';
 import '../models/chat_session.dart';
 import '../models/chat_message.dart';
 import '../models/knowledge_stats.dart';
+import '../models/query_response.dart';
 
 class AIAssistantProvider extends ChangeNotifier {
   final AIAssistantService _service = AIAssistantService();
@@ -15,6 +16,7 @@ class AIAssistantProvider extends ChangeNotifier {
   bool _isSending = false;
   String? _error;
   KnowledgeStats? _stats;
+  MemoriesUsed? _lastMemoriesUsed;
 
   // Getters
   List<ChatSession> get sessions => _sessions;
@@ -24,6 +26,7 @@ class AIAssistantProvider extends ChangeNotifier {
   bool get isSending => _isSending;
   String? get error => _error;
   KnowledgeStats? get stats => _stats;
+  MemoriesUsed? get lastMemoriesUsed => _lastMemoriesUsed;
   bool get hasCurrentSession => _currentSession != null;
 
   // ============================================
@@ -145,6 +148,9 @@ class AIAssistantProvider extends ChangeNotifier {
         sessionId: _currentSession!.id,
       );
 
+      // Store memories used for UI indicator
+      _lastMemoriesUsed = response.memoriesUsed;
+
       // Add assistant message
       final assistantMsg = ChatMessage(
         id: 'temp-assistant-${DateTime.now().millisecondsSinceEpoch}',
@@ -194,6 +200,93 @@ class AIAssistantProvider extends ChangeNotifier {
       _error = e.toString();
       notifyListeners();
     }
+  }
+
+  // ============================================
+  // FEEDBACK
+  // ============================================
+
+  /// Submit feedback for a message
+  Future<void> submitFeedback({
+    required String messageId,
+    required String feedbackType,
+  }) async {
+    if (_currentSession == null) return;
+
+    // Find the message and the preceding user query
+    final messageIndex = _messages.indexWhere((m) => m.id == messageId);
+    if (messageIndex < 0) return;
+
+    final message = _messages[messageIndex];
+    String query = '';
+    if (messageIndex > 0 && _messages[messageIndex - 1].role == 'user') {
+      query = _messages[messageIndex - 1].content;
+    }
+
+    // Update feedback state in UI immediately
+    final newState = feedbackType == 'positive'
+        ? FeedbackState.positive
+        : FeedbackState.negative;
+
+    _messages[messageIndex] = ChatMessage(
+      id: message.id,
+      createdAt: message.createdAt,
+      sessionId: message.sessionId,
+      role: message.role,
+      content: message.content,
+      sourceDocuments: message.sourceDocuments,
+      tokensUsed: message.tokensUsed,
+      feedbackState: newState,
+    );
+    notifyListeners();
+
+    // Submit to backend
+    await _service.submitFeedback(
+      sessionId: _currentSession!.id,
+      messageId: messageId,
+      query: query,
+      response: message.content,
+      feedbackType: feedbackType,
+      sourcesUsed: message.sourceDocuments
+          .map((s) => {
+                'id': s.id,
+                'source_type': s.sourceType,
+                'source_table': s.sourceTable,
+                'title': s.title,
+              })
+          .toList(),
+    );
+  }
+
+  /// Regenerate a response
+  Future<void> regenerateResponse(String messageId) async {
+    if (_currentSession == null) return;
+
+    // Find the message and the preceding user query
+    final messageIndex = _messages.indexWhere((m) => m.id == messageId);
+    if (messageIndex <= 0) return;
+
+    final userMessage = _messages[messageIndex - 1];
+    if (userMessage.role != 'user') return;
+
+    // Submit regenerate feedback
+    final message = _messages[messageIndex];
+    await _service.submitFeedback(
+      sessionId: _currentSession!.id,
+      messageId: messageId,
+      query: userMessage.content,
+      response: message.content,
+      feedbackType: 'regenerate',
+    );
+
+    // Remove the old response
+    _messages.removeAt(messageIndex);
+    // Remove the user message too since sendMessage will add it again
+    _messages.removeAt(messageIndex - 1);
+    notifyListeners();
+
+    // Re-query with the same message
+    await sendMessage(userMessage.content);
   }
 
   // ============================================
