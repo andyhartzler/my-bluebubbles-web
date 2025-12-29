@@ -236,32 +236,74 @@ class AIAssistantService {
     final byType = <String, int>{};
     double totalCostCents = 0;
 
-    // Get document counts by status
+    // Get total document count using count query (not limited to 1000)
     try {
-      final docsResponse = await _supabase
+      final totalResponse = await _supabase
           .from('knowledge_documents')
-          .select('source_type, source_table, embedding_status');
+          .select()
+          .count(CountOption.exact);
+      total = totalResponse.count ?? 0;
+    } catch (e) {
+      print('Error fetching total count: $e');
+    }
 
-      final docs = docsResponse as List;
-      total = docs.length;
+    // Get pending count
+    try {
+      final pendingResponse = await _supabase
+          .from('knowledge_documents')
+          .select()
+          .eq('embedding_status', 'pending')
+          .count(CountOption.exact);
+      pending = pendingResponse.count ?? 0;
+    } catch (e) {
+      print('Error fetching pending count: $e');
+    }
 
-      for (final doc in docs) {
-        final status = doc['embedding_status'] as String?;
-        final table = doc['source_table'] as String?;
-        final type = doc['source_type'] as String?;
+    // Get failed count
+    try {
+      final failedResponse = await _supabase
+          .from('knowledge_documents')
+          .select()
+          .eq('embedding_status', 'failed')
+          .count(CountOption.exact);
+      failed = failedResponse.count ?? 0;
+    } catch (e) {
+      print('Error fetching failed count: $e');
+    }
 
-        if (status == 'pending') pending++;
-        if (status == 'failed') failed++;
+    // Get documents by table - fetch in batches to avoid 1000 limit
+    try {
+      int offset = 0;
+      const batchSize = 1000;
+      bool hasMore = true;
 
-        if (table != null) {
-          byTable[table] = (byTable[table] ?? 0) + 1;
-        }
-        if (type != null) {
-          byType[type] = (byType[type] ?? 0) + 1;
+      while (hasMore) {
+        final response = await _supabase
+            .from('knowledge_documents')
+            .select('source_table, source_type')
+            .range(offset, offset + batchSize - 1);
+
+        final docs = response as List;
+        if (docs.isEmpty) {
+          hasMore = false;
+        } else {
+          for (final doc in docs) {
+            final table = doc['source_table'] as String?;
+            final type = doc['source_type'] as String?;
+
+            if (table != null) {
+              byTable[table] = (byTable[table] ?? 0) + 1;
+            }
+            if (type != null) {
+              byType[type] = (byType[type] ?? 0) + 1;
+            }
+          }
+          offset += batchSize;
+          hasMore = docs.length == batchSize;
         }
       }
     } catch (e) {
-      print('Error fetching document stats: $e');
+      print('Error fetching document breakdown: $e');
     }
 
     // Get usage for current month
