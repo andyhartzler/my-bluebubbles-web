@@ -14,469 +14,253 @@ T _$identity<T>(T value) => value;
 final _privateConstructorUsedError = UnsupportedError(
     'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
-QueryIntent _$QueryIntentFromJson(Map<String, dynamic> json) {
-  return _QueryIntent.fromJson(json);
+TaskClassification _$TaskClassificationFromJson(Map<String, dynamic> json) {
+  return _TaskClassification.fromJson(json);
 }
 
 /// @nodoc
-mixin _$QueryIntent {
+mixin _$TaskClassification {
+  /// One of: simple_lookup, entity_search, explanation, comprehensive_research, content_generation
   String get type => throw _privateConstructorUsedError;
-  String? get entity => throw _privateConstructorUsedError;
-  String? get temporal => throw _privateConstructorUsedError;
-  double get confidence => throw _privateConstructorUsedError;
-  List<String> get keywords => throw _privateConstructorUsedError;
-  Map<String, dynamic>? get filters => throw _privateConstructorUsedError;
 
-  /// Serializes this QueryIntent to a JSON map.
+  /// One of: narrow, moderate, exhaustive
+  String get scope => throw _privateConstructorUsedError;
+
+  /// Data sources queried
+  @JsonKey(name: 'dataNeeds')
+  List<String> get dataNeeds => throw _privateConstructorUsedError;
+
+  /// Confidence score 0.0 to 1.0
+  double get confidence => throw _privateConstructorUsedError;
+
+  /// Serializes this TaskClassification to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
-  /// Create a copy of QueryIntent
+  /// Create a copy of TaskClassification
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
-  $QueryIntentCopyWith<QueryIntent> get copyWith =>
+  $TaskClassificationCopyWith<TaskClassification> get copyWith =>
       throw _privateConstructorUsedError;
 }
 
 /// @nodoc
-abstract class $QueryIntentCopyWith<$Res> {
-  factory $QueryIntentCopyWith(
-          QueryIntent value, $Res Function(QueryIntent) then) =
-      _$QueryIntentCopyWithImpl<$Res, QueryIntent>;
+abstract class $TaskClassificationCopyWith<$Res> {
+  factory $TaskClassificationCopyWith(
+          TaskClassification value, $Res Function(TaskClassification) then) =
+      _$TaskClassificationCopyWithImpl<$Res, TaskClassification>;
   @useResult
   $Res call(
       {String type,
-      String? entity,
-      String? temporal,
-      double confidence,
-      List<String> keywords,
-      Map<String, dynamic>? filters});
+      String scope,
+      @JsonKey(name: 'dataNeeds') List<String> dataNeeds,
+      double confidence});
 }
 
 /// @nodoc
-class _$QueryIntentCopyWithImpl<$Res, $Val extends QueryIntent>
-    implements $QueryIntentCopyWith<$Res> {
-  _$QueryIntentCopyWithImpl(this._value, this._then);
+class _$TaskClassificationCopyWithImpl<$Res, $Val extends TaskClassification>
+    implements $TaskClassificationCopyWith<$Res> {
+  _$TaskClassificationCopyWithImpl(this._value, this._then);
 
   // ignore: unused_field
   final $Val _value;
   // ignore: unused_field
   final $Res Function($Val) _then;
 
-  /// Create a copy of QueryIntent
+  /// Create a copy of TaskClassification
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
     Object? type = null,
-    Object? entity = freezed,
-    Object? temporal = freezed,
+    Object? scope = null,
+    Object? dataNeeds = null,
     Object? confidence = null,
-    Object? keywords = null,
-    Object? filters = freezed,
   }) {
     return _then(_value.copyWith(
       type: null == type
           ? _value.type
           : type // ignore: cast_nullable_to_non_nullable
               as String,
-      entity: freezed == entity
-          ? _value.entity
-          : entity // ignore: cast_nullable_to_non_nullable
-              as String?,
-      temporal: freezed == temporal
-          ? _value.temporal
-          : temporal // ignore: cast_nullable_to_non_nullable
-              as String?,
+      scope: null == scope
+          ? _value.scope
+          : scope // ignore: cast_nullable_to_non_nullable
+              as String,
+      dataNeeds: null == dataNeeds
+          ? _value.dataNeeds
+          : dataNeeds // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       confidence: null == confidence
           ? _value.confidence
           : confidence // ignore: cast_nullable_to_non_nullable
               as double,
-      keywords: null == keywords
-          ? _value.keywords
-          : keywords // ignore: cast_nullable_to_non_nullable
-              as List<String>,
-      filters: freezed == filters
-          ? _value.filters
-          : filters // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
     ) as $Val);
   }
 }
 
 /// @nodoc
-abstract class _$$QueryIntentImplCopyWith<$Res>
-    implements $QueryIntentCopyWith<$Res> {
-  factory _$$QueryIntentImplCopyWith(
-          _$QueryIntentImpl value, $Res Function(_$QueryIntentImpl) then) =
-      __$$QueryIntentImplCopyWithImpl<$Res>;
+abstract class _$$TaskClassificationImplCopyWith<$Res>
+    implements $TaskClassificationCopyWith<$Res> {
+  factory _$$TaskClassificationImplCopyWith(_$TaskClassificationImpl value,
+          $Res Function(_$TaskClassificationImpl) then) =
+      __$$TaskClassificationImplCopyWithImpl<$Res>;
   @override
   @useResult
   $Res call(
       {String type,
-      String? entity,
-      String? temporal,
-      double confidence,
-      List<String> keywords,
-      Map<String, dynamic>? filters});
+      String scope,
+      @JsonKey(name: 'dataNeeds') List<String> dataNeeds,
+      double confidence});
 }
 
 /// @nodoc
-class __$$QueryIntentImplCopyWithImpl<$Res>
-    extends _$QueryIntentCopyWithImpl<$Res, _$QueryIntentImpl>
-    implements _$$QueryIntentImplCopyWith<$Res> {
-  __$$QueryIntentImplCopyWithImpl(
-      _$QueryIntentImpl _value, $Res Function(_$QueryIntentImpl) _then)
+class __$$TaskClassificationImplCopyWithImpl<$Res>
+    extends _$TaskClassificationCopyWithImpl<$Res, _$TaskClassificationImpl>
+    implements _$$TaskClassificationImplCopyWith<$Res> {
+  __$$TaskClassificationImplCopyWithImpl(_$TaskClassificationImpl _value,
+      $Res Function(_$TaskClassificationImpl) _then)
       : super(_value, _then);
 
-  /// Create a copy of QueryIntent
+  /// Create a copy of TaskClassification
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
     Object? type = null,
-    Object? entity = freezed,
-    Object? temporal = freezed,
+    Object? scope = null,
+    Object? dataNeeds = null,
     Object? confidence = null,
-    Object? keywords = null,
-    Object? filters = freezed,
   }) {
-    return _then(_$QueryIntentImpl(
+    return _then(_$TaskClassificationImpl(
       type: null == type
           ? _value.type
           : type // ignore: cast_nullable_to_non_nullable
               as String,
-      entity: freezed == entity
-          ? _value.entity
-          : entity // ignore: cast_nullable_to_non_nullable
-              as String?,
-      temporal: freezed == temporal
-          ? _value.temporal
-          : temporal // ignore: cast_nullable_to_non_nullable
-              as String?,
+      scope: null == scope
+          ? _value.scope
+          : scope // ignore: cast_nullable_to_non_nullable
+              as String,
+      dataNeeds: null == dataNeeds
+          ? _value._dataNeeds
+          : dataNeeds // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       confidence: null == confidence
           ? _value.confidence
           : confidence // ignore: cast_nullable_to_non_nullable
               as double,
-      keywords: null == keywords
-          ? _value._keywords
-          : keywords // ignore: cast_nullable_to_non_nullable
-              as List<String>,
-      filters: freezed == filters
-          ? _value._filters
-          : filters // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
     ));
   }
 }
 
 /// @nodoc
 @JsonSerializable()
-class _$QueryIntentImpl implements _QueryIntent {
-  const _$QueryIntentImpl(
+class _$TaskClassificationImpl implements _TaskClassification {
+  const _$TaskClassificationImpl(
       {required this.type,
-      this.entity,
-      this.temporal,
-      this.confidence = 0.5,
-      final List<String> keywords = const [],
-      final Map<String, dynamic>? filters})
-      : _keywords = keywords,
-        _filters = filters;
+      required this.scope,
+      @JsonKey(name: 'dataNeeds') final List<String> dataNeeds = const [],
+      this.confidence = 0.5})
+      : _dataNeeds = dataNeeds;
 
-  factory _$QueryIntentImpl.fromJson(Map<String, dynamic> json) =>
-      _$$QueryIntentImplFromJson(json);
+  factory _$TaskClassificationImpl.fromJson(Map<String, dynamic> json) =>
+      _$$TaskClassificationImplFromJson(json);
 
+  /// One of: simple_lookup, entity_search, explanation, comprehensive_research, content_generation
   @override
   final String type;
+
+  /// One of: narrow, moderate, exhaustive
   @override
-  final String? entity;
+  final String scope;
+
+  /// Data sources queried
+  final List<String> _dataNeeds;
+
+  /// Data sources queried
   @override
-  final String? temporal;
+  @JsonKey(name: 'dataNeeds')
+  List<String> get dataNeeds {
+    if (_dataNeeds is EqualUnmodifiableListView) return _dataNeeds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_dataNeeds);
+  }
+
+  /// Confidence score 0.0 to 1.0
   @override
   @JsonKey()
   final double confidence;
-  final List<String> _keywords;
-  @override
-  @JsonKey()
-  List<String> get keywords {
-    if (_keywords is EqualUnmodifiableListView) return _keywords;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_keywords);
-  }
-
-  final Map<String, dynamic>? _filters;
-  @override
-  Map<String, dynamic>? get filters {
-    final value = _filters;
-    if (value == null) return null;
-    if (_filters is EqualUnmodifiableMapView) return _filters;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(value);
-  }
 
   @override
   String toString() {
-    return 'QueryIntent(type: $type, entity: $entity, temporal: $temporal, confidence: $confidence, keywords: $keywords, filters: $filters)';
+    return 'TaskClassification(type: $type, scope: $scope, dataNeeds: $dataNeeds, confidence: $confidence)';
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$QueryIntentImpl &&
+            other is _$TaskClassificationImpl &&
             (identical(other.type, type) || other.type == type) &&
-            (identical(other.entity, entity) || other.entity == entity) &&
-            (identical(other.temporal, temporal) ||
-                other.temporal == temporal) &&
+            (identical(other.scope, scope) || other.scope == scope) &&
+            const DeepCollectionEquality()
+                .equals(other._dataNeeds, _dataNeeds) &&
             (identical(other.confidence, confidence) ||
-                other.confidence == confidence) &&
-            const DeepCollectionEquality().equals(other._keywords, _keywords) &&
-            const DeepCollectionEquality().equals(other._filters, _filters));
+                other.confidence == confidence));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      type,
-      entity,
-      temporal,
-      confidence,
-      const DeepCollectionEquality().hash(_keywords),
-      const DeepCollectionEquality().hash(_filters));
+  int get hashCode => Object.hash(runtimeType, type, scope,
+      const DeepCollectionEquality().hash(_dataNeeds), confidence);
 
-  /// Create a copy of QueryIntent
+  /// Create a copy of TaskClassification
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
-  _$$QueryIntentImplCopyWith<_$QueryIntentImpl> get copyWith =>
-      __$$QueryIntentImplCopyWithImpl<_$QueryIntentImpl>(this, _$identity);
+  _$$TaskClassificationImplCopyWith<_$TaskClassificationImpl> get copyWith =>
+      __$$TaskClassificationImplCopyWithImpl<_$TaskClassificationImpl>(
+          this, _$identity);
 
   @override
   Map<String, dynamic> toJson() {
-    return _$$QueryIntentImplToJson(
+    return _$$TaskClassificationImplToJson(
       this,
     );
   }
 }
 
-abstract class _QueryIntent implements QueryIntent {
-  const factory _QueryIntent(
+abstract class _TaskClassification implements TaskClassification {
+  const factory _TaskClassification(
       {required final String type,
-      final String? entity,
-      final String? temporal,
-      final double confidence,
-      final List<String> keywords,
-      final Map<String, dynamic>? filters}) = _$QueryIntentImpl;
+      required final String scope,
+      @JsonKey(name: 'dataNeeds') final List<String> dataNeeds,
+      final double confidence}) = _$TaskClassificationImpl;
 
-  factory _QueryIntent.fromJson(Map<String, dynamic> json) =
-      _$QueryIntentImpl.fromJson;
+  factory _TaskClassification.fromJson(Map<String, dynamic> json) =
+      _$TaskClassificationImpl.fromJson;
 
+  /// One of: simple_lookup, entity_search, explanation, comprehensive_research, content_generation
   @override
   String get type;
+
+  /// One of: narrow, moderate, exhaustive
   @override
-  String? get entity;
+  String get scope;
+
+  /// Data sources queried
   @override
-  String? get temporal;
+  @JsonKey(name: 'dataNeeds')
+  List<String> get dataNeeds;
+
+  /// Confidence score 0.0 to 1.0
   @override
   double get confidence;
-  @override
-  List<String> get keywords;
-  @override
-  Map<String, dynamic>? get filters;
 
-  /// Create a copy of QueryIntent
+  /// Create a copy of TaskClassification
   /// with the given fields replaced by the non-null parameter values.
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$QueryIntentImplCopyWith<_$QueryIntentImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-MemoriesUsed _$MemoriesUsedFromJson(Map<String, dynamic> json) {
-  return _MemoriesUsed.fromJson(json);
-}
-
-/// @nodoc
-mixin _$MemoriesUsed {
-  int get session => throw _privateConstructorUsedError;
-  int get user => throw _privateConstructorUsedError;
-  int get org => throw _privateConstructorUsedError;
-
-  /// Serializes this MemoriesUsed to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of MemoriesUsed
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $MemoriesUsedCopyWith<MemoriesUsed> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $MemoriesUsedCopyWith<$Res> {
-  factory $MemoriesUsedCopyWith(
-          MemoriesUsed value, $Res Function(MemoriesUsed) then) =
-      _$MemoriesUsedCopyWithImpl<$Res, MemoriesUsed>;
-  @useResult
-  $Res call({int session, int user, int org});
-}
-
-/// @nodoc
-class _$MemoriesUsedCopyWithImpl<$Res, $Val extends MemoriesUsed>
-    implements $MemoriesUsedCopyWith<$Res> {
-  _$MemoriesUsedCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of MemoriesUsed
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? session = null,
-    Object? user = null,
-    Object? org = null,
-  }) {
-    return _then(_value.copyWith(
-      session: null == session
-          ? _value.session
-          : session // ignore: cast_nullable_to_non_nullable
-              as int,
-      user: null == user
-          ? _value.user
-          : user // ignore: cast_nullable_to_non_nullable
-              as int,
-      org: null == org
-          ? _value.org
-          : org // ignore: cast_nullable_to_non_nullable
-              as int,
-    ) as $Val);
-  }
-}
-
-/// @nodoc
-abstract class _$$MemoriesUsedImplCopyWith<$Res>
-    implements $MemoriesUsedCopyWith<$Res> {
-  factory _$$MemoriesUsedImplCopyWith(
-          _$MemoriesUsedImpl value, $Res Function(_$MemoriesUsedImpl) then) =
-      __$$MemoriesUsedImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({int session, int user, int org});
-}
-
-/// @nodoc
-class __$$MemoriesUsedImplCopyWithImpl<$Res>
-    extends _$MemoriesUsedCopyWithImpl<$Res, _$MemoriesUsedImpl>
-    implements _$$MemoriesUsedImplCopyWith<$Res> {
-  __$$MemoriesUsedImplCopyWithImpl(
-      _$MemoriesUsedImpl _value, $Res Function(_$MemoriesUsedImpl) _then)
-      : super(_value, _then);
-
-  /// Create a copy of MemoriesUsed
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? session = null,
-    Object? user = null,
-    Object? org = null,
-  }) {
-    return _then(_$MemoriesUsedImpl(
-      session: null == session
-          ? _value.session
-          : session // ignore: cast_nullable_to_non_nullable
-              as int,
-      user: null == user
-          ? _value.user
-          : user // ignore: cast_nullable_to_non_nullable
-              as int,
-      org: null == org
-          ? _value.org
-          : org // ignore: cast_nullable_to_non_nullable
-              as int,
-    ));
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$MemoriesUsedImpl extends _MemoriesUsed {
-  const _$MemoriesUsedImpl({this.session = 0, this.user = 0, this.org = 0})
-      : super._();
-
-  factory _$MemoriesUsedImpl.fromJson(Map<String, dynamic> json) =>
-      _$$MemoriesUsedImplFromJson(json);
-
-  @override
-  @JsonKey()
-  final int session;
-  @override
-  @JsonKey()
-  final int user;
-  @override
-  @JsonKey()
-  final int org;
-
-  @override
-  String toString() {
-    return 'MemoriesUsed(session: $session, user: $user, org: $org)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$MemoriesUsedImpl &&
-            (identical(other.session, session) || other.session == session) &&
-            (identical(other.user, user) || other.user == user) &&
-            (identical(other.org, org) || other.org == org));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, session, user, org);
-
-  /// Create a copy of MemoriesUsed
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$MemoriesUsedImplCopyWith<_$MemoriesUsedImpl> get copyWith =>
-      __$$MemoriesUsedImplCopyWithImpl<_$MemoriesUsedImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$MemoriesUsedImplToJson(
-      this,
-    );
-  }
-}
-
-abstract class _MemoriesUsed extends MemoriesUsed {
-  const factory _MemoriesUsed(
-      {final int session, final int user, final int org}) = _$MemoriesUsedImpl;
-  const _MemoriesUsed._() : super._();
-
-  factory _MemoriesUsed.fromJson(Map<String, dynamic> json) =
-      _$MemoriesUsedImpl.fromJson;
-
-  @override
-  int get session;
-  @override
-  int get user;
-  @override
-  int get org;
-
-  /// Create a copy of MemoriesUsed
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$MemoriesUsedImplCopyWith<_$MemoriesUsedImpl> get copyWith =>
+  _$$TaskClassificationImplCopyWith<_$TaskClassificationImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
 
