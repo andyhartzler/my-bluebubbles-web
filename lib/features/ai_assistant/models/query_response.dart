@@ -22,6 +22,8 @@ class QueryIntent with _$QueryIntent {
 /// Memory usage information from AI response
 @freezed
 class MemoriesUsed with _$MemoriesUsed {
+  const MemoriesUsed._();
+
   const factory MemoriesUsed({
     @Default(0) int session,
     @Default(0) int user,

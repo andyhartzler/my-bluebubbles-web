@@ -29,8 +29,12 @@ mixin _$KnowledgeStats {
   int get totalQueries => throw _privateConstructorUsedError;
   List<TableConfig> get tableConfigs => throw _privateConstructorUsedError;
 
+  /// Serializes this KnowledgeStats to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of KnowledgeStats
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $KnowledgeStatsCopyWith<KnowledgeStats> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -62,6 +66,8 @@ class _$KnowledgeStatsCopyWithImpl<$Res, $Val extends KnowledgeStats>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of KnowledgeStats
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -138,6 +144,8 @@ class __$$KnowledgeStatsImplCopyWithImpl<$Res>
       _$KnowledgeStatsImpl _value, $Res Function(_$KnowledgeStatsImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of KnowledgeStats
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -277,7 +285,7 @@ class _$KnowledgeStatsImpl extends _KnowledgeStats {
                 .equals(other._tableConfigs, _tableConfigs));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
       runtimeType,
@@ -290,7 +298,9 @@ class _$KnowledgeStatsImpl extends _KnowledgeStats {
       totalQueries,
       const DeepCollectionEquality().hash(_tableConfigs));
 
-  @JsonKey(ignore: true)
+  /// Create a copy of KnowledgeStats
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$KnowledgeStatsImplCopyWith<_$KnowledgeStatsImpl> get copyWith =>
@@ -336,8 +346,11 @@ abstract class _KnowledgeStats extends KnowledgeStats {
   int get totalQueries;
   @override
   List<TableConfig> get tableConfigs;
+
+  /// Create a copy of KnowledgeStats
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$KnowledgeStatsImplCopyWith<_$KnowledgeStatsImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -348,16 +361,25 @@ TableConfig _$TableConfigFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$TableConfig {
+  @JsonKey(name: 'table_name')
   String get tableName => throw _privateConstructorUsedError;
+  @JsonKey(name: 'is_enabled')
   bool get isEnabled => throw _privateConstructorUsedError;
+  @JsonKey(name: 'is_discovered')
   bool get isDiscovered => throw _privateConstructorUsedError;
+  @JsonKey(name: 'trigger_installed')
   bool get triggerInstalled => throw _privateConstructorUsedError;
   @JsonKey(name: 'last_full_sync_at')
   DateTime? get lastSyncAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'row_count')
   int? get rowCount => throw _privateConstructorUsedError;
 
+  /// Serializes this TableConfig to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of TableConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $TableConfigCopyWith<TableConfig> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -369,12 +391,12 @@ abstract class $TableConfigCopyWith<$Res> {
       _$TableConfigCopyWithImpl<$Res, TableConfig>;
   @useResult
   $Res call(
-      {String tableName,
-      bool isEnabled,
-      bool isDiscovered,
-      bool triggerInstalled,
+      {@JsonKey(name: 'table_name') String tableName,
+      @JsonKey(name: 'is_enabled') bool isEnabled,
+      @JsonKey(name: 'is_discovered') bool isDiscovered,
+      @JsonKey(name: 'trigger_installed') bool triggerInstalled,
       @JsonKey(name: 'last_full_sync_at') DateTime? lastSyncAt,
-      int? rowCount});
+      @JsonKey(name: 'row_count') int? rowCount});
 }
 
 /// @nodoc
@@ -387,6 +409,8 @@ class _$TableConfigCopyWithImpl<$Res, $Val extends TableConfig>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of TableConfig
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -435,12 +459,12 @@ abstract class _$$TableConfigImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {String tableName,
-      bool isEnabled,
-      bool isDiscovered,
-      bool triggerInstalled,
+      {@JsonKey(name: 'table_name') String tableName,
+      @JsonKey(name: 'is_enabled') bool isEnabled,
+      @JsonKey(name: 'is_discovered') bool isDiscovered,
+      @JsonKey(name: 'trigger_installed') bool triggerInstalled,
       @JsonKey(name: 'last_full_sync_at') DateTime? lastSyncAt,
-      int? rowCount});
+      @JsonKey(name: 'row_count') int? rowCount});
 }
 
 /// @nodoc
@@ -451,6 +475,8 @@ class __$$TableConfigImplCopyWithImpl<$Res>
       _$TableConfigImpl _value, $Res Function(_$TableConfigImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of TableConfig
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -494,31 +520,33 @@ class __$$TableConfigImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$TableConfigImpl implements _TableConfig {
   const _$TableConfigImpl(
-      {required this.tableName,
-      this.isEnabled = false,
-      this.isDiscovered = false,
-      this.triggerInstalled = false,
+      {@JsonKey(name: 'table_name') required this.tableName,
+      @JsonKey(name: 'is_enabled') this.isEnabled = false,
+      @JsonKey(name: 'is_discovered') this.isDiscovered = false,
+      @JsonKey(name: 'trigger_installed') this.triggerInstalled = false,
       @JsonKey(name: 'last_full_sync_at') this.lastSyncAt,
-      this.rowCount});
+      @JsonKey(name: 'row_count') this.rowCount});
 
   factory _$TableConfigImpl.fromJson(Map<String, dynamic> json) =>
       _$$TableConfigImplFromJson(json);
 
   @override
+  @JsonKey(name: 'table_name')
   final String tableName;
   @override
-  @JsonKey()
+  @JsonKey(name: 'is_enabled')
   final bool isEnabled;
   @override
-  @JsonKey()
+  @JsonKey(name: 'is_discovered')
   final bool isDiscovered;
   @override
-  @JsonKey()
+  @JsonKey(name: 'trigger_installed')
   final bool triggerInstalled;
   @override
   @JsonKey(name: 'last_full_sync_at')
   final DateTime? lastSyncAt;
   @override
+  @JsonKey(name: 'row_count')
   final int? rowCount;
 
   @override
@@ -545,12 +573,14 @@ class _$TableConfigImpl implements _TableConfig {
                 other.rowCount == rowCount));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, tableName, isEnabled,
       isDiscovered, triggerInstalled, lastSyncAt, rowCount);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of TableConfig
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$TableConfigImplCopyWith<_$TableConfigImpl> get copyWith =>
@@ -566,31 +596,39 @@ class _$TableConfigImpl implements _TableConfig {
 
 abstract class _TableConfig implements TableConfig {
   const factory _TableConfig(
-      {required final String tableName,
-      final bool isEnabled,
-      final bool isDiscovered,
-      final bool triggerInstalled,
+      {@JsonKey(name: 'table_name') required final String tableName,
+      @JsonKey(name: 'is_enabled') final bool isEnabled,
+      @JsonKey(name: 'is_discovered') final bool isDiscovered,
+      @JsonKey(name: 'trigger_installed') final bool triggerInstalled,
       @JsonKey(name: 'last_full_sync_at') final DateTime? lastSyncAt,
-      final int? rowCount}) = _$TableConfigImpl;
+      @JsonKey(name: 'row_count') final int? rowCount}) = _$TableConfigImpl;
 
   factory _TableConfig.fromJson(Map<String, dynamic> json) =
       _$TableConfigImpl.fromJson;
 
   @override
+  @JsonKey(name: 'table_name')
   String get tableName;
   @override
+  @JsonKey(name: 'is_enabled')
   bool get isEnabled;
   @override
+  @JsonKey(name: 'is_discovered')
   bool get isDiscovered;
   @override
+  @JsonKey(name: 'trigger_installed')
   bool get triggerInstalled;
   @override
   @JsonKey(name: 'last_full_sync_at')
   DateTime? get lastSyncAt;
   @override
+  @JsonKey(name: 'row_count')
   int? get rowCount;
+
+  /// Create a copy of TableConfig
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$TableConfigImplCopyWith<_$TableConfigImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

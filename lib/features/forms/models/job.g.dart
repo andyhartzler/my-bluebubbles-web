@@ -12,7 +12,9 @@ _$CustomQuestionImpl _$$CustomQuestionImplFromJson(Map<String, dynamic> json) =>
       question: json['question'] as String,
       type: $enumDecodeNullable(_$CustomQuestionTypeEnumMap, json['type']) ??
           CustomQuestionType.text,
-      required: json['required'] as bool? ?? false,
+      required: json['required'] == null
+          ? false
+          : const SafeBoolConverter().fromJson(json['required']),
       options: (json['options'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
@@ -26,7 +28,7 @@ Map<String, dynamic> _$$CustomQuestionImplToJson(
       'id': instance.id,
       'question': instance.question,
       'type': _$CustomQuestionTypeEnumMap[instance.type]!,
-      'required': instance.required,
+      'required': const SafeBoolConverter().toJson(instance.required),
       'options': instance.options,
       'order': instance.order,
     };
@@ -49,7 +51,9 @@ _$JobImpl _$$JobImplFromJson(Map<String, dynamic> json) => _$JobImpl(
       jobType: json['job_type'] as String,
       location: json['location'] as String?,
       locationType: json['location_type'] as String?,
-      isPaid: json['is_paid'] as bool? ?? false,
+      isPaid: json['is_paid'] == null
+          ? false
+          : const SafeBoolConverter().fromJson(json['is_paid']),
       salaryRange: json['salary_range'] as String?,
       hourlyRate: json['hourly_rate'] as String?,
       requirements: json['requirements'] as String?,
@@ -73,19 +77,33 @@ _$JobImpl _$$JobImplFromJson(Map<String, dynamic> json) => _$JobImpl(
       submitterOrganization: json['submitter_organization'] as String?,
       submitterPhone: json['submitter_phone'] as String?,
       slug: json['slug'] as String?,
-      featured: json['featured'] as bool? ?? false,
+      featured: json['featured'] == null
+          ? false
+          : const SafeBoolConverter().fromJson(json['featured']),
       tags: (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList(),
       applicationCount: (json['application_count'] as num?)?.toInt() ?? 0,
       viewCount: (json['view_count'] as num?)?.toInt() ?? 0,
-      customQuestions: _customQuestionsFromJson(json['custom_questions']),
-      resumeEnabled: json['resume_enabled'] as bool?,
-      resumeRequired: json['resume_required'] as bool?,
-      coverLetterEnabled: json['cover_letter_enabled'] as bool?,
-      coverLetterRequired: json['cover_letter_required'] as bool?,
-      referencesEnabled: json['references_enabled'] as bool? ?? false,
-      referencesRequired: json['references_required'] as bool? ?? false,
+      customQuestions: json['custom_questions'] == null
+          ? const []
+          : _customQuestionsFromJson(json['custom_questions']),
+      resumeEnabled:
+          const SafeNullableBoolConverter().fromJson(json['resume_enabled']),
+      resumeRequired:
+          const SafeNullableBoolConverter().fromJson(json['resume_required']),
+      coverLetterEnabled: const SafeNullableBoolConverter()
+          .fromJson(json['cover_letter_enabled']),
+      coverLetterRequired: const SafeNullableBoolConverter()
+          .fromJson(json['cover_letter_required']),
+      referencesEnabled: json['references_enabled'] == null
+          ? false
+          : const SafeBoolConverter().fromJson(json['references_enabled']),
+      referencesRequired: json['references_required'] == null
+          ? false
+          : const SafeBoolConverter().fromJson(json['references_required']),
       referencesCount: (json['references_count'] as num?)?.toInt() ?? 2,
-      useExternalApply: json['use_external_apply'] as bool? ?? false,
+      useExternalApply: json['use_external_apply'] == null
+          ? false
+          : const SafeBoolConverter().fromJson(json['use_external_apply']),
     );
 
 Map<String, dynamic> _$$JobImplToJson(_$JobImpl instance) => <String, dynamic>{
@@ -98,7 +116,7 @@ Map<String, dynamic> _$$JobImplToJson(_$JobImpl instance) => <String, dynamic>{
       'job_type': instance.jobType,
       'location': instance.location,
       'location_type': instance.locationType,
-      'is_paid': instance.isPaid,
+      'is_paid': const SafeBoolConverter().toJson(instance.isPaid),
       'salary_range': instance.salaryRange,
       'hourly_rate': instance.hourlyRate,
       'requirements': instance.requirements,
@@ -118,17 +136,24 @@ Map<String, dynamic> _$$JobImplToJson(_$JobImpl instance) => <String, dynamic>{
       'submitter_organization': instance.submitterOrganization,
       'submitter_phone': instance.submitterPhone,
       'slug': instance.slug,
-      'featured': instance.featured,
+      'featured': const SafeBoolConverter().toJson(instance.featured),
       'tags': instance.tags,
       'application_count': instance.applicationCount,
       'view_count': instance.viewCount,
       'custom_questions': _customQuestionsToJson(instance.customQuestions),
-      'resume_enabled': instance.resumeEnabled,
-      'resume_required': instance.resumeRequired,
-      'cover_letter_enabled': instance.coverLetterEnabled,
-      'cover_letter_required': instance.coverLetterRequired,
-      'references_enabled': instance.referencesEnabled,
-      'references_required': instance.referencesRequired,
+      'resume_enabled':
+          const SafeNullableBoolConverter().toJson(instance.resumeEnabled),
+      'resume_required':
+          const SafeNullableBoolConverter().toJson(instance.resumeRequired),
+      'cover_letter_enabled':
+          const SafeNullableBoolConverter().toJson(instance.coverLetterEnabled),
+      'cover_letter_required': const SafeNullableBoolConverter()
+          .toJson(instance.coverLetterRequired),
+      'references_enabled':
+          const SafeBoolConverter().toJson(instance.referencesEnabled),
+      'references_required':
+          const SafeBoolConverter().toJson(instance.referencesRequired),
       'references_count': instance.referencesCount,
-      'use_external_apply': instance.useExternalApply,
+      'use_external_apply':
+          const SafeBoolConverter().toJson(instance.useExternalApply),
     };

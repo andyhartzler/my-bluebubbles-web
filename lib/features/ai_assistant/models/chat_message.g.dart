@@ -27,7 +27,6 @@ Map<String, dynamic> _$$ChatMessageImplToJson(_$ChatMessageImpl instance) =>
       'session_id': instance.sessionId,
       'role': instance.role,
       'content': instance.content,
-      'source_documents':
-          instance.sourceDocuments.map((e) => e.toJson()).toList(),
+      'source_documents': instance.sourceDocuments,
       'tokens_used': instance.tokensUsed,
     };

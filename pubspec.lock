@@ -372,6 +372,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.18.0"
+  community_material_icon:
+    dependency: transitive
+    description:
+      name: community_material_icon
+      sha256: bb389689f6278158d7b9d9b0c9433e603933283104fea226594590f61503fd08
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.9.55"
   confetti:
     dependency: "direct main"
     description:
@@ -602,6 +610,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.22"
+  dropdown_search:
+    dependency: transitive
+    description:
+      name: dropdown_search
+      sha256: "55106e8290acaa97ed15bea1fdad82c3cf0c248dd410e651f5a8ac6870f783ab"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.0.6"
   dynamic_color:
     dependency: "direct main"
     description:
@@ -877,6 +893,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.1.0"
+  flutter_form_builder:
+    dependency: "direct main"
+    description:
+      name: flutter_form_builder
+      sha256: c278ef69b08957d484f83413f0e77b656a39b7a7bb4eb8a295da3a820ecc6545
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.5.0"
   flutter_html:
     dependency: "direct main"
     description:
@@ -1080,6 +1104,62 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.8"
+  flutter_rating_bar:
+    dependency: transitive
+    description:
+      name: flutter_rating_bar
+      sha256: d2af03469eac832c591a1eba47c91ecc871fe5708e69967073c043b2d775ed93
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.1"
+  flutter_secure_storage:
+    dependency: "direct main"
+    description:
+      name: flutter_secure_storage
+      sha256: "9cad52d75ebc511adfae3d447d5d13da15a55a92c9410e50f67335b6d21d16ea"
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.2.4"
+  flutter_secure_storage_linux:
+    dependency: transitive
+    description:
+      name: flutter_secure_storage_linux
+      sha256: be76c1d24a97d0b98f8b54bce6b481a380a6590df992d0098f868ad54dc8f688
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.3"
+  flutter_secure_storage_macos:
+    dependency: transitive
+    description:
+      name: flutter_secure_storage_macos
+      sha256: "6c0a2795a2d1de26ae202a0d78527d163f4acbb11cde4c75c670f3a0fc064247"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.3"
+  flutter_secure_storage_platform_interface:
+    dependency: transitive
+    description:
+      name: flutter_secure_storage_platform_interface
+      sha256: cf91ad32ce5adef6fba4d736a542baca9daf3beac4db2d04be350b87f69ac4a8
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.2"
+  flutter_secure_storage_web:
+    dependency: transitive
+    description:
+      name: flutter_secure_storage_web
+      sha256: f4ebff989b4f07b2656fb16b47852c0aab9fed9b4ec1c70103368337bc1886a9
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.1"
+  flutter_secure_storage_windows:
+    dependency: transitive
+    description:
+      name: flutter_secure_storage_windows
+      sha256: b20b07cb5ed4ed74fc567b78a72936203f587eba460af1df11281c9326cd3709
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.2"
   flutter_slidable:
     dependency: "direct main"
     description:
@@ -1116,11 +1196,59 @@ packages:
       relative: true
     source: path
     version: "1.0.0"
+  flutter_typeahead:
+    dependency: transitive
+    description:
+      name: flutter_typeahead
+      sha256: d64712c65db240b1057559b952398ebb6e498077baeebf9b0731dade62438a6d
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.2.0"
   flutter_web_plugins:
     dependency: transitive
     description: flutter
     source: sdk
     version: "0.0.0"
+  form_builder_cupertino_fields:
+    dependency: "direct main"
+    description:
+      name: form_builder_cupertino_fields
+      sha256: "6318dba2fb795c443e8beeb753f0b1d0e7fd9d51fe612107ecb4f41f11b846ab"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.0"
+  form_builder_extra_fields:
+    dependency: "direct main"
+    description:
+      name: form_builder_extra_fields
+      sha256: "34fae81ce02c315460285064166d48240160f2951ebcb007d2906bbdfa5ea297"
+      url: "https://pub.dev"
+    source: hosted
+    version: "11.0.0"
+  form_builder_file_picker:
+    dependency: "direct main"
+    description:
+      name: form_builder_file_picker
+      sha256: "8bd5fca63a13bb5446c272e9d6968d114b3600496b291e34e76160a1b9219115"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.2.0"
+  form_builder_image_picker:
+    dependency: "direct main"
+    description:
+      name: form_builder_image_picker
+      sha256: "90c861157a367bfd1259368e61b04daef805df1ee7c53667391bc470ad4768c6"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.1.0"
+  form_builder_validators:
+    dependency: "direct main"
+    description:
+      name: form_builder_validators
+      sha256: c61ed7b1deecf0e1ebe49e2fa79e3283937c5a21c7e48e3ed9856a4a14e1191a
+      url: "https://pub.dev"
+    source: hosted
+    version: "11.0.0"
   freezed:
     dependency: "direct dev"
     description:
@@ -2109,6 +2237,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.1.0"
+  perfect_freehand:
+    dependency: "direct main"
+    description:
+      name: perfect_freehand
+      sha256: "7a6a591832be33fe82d8ecab68562a794d39837af16e7413fe0ccebdd0c3e3c0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.5.1"
   permission_handler:
     dependency: "direct main"
     description:
@@ -2180,6 +2316,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
+  pointer_interceptor:
+    dependency: transitive
+    description:
+      name: pointer_interceptor
+      sha256: "57210410680379aea8b1b7ed6ae0c3ad349bfd56fe845b8ea934a53344b9d523"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.10.1+2"
+  pointer_interceptor_ios:
+    dependency: transitive
+    description:
+      name: pointer_interceptor_ios
+      sha256: a6906772b3205b42c44614fcea28f818b1e5fdad73a4ca742a7bd49818d9c917
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.10.1"
+  pointer_interceptor_platform_interface:
+    dependency: transitive
+    description:
+      name: pointer_interceptor_platform_interface
+      sha256: "0597b0560e14354baeb23f8375cd612e8bd4841bf8306ecb71fcd0bb78552506"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.10.0+1"
+  pointer_interceptor_web:
+    dependency: transitive
+    description:
+      name: pointer_interceptor_web
+      sha256: "7a7087782110f8c1827170660b09f8aa893e0e9a61431dbbe2ac3fc482e8c044"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.10.2+1"
   pointycastle:
     dependency: transitive
     description:
@@ -2603,6 +2771,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
+  signature:
+    dependency: transitive
+    description:
+      name: signature
+      sha256: "8056e091ad59c2eb5735fee975ec649d0caf8ce802bb1ffb1e0955b00a6d0daa"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.5.0"
   simple_animations:
     dependency: "direct main"
     description:
@@ -3219,10 +3395,10 @@ packages:
     dependency: transitive
     description:
       name: vm_service
-      sha256: f652077d0bdf60abe4c1f6377448e8655008eef28f128bc023f7b5e8dfeb48fc
+      sha256: "5c5f338a667b4c644744b661f309fb8080bb94b18a7e91ef1dbd343bed00ed6d"
       url: "https://pub.dev"
     source: hosted
-    version: "14.2.4"
+    version: "14.2.5"
   volume_controller:
     dependency: transitive
     description:
@@ -3279,6 +3455,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.1"
+  webview_flutter:
+    dependency: "direct main"
+    description:
+      name: webview_flutter
+      sha256: "889a0a678e7c793c308c68739996227c9661590605e70b1f6cf6b9a6634f7aec"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.10.0"
+  webview_flutter_android:
+    dependency: transitive
+    description:
+      name: webview_flutter_android
+      sha256: "512c26ccc5b8a571fd5d13ec994b7509f142ff6faf85835e243dde3538fdc713"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.3.2"
+  webview_flutter_platform_interface:
+    dependency: transitive
+    description:
+      name: webview_flutter_platform_interface
+      sha256: "7cb32b21825bd65569665c32bb00a34ded5779786d6201f5350979d2d529940d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.13.0"
+  webview_flutter_wkwebview:
+    dependency: transitive
+    description:
+      name: webview_flutter_wkwebview
+      sha256: a3d461fe3467014e05f3ac4962e5fdde2a4bf44c561cb53e9ae5c586600fdbc3
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.22.0"
   win32:
     dependency: "direct overridden"
     description:

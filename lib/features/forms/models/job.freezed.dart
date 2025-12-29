@@ -23,12 +23,17 @@ mixin _$CustomQuestion {
   String get id => throw _privateConstructorUsedError;
   String get question => throw _privateConstructorUsedError;
   CustomQuestionType get type => throw _privateConstructorUsedError;
+  @SafeBoolConverter()
   bool get required => throw _privateConstructorUsedError;
   List<String> get options => throw _privateConstructorUsedError;
   int get order => throw _privateConstructorUsedError;
 
+  /// Serializes this CustomQuestion to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of CustomQuestion
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $CustomQuestionCopyWith<CustomQuestion> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -43,7 +48,7 @@ abstract class $CustomQuestionCopyWith<$Res> {
       {String id,
       String question,
       CustomQuestionType type,
-      bool required,
+      @SafeBoolConverter() bool required,
       List<String> options,
       int order});
 }
@@ -58,6 +63,8 @@ class _$CustomQuestionCopyWithImpl<$Res, $Val extends CustomQuestion>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of CustomQuestion
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -109,7 +116,7 @@ abstract class _$$CustomQuestionImplCopyWith<$Res>
       {String id,
       String question,
       CustomQuestionType type,
-      bool required,
+      @SafeBoolConverter() bool required,
       List<String> options,
       int order});
 }
@@ -122,6 +129,8 @@ class __$$CustomQuestionImplCopyWithImpl<$Res>
       _$CustomQuestionImpl _value, $Res Function(_$CustomQuestionImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of CustomQuestion
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -168,7 +177,7 @@ class _$CustomQuestionImpl implements _CustomQuestion {
       {required this.id,
       required this.question,
       this.type = CustomQuestionType.text,
-      this.required = false,
+      @SafeBoolConverter() this.required = false,
       final List<String> options = const [],
       this.order = 0})
       : _options = options;
@@ -185,6 +194,7 @@ class _$CustomQuestionImpl implements _CustomQuestion {
   final CustomQuestionType type;
   @override
   @JsonKey()
+  @SafeBoolConverter()
   final bool required;
   final List<String> _options;
   @override
@@ -219,12 +229,14 @@ class _$CustomQuestionImpl implements _CustomQuestion {
             (identical(other.order, order) || other.order == order));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, id, question, type, required,
       const DeepCollectionEquality().hash(_options), order);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of CustomQuestion
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$CustomQuestionImplCopyWith<_$CustomQuestionImpl> get copyWith =>
@@ -244,7 +256,7 @@ abstract class _CustomQuestion implements CustomQuestion {
       {required final String id,
       required final String question,
       final CustomQuestionType type,
-      final bool required,
+      @SafeBoolConverter() final bool required,
       final List<String> options,
       final int order}) = _$CustomQuestionImpl;
 
@@ -258,13 +270,17 @@ abstract class _CustomQuestion implements CustomQuestion {
   @override
   CustomQuestionType get type;
   @override
+  @SafeBoolConverter()
   bool get required;
   @override
   List<String> get options;
   @override
   int get order;
+
+  /// Create a copy of CustomQuestion
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$CustomQuestionImplCopyWith<_$CustomQuestionImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -279,23 +295,28 @@ mixin _$Job {
   @JsonKey(name: 'created_at')
   DateTime get createdAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'updated_at')
-  DateTime get updatedAt => throw _privateConstructorUsedError;
+  DateTime get updatedAt =>
+      throw _privateConstructorUsedError; // Job Information
   String get title => throw _privateConstructorUsedError;
   String get organization => throw _privateConstructorUsedError;
-  String get description => throw _privateConstructorUsedError;
+  String get description =>
+      throw _privateConstructorUsedError; // Job Type & Location
   @JsonKey(name: 'job_type')
   String get jobType => throw _privateConstructorUsedError;
   String? get location => throw _privateConstructorUsedError;
   @JsonKey(name: 'location_type')
-  String? get locationType => throw _privateConstructorUsedError;
+  String? get locationType =>
+      throw _privateConstructorUsedError; // Compensation
   @JsonKey(name: 'is_paid')
+  @SafeBoolConverter()
   bool get isPaid => throw _privateConstructorUsedError;
   @JsonKey(name: 'salary_range')
   String? get salaryRange => throw _privateConstructorUsedError;
   @JsonKey(name: 'hourly_rate')
-  String? get hourlyRate => throw _privateConstructorUsedError;
+  String? get hourlyRate => throw _privateConstructorUsedError; // Requirements
   String? get requirements => throw _privateConstructorUsedError;
-  String? get qualifications => throw _privateConstructorUsedError;
+  String? get qualifications =>
+      throw _privateConstructorUsedError; // Contact Information
   @JsonKey(name: 'contact_email')
   String get contactEmail => throw _privateConstructorUsedError;
   @JsonKey(name: 'contact_name')
@@ -305,7 +326,8 @@ mixin _$Job {
   @JsonKey(name: 'application_url')
   String? get applicationUrl => throw _privateConstructorUsedError;
   @JsonKey(name: 'application_instructions')
-  String? get applicationInstructions => throw _privateConstructorUsedError;
+  String? get applicationInstructions =>
+      throw _privateConstructorUsedError; // Metadata
   @JsonKey(name: 'expires_at')
   DateTime? get expiresAt => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
@@ -314,7 +336,8 @@ mixin _$Job {
   @JsonKey(name: 'approved_by')
   String? get approvedBy => throw _privateConstructorUsedError;
   @JsonKey(name: 'rejection_reason')
-  String? get rejectionReason => throw _privateConstructorUsedError;
+  String? get rejectionReason =>
+      throw _privateConstructorUsedError; // Submission Information
   @JsonKey(name: 'submitter_name')
   String get submitterName => throw _privateConstructorUsedError;
   @JsonKey(name: 'submitter_email')
@@ -322,39 +345,56 @@ mixin _$Job {
   @JsonKey(name: 'submitter_organization')
   String? get submitterOrganization => throw _privateConstructorUsedError;
   @JsonKey(name: 'submitter_phone')
-  String? get submitterPhone => throw _privateConstructorUsedError;
+  String? get submitterPhone =>
+      throw _privateConstructorUsedError; // SEO & Display
   String? get slug => throw _privateConstructorUsedError;
+  @SafeBoolConverter()
   bool get featured => throw _privateConstructorUsedError;
-  List<String>? get tags => throw _privateConstructorUsedError;
+  List<String>? get tags =>
+      throw _privateConstructorUsedError; // Application Tracking
   @JsonKey(name: 'application_count')
   int get applicationCount => throw _privateConstructorUsedError;
   @JsonKey(name: 'view_count')
-  int get viewCount => throw _privateConstructorUsedError;
+  int get viewCount =>
+      throw _privateConstructorUsedError; // Custom Questions for Applications
   @JsonKey(
       name: 'custom_questions',
       fromJson: _customQuestionsFromJson,
       toJson: _customQuestionsToJson)
   List<CustomQuestion> get customQuestions =>
-      throw _privateConstructorUsedError;
+      throw _privateConstructorUsedError; // Resume & Cover Letter Options
   @JsonKey(name: 'resume_enabled')
+  @SafeNullableBoolConverter()
   bool? get resumeEnabled => throw _privateConstructorUsedError;
   @JsonKey(name: 'resume_required')
+  @SafeNullableBoolConverter()
   bool? get resumeRequired => throw _privateConstructorUsedError;
   @JsonKey(name: 'cover_letter_enabled')
+  @SafeNullableBoolConverter()
   bool? get coverLetterEnabled => throw _privateConstructorUsedError;
   @JsonKey(name: 'cover_letter_required')
-  bool? get coverLetterRequired => throw _privateConstructorUsedError;
+  @SafeNullableBoolConverter()
+  bool? get coverLetterRequired =>
+      throw _privateConstructorUsedError; // References Options
   @JsonKey(name: 'references_enabled')
+  @SafeBoolConverter()
   bool get referencesEnabled => throw _privateConstructorUsedError;
   @JsonKey(name: 'references_required')
+  @SafeBoolConverter()
   bool get referencesRequired => throw _privateConstructorUsedError;
   @JsonKey(name: 'references_count')
-  int get referencesCount => throw _privateConstructorUsedError;
+  int get referencesCount =>
+      throw _privateConstructorUsedError; // External Application Option
   @JsonKey(name: 'use_external_apply')
+  @SafeBoolConverter()
   bool get useExternalApply => throw _privateConstructorUsedError;
 
+  /// Serializes this Job to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of Job
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $JobCopyWith<Job> get copyWith => throw _privateConstructorUsedError;
 }
 
@@ -373,7 +413,7 @@ abstract class $JobCopyWith<$Res> {
       @JsonKey(name: 'job_type') String jobType,
       String? location,
       @JsonKey(name: 'location_type') String? locationType,
-      @JsonKey(name: 'is_paid') bool isPaid,
+      @JsonKey(name: 'is_paid') @SafeBoolConverter() bool isPaid,
       @JsonKey(name: 'salary_range') String? salaryRange,
       @JsonKey(name: 'hourly_rate') String? hourlyRate,
       String? requirements,
@@ -382,7 +422,8 @@ abstract class $JobCopyWith<$Res> {
       @JsonKey(name: 'contact_name') String? contactName,
       @JsonKey(name: 'contact_phone') String? contactPhone,
       @JsonKey(name: 'application_url') String? applicationUrl,
-      @JsonKey(name: 'application_instructions') String? applicationInstructions,
+      @JsonKey(name: 'application_instructions')
+      String? applicationInstructions,
       @JsonKey(name: 'expires_at') DateTime? expiresAt,
       String status,
       @JsonKey(name: 'approved_at') DateTime? approvedAt,
@@ -393,20 +434,37 @@ abstract class $JobCopyWith<$Res> {
       @JsonKey(name: 'submitter_organization') String? submitterOrganization,
       @JsonKey(name: 'submitter_phone') String? submitterPhone,
       String? slug,
-      bool featured,
+      @SafeBoolConverter() bool featured,
       List<String>? tags,
       @JsonKey(name: 'application_count') int applicationCount,
       @JsonKey(name: 'view_count') int viewCount,
-      @JsonKey(name: 'custom_questions', fromJson: _customQuestionsFromJson, toJson: _customQuestionsToJson)
+      @JsonKey(
+          name: 'custom_questions',
+          fromJson: _customQuestionsFromJson,
+          toJson: _customQuestionsToJson)
       List<CustomQuestion> customQuestions,
-      @JsonKey(name: 'resume_enabled') bool? resumeEnabled,
-      @JsonKey(name: 'resume_required') bool? resumeRequired,
-      @JsonKey(name: 'cover_letter_enabled') bool? coverLetterEnabled,
-      @JsonKey(name: 'cover_letter_required') bool? coverLetterRequired,
-      @JsonKey(name: 'references_enabled') bool referencesEnabled,
-      @JsonKey(name: 'references_required') bool referencesRequired,
+      @JsonKey(name: 'resume_enabled')
+      @SafeNullableBoolConverter()
+      bool? resumeEnabled,
+      @JsonKey(name: 'resume_required')
+      @SafeNullableBoolConverter()
+      bool? resumeRequired,
+      @JsonKey(name: 'cover_letter_enabled')
+      @SafeNullableBoolConverter()
+      bool? coverLetterEnabled,
+      @JsonKey(name: 'cover_letter_required')
+      @SafeNullableBoolConverter()
+      bool? coverLetterRequired,
+      @JsonKey(name: 'references_enabled')
+      @SafeBoolConverter()
+      bool referencesEnabled,
+      @JsonKey(name: 'references_required')
+      @SafeBoolConverter()
+      bool referencesRequired,
       @JsonKey(name: 'references_count') int referencesCount,
-      @JsonKey(name: 'use_external_apply') bool useExternalApply});
+      @JsonKey(name: 'use_external_apply')
+      @SafeBoolConverter()
+      bool useExternalApply});
 }
 
 /// @nodoc
@@ -418,6 +476,8 @@ class _$JobCopyWithImpl<$Res, $Val extends Job> implements $JobCopyWith<$Res> {
   // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of Job
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -653,7 +713,7 @@ abstract class _$$JobImplCopyWith<$Res> implements $JobCopyWith<$Res> {
       @JsonKey(name: 'job_type') String jobType,
       String? location,
       @JsonKey(name: 'location_type') String? locationType,
-      @JsonKey(name: 'is_paid') bool isPaid,
+      @JsonKey(name: 'is_paid') @SafeBoolConverter() bool isPaid,
       @JsonKey(name: 'salary_range') String? salaryRange,
       @JsonKey(name: 'hourly_rate') String? hourlyRate,
       String? requirements,
@@ -662,7 +722,8 @@ abstract class _$$JobImplCopyWith<$Res> implements $JobCopyWith<$Res> {
       @JsonKey(name: 'contact_name') String? contactName,
       @JsonKey(name: 'contact_phone') String? contactPhone,
       @JsonKey(name: 'application_url') String? applicationUrl,
-      @JsonKey(name: 'application_instructions') String? applicationInstructions,
+      @JsonKey(name: 'application_instructions')
+      String? applicationInstructions,
       @JsonKey(name: 'expires_at') DateTime? expiresAt,
       String status,
       @JsonKey(name: 'approved_at') DateTime? approvedAt,
@@ -673,20 +734,37 @@ abstract class _$$JobImplCopyWith<$Res> implements $JobCopyWith<$Res> {
       @JsonKey(name: 'submitter_organization') String? submitterOrganization,
       @JsonKey(name: 'submitter_phone') String? submitterPhone,
       String? slug,
-      bool featured,
+      @SafeBoolConverter() bool featured,
       List<String>? tags,
       @JsonKey(name: 'application_count') int applicationCount,
       @JsonKey(name: 'view_count') int viewCount,
-      @JsonKey(name: 'custom_questions', fromJson: _customQuestionsFromJson, toJson: _customQuestionsToJson)
+      @JsonKey(
+          name: 'custom_questions',
+          fromJson: _customQuestionsFromJson,
+          toJson: _customQuestionsToJson)
       List<CustomQuestion> customQuestions,
-      @JsonKey(name: 'resume_enabled') bool? resumeEnabled,
-      @JsonKey(name: 'resume_required') bool? resumeRequired,
-      @JsonKey(name: 'cover_letter_enabled') bool? coverLetterEnabled,
-      @JsonKey(name: 'cover_letter_required') bool? coverLetterRequired,
-      @JsonKey(name: 'references_enabled') bool referencesEnabled,
-      @JsonKey(name: 'references_required') bool referencesRequired,
+      @JsonKey(name: 'resume_enabled')
+      @SafeNullableBoolConverter()
+      bool? resumeEnabled,
+      @JsonKey(name: 'resume_required')
+      @SafeNullableBoolConverter()
+      bool? resumeRequired,
+      @JsonKey(name: 'cover_letter_enabled')
+      @SafeNullableBoolConverter()
+      bool? coverLetterEnabled,
+      @JsonKey(name: 'cover_letter_required')
+      @SafeNullableBoolConverter()
+      bool? coverLetterRequired,
+      @JsonKey(name: 'references_enabled')
+      @SafeBoolConverter()
+      bool referencesEnabled,
+      @JsonKey(name: 'references_required')
+      @SafeBoolConverter()
+      bool referencesRequired,
       @JsonKey(name: 'references_count') int referencesCount,
-      @JsonKey(name: 'use_external_apply') bool useExternalApply});
+      @JsonKey(name: 'use_external_apply')
+      @SafeBoolConverter()
+      bool useExternalApply});
 }
 
 /// @nodoc
@@ -695,6 +773,8 @@ class __$$JobImplCopyWithImpl<$Res> extends _$JobCopyWithImpl<$Res, _$JobImpl>
   __$$JobImplCopyWithImpl(_$JobImpl _value, $Res Function(_$JobImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of Job
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -927,7 +1007,7 @@ class _$JobImpl implements _Job {
       @JsonKey(name: 'job_type') required this.jobType,
       this.location,
       @JsonKey(name: 'location_type') this.locationType,
-      @JsonKey(name: 'is_paid') this.isPaid = false,
+      @JsonKey(name: 'is_paid') @SafeBoolConverter() this.isPaid = false,
       @JsonKey(name: 'salary_range') this.salaryRange,
       @JsonKey(name: 'hourly_rate') this.hourlyRate,
       this.requirements,
@@ -947,20 +1027,37 @@ class _$JobImpl implements _Job {
       @JsonKey(name: 'submitter_organization') this.submitterOrganization,
       @JsonKey(name: 'submitter_phone') this.submitterPhone,
       this.slug,
-      this.featured = false,
+      @SafeBoolConverter() this.featured = false,
       final List<String>? tags,
       @JsonKey(name: 'application_count') this.applicationCount = 0,
       @JsonKey(name: 'view_count') this.viewCount = 0,
-      @JsonKey(name: 'custom_questions', fromJson: _customQuestionsFromJson, toJson: _customQuestionsToJson)
+      @JsonKey(
+          name: 'custom_questions',
+          fromJson: _customQuestionsFromJson,
+          toJson: _customQuestionsToJson)
       final List<CustomQuestion> customQuestions = const [],
-      @JsonKey(name: 'resume_enabled') this.resumeEnabled,
-      @JsonKey(name: 'resume_required') this.resumeRequired,
-      @JsonKey(name: 'cover_letter_enabled') this.coverLetterEnabled,
-      @JsonKey(name: 'cover_letter_required') this.coverLetterRequired,
-      @JsonKey(name: 'references_enabled') this.referencesEnabled = false,
-      @JsonKey(name: 'references_required') this.referencesRequired = false,
+      @JsonKey(name: 'resume_enabled')
+      @SafeNullableBoolConverter()
+      this.resumeEnabled,
+      @JsonKey(name: 'resume_required')
+      @SafeNullableBoolConverter()
+      this.resumeRequired,
+      @JsonKey(name: 'cover_letter_enabled')
+      @SafeNullableBoolConverter()
+      this.coverLetterEnabled,
+      @JsonKey(name: 'cover_letter_required')
+      @SafeNullableBoolConverter()
+      this.coverLetterRequired,
+      @JsonKey(name: 'references_enabled')
+      @SafeBoolConverter()
+      this.referencesEnabled = false,
+      @JsonKey(name: 'references_required')
+      @SafeBoolConverter()
+      this.referencesRequired = false,
       @JsonKey(name: 'references_count') this.referencesCount = 2,
-      @JsonKey(name: 'use_external_apply') this.useExternalApply = false})
+      @JsonKey(name: 'use_external_apply')
+      @SafeBoolConverter()
+      this.useExternalApply = false})
       : _tags = tags,
         _customQuestions = customQuestions;
 
@@ -975,12 +1072,14 @@ class _$JobImpl implements _Job {
   @override
   @JsonKey(name: 'updated_at')
   final DateTime updatedAt;
+// Job Information
   @override
   final String title;
   @override
   final String organization;
   @override
   final String description;
+// Job Type & Location
   @override
   @JsonKey(name: 'job_type')
   final String jobType;
@@ -989,8 +1088,10 @@ class _$JobImpl implements _Job {
   @override
   @JsonKey(name: 'location_type')
   final String? locationType;
+// Compensation
   @override
   @JsonKey(name: 'is_paid')
+  @SafeBoolConverter()
   final bool isPaid;
   @override
   @JsonKey(name: 'salary_range')
@@ -998,10 +1099,12 @@ class _$JobImpl implements _Job {
   @override
   @JsonKey(name: 'hourly_rate')
   final String? hourlyRate;
+// Requirements
   @override
   final String? requirements;
   @override
   final String? qualifications;
+// Contact Information
   @override
   @JsonKey(name: 'contact_email')
   final String contactEmail;
@@ -1017,6 +1120,7 @@ class _$JobImpl implements _Job {
   @override
   @JsonKey(name: 'application_instructions')
   final String? applicationInstructions;
+// Metadata
   @override
   @JsonKey(name: 'expires_at')
   final DateTime? expiresAt;
@@ -1032,6 +1136,7 @@ class _$JobImpl implements _Job {
   @override
   @JsonKey(name: 'rejection_reason')
   final String? rejectionReason;
+// Submission Information
   @override
   @JsonKey(name: 'submitter_name')
   final String submitterName;
@@ -1044,10 +1149,12 @@ class _$JobImpl implements _Job {
   @override
   @JsonKey(name: 'submitter_phone')
   final String? submitterPhone;
+// SEO & Display
   @override
   final String? slug;
   @override
   @JsonKey()
+  @SafeBoolConverter()
   final bool featured;
   final List<String>? _tags;
   @override
@@ -1059,13 +1166,16 @@ class _$JobImpl implements _Job {
     return EqualUnmodifiableListView(value);
   }
 
+// Application Tracking
   @override
   @JsonKey(name: 'application_count')
   final int applicationCount;
   @override
   @JsonKey(name: 'view_count')
   final int viewCount;
+// Custom Questions for Applications
   final List<CustomQuestion> _customQuestions;
+// Custom Questions for Applications
   @override
   @JsonKey(
       name: 'custom_questions',
@@ -1077,29 +1187,39 @@ class _$JobImpl implements _Job {
     return EqualUnmodifiableListView(_customQuestions);
   }
 
+// Resume & Cover Letter Options
   @override
   @JsonKey(name: 'resume_enabled')
+  @SafeNullableBoolConverter()
   final bool? resumeEnabled;
   @override
   @JsonKey(name: 'resume_required')
+  @SafeNullableBoolConverter()
   final bool? resumeRequired;
   @override
   @JsonKey(name: 'cover_letter_enabled')
+  @SafeNullableBoolConverter()
   final bool? coverLetterEnabled;
   @override
   @JsonKey(name: 'cover_letter_required')
+  @SafeNullableBoolConverter()
   final bool? coverLetterRequired;
+// References Options
   @override
   @JsonKey(name: 'references_enabled')
+  @SafeBoolConverter()
   final bool referencesEnabled;
   @override
   @JsonKey(name: 'references_required')
+  @SafeBoolConverter()
   final bool referencesRequired;
   @override
   @JsonKey(name: 'references_count')
   final int referencesCount;
+// External Application Option
   @override
   @JsonKey(name: 'use_external_apply')
+  @SafeBoolConverter()
   final bool useExternalApply;
 
   @override
@@ -1144,7 +1264,8 @@ class _$JobImpl implements _Job {
                 other.contactPhone == contactPhone) &&
             (identical(other.applicationUrl, applicationUrl) ||
                 other.applicationUrl == applicationUrl) &&
-            (identical(other.applicationInstructions, applicationInstructions) ||
+            (identical(
+                    other.applicationInstructions, applicationInstructions) ||
                 other.applicationInstructions == applicationInstructions) &&
             (identical(other.expiresAt, expiresAt) ||
                 other.expiresAt == expiresAt) &&
@@ -1191,7 +1312,7 @@ class _$JobImpl implements _Job {
                 other.useExternalApply == useExternalApply));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hashAll([
         runtimeType,
@@ -1236,10 +1357,12 @@ class _$JobImpl implements _Job {
         referencesEnabled,
         referencesRequired,
         referencesCount,
-        useExternalApply,
+        useExternalApply
       ]);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of Job
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$JobImplCopyWith<_$JobImpl> get copyWith =>
@@ -1264,7 +1387,7 @@ abstract class _Job implements Job {
       @JsonKey(name: 'job_type') required final String jobType,
       final String? location,
       @JsonKey(name: 'location_type') final String? locationType,
-      @JsonKey(name: 'is_paid') final bool isPaid,
+      @JsonKey(name: 'is_paid') @SafeBoolConverter() final bool isPaid,
       @JsonKey(name: 'salary_range') final String? salaryRange,
       @JsonKey(name: 'hourly_rate') final String? hourlyRate,
       final String? requirements,
@@ -1286,20 +1409,36 @@ abstract class _Job implements Job {
       final String? submitterOrganization,
       @JsonKey(name: 'submitter_phone') final String? submitterPhone,
       final String? slug,
-      final bool featured,
+      @SafeBoolConverter() final bool featured,
       final List<String>? tags,
       @JsonKey(name: 'application_count') final int applicationCount,
       @JsonKey(name: 'view_count') final int viewCount,
-      @JsonKey(name: 'custom_questions', fromJson: _customQuestionsFromJson, toJson: _customQuestionsToJson)
+      @JsonKey(
+          name: 'custom_questions',
+          fromJson: _customQuestionsFromJson,
+          toJson: _customQuestionsToJson)
       final List<CustomQuestion> customQuestions,
-      @JsonKey(name: 'resume_enabled') final bool? resumeEnabled,
-      @JsonKey(name: 'resume_required') final bool? resumeRequired,
-      @JsonKey(name: 'cover_letter_enabled') final bool? coverLetterEnabled,
-      @JsonKey(name: 'cover_letter_required') final bool? coverLetterRequired,
-      @JsonKey(name: 'references_enabled') final bool referencesEnabled,
-      @JsonKey(name: 'references_required') final bool referencesRequired,
+      @JsonKey(name: 'resume_enabled')
+      @SafeNullableBoolConverter()
+      final bool? resumeEnabled,
+      @JsonKey(name: 'resume_required')
+      @SafeNullableBoolConverter()
+      final bool? resumeRequired,
+      @JsonKey(name: 'cover_letter_enabled')
+      @SafeNullableBoolConverter()
+      final bool? coverLetterEnabled,
+      @JsonKey(name: 'cover_letter_required')
+      @SafeNullableBoolConverter()
+      final bool? coverLetterRequired,
+      @JsonKey(name: 'references_enabled')
+      @SafeBoolConverter()
+      final bool referencesEnabled,
+      @JsonKey(name: 'references_required')
+      @SafeBoolConverter()
+      final bool referencesRequired,
       @JsonKey(name: 'references_count') final int referencesCount,
       @JsonKey(name: 'use_external_apply')
+      @SafeBoolConverter()
       final bool useExternalApply}) = _$JobImpl;
 
   factory _Job.fromJson(Map<String, dynamic> json) = _$JobImpl.fromJson;
@@ -1311,13 +1450,13 @@ abstract class _Job implements Job {
   DateTime get createdAt;
   @override
   @JsonKey(name: 'updated_at')
-  DateTime get updatedAt;
+  DateTime get updatedAt; // Job Information
   @override
   String get title;
   @override
   String get organization;
   @override
-  String get description;
+  String get description; // Job Type & Location
   @override
   @JsonKey(name: 'job_type')
   String get jobType;
@@ -1325,20 +1464,21 @@ abstract class _Job implements Job {
   String? get location;
   @override
   @JsonKey(name: 'location_type')
-  String? get locationType;
+  String? get locationType; // Compensation
   @override
   @JsonKey(name: 'is_paid')
+  @SafeBoolConverter()
   bool get isPaid;
   @override
   @JsonKey(name: 'salary_range')
   String? get salaryRange;
   @override
   @JsonKey(name: 'hourly_rate')
-  String? get hourlyRate;
+  String? get hourlyRate; // Requirements
   @override
   String? get requirements;
   @override
-  String? get qualifications;
+  String? get qualifications; // Contact Information
   @override
   @JsonKey(name: 'contact_email')
   String get contactEmail;
@@ -1353,7 +1493,7 @@ abstract class _Job implements Job {
   String? get applicationUrl;
   @override
   @JsonKey(name: 'application_instructions')
-  String? get applicationInstructions;
+  String? get applicationInstructions; // Metadata
   @override
   @JsonKey(name: 'expires_at')
   DateTime? get expiresAt;
@@ -1367,7 +1507,7 @@ abstract class _Job implements Job {
   String? get approvedBy;
   @override
   @JsonKey(name: 'rejection_reason')
-  String? get rejectionReason;
+  String? get rejectionReason; // Submission Information
   @override
   @JsonKey(name: 'submitter_name')
   String get submitterName;
@@ -1379,51 +1519,62 @@ abstract class _Job implements Job {
   String? get submitterOrganization;
   @override
   @JsonKey(name: 'submitter_phone')
-  String? get submitterPhone;
+  String? get submitterPhone; // SEO & Display
   @override
   String? get slug;
   @override
+  @SafeBoolConverter()
   bool get featured;
   @override
-  List<String>? get tags;
+  List<String>? get tags; // Application Tracking
   @override
   @JsonKey(name: 'application_count')
   int get applicationCount;
   @override
   @JsonKey(name: 'view_count')
-  int get viewCount;
+  int get viewCount; // Custom Questions for Applications
   @override
   @JsonKey(
       name: 'custom_questions',
       fromJson: _customQuestionsFromJson,
       toJson: _customQuestionsToJson)
-  List<CustomQuestion> get customQuestions;
+  List<CustomQuestion> get customQuestions; // Resume & Cover Letter Options
   @override
   @JsonKey(name: 'resume_enabled')
+  @SafeNullableBoolConverter()
   bool? get resumeEnabled;
   @override
   @JsonKey(name: 'resume_required')
+  @SafeNullableBoolConverter()
   bool? get resumeRequired;
   @override
   @JsonKey(name: 'cover_letter_enabled')
+  @SafeNullableBoolConverter()
   bool? get coverLetterEnabled;
   @override
   @JsonKey(name: 'cover_letter_required')
-  bool? get coverLetterRequired;
+  @SafeNullableBoolConverter()
+  bool? get coverLetterRequired; // References Options
   @override
   @JsonKey(name: 'references_enabled')
+  @SafeBoolConverter()
   bool get referencesEnabled;
   @override
   @JsonKey(name: 'references_required')
+  @SafeBoolConverter()
   bool get referencesRequired;
   @override
   @JsonKey(name: 'references_count')
-  int get referencesCount;
+  int get referencesCount; // External Application Option
   @override
   @JsonKey(name: 'use_external_apply')
+  @SafeBoolConverter()
   bool get useExternalApply;
+
+  /// Create a copy of Job
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$JobImplCopyWith<_$JobImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

@@ -27,8 +27,12 @@ mixin _$QueryIntent {
   List<String> get keywords => throw _privateConstructorUsedError;
   Map<String, dynamic>? get filters => throw _privateConstructorUsedError;
 
+  /// Serializes this QueryIntent to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of QueryIntent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $QueryIntentCopyWith<QueryIntent> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -53,9 +57,13 @@ class _$QueryIntentCopyWithImpl<$Res, $Val extends QueryIntent>
     implements $QueryIntentCopyWith<$Res> {
   _$QueryIntentCopyWithImpl(this._value, this._then);
 
+  // ignore: unused_field
   final $Val _value;
+  // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of QueryIntent
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -69,22 +77,28 @@ class _$QueryIntentCopyWithImpl<$Res, $Val extends QueryIntent>
     return _then(_value.copyWith(
       type: null == type
           ? _value.type
-          : type as String,
+          : type // ignore: cast_nullable_to_non_nullable
+              as String,
       entity: freezed == entity
           ? _value.entity
-          : entity as String?,
+          : entity // ignore: cast_nullable_to_non_nullable
+              as String?,
       temporal: freezed == temporal
           ? _value.temporal
-          : temporal as String?,
+          : temporal // ignore: cast_nullable_to_non_nullable
+              as String?,
       confidence: null == confidence
           ? _value.confidence
-          : confidence as double,
+          : confidence // ignore: cast_nullable_to_non_nullable
+              as double,
       keywords: null == keywords
           ? _value.keywords
-          : keywords as List<String>,
+          : keywords // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       filters: freezed == filters
           ? _value.filters
-          : filters as Map<String, dynamic>?,
+          : filters // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
     ) as $Val);
   }
 }
@@ -114,6 +128,8 @@ class __$$QueryIntentImplCopyWithImpl<$Res>
       _$QueryIntentImpl _value, $Res Function(_$QueryIntentImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of QueryIntent
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -127,22 +143,28 @@ class __$$QueryIntentImplCopyWithImpl<$Res>
     return _then(_$QueryIntentImpl(
       type: null == type
           ? _value.type
-          : type as String,
+          : type // ignore: cast_nullable_to_non_nullable
+              as String,
       entity: freezed == entity
           ? _value.entity
-          : entity as String?,
+          : entity // ignore: cast_nullable_to_non_nullable
+              as String?,
       temporal: freezed == temporal
           ? _value.temporal
-          : temporal as String?,
+          : temporal // ignore: cast_nullable_to_non_nullable
+              as String?,
       confidence: null == confidence
           ? _value.confidence
-          : confidence as double,
+          : confidence // ignore: cast_nullable_to_non_nullable
+              as double,
       keywords: null == keywords
           ? _value._keywords
-          : keywords as List<String>,
+          : keywords // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       filters: freezed == filters
           ? _value._filters
-          : filters as Map<String, dynamic>?,
+          : filters // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
     ));
   }
 }
@@ -177,6 +199,7 @@ class _$QueryIntentImpl implements _QueryIntent {
   @JsonKey()
   List<String> get keywords {
     if (_keywords is EqualUnmodifiableListView) return _keywords;
+    // ignore: implicit_dynamic_type
     return EqualUnmodifiableListView(_keywords);
   }
 
@@ -186,6 +209,7 @@ class _$QueryIntentImpl implements _QueryIntent {
     final value = _filters;
     if (value == null) return null;
     if (_filters is EqualUnmodifiableMapView) return _filters;
+    // ignore: implicit_dynamic_type
     return EqualUnmodifiableMapView(value);
   }
 
@@ -209,7 +233,7 @@ class _$QueryIntentImpl implements _QueryIntent {
             const DeepCollectionEquality().equals(other._filters, _filters));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
       runtimeType,
@@ -220,7 +244,9 @@ class _$QueryIntentImpl implements _QueryIntent {
       const DeepCollectionEquality().hash(_keywords),
       const DeepCollectionEquality().hash(_filters));
 
-  @JsonKey(ignore: true)
+  /// Create a copy of QueryIntent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$QueryIntentImplCopyWith<_$QueryIntentImpl> get copyWith =>
@@ -228,7 +254,9 @@ class _$QueryIntentImpl implements _QueryIntent {
 
   @override
   Map<String, dynamic> toJson() {
-    return _$$QueryIntentImplToJson(this);
+    return _$$QueryIntentImplToJson(
+      this,
+    );
   }
 }
 
@@ -256,8 +284,11 @@ abstract class _QueryIntent implements QueryIntent {
   List<String> get keywords;
   @override
   Map<String, dynamic>? get filters;
+
+  /// Create a copy of QueryIntent
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$QueryIntentImplCopyWith<_$QueryIntentImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -272,8 +303,12 @@ mixin _$MemoriesUsed {
   int get user => throw _privateConstructorUsedError;
   int get org => throw _privateConstructorUsedError;
 
+  /// Serializes this MemoriesUsed to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of MemoriesUsed
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $MemoriesUsedCopyWith<MemoriesUsed> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -292,9 +327,13 @@ class _$MemoriesUsedCopyWithImpl<$Res, $Val extends MemoriesUsed>
     implements $MemoriesUsedCopyWith<$Res> {
   _$MemoriesUsedCopyWithImpl(this._value, this._then);
 
+  // ignore: unused_field
   final $Val _value;
+  // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of MemoriesUsed
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -305,13 +344,16 @@ class _$MemoriesUsedCopyWithImpl<$Res, $Val extends MemoriesUsed>
     return _then(_value.copyWith(
       session: null == session
           ? _value.session
-          : session as int,
+          : session // ignore: cast_nullable_to_non_nullable
+              as int,
       user: null == user
           ? _value.user
-          : user as int,
+          : user // ignore: cast_nullable_to_non_nullable
+              as int,
       org: null == org
           ? _value.org
-          : org as int,
+          : org // ignore: cast_nullable_to_non_nullable
+              as int,
     ) as $Val);
   }
 }
@@ -335,6 +377,8 @@ class __$$MemoriesUsedImplCopyWithImpl<$Res>
       _$MemoriesUsedImpl _value, $Res Function(_$MemoriesUsedImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of MemoriesUsed
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -345,21 +389,25 @@ class __$$MemoriesUsedImplCopyWithImpl<$Res>
     return _then(_$MemoriesUsedImpl(
       session: null == session
           ? _value.session
-          : session as int,
+          : session // ignore: cast_nullable_to_non_nullable
+              as int,
       user: null == user
           ? _value.user
-          : user as int,
+          : user // ignore: cast_nullable_to_non_nullable
+              as int,
       org: null == org
           ? _value.org
-          : org as int,
+          : org // ignore: cast_nullable_to_non_nullable
+              as int,
     ));
   }
 }
 
 /// @nodoc
 @JsonSerializable()
-class _$MemoriesUsedImpl implements _MemoriesUsed {
-  const _$MemoriesUsedImpl({this.session = 0, this.user = 0, this.org = 0});
+class _$MemoriesUsedImpl extends _MemoriesUsed {
+  const _$MemoriesUsedImpl({this.session = 0, this.user = 0, this.org = 0})
+      : super._();
 
   factory _$MemoriesUsedImpl.fromJson(Map<String, dynamic> json) =>
       _$$MemoriesUsedImplFromJson(json);
@@ -389,11 +437,13 @@ class _$MemoriesUsedImpl implements _MemoriesUsed {
             (identical(other.org, org) || other.org == org));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, session, user, org);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of MemoriesUsed
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$MemoriesUsedImplCopyWith<_$MemoriesUsedImpl> get copyWith =>
@@ -401,13 +451,16 @@ class _$MemoriesUsedImpl implements _MemoriesUsed {
 
   @override
   Map<String, dynamic> toJson() {
-    return _$$MemoriesUsedImplToJson(this);
+    return _$$MemoriesUsedImplToJson(
+      this,
+    );
   }
 }
 
-abstract class _MemoriesUsed implements MemoriesUsed {
+abstract class _MemoriesUsed extends MemoriesUsed {
   const factory _MemoriesUsed(
       {final int session, final int user, final int org}) = _$MemoriesUsedImpl;
+  const _MemoriesUsed._() : super._();
 
   factory _MemoriesUsed.fromJson(Map<String, dynamic> json) =
       _$MemoriesUsedImpl.fromJson;
@@ -418,8 +471,11 @@ abstract class _MemoriesUsed implements MemoriesUsed {
   int get user;
   @override
   int get org;
+
+  /// Create a copy of MemoriesUsed
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$MemoriesUsedImplCopyWith<_$MemoriesUsedImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -438,8 +494,12 @@ mixin _$UsageInfo {
   @JsonKey(name: 'processing_time_ms')
   int get processingTimeMs => throw _privateConstructorUsedError;
 
+  /// Serializes this UsageInfo to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of UsageInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $UsageInfoCopyWith<UsageInfo> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -461,9 +521,13 @@ class _$UsageInfoCopyWithImpl<$Res, $Val extends UsageInfo>
     implements $UsageInfoCopyWith<$Res> {
   _$UsageInfoCopyWithImpl(this._value, this._then);
 
+  // ignore: unused_field
   final $Val _value;
+  // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of UsageInfo
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -475,16 +539,20 @@ class _$UsageInfoCopyWithImpl<$Res, $Val extends UsageInfo>
     return _then(_value.copyWith(
       inputTokens: null == inputTokens
           ? _value.inputTokens
-          : inputTokens as int,
+          : inputTokens // ignore: cast_nullable_to_non_nullable
+              as int,
       outputTokens: null == outputTokens
           ? _value.outputTokens
-          : outputTokens as int,
+          : outputTokens // ignore: cast_nullable_to_non_nullable
+              as int,
       model: freezed == model
           ? _value.model
-          : model as String?,
+          : model // ignore: cast_nullable_to_non_nullable
+              as String?,
       processingTimeMs: null == processingTimeMs
           ? _value.processingTimeMs
-          : processingTimeMs as int,
+          : processingTimeMs // ignore: cast_nullable_to_non_nullable
+              as int,
     ) as $Val);
   }
 }
@@ -512,6 +580,8 @@ class __$$UsageInfoImplCopyWithImpl<$Res>
       _$UsageInfoImpl _value, $Res Function(_$UsageInfoImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of UsageInfo
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -523,16 +593,20 @@ class __$$UsageInfoImplCopyWithImpl<$Res>
     return _then(_$UsageInfoImpl(
       inputTokens: null == inputTokens
           ? _value.inputTokens
-          : inputTokens as int,
+          : inputTokens // ignore: cast_nullable_to_non_nullable
+              as int,
       outputTokens: null == outputTokens
           ? _value.outputTokens
-          : outputTokens as int,
+          : outputTokens // ignore: cast_nullable_to_non_nullable
+              as int,
       model: freezed == model
           ? _value.model
-          : model as String?,
+          : model // ignore: cast_nullable_to_non_nullable
+              as String?,
       processingTimeMs: null == processingTimeMs
           ? _value.processingTimeMs
-          : processingTimeMs as int,
+          : processingTimeMs // ignore: cast_nullable_to_non_nullable
+              as int,
     ));
   }
 }
@@ -580,12 +654,14 @@ class _$UsageInfoImpl implements _UsageInfo {
                 other.processingTimeMs == processingTimeMs));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, inputTokens, outputTokens, model, processingTimeMs);
+  int get hashCode => Object.hash(
+      runtimeType, inputTokens, outputTokens, model, processingTimeMs);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of UsageInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$UsageInfoImplCopyWith<_$UsageInfoImpl> get copyWith =>
@@ -593,7 +669,9 @@ class _$UsageInfoImpl implements _UsageInfo {
 
   @override
   Map<String, dynamic> toJson() {
-    return _$$UsageInfoImplToJson(this);
+    return _$$UsageInfoImplToJson(
+      this,
+    );
   }
 }
 
@@ -619,8 +697,11 @@ abstract class _UsageInfo implements UsageInfo {
   @override
   @JsonKey(name: 'processing_time_ms')
   int get processingTimeMs;
+
+  /// Create a copy of UsageInfo
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$UsageInfoImplCopyWith<_$UsageInfoImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
