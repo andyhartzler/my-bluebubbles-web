@@ -16,11 +16,10 @@ _$KnowledgeStatsImpl _$$KnowledgeStatsImplFromJson(Map<String, dynamic> json) =>
                 (k, e) => MapEntry(k, (e as num).toInt()),
               ) ??
               const {},
-      documentsByType:
-          (json['documentsByType'] as Map<String, dynamic>?)?.map(
-                (k, e) => MapEntry(k, (e as num).toInt()),
-              ) ??
-              const {},
+      documentsByType: (json['documentsByType'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(k, (e as num).toInt()),
+          ) ??
+          const {},
       monthlyUsageDollars:
           (json['monthlyUsageDollars'] as num?)?.toDouble() ?? 0.0,
       totalQueries: (json['totalQueries'] as num?)?.toInt() ?? 0,
@@ -40,7 +39,7 @@ Map<String, dynamic> _$$KnowledgeStatsImplToJson(
       'documentsByType': instance.documentsByType,
       'monthlyUsageDollars': instance.monthlyUsageDollars,
       'totalQueries': instance.totalQueries,
-      'tableConfigs': instance.tableConfigs.map((e) => e.toJson()).toList(),
+      'tableConfigs': instance.tableConfigs,
     };
 
 _$TableConfigImpl _$$TableConfigImplFromJson(Map<String, dynamic> json) =>

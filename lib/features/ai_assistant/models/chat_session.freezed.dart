@@ -31,8 +31,12 @@ mixin _$ChatSession {
   @JsonKey(name: 'is_archived')
   bool get isArchived => throw _privateConstructorUsedError;
 
+  /// Serializes this ChatSession to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of ChatSession
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $ChatSessionCopyWith<ChatSession> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -62,6 +66,8 @@ class _$ChatSessionCopyWithImpl<$Res, $Val extends ChatSession>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of ChatSession
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -126,6 +132,8 @@ class __$$ChatSessionImplCopyWithImpl<$Res>
       _$ChatSessionImpl _value, $Res Function(_$ChatSessionImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of ChatSession
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -217,12 +225,14 @@ class _$ChatSessionImpl implements _ChatSession {
                 other.isArchived == isArchived));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
       runtimeType, id, createdAt, updatedAt, userId, title, isArchived);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of ChatSession
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$ChatSessionImplCopyWith<_$ChatSessionImpl> get copyWith =>
@@ -264,8 +274,11 @@ abstract class _ChatSession implements ChatSession {
   @override
   @JsonKey(name: 'is_archived')
   bool get isArchived;
+
+  /// Create a copy of ChatSession
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$ChatSessionImplCopyWith<_$ChatSessionImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

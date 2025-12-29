@@ -28,10 +28,13 @@ mixin _$VotingForm {
   @JsonKey(name: 'created_by')
   String? get createdBy => throw _privateConstructorUsedError;
   String get title => throw _privateConstructorUsedError;
-  String? get description => throw _privateConstructorUsedError;
-  Map<String, dynamic> get schema => throw _privateConstructorUsedError;
+  String? get description =>
+      throw _privateConstructorUsedError; // Schema contains the voting options and configuration
+  Map<String, dynamic> get schema =>
+      throw _privateConstructorUsedError; // Settings for vote configuration
   Map<String, dynamic> get settings => throw _privateConstructorUsedError;
-  String get status => throw _privateConstructorUsedError;
+  String get status =>
+      throw _privateConstructorUsedError; // Voting-specific fields from form_schemas
   @JsonKey(name: 'voting_starts_at')
   DateTime? get votingStartsAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'voting_ends_at')
@@ -40,37 +43,51 @@ mixin _$VotingForm {
   Map<String, dynamic>? get eligibleMembers =>
       throw _privateConstructorUsedError;
   @JsonKey(name: 'results_public')
+  @SafeBoolConverter()
   bool get resultsPublic => throw _privateConstructorUsedError;
   @JsonKey(name: 'results_data')
-  Map<String, dynamic>? get resultsData => throw _privateConstructorUsedError;
+  Map<String, dynamic>? get resultsData =>
+      throw _privateConstructorUsedError; // Page management
   @JsonKey(name: 'page_count')
-  int get pageCount => throw _privateConstructorUsedError;
-  String? get slug => throw _privateConstructorUsedError;
+  int get pageCount => throw _privateConstructorUsedError; // Custom URL slug
+  String? get slug => throw _privateConstructorUsedError; // Submission tracking
   @JsonKey(name: 'submission_count')
-  int get submissionCount => throw _privateConstructorUsedError;
+  int get submissionCount => throw _privateConstructorUsedError; // Scheduling
   @JsonKey(name: 'opens_at')
   DateTime? get opensAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'closes_at')
-  DateTime? get closesAt => throw _privateConstructorUsedError;
+  DateTime? get closesAt =>
+      throw _privateConstructorUsedError; // Submission limits
   @JsonKey(name: 'max_submissions')
-  int? get maxSubmissions => throw _privateConstructorUsedError;
+  int? get maxSubmissions =>
+      throw _privateConstructorUsedError; // Access control
   @JsonKey(name: 'require_login')
+  @SafeBoolConverter()
   bool get requireLogin => throw _privateConstructorUsedError;
   @JsonKey(name: 'one_submission_per_user')
-  bool get oneSubmissionPerUser => throw _privateConstructorUsedError;
+  @SafeBoolTrueConverter()
+  bool get oneSubmissionPerUser =>
+      throw _privateConstructorUsedError; // Email settings
   @JsonKey(name: 'confirmation_email_template')
   String? get confirmationEmailTemplate => throw _privateConstructorUsedError;
   @JsonKey(name: 'notification_emails')
-  List<String>? get notificationEmails => throw _privateConstructorUsedError;
+  List<String>? get notificationEmails =>
+      throw _privateConstructorUsedError; // Supporting documents (list of document metadata objects)
   @JsonKey(name: 'supporting_documents')
   List<Map<String, dynamic>>? get supportingDocuments =>
-      throw _privateConstructorUsedError;
+      throw _privateConstructorUsedError; // Executive Committee Only - restricts voting to executive committee members
   @JsonKey(name: 'executive_only')
-  bool get executiveOnly => throw _privateConstructorUsedError;
+  @SafeBoolConverter()
+  bool get executiveOnly =>
+      throw _privateConstructorUsedError; // Committee association - ties vote to a specific committee
   String? get committee => throw _privateConstructorUsedError;
 
+  /// Serializes this VotingForm to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of VotingForm
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $VotingFormCopyWith<VotingForm> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -94,7 +111,7 @@ abstract class $VotingFormCopyWith<$Res> {
       @JsonKey(name: 'voting_starts_at') DateTime? votingStartsAt,
       @JsonKey(name: 'voting_ends_at') DateTime? votingEndsAt,
       @JsonKey(name: 'eligible_members') Map<String, dynamic>? eligibleMembers,
-      @JsonKey(name: 'results_public') bool resultsPublic,
+      @JsonKey(name: 'results_public') @SafeBoolConverter() bool resultsPublic,
       @JsonKey(name: 'results_data') Map<String, dynamic>? resultsData,
       @JsonKey(name: 'page_count') int pageCount,
       String? slug,
@@ -102,14 +119,16 @@ abstract class $VotingFormCopyWith<$Res> {
       @JsonKey(name: 'opens_at') DateTime? opensAt,
       @JsonKey(name: 'closes_at') DateTime? closesAt,
       @JsonKey(name: 'max_submissions') int? maxSubmissions,
-      @JsonKey(name: 'require_login') bool requireLogin,
-      @JsonKey(name: 'one_submission_per_user') bool oneSubmissionPerUser,
+      @JsonKey(name: 'require_login') @SafeBoolConverter() bool requireLogin,
+      @JsonKey(name: 'one_submission_per_user')
+      @SafeBoolTrueConverter()
+      bool oneSubmissionPerUser,
       @JsonKey(name: 'confirmation_email_template')
       String? confirmationEmailTemplate,
       @JsonKey(name: 'notification_emails') List<String>? notificationEmails,
       @JsonKey(name: 'supporting_documents')
       List<Map<String, dynamic>>? supportingDocuments,
-      @JsonKey(name: 'executive_only') bool executiveOnly,
+      @JsonKey(name: 'executive_only') @SafeBoolConverter() bool executiveOnly,
       String? committee});
 }
 
@@ -123,6 +142,8 @@ class _$VotingFormCopyWithImpl<$Res, $Val extends VotingForm>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of VotingForm
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -288,7 +309,7 @@ abstract class _$$VotingFormImplCopyWith<$Res>
       @JsonKey(name: 'voting_starts_at') DateTime? votingStartsAt,
       @JsonKey(name: 'voting_ends_at') DateTime? votingEndsAt,
       @JsonKey(name: 'eligible_members') Map<String, dynamic>? eligibleMembers,
-      @JsonKey(name: 'results_public') bool resultsPublic,
+      @JsonKey(name: 'results_public') @SafeBoolConverter() bool resultsPublic,
       @JsonKey(name: 'results_data') Map<String, dynamic>? resultsData,
       @JsonKey(name: 'page_count') int pageCount,
       String? slug,
@@ -296,14 +317,16 @@ abstract class _$$VotingFormImplCopyWith<$Res>
       @JsonKey(name: 'opens_at') DateTime? opensAt,
       @JsonKey(name: 'closes_at') DateTime? closesAt,
       @JsonKey(name: 'max_submissions') int? maxSubmissions,
-      @JsonKey(name: 'require_login') bool requireLogin,
-      @JsonKey(name: 'one_submission_per_user') bool oneSubmissionPerUser,
+      @JsonKey(name: 'require_login') @SafeBoolConverter() bool requireLogin,
+      @JsonKey(name: 'one_submission_per_user')
+      @SafeBoolTrueConverter()
+      bool oneSubmissionPerUser,
       @JsonKey(name: 'confirmation_email_template')
       String? confirmationEmailTemplate,
       @JsonKey(name: 'notification_emails') List<String>? notificationEmails,
       @JsonKey(name: 'supporting_documents')
       List<Map<String, dynamic>>? supportingDocuments,
-      @JsonKey(name: 'executive_only') bool executiveOnly,
+      @JsonKey(name: 'executive_only') @SafeBoolConverter() bool executiveOnly,
       String? committee});
 }
 
@@ -315,6 +338,8 @@ class __$$VotingFormImplCopyWithImpl<$Res>
       _$VotingFormImpl _value, $Res Function(_$VotingFormImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of VotingForm
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -476,7 +501,9 @@ class _$VotingFormImpl implements _VotingForm {
       @JsonKey(name: 'voting_ends_at') this.votingEndsAt,
       @JsonKey(name: 'eligible_members')
       final Map<String, dynamic>? eligibleMembers,
-      @JsonKey(name: 'results_public') this.resultsPublic = false,
+      @JsonKey(name: 'results_public')
+      @SafeBoolConverter()
+      this.resultsPublic = false,
       @JsonKey(name: 'results_data') final Map<String, dynamic>? resultsData,
       @JsonKey(name: 'page_count') this.pageCount = 1,
       this.slug,
@@ -484,14 +511,21 @@ class _$VotingFormImpl implements _VotingForm {
       @JsonKey(name: 'opens_at') this.opensAt,
       @JsonKey(name: 'closes_at') this.closesAt,
       @JsonKey(name: 'max_submissions') this.maxSubmissions,
-      @JsonKey(name: 'require_login') this.requireLogin = false,
-      @JsonKey(name: 'one_submission_per_user') this.oneSubmissionPerUser = true,
+      @JsonKey(name: 'require_login')
+      @SafeBoolConverter()
+      this.requireLogin = false,
+      @JsonKey(name: 'one_submission_per_user')
+      @SafeBoolTrueConverter()
+      this.oneSubmissionPerUser = true,
       @JsonKey(name: 'confirmation_email_template')
       this.confirmationEmailTemplate,
-      @JsonKey(name: 'notification_emails') final List<String>? notificationEmails,
+      @JsonKey(name: 'notification_emails')
+      final List<String>? notificationEmails,
       @JsonKey(name: 'supporting_documents')
       final List<Map<String, dynamic>>? supportingDocuments,
-      @JsonKey(name: 'executive_only') this.executiveOnly = false,
+      @JsonKey(name: 'executive_only')
+      @SafeBoolConverter()
+      this.executiveOnly = false,
       this.committee})
       : _schema = schema,
         _settings = settings,
@@ -518,7 +552,9 @@ class _$VotingFormImpl implements _VotingForm {
   final String title;
   @override
   final String? description;
+// Schema contains the voting options and configuration
   final Map<String, dynamic> _schema;
+// Schema contains the voting options and configuration
   @override
   Map<String, dynamic> get schema {
     if (_schema is EqualUnmodifiableMapView) return _schema;
@@ -526,7 +562,9 @@ class _$VotingFormImpl implements _VotingForm {
     return EqualUnmodifiableMapView(_schema);
   }
 
+// Settings for vote configuration
   final Map<String, dynamic> _settings;
+// Settings for vote configuration
   @override
   @JsonKey()
   Map<String, dynamic> get settings {
@@ -538,6 +576,7 @@ class _$VotingFormImpl implements _VotingForm {
   @override
   @JsonKey()
   final String status;
+// Voting-specific fields from form_schemas
   @override
   @JsonKey(name: 'voting_starts_at')
   final DateTime? votingStartsAt;
@@ -557,6 +596,7 @@ class _$VotingFormImpl implements _VotingForm {
 
   @override
   @JsonKey(name: 'results_public')
+  @SafeBoolConverter()
   final bool resultsPublic;
   final Map<String, dynamic>? _resultsData;
   @override
@@ -569,29 +609,38 @@ class _$VotingFormImpl implements _VotingForm {
     return EqualUnmodifiableMapView(value);
   }
 
+// Page management
   @override
   @JsonKey(name: 'page_count')
   final int pageCount;
+// Custom URL slug
   @override
   final String? slug;
+// Submission tracking
   @override
   @JsonKey(name: 'submission_count')
   final int submissionCount;
+// Scheduling
   @override
   @JsonKey(name: 'opens_at')
   final DateTime? opensAt;
   @override
   @JsonKey(name: 'closes_at')
   final DateTime? closesAt;
+// Submission limits
   @override
   @JsonKey(name: 'max_submissions')
   final int? maxSubmissions;
+// Access control
   @override
   @JsonKey(name: 'require_login')
+  @SafeBoolConverter()
   final bool requireLogin;
   @override
   @JsonKey(name: 'one_submission_per_user')
+  @SafeBoolTrueConverter()
   final bool oneSubmissionPerUser;
+// Email settings
   @override
   @JsonKey(name: 'confirmation_email_template')
   final String? confirmationEmailTemplate;
@@ -607,7 +656,9 @@ class _$VotingFormImpl implements _VotingForm {
     return EqualUnmodifiableListView(value);
   }
 
+// Supporting documents (list of document metadata objects)
   final List<Map<String, dynamic>>? _supportingDocuments;
+// Supporting documents (list of document metadata objects)
   @override
   @JsonKey(name: 'supporting_documents')
   List<Map<String, dynamic>>? get supportingDocuments {
@@ -619,9 +670,12 @@ class _$VotingFormImpl implements _VotingForm {
     return EqualUnmodifiableListView(value);
   }
 
+// Executive Committee Only - restricts voting to executive committee members
   @override
   @JsonKey(name: 'executive_only')
+  @SafeBoolConverter()
   final bool executiveOnly;
+// Committee association - ties vote to a specific committee
   @override
   final String? committee;
 
@@ -685,7 +739,7 @@ class _$VotingFormImpl implements _VotingForm {
                 other.committee == committee));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hashAll([
         runtimeType,
@@ -718,7 +772,9 @@ class _$VotingFormImpl implements _VotingForm {
         committee
       ]);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of VotingForm
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$VotingFormImplCopyWith<_$VotingFormImpl> get copyWith =>
@@ -747,7 +803,9 @@ abstract class _VotingForm implements VotingForm {
       @JsonKey(name: 'voting_ends_at') final DateTime? votingEndsAt,
       @JsonKey(name: 'eligible_members')
       final Map<String, dynamic>? eligibleMembers,
-      @JsonKey(name: 'results_public') final bool resultsPublic,
+      @JsonKey(name: 'results_public')
+      @SafeBoolConverter()
+      final bool resultsPublic,
       @JsonKey(name: 'results_data') final Map<String, dynamic>? resultsData,
       @JsonKey(name: 'page_count') final int pageCount,
       final String? slug,
@@ -755,14 +813,21 @@ abstract class _VotingForm implements VotingForm {
       @JsonKey(name: 'opens_at') final DateTime? opensAt,
       @JsonKey(name: 'closes_at') final DateTime? closesAt,
       @JsonKey(name: 'max_submissions') final int? maxSubmissions,
-      @JsonKey(name: 'require_login') final bool requireLogin,
-      @JsonKey(name: 'one_submission_per_user') final bool oneSubmissionPerUser,
+      @JsonKey(name: 'require_login')
+      @SafeBoolConverter()
+      final bool requireLogin,
+      @JsonKey(name: 'one_submission_per_user')
+      @SafeBoolTrueConverter()
+      final bool oneSubmissionPerUser,
       @JsonKey(name: 'confirmation_email_template')
       final String? confirmationEmailTemplate,
-      @JsonKey(name: 'notification_emails') final List<String>? notificationEmails,
+      @JsonKey(name: 'notification_emails')
+      final List<String>? notificationEmails,
       @JsonKey(name: 'supporting_documents')
       final List<Map<String, dynamic>>? supportingDocuments,
-      @JsonKey(name: 'executive_only') final bool executiveOnly,
+      @JsonKey(name: 'executive_only')
+      @SafeBoolConverter()
+      final bool executiveOnly,
       final String? committee}) = _$VotingFormImpl;
 
   factory _VotingForm.fromJson(Map<String, dynamic> json) =
@@ -782,13 +847,14 @@ abstract class _VotingForm implements VotingForm {
   @override
   String get title;
   @override
-  String? get description;
+  String?
+      get description; // Schema contains the voting options and configuration
   @override
-  Map<String, dynamic> get schema;
+  Map<String, dynamic> get schema; // Settings for vote configuration
   @override
   Map<String, dynamic> get settings;
   @override
-  String get status;
+  String get status; // Voting-specific fields from form_schemas
   @override
   @JsonKey(name: 'voting_starts_at')
   DateTime? get votingStartsAt;
@@ -800,49 +866,59 @@ abstract class _VotingForm implements VotingForm {
   Map<String, dynamic>? get eligibleMembers;
   @override
   @JsonKey(name: 'results_public')
+  @SafeBoolConverter()
   bool get resultsPublic;
   @override
   @JsonKey(name: 'results_data')
-  Map<String, dynamic>? get resultsData;
+  Map<String, dynamic>? get resultsData; // Page management
   @override
   @JsonKey(name: 'page_count')
-  int get pageCount;
+  int get pageCount; // Custom URL slug
   @override
-  String? get slug;
+  String? get slug; // Submission tracking
   @override
   @JsonKey(name: 'submission_count')
-  int get submissionCount;
+  int get submissionCount; // Scheduling
   @override
   @JsonKey(name: 'opens_at')
   DateTime? get opensAt;
   @override
   @JsonKey(name: 'closes_at')
-  DateTime? get closesAt;
+  DateTime? get closesAt; // Submission limits
   @override
   @JsonKey(name: 'max_submissions')
-  int? get maxSubmissions;
+  int? get maxSubmissions; // Access control
   @override
   @JsonKey(name: 'require_login')
+  @SafeBoolConverter()
   bool get requireLogin;
   @override
   @JsonKey(name: 'one_submission_per_user')
-  bool get oneSubmissionPerUser;
+  @SafeBoolTrueConverter()
+  bool get oneSubmissionPerUser; // Email settings
   @override
   @JsonKey(name: 'confirmation_email_template')
   String? get confirmationEmailTemplate;
   @override
   @JsonKey(name: 'notification_emails')
-  List<String>? get notificationEmails;
+  List<String>?
+      get notificationEmails; // Supporting documents (list of document metadata objects)
   @override
   @JsonKey(name: 'supporting_documents')
-  List<Map<String, dynamic>>? get supportingDocuments;
+  List<Map<String, dynamic>>?
+      get supportingDocuments; // Executive Committee Only - restricts voting to executive committee members
   @override
   @JsonKey(name: 'executive_only')
-  bool get executiveOnly;
+  @SafeBoolConverter()
+  bool
+      get executiveOnly; // Committee association - ties vote to a specific committee
   @override
   String? get committee;
+
+  /// Create a copy of VotingForm
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$VotingFormImplCopyWith<_$VotingFormImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -858,8 +934,12 @@ mixin _$VotingOption {
   String? get description => throw _privateConstructorUsedError;
   int get votes => throw _privateConstructorUsedError;
 
+  /// Serializes this VotingOption to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of VotingOption
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $VotingOptionCopyWith<VotingOption> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -883,6 +963,8 @@ class _$VotingOptionCopyWithImpl<$Res, $Val extends VotingOption>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of VotingOption
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -931,6 +1013,8 @@ class __$$VotingOptionImplCopyWithImpl<$Res>
       _$VotingOptionImpl _value, $Res Function(_$VotingOptionImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of VotingOption
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -999,11 +1083,13 @@ class _$VotingOptionImpl implements _VotingOption {
             (identical(other.votes, votes) || other.votes == votes));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, id, label, description, votes);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of VotingOption
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$VotingOptionImplCopyWith<_$VotingOptionImpl> get copyWith =>
@@ -1035,8 +1121,11 @@ abstract class _VotingOption implements VotingOption {
   String? get description;
   @override
   int get votes;
+
+  /// Create a copy of VotingOption
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$VotingOptionImplCopyWith<_$VotingOptionImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -1057,8 +1146,12 @@ mixin _$Vote {
   @JsonKey(name: 'vote_data')
   Map<String, dynamic> get voteData => throw _privateConstructorUsedError;
 
+  /// Serializes this Vote to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of Vote
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $VoteCopyWith<Vote> get copyWith => throw _privateConstructorUsedError;
 }
 
@@ -1085,6 +1178,8 @@ class _$VoteCopyWithImpl<$Res, $Val extends Vote>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of Vote
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -1141,6 +1236,8 @@ class __$$VoteImplCopyWithImpl<$Res>
   __$$VoteImplCopyWithImpl(_$VoteImpl _value, $Res Function(_$VoteImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of Vote
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -1229,12 +1326,14 @@ class _$VoteImpl implements _Vote {
             const DeepCollectionEquality().equals(other._voteData, _voteData));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, id, createdAt, votingFormId,
       memberId, const DeepCollectionEquality().hash(_voteData));
 
-  @JsonKey(ignore: true)
+  /// Create a copy of Vote
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$VoteImplCopyWith<_$VoteImpl> get copyWith =>
@@ -1273,8 +1372,11 @@ abstract class _Vote implements Vote {
   @override
   @JsonKey(name: 'vote_data')
   Map<String, dynamic> get voteData;
+
+  /// Create a copy of Vote
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$VoteImplCopyWith<_$VoteImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

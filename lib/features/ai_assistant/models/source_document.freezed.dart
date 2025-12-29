@@ -30,8 +30,12 @@ mixin _$SourceDocument {
   @JsonKey(name: 'retrieval_method')
   String? get retrievalMethod => throw _privateConstructorUsedError;
 
+  /// Serializes this SourceDocument to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of SourceDocument
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $SourceDocumentCopyWith<SourceDocument> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -61,6 +65,8 @@ class _$SourceDocumentCopyWithImpl<$Res, $Val extends SourceDocument>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of SourceDocument
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -125,6 +131,8 @@ class __$$SourceDocumentImplCopyWithImpl<$Res>
       _$SourceDocumentImpl _value, $Res Function(_$SourceDocumentImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of SourceDocument
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -216,12 +224,14 @@ class _$SourceDocumentImpl implements _SourceDocument {
                 other.retrievalMethod == retrievalMethod));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, id, sourceType, sourceTable, title, similarity, retrievalMethod);
+  int get hashCode => Object.hash(runtimeType, id, sourceType, sourceTable,
+      title, similarity, retrievalMethod);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of SourceDocument
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$SourceDocumentImplCopyWith<_$SourceDocumentImpl> get copyWith =>
@@ -238,12 +248,13 @@ class _$SourceDocumentImpl implements _SourceDocument {
 
 abstract class _SourceDocument implements SourceDocument {
   const factory _SourceDocument(
-      {required final String id,
-      @JsonKey(name: 'source_type') required final String sourceType,
-      @JsonKey(name: 'source_table') final String? sourceTable,
-      final String? title,
-      final double? similarity,
-      @JsonKey(name: 'retrieval_method') final String? retrievalMethod}) = _$SourceDocumentImpl;
+          {required final String id,
+          @JsonKey(name: 'source_type') required final String sourceType,
+          @JsonKey(name: 'source_table') final String? sourceTable,
+          final String? title,
+          final double? similarity,
+          @JsonKey(name: 'retrieval_method') final String? retrievalMethod}) =
+      _$SourceDocumentImpl;
 
   factory _SourceDocument.fromJson(Map<String, dynamic> json) =
       _$SourceDocumentImpl.fromJson;
@@ -263,8 +274,11 @@ abstract class _SourceDocument implements SourceDocument {
   @override
   @JsonKey(name: 'retrieval_method')
   String? get retrievalMethod;
+
+  /// Create a copy of SourceDocument
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$SourceDocumentImplCopyWith<_$SourceDocumentImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

@@ -32,9 +32,15 @@ mixin _$ChatMessage {
       throw _privateConstructorUsedError;
   @JsonKey(name: 'tokens_used')
   Map<String, dynamic>? get tokensUsed => throw _privateConstructorUsedError;
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  FeedbackState get feedbackState => throw _privateConstructorUsedError;
 
+  /// Serializes this ChatMessage to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-  @JsonKey(ignore: true)
+
+  /// Create a copy of ChatMessage
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   $ChatMessageCopyWith<ChatMessage> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -52,7 +58,9 @@ abstract class $ChatMessageCopyWith<$Res> {
       String role,
       String content,
       @JsonKey(name: 'source_documents') List<SourceDocument> sourceDocuments,
-      @JsonKey(name: 'tokens_used') Map<String, dynamic>? tokensUsed});
+      @JsonKey(name: 'tokens_used') Map<String, dynamic>? tokensUsed,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      FeedbackState feedbackState});
 }
 
 /// @nodoc
@@ -65,6 +73,8 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
+  /// Create a copy of ChatMessage
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -75,6 +85,7 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
     Object? content = null,
     Object? sourceDocuments = null,
     Object? tokensUsed = freezed,
+    Object? feedbackState = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -105,6 +116,10 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
           ? _value.tokensUsed
           : tokensUsed // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
+      feedbackState: null == feedbackState
+          ? _value.feedbackState
+          : feedbackState // ignore: cast_nullable_to_non_nullable
+              as FeedbackState,
     ) as $Val);
   }
 }
@@ -124,7 +139,9 @@ abstract class _$$ChatMessageImplCopyWith<$Res>
       String role,
       String content,
       @JsonKey(name: 'source_documents') List<SourceDocument> sourceDocuments,
-      @JsonKey(name: 'tokens_used') Map<String, dynamic>? tokensUsed});
+      @JsonKey(name: 'tokens_used') Map<String, dynamic>? tokensUsed,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      FeedbackState feedbackState});
 }
 
 /// @nodoc
@@ -135,6 +152,8 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
       _$ChatMessageImpl _value, $Res Function(_$ChatMessageImpl) _then)
       : super(_value, _then);
 
+  /// Create a copy of ChatMessage
+  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -145,6 +164,7 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
     Object? content = null,
     Object? sourceDocuments = null,
     Object? tokensUsed = freezed,
+    Object? feedbackState = null,
   }) {
     return _then(_$ChatMessageImpl(
       id: null == id
@@ -175,6 +195,10 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
           ? _value._tokensUsed
           : tokensUsed // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
+      feedbackState: null == feedbackState
+          ? _value.feedbackState
+          : feedbackState // ignore: cast_nullable_to_non_nullable
+              as FeedbackState,
     ));
   }
 }
@@ -190,7 +214,9 @@ class _$ChatMessageImpl implements _ChatMessage {
       required this.content,
       @JsonKey(name: 'source_documents')
       final List<SourceDocument> sourceDocuments = const [],
-      @JsonKey(name: 'tokens_used') final Map<String, dynamic>? tokensUsed})
+      @JsonKey(name: 'tokens_used') final Map<String, dynamic>? tokensUsed,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      this.feedbackState = FeedbackState.none})
       : _sourceDocuments = sourceDocuments,
         _tokensUsed = tokensUsed;
 
@@ -230,8 +256,12 @@ class _$ChatMessageImpl implements _ChatMessage {
   }
 
   @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  final FeedbackState feedbackState;
+
+  @override
   String toString() {
-    return 'ChatMessage(id: $id, createdAt: $createdAt, sessionId: $sessionId, role: $role, content: $content, sourceDocuments: $sourceDocuments, tokensUsed: $tokensUsed)';
+    return 'ChatMessage(id: $id, createdAt: $createdAt, sessionId: $sessionId, role: $role, content: $content, sourceDocuments: $sourceDocuments, tokensUsed: $tokensUsed, feedbackState: $feedbackState)';
   }
 
   @override
@@ -249,10 +279,12 @@ class _$ChatMessageImpl implements _ChatMessage {
             const DeepCollectionEquality()
                 .equals(other._sourceDocuments, _sourceDocuments) &&
             const DeepCollectionEquality()
-                .equals(other._tokensUsed, _tokensUsed));
+                .equals(other._tokensUsed, _tokensUsed) &&
+            (identical(other.feedbackState, feedbackState) ||
+                other.feedbackState == feedbackState));
   }
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
       runtimeType,
@@ -262,9 +294,12 @@ class _$ChatMessageImpl implements _ChatMessage {
       role,
       content,
       const DeepCollectionEquality().hash(_sourceDocuments),
-      const DeepCollectionEquality().hash(_tokensUsed));
+      const DeepCollectionEquality().hash(_tokensUsed),
+      feedbackState);
 
-  @JsonKey(ignore: true)
+  /// Create a copy of ChatMessage
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
   _$$ChatMessageImplCopyWith<_$ChatMessageImpl> get copyWith =>
@@ -280,15 +315,16 @@ class _$ChatMessageImpl implements _ChatMessage {
 
 abstract class _ChatMessage implements ChatMessage {
   const factory _ChatMessage(
-          {required final String id,
-          @JsonKey(name: 'created_at') required final DateTime createdAt,
-          @JsonKey(name: 'session_id') required final String sessionId,
-          required final String role,
-          required final String content,
-          @JsonKey(name: 'source_documents')
-          final List<SourceDocument> sourceDocuments,
-          @JsonKey(name: 'tokens_used') final Map<String, dynamic>? tokensUsed}) =
-      _$ChatMessageImpl;
+      {required final String id,
+      @JsonKey(name: 'created_at') required final DateTime createdAt,
+      @JsonKey(name: 'session_id') required final String sessionId,
+      required final String role,
+      required final String content,
+      @JsonKey(name: 'source_documents')
+      final List<SourceDocument> sourceDocuments,
+      @JsonKey(name: 'tokens_used') final Map<String, dynamic>? tokensUsed,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      final FeedbackState feedbackState}) = _$ChatMessageImpl;
 
   factory _ChatMessage.fromJson(Map<String, dynamic> json) =
       _$ChatMessageImpl.fromJson;
@@ -312,7 +348,13 @@ abstract class _ChatMessage implements ChatMessage {
   @JsonKey(name: 'tokens_used')
   Map<String, dynamic>? get tokensUsed;
   @override
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  FeedbackState get feedbackState;
+
+  /// Create a copy of ChatMessage
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
   _$$ChatMessageImplCopyWith<_$ChatMessageImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
