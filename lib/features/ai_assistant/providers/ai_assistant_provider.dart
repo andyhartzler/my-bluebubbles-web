@@ -16,7 +16,8 @@ class AIAssistantProvider extends ChangeNotifier {
   bool _isSending = false;
   String? _error;
   KnowledgeStats? _stats;
-  MemoriesUsed? _lastMemoriesUsed;
+  TaskClassification? _lastClassification;
+  int? _lastDocumentsRetrieved;
 
   // Getters
   List<ChatSession> get sessions => _sessions;
@@ -26,8 +27,10 @@ class AIAssistantProvider extends ChangeNotifier {
   bool get isSending => _isSending;
   String? get error => _error;
   KnowledgeStats? get stats => _stats;
-  MemoriesUsed? get lastMemoriesUsed => _lastMemoriesUsed;
+  TaskClassification? get lastClassification => _lastClassification;
+  int? get lastDocumentsRetrieved => _lastDocumentsRetrieved;
   bool get hasCurrentSession => _currentSession != null;
+  bool get isDeepResearchMode => _lastClassification?.scope == 'exhaustive';
 
   // ============================================
   // SESSION MANAGEMENT
@@ -148,8 +151,9 @@ class AIAssistantProvider extends ChangeNotifier {
         sessionId: _currentSession!.id,
       );
 
-      // Store memories used for UI indicator
-      _lastMemoriesUsed = response.memoriesUsed;
+      // Store classification and documents retrieved for UI indicators
+      _lastClassification = response.classification;
+      _lastDocumentsRetrieved = response.documentsRetrieved;
 
       // Add assistant message
       final assistantMsg = ChatMessage(

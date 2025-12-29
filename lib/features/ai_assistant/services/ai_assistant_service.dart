@@ -146,18 +146,11 @@ class AIAssistantService {
 
     final data = response.data as Map<String, dynamic>;
 
-    // Parse enhanced response fields
-    QueryIntent? intent;
-    if (data['intent'] != null) {
+    // Parse V2 classification (replaces old intent field)
+    TaskClassification? classification;
+    if (data['classification'] != null) {
       try {
-        intent = QueryIntent.fromJson(data['intent'] as Map<String, dynamic>);
-      } catch (_) {}
-    }
-
-    MemoriesUsed? memoriesUsed;
-    if (data['memories_used'] != null) {
-      try {
-        memoriesUsed = MemoriesUsed.fromJson(data['memories_used'] as Map<String, dynamic>);
+        classification = TaskClassification.fromJson(data['classification'] as Map<String, dynamic>);
       } catch (_) {}
     }
 
@@ -166,8 +159,8 @@ class AIAssistantService {
       sources: (data['sources'] as List? ?? [])
           .map((s) => SourceDocument.fromJson(s as Map<String, dynamic>))
           .toList(),
-      intent: intent,
-      memoriesUsed: memoriesUsed,
+      classification: classification,
+      documentsRetrieved: data['documentsRetrieved'] as int?,
       inputTokens: data['usage']?['input_tokens'] as int? ?? 0,
       outputTokens: data['usage']?['output_tokens'] as int? ?? 0,
     );
@@ -437,25 +430,28 @@ class AIAssistantService {
   }
 }
 
-/// Enhanced response from AI query with memory and intent data
+/// Enhanced response from AI query with V2 classification data
 class EnhancedQueryResponse {
   final String response;
   final List<SourceDocument> sources;
-  final QueryIntent? intent;
-  final MemoriesUsed? memoriesUsed;
+  final TaskClassification? classification;
+  final int? documentsRetrieved;
   final int inputTokens;
   final int outputTokens;
 
   EnhancedQueryResponse({
     required this.response,
     required this.sources,
-    this.intent,
-    this.memoriesUsed,
+    this.classification,
+    this.documentsRetrieved,
     required this.inputTokens,
     required this.outputTokens,
   });
 
   int get totalTokens => inputTokens + outputTokens;
+
+  /// Whether this was a comprehensive/exhaustive research query
+  bool get isDeepResearch => classification?.scope == 'exhaustive';
 
   /// Estimated cost in cents
   double get estimatedCostCents {

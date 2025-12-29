@@ -3,37 +3,22 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'query_response.freezed.dart';
 part 'query_response.g.dart';
 
-/// Intent detected from user query
+/// Task classification from Knowledge Chat V2
 @freezed
-class QueryIntent with _$QueryIntent {
-  const factory QueryIntent({
+class TaskClassification with _$TaskClassification {
+  const factory TaskClassification({
+    /// One of: simple_lookup, entity_search, explanation, comprehensive_research, content_generation
     required String type,
-    String? entity,
-    String? temporal,
+    /// One of: narrow, moderate, exhaustive
+    required String scope,
+    /// Data sources queried
+    @JsonKey(name: 'dataNeeds') @Default([]) List<String> dataNeeds,
+    /// Confidence score 0.0 to 1.0
     @Default(0.5) double confidence,
-    @Default([]) List<String> keywords,
-    Map<String, dynamic>? filters,
-  }) = _QueryIntent;
+  }) = _TaskClassification;
 
-  factory QueryIntent.fromJson(Map<String, dynamic> json) =>
-      _$QueryIntentFromJson(json);
-}
-
-/// Memory usage information from AI response
-@freezed
-class MemoriesUsed with _$MemoriesUsed {
-  const MemoriesUsed._();
-
-  const factory MemoriesUsed({
-    @Default(0) int session,
-    @Default(0) int user,
-    @Default(0) int org,
-  }) = _MemoriesUsed;
-
-  factory MemoriesUsed.fromJson(Map<String, dynamic> json) =>
-      _$MemoriesUsedFromJson(json);
-
-  int get total => session + user + org;
+  factory TaskClassification.fromJson(Map<String, dynamic> json) =>
+      _$TaskClassificationFromJson(json);
 }
 
 /// Usage information from AI response

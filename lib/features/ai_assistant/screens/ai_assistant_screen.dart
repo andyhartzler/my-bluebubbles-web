@@ -5,7 +5,6 @@ import '../widgets/chat_message_bubble.dart';
 import '../widgets/chat_input_field.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/suggestion_chips.dart';
-import '../widgets/memory_indicator.dart';
 
 // Brand colors matching dashboard theme
 const _unityBlue = Color(0xFF273351);
@@ -92,21 +91,72 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
           },
         ),
         actions: [
-          // Memory indicator
+          // Scope indicator - shows when deep research mode is active
           Consumer<AIAssistantProvider>(
             builder: (context, provider, _) {
-              final memories = provider.lastMemoriesUsed;
-              if (memories == null || memories.total == 0) {
+              final classification = provider.lastClassification;
+              final docsRetrieved = provider.lastDocumentsRetrieved;
+
+              if (classification == null) {
                 return const SizedBox.shrink();
               }
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: MemoryIndicator(
-                  sessionMemories: memories.session,
-                  userMemories: memories.user,
-                  orgMemories: memories.org,
-                ),
-              );
+
+              // Show indicator for exhaustive/comprehensive queries
+              if (classification.scope == 'exhaustive') {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Tooltip(
+                    message: docsRetrieved != null
+                        ? 'Deep Research: Analyzed $docsRetrieved documents'
+                        : 'Deep Research Mode',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _momentumBlue.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.search, size: 14, color: _momentumBlue),
+                          const SizedBox(width: 4),
+                          Text(
+                            docsRetrieved != null ? '$docsRetrieved docs' : 'Deep',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: _momentumBlue,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              // For moderate scope, show smaller indicator
+              if (classification.scope == 'moderate' && docsRetrieved != null && docsRetrieved > 5) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Tooltip(
+                    message: 'Analyzed $docsRetrieved documents',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$docsRetrieved',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return const SizedBox.shrink();
             },
           ),
           // New chat button
