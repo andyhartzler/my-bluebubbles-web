@@ -1,26 +1,33 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for handling Mautic authentication via Edge Function
 class MauticAuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  /// Base URL for Mautic (fallback if Edge Function doesn't return it)
+  /// Base URL for Mautic
   static const String mauticBaseUrl = 'https://email.moyd.app';
+
+  /// Dashboard URL (used as fallback)
+  static const String mauticDashboardUrl = '$mauticBaseUrl/s/dashboard';
 
   /// Gets a one-time auto-login URL for Mautic
   ///
   /// [redirect] - Optional path to redirect to after login (e.g., '/s/emails' for emails page)
   ///
   /// Returns the full URL to load in WebView or browser
-  /// Throws exception if user is not authenticated or Edge Function fails
+  /// Falls back to dashboard URL if Edge Function fails
   Future<String> getMauticLoginUrl({String? redirect}) async {
     // Verify user is logged into CRM
     final session = _supabase.auth.currentSession;
     if (session == null) {
-      throw Exception('User not authenticated in CRM');
+      debugPrint('Mautic: No CRM session, loading dashboard directly');
+      return mauticDashboardUrl;
     }
 
     try {
+      debugPrint('Mautic: Calling mautic-auth Edge Function...');
+
       final response = await _supabase.functions.invoke(
         'mautic-auth',
         body: {
@@ -28,20 +35,28 @@ class MauticAuthService {
         },
       );
 
+      debugPrint('Mautic: Edge Function response status: ${response.status}');
+      debugPrint('Mautic: Edge Function response data: ${response.data}');
+
       if (response.status != 200) {
-        final error = response.data?['error'] ?? 'Unknown error';
-        throw Exception('Failed to get Mautic auth: $error');
+        final error = response.data?['error'] ?? 'Unknown error (status ${response.status})';
+        debugPrint('Mautic: Edge Function error: $error');
+        // Fall back to dashboard URL
+        return mauticDashboardUrl;
       }
 
       final loginUrl = response.data['login_url'] as String?;
       if (loginUrl == null || loginUrl.isEmpty) {
-        throw Exception('No login URL returned from Edge Function');
+        debugPrint('Mautic: No login_url in response, falling back to dashboard');
+        return mauticDashboardUrl;
       }
 
+      debugPrint('Mautic: Got login URL: $loginUrl');
       return loginUrl;
     } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Failed to connect to auth service: $e');
+      debugPrint('Mautic: Exception calling Edge Function: $e');
+      // Fall back to dashboard URL on any error
+      return mauticDashboardUrl;
     }
   }
 
