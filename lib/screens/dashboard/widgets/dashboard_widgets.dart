@@ -382,6 +382,11 @@ class BarChartWidget extends StatelessWidget {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  // Safety check: ensure valid constraints before rendering chart
+                  if (constraints.maxWidth <= 0 || constraints.maxHeight <= 0 ||
+                      !constraints.maxWidth.isFinite || !constraints.maxHeight.isFinite) {
+                    return const SizedBox.shrink();
+                  }
                   // Use horizontal bar chart for small screens
                   final isSmall = constraints.maxWidth < 300;
                   if (isSmall) {
@@ -742,6 +747,12 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
                   ? _buildEmptyState()
                   : LayoutBuilder(
                       builder: (context, constraints) {
+                        // Safety check: ensure valid constraints before rendering chart
+                        // This prevents layout errors during animation transitions
+                        if (constraints.maxWidth <= 0 || constraints.maxHeight <= 0 ||
+                            !constraints.maxWidth.isFinite || !constraints.maxHeight.isFinite) {
+                          return const SizedBox.shrink();
+                        }
                         return _buildChart(data, constraints);
                       },
                     ),
@@ -1115,6 +1126,11 @@ class _PieChartWidgetState extends State<PieChartWidget> {
   }
 
   Widget _buildResponsiveChart(BoxConstraints constraints) {
+    // Safety check: ensure valid constraints before rendering chart
+    if (constraints.maxWidth <= 0 || constraints.maxHeight <= 0 ||
+        !constraints.maxWidth.isFinite || !constraints.maxHeight.isFinite) {
+      return const SizedBox.shrink();
+    }
     final width = constraints.maxWidth;
     final height = constraints.maxHeight;
     final isCompact = width < 250 || height < 200;
@@ -1428,7 +1444,14 @@ class LineChartWidget extends StatelessWidget {
             _buildHeader(),
             const SizedBox(height: 16),
             Expanded(
-              child: LineChart(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Safety check: ensure valid constraints before rendering chart
+                  if (constraints.maxWidth <= 0 || constraints.maxHeight <= 0 ||
+                      !constraints.maxWidth.isFinite || !constraints.maxHeight.isFinite) {
+                    return const SizedBox.shrink();
+                  }
+                  return LineChart(
                 LineChartData(
                   minY: 0,
                   maxY: (maxValue * 1.2).clamp(1, double.infinity).toDouble(),
@@ -1529,6 +1552,8 @@ class LineChartWidget extends StatelessWidget {
                     ),
                   ),
                 ),
+                  );
+                },
               ),
             ),
           ],
