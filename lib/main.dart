@@ -8,7 +8,6 @@ import 'package:bluebubbles/app/components/custom/custom_error_box.dart';
 import 'package:bluebubbles/helpers/backend/startup_tasks.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/services/network/http_overrides.dart';
-import 'package:bluebubbles/services/credential_storage_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/utils/window_effects.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
@@ -37,7 +36,7 @@ import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
 import 'package:bluebubbles/features/committees/screens/committees_dashboard_screen.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
-import 'package:bluebubbles/features/campaigns/screens/listmonk_webview_screen.dart';
+import 'package:bluebubbles/features/campaigns/screens/mautic_embed_screen.dart';
 import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
 import 'package:collection/collection.dart';
@@ -123,10 +122,6 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
         try {
           await CRMSupabaseService().initialize();
           Logger.info('CRM system initialized');
-
-          // Initialize Listmonk credentials
-          await CredentialStorageService.initializeListmonkCredentials();
-          Logger.info('Listmonk credentials initialized');
         } catch (e, s) {
           Logger.warn('CRM system failed to initialize: $e', trace: s);
         }
@@ -1009,7 +1004,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                         key: PageStorageKey('slack-management-view'),
                         embed: true,
                       ),
-                      const ListmonkWebViewScreen(
+                      const MauticEmbedScreen(
                         key: PageStorageKey('campaigns-view'),
                       ),
                       const FormsMainScreen(
