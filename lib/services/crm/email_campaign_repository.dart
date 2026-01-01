@@ -58,16 +58,16 @@ class EmailCampaignRepository {
       }
 
       // Order by sent_at descending (nulls last for drafts)
-      query.order('sent_at', ascending: false, nullsFirst: false);
+      final orderedQuery = query.order('sent_at', ascending: false, nullsFirst: false);
 
-      if (limit > 0) {
-        query.range(offset, offset + limit - 1);
-      }
+      final finalQuery = limit > 0
+          ? orderedQuery.range(offset, offset + limit - 1)
+          : orderedQuery;
 
       final postgrest.PostgrestResponse response = fetchTotalCount
-          ? await query.count(postgrest.CountOption.exact)
+          ? await finalQuery.count(postgrest.CountOption.exact)
           : postgrest.PostgrestResponse(
-              data: await query,
+              data: await finalQuery,
               count: 0,
             );
 

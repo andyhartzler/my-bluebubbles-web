@@ -69,7 +69,7 @@ class CampaignHtmlPreview extends StatelessWidget {
                   style: {
                     'body': Style(
                       margin: Margins.zero,
-                      padding: HtmlPaddings.all(16),
+                      padding: HtmlPaddings.zero,
                       fontSize: FontSize(14),
                       color: Colors.black87,
                       backgroundColor: Colors.white,
@@ -96,15 +96,8 @@ class CampaignHtmlPreview extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                       margin: Margins.only(bottom: 10, top: 8),
                     ),
-                    'img': Style(
-                      width: Width(100, Unit.percent),
-                      height: Height.auto(),
-                    ),
-                    'table': Style(
-                      width: Width(100, Unit.percent),
-                    ),
                     'td': Style(
-                      padding: HtmlPaddings.all(8),
+                      padding: HtmlPaddings.symmetric(horizontal: 8, vertical: 4),
                     ),
                     'ul': Style(
                       margin: Margins.only(left: 16, bottom: 12),
