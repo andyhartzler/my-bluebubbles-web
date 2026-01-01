@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/models/crm/subscriber.dart';
+import 'package:bluebubbles/models/crm/email_campaign.dart';
 import 'package:bluebubbles/services/crm/subscriber_repository.dart';
+import 'package:bluebubbles/services/crm/email_campaign_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/features/forms/models/form_submission.dart';
 import 'package:bluebubbles/features/forms/services/forms_service.dart';
 import 'package:bluebubbles/features/forms/widgets/submission_status_badge.dart';
+import 'package:bluebubbles/screens/crm/email_campaigns/email_campaigns_tab.dart';
+import 'package:bluebubbles/screens/crm/email_campaigns/email_campaign_detail_screen.dart';
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
@@ -201,9 +205,11 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Subscribers'),
+        title: const Text('Subscribers & Campaigns'),
         actions: [
           IconButton(
             tooltip: 'Refresh',
@@ -212,11 +218,11 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
           ),
         ],
       ),
-      body: _buildBody(context),
+      body: _buildBody(context, theme),
     );
   }
 
-  Widget _buildBody(BuildContext context) {
+  Widget _buildBody(BuildContext context, ThemeData theme) {
     if (_errorState) {
       return Center(
         child: Column(
@@ -232,6 +238,37 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
       );
     }
 
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          Material(
+            elevation: 2,
+            color: theme.colorScheme.surface,
+            child: TabBar(
+              labelColor: theme.colorScheme.primary,
+              unselectedLabelColor: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+              indicatorColor: theme.colorScheme.primary,
+              tabs: const [
+                Tab(icon: Icon(Icons.people_outline), text: 'Subscribers'),
+                Tab(icon: Icon(Icons.campaign_outlined), text: 'Campaigns'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildSubscribersTab(),
+                const EmailCampaignsTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubscribersTab() {
     if (_loading && _subscribers.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -964,14 +1001,18 @@ class _SubscriberDetailSheet extends StatefulWidget {
 class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
   late Subscriber _subscriber;
   final FormsService _formsService = FormsService();
+  final EmailCampaignRepository _campaignRepository = EmailCampaignRepository();
   List<FormSubmission> _formSubmissions = [];
+  List<EmailCampaignRecipient> _campaignRecipients = [];
   bool _loadingSubmissions = false;
+  bool _loadingCampaigns = false;
 
   @override
   void initState() {
     super.initState();
     _subscriber = widget.subscriber;
     _loadFormSubmissions();
+    _loadCampaignHistory();
   }
 
   Future<void> _loadFormSubmissions() async {
@@ -988,6 +1029,57 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
       if (mounted) {
         setState(() => _loadingSubmissions = false);
       }
+    }
+  }
+
+  Future<void> _loadCampaignHistory() async {
+    setState(() => _loadingCampaigns = true);
+    try {
+      // Try by subscriber ID first, then fall back to email
+      var recipients = await _campaignRepository.fetchSubscriberCampaigns(
+        subscriberId: _subscriber.id,
+        limit: 10,
+      );
+
+      // If no results by ID, try by email
+      if (recipients.isEmpty && _subscriber.email.isNotEmpty) {
+        recipients = await _campaignRepository.fetchSubscriberCampaignsByEmail(
+          email: _subscriber.email,
+          limit: 10,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _campaignRecipients = recipients;
+          _loadingCampaigns = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingCampaigns = false);
+      }
+    }
+  }
+
+  void _openCampaignDetail(EmailCampaignRecipient recipient) {
+    if (recipient.campaign != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => EmailCampaignDetailScreen(
+            campaignId: recipient.campaignId,
+            initialCampaign: recipient.campaign,
+          ),
+        ),
+      );
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => EmailCampaignDetailScreen(
+            campaignId: recipient.campaignId,
+          ),
+        ),
+      );
     }
   }
 
@@ -1030,6 +1122,100 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
           ),
           SubmissionStatusBadge(status: submission.status, compact: true),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCampaignTile(EmailCampaignRecipient recipient) {
+    final theme = Theme.of(context);
+    final dateFormat = DateFormat('MMM d, y');
+    final campaign = recipient.campaign;
+
+    return InkWell(
+      onTap: () => _openCampaignDetail(recipient),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withOpacity(0.5),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        campaign?.name ?? 'Campaign',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (campaign?.subject != null)
+                        Text(
+                          campaign!.subject,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (recipient.sentAt != null)
+                  _CampaignInfoChip(
+                    icon: Icons.schedule_outlined,
+                    label: dateFormat.format(recipient.sentAt!),
+                  ),
+                if (recipient.opened)
+                  _CampaignInfoChip(
+                    icon: Icons.mark_email_read_outlined,
+                    label: recipient.openCount > 1 ? 'Opened ${recipient.openCount}x' : 'Opened',
+                    color: _grassrootsGreen,
+                  ),
+                if (recipient.clicked)
+                  _CampaignInfoChip(
+                    icon: Icons.touch_app_outlined,
+                    label: recipient.clickCount > 1 ? 'Clicked ${recipient.clickCount}x' : 'Clicked',
+                    color: _momentumBlue,
+                  ),
+                if (recipient.bounced)
+                  _CampaignInfoChip(
+                    icon: Icons.error_outline,
+                    label: 'Bounced',
+                    color: _actionRed,
+                  ),
+                if (recipient.unsubscribed)
+                  _CampaignInfoChip(
+                    icon: Icons.unsubscribe_outlined,
+                    label: 'Unsubscribed',
+                    color: Colors.orange,
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1239,6 +1425,43 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         '+${_formSubmissions.length - 5} more submissions',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                ],
+                // Email Campaigns Section
+                if (_loadingCampaigns) ...[
+                  const SizedBox(height: 8),
+                  const Center(child: CircularProgressIndicator()),
+                  const SizedBox(height: 12),
+                ] else if (_campaignRecipients.isNotEmpty) ...[
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.campaign_outlined, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Email Campaigns', style: theme.textTheme.titleMedium),
+                      const Spacer(),
+                      Text(
+                        '${_campaignRecipients.length}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ..._campaignRecipients.take(5).map((recipient) => _buildCampaignTile(recipient)),
+                  if (_campaignRecipients.length > 5)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '+${_campaignRecipients.length - 5} more campaigns',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -1891,6 +2114,47 @@ class _StatusPill extends StatelessWidget {
               color: color,
               fontWeight: FontWeight.w600,
             ),
+      ),
+    );
+  }
+}
+
+class _CampaignInfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  const _CampaignInfoChip({
+    required this.icon,
+    required this.label,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final chipColor = color ?? theme.colorScheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: chipColor.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: chipColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: chipColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
