@@ -1,6 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+
+// Conditional imports for web
+import 'campaign_html_preview_stub.dart'
+    if (dart.library.html) 'campaign_html_preview_web.dart' as platform;
 
 class CampaignHtmlPreview extends StatefulWidget {
   final String? htmlContent;
@@ -17,41 +21,7 @@ class CampaignHtmlPreview extends StatefulWidget {
 }
 
 class _CampaignHtmlPreviewState extends State<CampaignHtmlPreview> {
-  WebViewController? _webViewController;
-  bool _webViewLoading = true;
   bool _showTextVersion = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _initWebView();
-  }
-
-  void _initWebView() {
-    if (widget.htmlContent != null && widget.htmlContent!.isNotEmpty) {
-      _webViewController = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(Colors.white)
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onPageFinished: (_) {
-              if (mounted) {
-                setState(() => _webViewLoading = false);
-              }
-            },
-            onNavigationRequest: (request) {
-              // Open external links in a snackbar with copy option
-              if (request.url.startsWith('http')) {
-                _showLinkSnackbar(request.url);
-                return NavigationDecision.prevent;
-              }
-              return NavigationDecision.navigate;
-            },
-          ),
-        )
-        ..loadHtmlString(_wrapHtml(widget.htmlContent!));
-    }
-  }
 
   String _wrapHtml(String content) {
     return '''
@@ -59,11 +29,9 @@ class _CampaignHtmlPreviewState extends State<CampaignHtmlPreview> {
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       padding: 16px;
@@ -73,21 +41,10 @@ class _CampaignHtmlPreviewState extends State<CampaignHtmlPreview> {
       color: #333;
       background-color: #fff;
     }
-    img {
-      max-width: 100%;
-      height: auto;
-    }
-    table {
-      max-width: 100%;
-      border-collapse: collapse;
-    }
-    a {
-      color: #0066cc;
-    }
-    pre, code {
-      overflow-x: auto;
-      max-width: 100%;
-    }
+    img { max-width: 100%; height: auto; }
+    table { max-width: 100%; border-collapse: collapse; }
+    a { color: #0066cc; }
+    pre, code { overflow-x: auto; max-width: 100%; }
   </style>
 </head>
 <body>
@@ -95,27 +52,6 @@ $content
 </body>
 </html>
 ''';
-  }
-
-  void _showLinkSnackbar(String url) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(url, maxLines: 2, overflow: TextOverflow.ellipsis),
-        action: SnackBarAction(
-          label: 'Copy',
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: url));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Link copied to clipboard'),
-                duration: Duration(seconds: 1),
-              ),
-            );
-          },
-        ),
-        duration: const Duration(seconds: 4),
-      ),
-    );
   }
 
   @override
@@ -192,32 +128,24 @@ $content
   }
 
   Widget _buildHtmlContent(ThemeData theme) {
-    if (_webViewController == null) {
-      return const Center(child: Text('Unable to load HTML content'));
-    }
+    final wrappedHtml = _wrapHtml(widget.htmlContent!);
 
-    return Stack(
-      children: [
-        Container(
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
+    return Container(
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
-          clipBehavior: Clip.antiAlias,
-          child: WebViewWidget(controller: _webViewController!),
-        ),
-        if (_webViewLoading)
-          const Center(child: CircularProgressIndicator()),
-      ],
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: platform.buildHtmlView(wrappedHtml),
     );
   }
 
