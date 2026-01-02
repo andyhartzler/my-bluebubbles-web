@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter/services.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
-class CampaignHtmlPreview extends StatelessWidget {
+class CampaignHtmlPreview extends StatefulWidget {
   final String? htmlContent;
   final String? textContent;
 
@@ -12,11 +13,119 @@ class CampaignHtmlPreview extends StatelessWidget {
   });
 
   @override
+  State<CampaignHtmlPreview> createState() => _CampaignHtmlPreviewState();
+}
+
+class _CampaignHtmlPreviewState extends State<CampaignHtmlPreview> {
+  WebViewController? _webViewController;
+  bool _webViewLoading = true;
+  bool _showTextVersion = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initWebView();
+  }
+
+  void _initWebView() {
+    if (widget.htmlContent != null && widget.htmlContent!.isNotEmpty) {
+      _webViewController = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(Colors.white)
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageFinished: (_) {
+              if (mounted) {
+                setState(() => _webViewLoading = false);
+              }
+            },
+            onNavigationRequest: (request) {
+              // Open external links in a snackbar with copy option
+              if (request.url.startsWith('http')) {
+                _showLinkSnackbar(request.url);
+                return NavigationDecision.prevent;
+              }
+              return NavigationDecision.navigate;
+            },
+          ),
+        )
+        ..loadHtmlString(_wrapHtml(widget.htmlContent!));
+    }
+  }
+
+  String _wrapHtml(String content) {
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+      background-color: #fff;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    table {
+      max-width: 100%;
+      border-collapse: collapse;
+    }
+    a {
+      color: #0066cc;
+    }
+    pre, code {
+      overflow-x: auto;
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+$content
+</body>
+</html>
+''';
+  }
+
+  void _showLinkSnackbar(String url) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(url, maxLines: 2, overflow: TextOverflow.ellipsis),
+        action: SnackBarAction(
+          label: 'Copy',
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: url));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Link copied to clipboard'),
+                duration: Duration(seconds: 1),
+              ),
+            );
+          },
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasHtml = widget.htmlContent != null && widget.htmlContent!.isNotEmpty;
+    final hasText = widget.textContent != null && widget.textContent!.isNotEmpty;
 
-    if ((htmlContent == null || htmlContent!.isEmpty) &&
-        (textContent == null || textContent!.isEmpty)) {
+    // Empty state
+    if (!hasHtml && !hasText) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -39,135 +148,95 @@ class CampaignHtmlPreview extends StatelessWidget {
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (htmlContent != null && htmlContent!.isNotEmpty) ...[
-            _buildPreviewHeader(theme, 'HTML Email Preview'),
-            const SizedBox(height: 12),
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: Container(
-                width: double.infinity,
-                constraints: const BoxConstraints(maxWidth: 700),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(
-                    color: theme.colorScheme.outlineVariant,
-                  ),
+    return Column(
+      children: [
+        // Toggle between HTML and Text if both are available
+        if (hasHtml && hasText)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: false,
+                  label: Text('HTML Preview'),
+                  icon: Icon(Icons.code),
                 ),
-                child: Html(
-                  data: htmlContent!,
-                  style: {
-                    'body': Style(
-                      margin: Margins.zero,
-                      padding: HtmlPaddings.zero,
-                      fontSize: FontSize(14),
-                      color: Colors.black87,
-                      backgroundColor: Colors.white,
-                    ),
-                    'p': Style(
-                      margin: Margins.only(bottom: 12),
-                    ),
-                    'a': Style(
-                      color: Colors.blue[700],
-                      textDecoration: TextDecoration.underline,
-                    ),
-                    'h1': Style(
-                      fontSize: FontSize(24),
-                      fontWeight: FontWeight.bold,
-                      margin: Margins.only(bottom: 16, top: 8),
-                    ),
-                    'h2': Style(
-                      fontSize: FontSize(20),
-                      fontWeight: FontWeight.bold,
-                      margin: Margins.only(bottom: 12, top: 8),
-                    ),
-                    'h3': Style(
-                      fontSize: FontSize(18),
-                      fontWeight: FontWeight.bold,
-                      margin: Margins.only(bottom: 10, top: 8),
-                    ),
-                    'td': Style(
-                      padding: HtmlPaddings.symmetric(horizontal: 8, vertical: 4),
-                    ),
-                    'ul': Style(
-                      margin: Margins.only(left: 16, bottom: 12),
-                    ),
-                    'ol': Style(
-                      margin: Margins.only(left: 16, bottom: 12),
-                    ),
-                    'li': Style(
-                      margin: Margins.only(bottom: 4),
-                    ),
-                  },
-                  onLinkTap: (url, attributes, element) {
-                    if (url != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Link: $url'),
-                          action: SnackBarAction(
-                            label: 'Copy',
-                            onPressed: () {
-                              // Could add clipboard functionality here
-                            },
-                          ),
-                        ),
-                      );
-                    }
-                  },
+                ButtonSegment(
+                  value: true,
+                  label: Text('Plain Text'),
+                  icon: Icon(Icons.text_fields),
                 ),
-              ),
+              ],
+              selected: {_showTextVersion},
+              onSelectionChanged: (selected) {
+                setState(() => _showTextVersion = selected.first);
+              },
             ),
-          ],
-          if (textContent != null && textContent!.isNotEmpty) ...[
-            if (htmlContent != null && htmlContent!.isNotEmpty)
-              const SizedBox(height: 24),
-            _buildPreviewHeader(theme, 'Plain Text Version'),
-            const SizedBox(height: 12),
-            Card(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                child: SelectableText(
-                  textContent!,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    height: 1.5,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
+          ),
+
+        // Content area
+        Expanded(
+          child: _showTextVersion || !hasHtml
+              ? _buildTextContent(theme)
+              : _buildHtmlContent(theme),
+        ),
+      ],
     );
   }
 
-  Widget _buildPreviewHeader(ThemeData theme, String title) {
-    return Row(
+  Widget _buildHtmlContent(ThemeData theme) {
+    if (_webViewController == null) {
+      return const Center(child: Text('Unable to load HTML content'));
+    }
+
+    return Stack(
       children: [
-        Icon(
-          title.contains('HTML') ? Icons.code : Icons.text_fields,
-          size: 20,
-          color: theme.colorScheme.primary,
+        Container(
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: WebViewWidget(controller: _webViewController!),
         ),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+        if (_webViewLoading)
+          const Center(child: CircularProgressIndicator()),
+      ],
+    );
+  }
+
+  Widget _buildTextContent(ThemeData theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          child: SelectableText(
+            widget.textContent ?? 'No plain text content available',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontFamily: 'monospace',
+              height: 1.6,
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
