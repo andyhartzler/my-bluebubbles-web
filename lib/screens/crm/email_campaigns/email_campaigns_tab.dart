@@ -31,7 +31,6 @@ class _EmailCampaignsTabState extends State<EmailCampaignsTab> {
 
   Timer? _debounce;
   List<EmailCampaign> _campaigns = [];
-  EmailCampaignStats _stats = const EmailCampaignStats();
   bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = true;
@@ -78,16 +77,8 @@ class _EmailCampaignsTabState extends State<EmailCampaignsTab> {
 
     await Future.wait([
       _loadCampaigns(reset: true),
-      _loadStats(),
       _loadFilters(),
     ]);
-  }
-
-  Future<void> _loadStats() async {
-    final stats = await _repository.fetchStats();
-    if (mounted) {
-      setState(() => _stats = stats);
-    }
   }
 
   Future<void> _loadFilters() async {
@@ -235,10 +226,6 @@ class _EmailCampaignsTabState extends State<EmailCampaignsTab> {
               ),
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 0),
-                sliver: SliverToBoxAdapter(child: _buildStats(context)),
-              ),
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 0),
                 sliver: SliverToBoxAdapter(child: _buildFilters(context)),
               ),
               SliverPadding(
@@ -261,9 +248,9 @@ class _EmailCampaignsTabState extends State<EmailCampaignsTab> {
 
   Widget _buildHeader() {
     final theme = Theme.of(context);
-    final totalLabel = _stats.totalCampaigns > 0
-        ? '${_stats.totalCampaigns} campaign${_stats.totalCampaigns == 1 ? '' : 's'}'
-        : 'Email campaigns overview';
+    final totalLabel = _campaigns.isNotEmpty
+        ? '${_campaigns.length} campaign${_campaigns.length == 1 ? '' : 's'} loaded'
+        : 'Email campaigns';
 
     return Row(
       children: [
@@ -304,77 +291,6 @@ class _EmailCampaignsTabState extends State<EmailCampaignsTab> {
           onPressed: _loading ? null : () => _initialize(),
         ),
       ],
-    );
-  }
-
-  Widget _buildStats(BuildContext context) {
-    final tiles = [
-      _StatsTile(
-        label: 'Total Campaigns',
-        value: _stats.totalCampaigns,
-        icon: Icons.campaign_outlined,
-        color: Colors.blueGrey,
-      ),
-      _StatsTile(
-        label: 'Sent Campaigns',
-        value: _stats.sentCampaigns,
-        icon: Icons.send_outlined,
-        color: Colors.blue,
-      ),
-      _StatsTile(
-        label: 'Avg Open Rate',
-        value: _stats.averageOpenRate,
-        suffix: '%',
-        icon: Icons.mark_email_read_outlined,
-        color: _grassrootsGreen,
-      ),
-      _StatsTile(
-        label: 'Avg Click Rate',
-        value: _stats.averageClickRate,
-        suffix: '%',
-        icon: Icons.touch_app_outlined,
-        color: _momentumBlue,
-      ),
-      _StatsTile(
-        label: 'Total Recipients',
-        value: _stats.totalRecipients,
-        icon: Icons.people_outline,
-        color: Colors.purple,
-      ),
-      _StatsTile(
-        label: 'Total Bounces',
-        value: _stats.totalBounces,
-        icon: Icons.error_outline,
-        color: _actionRed,
-      ),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 900;
-        if (isMobile) {
-          return Column(
-            children: [
-              for (var i = 0; i < tiles.length; i++)
-                Padding(
-                  padding: EdgeInsets.only(bottom: i == tiles.length - 1 ? 0 : 8),
-                  child: tiles[i],
-                ),
-            ],
-          );
-        }
-        return Row(
-          children: [
-            for (var i = 0; i < tiles.length; i++)
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: i == tiles.length - 1 ? 0 : 8),
-                  child: tiles[i],
-                ),
-              ),
-          ],
-        );
-      },
     );
   }
 
@@ -515,61 +431,3 @@ String _capitalizeFirst(String text) {
   return text[0].toUpperCase() + text.substring(1).toLowerCase();
 }
 
-class _StatsTile extends StatelessWidget {
-  final String label;
-  final num value;
-  final String? suffix;
-  final IconData icon;
-  final Color color;
-
-  const _StatsTile({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    this.suffix,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final displayValue = value is double
-        ? (value as double).toStringAsFixed(1)
-        : value.toString();
-
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withOpacity(0.12),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: theme.textTheme.labelLarge),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$displayValue${suffix ?? ''}',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

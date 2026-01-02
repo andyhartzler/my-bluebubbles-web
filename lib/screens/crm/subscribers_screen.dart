@@ -13,6 +13,7 @@ import 'package:bluebubbles/features/forms/services/forms_service.dart';
 import 'package:bluebubbles/features/forms/widgets/submission_status_badge.dart';
 import 'package:bluebubbles/screens/crm/email_campaigns/email_campaigns_tab.dart';
 import 'package:bluebubbles/screens/crm/email_campaigns/email_campaign_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/subscribers_overview_tab.dart';
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
@@ -239,31 +240,41 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
     }
 
     return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          Material(
-            elevation: 2,
-            color: theme.colorScheme.surface,
-            child: TabBar(
-              labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
-              indicatorColor: theme.colorScheme.primary,
-              tabs: const [
-                Tab(icon: Icon(Icons.people_outline), text: 'Subscribers'),
-                Tab(icon: Icon(Icons.campaign_outlined), text: 'Campaigns'),
-              ],
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildSubscribersTab(),
-                const EmailCampaignsTab(),
-              ],
-            ),
-          ),
-        ],
+      length: 3,
+      child: Builder(
+        builder: (context) {
+          final tabController = DefaultTabController.of(context);
+          return Column(
+            children: [
+              Material(
+                elevation: 2,
+                color: theme.colorScheme.surface,
+                child: TabBar(
+                  labelColor: theme.colorScheme.primary,
+                  unselectedLabelColor: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                  indicatorColor: theme.colorScheme.primary,
+                  tabs: const [
+                    Tab(icon: Icon(Icons.dashboard_outlined), text: 'Overview'),
+                    Tab(icon: Icon(Icons.people_outline), text: 'Subscribers'),
+                    Tab(icon: Icon(Icons.campaign_outlined), text: 'Campaigns'),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    SubscribersOverviewTab(
+                      onNavigateToSubscribers: () => tabController.animateTo(1),
+                      onNavigateToCampaigns: () => tabController.animateTo(2),
+                    ),
+                    _buildSubscribersTab(),
+                    const EmailCampaignsTab(),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -314,15 +325,6 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
                 0,
               ),
               sliver: SliverToBoxAdapter(child: _buildHeader()),
-            ),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                16,
-                horizontalPadding,
-                0,
-              ),
-              sliver: SliverToBoxAdapter(child: _buildStats(context)),
             ),
             SliverPadding(
               padding: EdgeInsets.fromLTRB(
@@ -405,101 +407,6 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
           icon: const Icon(Icons.refresh),
           onPressed: _loading ? null : () => _initialize(),
         ),
-      ],
-    );
-  }
-
-  Widget _buildStats(BuildContext context) {
-    final tiles = [
-      _StatsTile(
-        label: 'Total Subscribers',
-        value: _stats.totalSubscribers,
-        icon: Icons.people_outline,
-        color: Colors.blueGrey,
-      ),
-      _StatsTile(
-        label: 'Active Subscribers',
-        value: _stats.activeSubscribers,
-        icon: Icons.mark_email_read_outlined,
-        color: Colors.blue,
-      ),
-      _StatsTile(
-        label: 'Unsubscribed',
-        value: _stats.unsubscribed,
-        icon: Icons.unsubscribe_outlined,
-        color: Colors.red,
-      ),
-      _StatsTile(
-        label: 'Also Donors',
-        value: _stats.donorCount,
-        icon: Icons.volunteer_activism_outlined,
-        color: Colors.purple,
-      ),
-      _StatsTile(
-        label: 'With Contact Info',
-        value: _stats.contactInfoCount,
-        icon: Icons.contact_phone_outlined,
-        color: Colors.teal,
-      ),
-      _StatsTile(
-        label: 'Recent Opt-ins (30d)',
-        value: _stats.recentOptIns,
-        icon: Icons.fiber_new_outlined,
-        color: Colors.orange,
-      ),
-    ];
-
-    final List<Widget> sourceTiles = _stats.bySource.entries
-        .map<Widget>(
-          (entry) => _StatsTile(
-            label: 'Source: ${_capitalizeFirst(entry.key)}',
-            value: entry.value,
-            icon: Icons.tag_outlined,
-            color: Colors.indigo,
-          ),
-        )
-        .toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < 900;
-            if (isMobile) {
-              // Mobile: Stack tiles vertically with horizontal layout
-              return Column(
-                children: [
-                  for (var i = 0; i < tiles.length; i++)
-                    Padding(
-                      padding: EdgeInsets.only(bottom: i == tiles.length - 1 ? 0 : 8),
-                      child: tiles[i],
-                    ),
-                ],
-              );
-            }
-            // Desktop: Horizontal row layout
-            return Row(
-              children: [
-                for (var i = 0; i < tiles.length; i++)
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(right: i == tiles.length - 1 ? 0 : 8),
-                      child: tiles[i],
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-        if (sourceTiles.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: sourceTiles,
-          ),
-        ],
       ],
     );
   }
