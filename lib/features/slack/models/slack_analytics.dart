@@ -283,7 +283,7 @@ class MembershipChange {
     if (memberData is Map<String, dynamic>) {
       memberName = memberData['name']?.toString();
       // Parse profile photos to get primary photo URL
-      final photos = memberData['profile_photos'];
+      final photos = memberData['profile_pictures'];
       if (photos is List && photos.isNotEmpty) {
         // Find primary photo or use first
         for (final photo in photos) {
@@ -299,7 +299,7 @@ class MembershipChange {
     } else if (memberData is List && memberData.isNotEmpty) {
       final first = memberData.first as Map<String, dynamic>?;
       memberName = first?['name']?.toString();
-      final photos = first?['profile_photos'];
+      final photos = first?['profile_pictures'];
       if (photos is List && photos.isNotEmpty) {
         for (final photo in photos) {
           if (photo is Map<String, dynamic>) {

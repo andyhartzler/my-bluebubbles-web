@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -87,17 +88,7 @@ class SlackMessageBubble extends StatelessWidget {
               // Header row
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundImage:
-                        avatarUrl != null && avatarUrl.isNotEmpty
-                            ? NetworkImage(avatarUrl)
-                            : null,
-                    backgroundColor: primaryColor.withOpacity(0.2),
-                    child: avatarUrl == null || avatarUrl.isEmpty
-                        ? Icon(Icons.person, size: 20, color: primaryColor)
-                        : null,
-                  ),
+                  _buildAvatar(avatarUrl, primaryColor),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -433,6 +424,45 @@ class SlackMessageBubble extends StatelessWidget {
             child: const Text('Close'),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Build avatar with CORS-safe image loading and fallback
+  Widget _buildAvatar(String? avatarUrl, Color color) {
+    const double radius = 18;
+
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: color.withOpacity(0.2),
+        child: Icon(Icons.person, size: 20, color: color),
+      );
+    }
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: avatarUrl,
+        width: radius * 2,
+        height: radius * 2,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => CircleAvatar(
+          radius: radius,
+          backgroundColor: color.withOpacity(0.2),
+          child: SizedBox(
+            width: radius,
+            height: radius,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ),
+        errorWidget: (context, url, error) => CircleAvatar(
+          radius: radius,
+          backgroundColor: color.withOpacity(0.2),
+          child: Icon(Icons.person, size: 20, color: color),
+        ),
       ),
     );
   }

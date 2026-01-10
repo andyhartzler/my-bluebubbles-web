@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -692,15 +693,9 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                             itemBuilder: (context, index) {
                               final member = _results[index];
                               return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundImage: member.primaryProfilePhotoUrl != null
-                                      ? NetworkImage(member.primaryProfilePhotoUrl!)
-                                      : null,
-                                  child: member.primaryProfilePhotoUrl == null
-                                      ? Text(member.name.isNotEmpty
-                                          ? member.name[0].toUpperCase()
-                                          : '?')
-                                      : null,
+                                leading: _MemberAvatar(
+                                  photoUrl: member.primaryProfilePhotoUrl,
+                                  name: member.name,
                                 ),
                                 title: Text(member.name),
                                 subtitle: Text(
@@ -855,6 +850,62 @@ class _CreateMemberDialogState extends State<_CreateMemberDialog> {
               : const Text('Create'),
         ),
       ],
+    );
+  }
+}
+
+/// Avatar widget that handles CORS errors gracefully for external image URLs
+class _MemberAvatar extends StatelessWidget {
+  const _MemberAvatar({
+    required this.photoUrl,
+    required this.name,
+    this.radius = 20,
+  });
+
+  final String? photoUrl;
+  final String name;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    if (photoUrl == null || photoUrl!.isEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Text(
+          initials,
+          style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+        ),
+      );
+    }
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: photoUrl!,
+        width: radius * 2,
+        height: radius * 2,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => CircleAvatar(
+          radius: radius,
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: SizedBox(
+            width: radius,
+            height: radius,
+            child: const CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        errorWidget: (context, url, error) => CircleAvatar(
+          radius: radius,
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: Text(
+            initials,
+            style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+          ),
+        ),
+      ),
     );
   }
 }

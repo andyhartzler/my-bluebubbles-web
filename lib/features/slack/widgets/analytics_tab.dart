@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/features/slack/models/slack_analytics.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
@@ -870,28 +871,51 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   Widget _buildUserAvatar(MembershipChange change) {
     final theme = Theme.of(context);
     final avatarUrl = change.avatarUrl;
+    final initials = change.displayName.isNotEmpty
+        ? change.displayName.substring(0, 1).toUpperCase()
+        : '?';
+    final color = change.isLinkedMember
+        ? theme.colorScheme.primary
+        : Colors.orange[700]!;
+    final bgColor = change.isLinkedMember
+        ? theme.colorScheme.primary.withOpacity(0.2)
+        : Colors.orange.withOpacity(0.2);
 
-    return CircleAvatar(
-      radius: 20,
-      backgroundColor: change.isLinkedMember
-          ? theme.colorScheme.primary.withOpacity(0.2)
-          : Colors.orange.withOpacity(0.2),
-      backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-          ? NetworkImage(avatarUrl)
-          : null,
-      child: avatarUrl == null || avatarUrl.isEmpty
-          ? Text(
-              change.displayName.isNotEmpty
-                  ? change.displayName.substring(0, 1).toUpperCase()
-                  : '?',
-              style: TextStyle(
-                color: change.isLinkedMember
-                    ? theme.colorScheme.primary
-                    : Colors.orange[700],
-                fontWeight: FontWeight.w600,
-              ),
-            )
-          : null,
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundColor: bgColor,
+        child: Text(
+          initials,
+          style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: avatarUrl,
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => CircleAvatar(
+          radius: 20,
+          backgroundColor: bgColor,
+          child: const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        errorWidget: (context, url, error) => CircleAvatar(
+          radius: 20,
+          backgroundColor: bgColor,
+          child: Text(
+            initials,
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1378,15 +1402,10 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                             itemBuilder: (context, index) {
                               final member = _results[index];
                               return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundImage: member.primaryProfilePhotoUrl != null
-                                      ? NetworkImage(member.primaryProfilePhotoUrl!)
-                                      : null,
-                                  child: member.primaryProfilePhotoUrl == null
-                                      ? Text(member.name.isNotEmpty
-                                          ? member.name[0].toUpperCase()
-                                          : '?')
-                                      : null,
+                                leading: _buildMemberAvatar(
+                                  member.primaryProfilePhotoUrl,
+                                  member.name,
+                                  theme,
                                 ),
                                 title: Text(member.name),
                                 subtitle: Text(
@@ -1409,6 +1428,48 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMemberAvatar(String? photoUrl, String name, ThemeData theme) {
+    const double radius = 20;
+    final initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    if (photoUrl == null || photoUrl.isEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Text(
+          initials,
+          style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+        ),
+      );
+    }
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: photoUrl,
+        width: radius * 2,
+        height: radius * 2,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => CircleAvatar(
+          radius: radius,
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: const SizedBox(
+            width: radius,
+            height: radius,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        errorWidget: (context, url, error) => CircleAvatar(
+          radius: radius,
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: Text(
+            initials,
+            style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
           ),
         ),
       ),
