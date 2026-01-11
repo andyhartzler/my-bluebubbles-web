@@ -19,6 +19,7 @@ import 'package:bluebubbles/services/crm/donor_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/screens/crm/dialogs/donor_export_dialog.dart';
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
@@ -70,7 +71,10 @@ class _DonationSearchResult {
       case _DonationSearchResultType.member:
         return member?.email ?? member?.phone ?? member?.phoneE164;
       case _DonationSearchResultType.attendee:
-        return attendee?.guestEmail ?? attendee?.guestPhone ?? attendee?.member?.email ?? attendee?.member?.phone;
+        return attendee?.guestEmail ??
+            attendee?.guestPhone ??
+            attendee?.member?.email ??
+            attendee?.member?.phone;
     }
   }
 
@@ -147,7 +151,8 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     if (!_repository.isReady) {
       setState(() {
         _loading = false;
-        _error = 'CRM Supabase is not configured. Add Supabase credentials to enable Donors.';
+        _error =
+            'CRM Supabase is not configured. Add Supabase credentials to enable Donors.';
       });
       return;
     }
@@ -168,9 +173,12 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         _totalDonors = stats['total'] as int? ?? result.donors.length;
         _recurringCount = stats['recurring'] as int? ?? 0;
         _linkedCount = stats['linked'] as int? ?? 0;
-        _totalRaised = stats['totalRaised'] as double? ?? _calculateTotalRaised(result.donors);
+        _totalRaised =
+            stats['totalRaised'] as double? ??
+            _calculateTotalRaised(result.donors);
         _recurringTotal =
-            stats['recurringTotal'] as double? ?? _calculateRecurringTotal(result.donors);
+            stats['recurringTotal'] as double? ??
+            _calculateRecurringTotal(result.donors);
         _recentDonations = donations;
         _loading = false;
       });
@@ -189,7 +197,10 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
   }
 
   double _calculateTotalRaised(List<Donor> donors) {
-    return donors.fold<double>(0, (sum, donor) => sum + (donor.totalDonated ?? 0));
+    return donors.fold<double>(
+      0,
+      (sum, donor) => sum + (donor.totalDonated ?? 0),
+    );
   }
 
   double _calculateRecurringTotal(List<Donor> donors) {
@@ -214,19 +225,28 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
 
     if (_recurringFilter != null) {
       filtered = filtered
-          .where((donor) =>
-              Donor.inferRecurringFromDonations(donor.donations) == _recurringFilter)
+          .where(
+            (donor) =>
+                Donor.inferRecurringFromDonations(donor.donations) ==
+                _recurringFilter,
+          )
           .toList();
     }
 
     if (_linkedFilter != null) {
       filtered = filtered
-          .where((donor) => _linkedFilter! ? donor.memberId != null : donor.memberId == null)
+          .where(
+            (donor) => _linkedFilter!
+                ? donor.memberId != null
+                : donor.memberId == null,
+          )
           .toList();
     }
 
     if (minTotal != null) {
-      filtered = filtered.where((donor) => (donor.totalDonated ?? 0) >= minTotal).toList();
+      filtered = filtered
+          .where((donor) => (donor.totalDonated ?? 0) >= minTotal)
+          .toList();
     }
 
     filtered.sort((a, b) {
@@ -246,7 +266,9 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
           comparison = (a.memberId ?? '').compareTo(b.memberId ?? '');
           break;
         default:
-          comparison = (a.name ?? '').toLowerCase().compareTo((b.name ?? '').toLowerCase());
+          comparison = (a.name ?? '').toLowerCase().compareTo(
+            (b.name ?? '').toLowerCase(),
+          );
       }
       return _ascending ? comparison : -comparison;
     });
@@ -256,26 +278,49 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     });
   }
 
-  Future<List<_DonationSearchResult>> _searchDonationSubjects(String query) async {
+  Future<List<_DonationSearchResult>> _searchDonationSubjects(
+    String query,
+  ) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return [];
 
     final results = <_DonationSearchResult>[];
 
-    final donorResult = await _repository.fetchDonors(searchQuery: trimmed, limit: 6);
+    final donorResult = await _repository.fetchDonors(
+      searchQuery: trimmed,
+      limit: 6,
+    );
     for (final donor in donorResult.donors) {
-      results.add(_DonationSearchResult(type: _DonationSearchResultType.donor, donor: donor));
+      results.add(
+        _DonationSearchResult(
+          type: _DonationSearchResultType.donor,
+          donor: donor,
+        ),
+      );
     }
 
     final members = await _memberRepository.searchMembers(trimmed);
     for (final member in members.take(6)) {
-      results.add(_DonationSearchResult(type: _DonationSearchResultType.member, member: member));
+      results.add(
+        _DonationSearchResult(
+          type: _DonationSearchResultType.member,
+          member: member,
+        ),
+      );
     }
 
     if (_eventRepository.isReady) {
-      final attendees = await _eventRepository.searchHistoricalAttendees(trimmed, limit: 6);
+      final attendees = await _eventRepository.searchHistoricalAttendees(
+        trimmed,
+        limit: 6,
+      );
       for (final attendee in attendees) {
-        results.add(_DonationSearchResult(type: _DonationSearchResultType.attendee, attendee: attendee));
+        results.add(
+          _DonationSearchResult(
+            type: _DonationSearchResultType.attendee,
+            attendee: attendee,
+          ),
+        );
       }
     }
 
@@ -307,7 +352,9 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
 
   Future<String?> _ensureDonorForAttendee(EventAttendee attendee) async {
     if (attendee.memberId != null) {
-      final existing = await _repository.findDonorByMemberId(attendee.memberId!);
+      final existing = await _repository.findDonorByMemberId(
+        attendee.memberId!,
+      );
       if (existing?.id != null) return existing!.id;
     } else if (attendee.guestPhone != null) {
       final existing = await _repository.findDonorByPhone(attendee.guestPhone!);
@@ -334,13 +381,14 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
   Future<void> _openMember(Donor donor) async {
     if (donor.memberId == null) return;
     try {
-      final Member? member = await _memberRepository.getMemberById(donor.memberId!);
+      final Member? member = await _memberRepository.getMemberById(
+        donor.memberId!,
+      );
       if (!mounted || member == null) return;
       await Navigator.of(context).push(
         ThemeSwitcher.buildPageRoute(
-          builder: (context) => TitleBarWrapper(
-            child: MemberDetailScreen(member: member),
-          ),
+          builder: (context) =>
+              TitleBarWrapper(child: MemberDetailScreen(member: member)),
         ),
       );
     } catch (e) {
@@ -381,14 +429,15 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                 child: Icon(icon, color: Colors.white),
               )
             else
-              const SizedBox(height: 40), // Placeholder to maintain consistent height
+              const SizedBox(
+                height: 40,
+              ), // Placeholder to maintain consistent height
             const SizedBox(height: 12),
             Text(
               title,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(color: Colors.white.withOpacity(0.9)),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Colors.white.withOpacity(0.9),
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -396,9 +445,9 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
             Text(
               value,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -406,10 +455,9 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
             Expanded(
               child: Text(
                 subtitle ?? '',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: Colors.white.withOpacity(0.8)),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withOpacity(0.8),
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -435,7 +483,11 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
           Flexible(
             child: Text(
               label,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
             ),
@@ -472,7 +524,9 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
 
   String? _cleanCountyLabel(String? county) {
     if (county == null) return null;
-    final trimmed = county.replaceFirst(RegExp(r'^County:\s*', caseSensitive: false), '').trim();
+    final trimmed = county
+        .replaceFirst(RegExp(r'^County:\s*', caseSensitive: false), '')
+        .trim();
     if (trimmed.isEmpty) return null;
     return trimmed;
   }
@@ -482,8 +536,13 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     final trimmed = district.trim();
     if (trimmed.isEmpty) return null;
 
-    final withoutPrefix =
-        trimmed.replaceFirst(RegExp(r'^(congressional district|district|cd)[:\s-]*', caseSensitive: false), '');
+    final withoutPrefix = trimmed.replaceFirst(
+      RegExp(
+        r'^(congressional district|district|cd)[:\s-]*',
+        caseSensitive: false,
+      ),
+      '',
+    );
     final normalized = withoutPrefix.replaceFirst(RegExp(r'^-+'), '');
     if (normalized.isEmpty) return null;
 
@@ -580,9 +639,16 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         );
 
         final subtitleChips = <Widget>[];
-        subtitleChips.add(_buildInfoChip(Icons.credit_card, donation.paymentMethodLabel));
+        subtitleChips.add(
+          _buildInfoChip(Icons.credit_card, donation.paymentMethodLabel),
+        );
         if (donation.eventId != null || donation.eventName != null) {
-          subtitleChips.add(_buildInfoChip(Icons.event_available, donation.eventName ?? 'Linked event'));
+          subtitleChips.add(
+            _buildInfoChip(
+              Icons.event_available,
+              donation.eventName ?? 'Linked event',
+            ),
+          );
         }
         if (donation.thankYous.isNotEmpty) {
           // Use method-specific icon from the latest thank you
@@ -597,23 +663,30 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
           subtitleChips.add(_buildInfoChip(icon, 'Thank you sent'));
         } else if (donation.sentThankYou) {
           // Legacy fallback for old records without method info
-          subtitleChips.add(_buildInfoChip(Icons.check_circle, 'Thank you sent'));
+          subtitleChips.add(
+            _buildInfoChip(Icons.check_circle, 'Thank you sent'),
+          );
         }
 
-        final phoneDisplay = _formatPhoneDisplay(donor.phoneE164 ?? donor.phone ?? donation.donorPhone);
+        final phoneDisplay = _formatPhoneDisplay(
+          donor.phoneE164 ?? donor.phone ?? donation.donorPhone,
+        );
         final county = donor.county;
         final district = donor.congressionalDistrict;
         final age = _calculateAge(donor.dateOfBirth);
         final headerLine = [
           donation.formattedDate,
           if (county != null && county.isNotEmpty) _cleanCountyLabel(county),
-          if (district != null && district.isNotEmpty) _formatDistrictLabel(district),
+          if (district != null && district.isNotEmpty)
+            _formatDistrictLabel(district),
           if (age != null) 'Age: $age',
         ].where((value) => (value ?? '').isNotEmpty).join(' • ');
 
         return Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           child: InkWell(
             borderRadius: BorderRadius.circular(18),
             onTap: () {
@@ -649,14 +722,16 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                       children: [
                         Text(
                           headerLine,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: Colors.white70),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 6),
                         Text(
                           donor.name ?? donation.donorName ?? 'Unknown Donor',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -673,7 +748,8 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                       children: [
                         Text(
                           currency.format(donation.amount ?? 0),
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -711,6 +787,22 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     _applyFilters();
   }
 
+  Future<void> _showExportDialog() async {
+    // Build a map of donors by ID for quick lookup
+    final donorsMap = <String, Donor>{};
+    for (final donor in _donors) {
+      if (donor.id != null) {
+        donorsMap[donor.id!] = donor;
+      }
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) =>
+          DonorExportDialog(donations: _recentDonations, donors: donorsMap),
+    );
+  }
+
   Future<void> _showAddDonationDialog() async {
     final amountController = TextEditingController();
     final notesController = TextEditingController();
@@ -736,7 +828,10 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
 
     Timer? debounce;
     final availableEvents = _eventRepository.isReady
-        ? await _eventRepository.fetchEvents(upcomingOnly: false, pastOnly: false)
+        ? await _eventRepository.fetchEvents(
+            upcomingOnly: false,
+            pastOnly: false,
+          )
         : <Event>[];
 
     await showDialog(
@@ -744,205 +839,266 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Add manual donation'),
-          content: StatefulBuilder(builder: (context, setState) {
-            Future<void> handleSearch(String value) async {
-              debounce?.cancel();
-              debounce = Timer(const Duration(milliseconds: 300), () async {
-                setState(() => searching = true);
-                final results = await _searchDonationSubjects(value);
-                if (!mounted) return;
-                setState(() {
-                  searchResults = results;
-                  searching = false;
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              Future<void> handleSearch(String value) async {
+                debounce?.cancel();
+                debounce = Timer(const Duration(milliseconds: 300), () async {
+                  setState(() => searching = true);
+                  final results = await _searchDonationSubjects(value);
+                  if (!mounted) return;
+                  setState(() {
+                    searchResults = results;
+                    searching = false;
+                  });
                 });
-              });
-            }
+              }
 
-            return SingleChildScrollView(
-              child: FocusTraversalGroup(
-                policy: ReadingOrderTraversalPolicy(),
-                child: AutofillGroup(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextField(
-                        controller: searchController,
-                        decoration: const InputDecoration(
-                          labelText: 'Search member, donor, or event attendee',
-                          prefixIcon: Icon(Icons.search),
-                        ),
-                        textInputAction: TextInputAction.search,
-                        onChanged: handleSearch,
-                        onSubmitted: handleSearch,
-                      ),
-                      const SizedBox(height: 8),
-                      if (selectedSubject != null)
-                        Card(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          child: ListTile(
-                            leading: Icon(selectedSubject!.icon),
-                            title: Text(selectedSubject!.displayName),
-                            subtitle: Text(selectedSubject!.detail ?? 'Selected record'),
-                            trailing: TextButton(
-                              onPressed: () => setState(() {
-                                selectedSubject = null;
-                                creatingNewDonor = false;
-                              }),
-                              child: const Text('Change'),
-                            ),
+              return SingleChildScrollView(
+                child: FocusTraversalGroup(
+                  policy: ReadingOrderTraversalPolicy(),
+                  child: AutofillGroup(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: searchController,
+                          decoration: const InputDecoration(
+                            labelText:
+                                'Search member, donor, or event attendee',
+                            prefixIcon: Icon(Icons.search),
                           ),
+                          textInputAction: TextInputAction.search,
+                          onChanged: handleSearch,
+                          onSubmitted: handleSearch,
                         ),
-                      if (!creatingNewDonor)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (searching)
-                              const LinearProgressIndicator(minHeight: 2)
-                            else if (searchResults.isEmpty && searchController.text.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 6.0),
-                                child: Text(
-                                  'No matches found. Create a new donor with full details.',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
+                        const SizedBox(height: 8),
+                        if (selectedSubject != null)
+                          Card(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primaryContainer,
+                            child: ListTile(
+                              leading: Icon(selectedSubject!.icon),
+                              title: Text(selectedSubject!.displayName),
+                              subtitle: Text(
+                                selectedSubject!.detail ?? 'Selected record',
                               ),
-                            ...searchResults.map(
-                              (result) => ListTile(
-                                dense: true,
-                                leading: Icon(result.icon),
-                                title: Text(result.displayName),
-                                subtitle: Row(
-                                  children: [
-                                    Chip(label: Text(result.chipLabel)),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child:
-                                          Text(result.detail ?? '', overflow: TextOverflow.ellipsis),
-                                    ),
-                                  ],
-                                ),
-                                onTap: () => setState(() {
-                                  selectedSubject = result;
+                              trailing: TextButton(
+                                onPressed: () => setState(() {
+                                  selectedSubject = null;
                                   creatingNewDonor = false;
                                 }),
+                                child: const Text('Change'),
                               ),
                             ),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: () => setState(() {
-                                  creatingNewDonor = true;
-                                  selectedSubject = null;
-                                  if (newDonorNameController.text.isEmpty &&
-                                      searchController.text.trim().isNotEmpty) {
-                                    newDonorNameController.text = searchController.text.trim();
-                                  }
-                                }),
-                                icon: const Icon(Icons.person_add_alt_1),
-                                label: const Text('Create new donor with details'),
+                          ),
+                        if (!creatingNewDonor)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (searching)
+                                const LinearProgressIndicator(minHeight: 2)
+                              else if (searchResults.isEmpty &&
+                                  searchController.text.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 6.0,
+                                  ),
+                                  child: Text(
+                                    'No matches found. Create a new donor with full details.',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ),
+                              ...searchResults.map(
+                                (result) => ListTile(
+                                  dense: true,
+                                  leading: Icon(result.icon),
+                                  title: Text(result.displayName),
+                                  subtitle: Row(
+                                    children: [
+                                      Chip(label: Text(result.chipLabel)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          result.detail ?? '',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () => setState(() {
+                                    selectedSubject = result;
+                                    creatingNewDonor = false;
+                                  }),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      if (creatingNewDonor) ...[
-                        const SizedBox(height: 8),
-                        Text('New donor details', style: Theme.of(context).textTheme.titleSmall),
-                        TextField(
-                          controller: newDonorNameController,
-                          decoration: const InputDecoration(labelText: 'Full name *'),
-                          textInputAction: TextInputAction.next,
-                        ),
-                        TextField(
-                          controller: newDonorEmailController,
-                          decoration: const InputDecoration(labelText: 'Email'),
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.email],
-                        ),
-                        TextField(
-                          controller: newDonorPhoneController,
-                          decoration: const InputDecoration(labelText: 'Phone (E.164 preferred)'),
-                          keyboardType: TextInputType.phone,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.telephoneNumber],
-                        ),
-                        TextField(
-                          controller: newDonorAddressController,
-                          decoration: const InputDecoration(labelText: 'Address'),
-                          keyboardType: TextInputType.streetAddress,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.streetAddressLine1],
-                        ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: newDonorCityController,
-                                decoration: const InputDecoration(labelText: 'City'),
-                                textInputAction: TextInputAction.next,
-                                autofillHints: const [AutofillHints.addressCity],
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () => setState(() {
+                                    creatingNewDonor = true;
+                                    selectedSubject = null;
+                                    if (newDonorNameController.text.isEmpty &&
+                                        searchController.text
+                                            .trim()
+                                            .isNotEmpty) {
+                                      newDonorNameController.text =
+                                          searchController.text.trim();
+                                    }
+                                  }),
+                                  icon: const Icon(Icons.person_add_alt_1),
+                                  label: const Text(
+                                    'Create new donor with details',
+                                  ),
+                                ),
                               ),
+                            ],
+                          ),
+                        if (creatingNewDonor) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'New donor details',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          TextField(
+                            controller: newDonorNameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Full name *',
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: newDonorStateController,
-                                decoration: const InputDecoration(labelText: 'State'),
-                                textInputAction: TextInputAction.next,
-                                autofillHints: const [AutofillHints.addressState],
+                            textInputAction: TextInputAction.next,
+                          ),
+                          TextField(
+                            controller: newDonorEmailController,
+                            decoration: const InputDecoration(
+                              labelText: 'Email',
+                            ),
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.email],
+                          ),
+                          TextField(
+                            controller: newDonorPhoneController,
+                            decoration: const InputDecoration(
+                              labelText: 'Phone (E.164 preferred)',
+                            ),
+                            keyboardType: TextInputType.phone,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [
+                              AutofillHints.telephoneNumber,
+                            ],
+                          ),
+                          TextField(
+                            controller: newDonorAddressController,
+                            decoration: const InputDecoration(
+                              labelText: 'Address',
+                            ),
+                            keyboardType: TextInputType.streetAddress,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [
+                              AutofillHints.streetAddressLine1,
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: newDonorCityController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'City',
+                                  ),
+                                  textInputAction: TextInputAction.next,
+                                  autofillHints: const [
+                                    AutofillHints.addressCity,
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: newDonorZipController,
-                                decoration: const InputDecoration(labelText: 'ZIP'),
-                                keyboardType: TextInputType.number,
-                                textInputAction: TextInputAction.next,
-                                autofillHints: const [AutofillHints.postalCode],
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: newDonorStateController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'State',
+                                  ),
+                                  textInputAction: TextInputAction.next,
+                                  autofillHints: const [
+                                    AutofillHints.addressState,
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: newDonorEmployerController,
-                                decoration: const InputDecoration(labelText: 'Employer'),
-                                textInputAction: TextInputAction.next,
-                                autofillHints: const [AutofillHints.organizationName],
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: newDonorZipController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'ZIP',
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  textInputAction: TextInputAction.next,
+                                  autofillHints: const [
+                                    AutofillHints.postalCode,
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: newDonorOccupationController,
-                                decoration: const InputDecoration(labelText: 'Occupation'),
-                                textInputAction: TextInputAction.next,
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: newDonorEmployerController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Employer',
+                                  ),
+                                  textInputAction: TextInputAction.next,
+                                  autofillHints: const [
+                                    AutofillHints.organizationName,
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: newDonorOccupationController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Occupation',
+                                  ),
+                                  textInputAction: TextInputAction.next,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         TextField(
                           controller: amountController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: const InputDecoration(labelText: 'Amount'),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Amount',
+                          ),
                           textInputAction: TextInputAction.next,
                         ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            Expanded(child: Text(DateFormat.yMMMd().format(donationDate))),
+                            Expanded(
+                              child: Text(
+                                DateFormat.yMMMd().format(donationDate),
+                              ),
+                            ),
                             TextButton(
                               onPressed: () async {
                                 final picked = await showDatePicker(
                                   context: context,
                                   initialDate: donationDate,
                                   firstDate: DateTime(2000),
-                                  lastDate: DateTime.now().add(const Duration(days: 1)),
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 1),
+                                  ),
                                 );
                                 if (picked != null) {
                                   setState(() => donationDate = picked);
@@ -952,143 +1108,173 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
                             ),
                           ],
                         ),
-                  DropdownButtonFormField<String>(
-                    value: method,
-                    decoration: const InputDecoration(labelText: 'Payment method'),
-                    items: const [
-                      DropdownMenuItem(value: 'Cash', child: Text('Cash')),
-                      DropdownMenuItem(value: 'Check', child: Text('Check')),
-                      DropdownMenuItem(value: 'In-kind', child: Text('In-kind')),
-                    ],
-                    onChanged: (value) => setState(() => method = value ?? 'Cash'),
-                  ),
-                  if (method.toLowerCase() == 'check')
-                    TextField(
-                      onChanged: (value) => checkNumber = value,
-                      decoration: const InputDecoration(labelText: 'Check number'),
-                      textInputAction: TextInputAction.next,
-                    ),
-                  DropdownButtonFormField<Event?>(
-                    value: selectedEvent,
-                    decoration: const InputDecoration(labelText: 'Link to event (optional)'),
-                    items: [
-                      const DropdownMenuItem<Event?>(value: null, child: Text('No event')),
-                      ...availableEvents.map(
-                        (event) => DropdownMenuItem<Event?>(
-                          value: event,
-                          child: Text('${event.title ?? 'Untitled'} — '
-                              '${event.eventDate != null ? DateFormat.yMMMd().format(event.eventDate!.toLocal()) : 'No date'}'),
+                        DropdownButtonFormField<String>(
+                          value: method,
+                          decoration: const InputDecoration(
+                            labelText: 'Payment method',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'Cash',
+                              child: Text('Cash'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Check',
+                              child: Text('Check'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'In-kind',
+                              child: Text('In-kind'),
+                            ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => method = value ?? 'Cash'),
                         ),
-                      ),
-                    ],
-                    onChanged: (value) => setState(() => selectedEvent = value),
+                        if (method.toLowerCase() == 'check')
+                          TextField(
+                            onChanged: (value) => checkNumber = value,
+                            decoration: const InputDecoration(
+                              labelText: 'Check number',
+                            ),
+                            textInputAction: TextInputAction.next,
+                          ),
+                        DropdownButtonFormField<Event?>(
+                          value: selectedEvent,
+                          decoration: const InputDecoration(
+                            labelText: 'Link to event (optional)',
+                          ),
+                          items: [
+                            const DropdownMenuItem<Event?>(
+                              value: null,
+                              child: Text('No event'),
+                            ),
+                            ...availableEvents.map(
+                              (event) => DropdownMenuItem<Event?>(
+                                value: event,
+                                child: Text(
+                                  '${event.title ?? 'Untitled'} — '
+                                  '${event.eventDate != null ? DateFormat.yMMMd().format(event.eventDate!.toLocal()) : 'No date'}',
+                                ),
+                              ),
+                            ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => selectedEvent = value),
+                        ),
+                        TextField(
+                          controller: notesController,
+                          decoration: const InputDecoration(labelText: 'Notes'),
+                          maxLines: 2,
+                          textInputAction: TextInputAction.done,
+                        ),
+                      ],
+                    ),
                   ),
-                  TextField(
-                    controller: notesController,
-                    decoration: const InputDecoration(labelText: 'Notes'),
-                    maxLines: 2,
-                    textInputAction: TextInputAction.done,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      }),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            final amount = double.tryParse(amountController.text.trim());
-            if (amount == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Enter a valid donation amount.')),
+                ),
               );
-              return;
-            }
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final amount = double.tryParse(amountController.text.trim());
+                if (amount == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Enter a valid donation amount.'),
+                    ),
+                  );
+                  return;
+                }
 
-            if (creatingNewDonor) {
-              final name = newDonorNameController.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Name is required to create a donor.')),
+                if (creatingNewDonor) {
+                  final name = newDonorNameController.text.trim();
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Name is required to create a donor.'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final payload = {
+                    'name': name,
+                    'email': newDonorEmailController.text.trim().isEmpty
+                        ? null
+                        : newDonorEmailController.text.trim(),
+                    'phone': newDonorPhoneController.text.trim().isEmpty
+                        ? null
+                        : newDonorPhoneController.text.trim(),
+                    'phone_e164': newDonorPhoneController.text.trim().isEmpty
+                        ? null
+                        : newDonorPhoneController.text.trim(),
+                    'address': newDonorAddressController.text.trim().isEmpty
+                        ? null
+                        : newDonorAddressController.text.trim(),
+                    'city': newDonorCityController.text.trim().isEmpty
+                        ? null
+                        : newDonorCityController.text.trim(),
+                    'state': newDonorStateController.text.trim().isEmpty
+                        ? null
+                        : newDonorStateController.text.trim(),
+                    'zip_code': newDonorZipController.text.trim().isEmpty
+                        ? null
+                        : newDonorZipController.text.trim(),
+                    'employer': newDonorEmployerController.text.trim().isEmpty
+                        ? null
+                        : newDonorEmployerController.text.trim(),
+                    'occupation':
+                        newDonorOccupationController.text.trim().isEmpty
+                        ? null
+                        : newDonorOccupationController.text.trim(),
+                  };
+
+                  donorId = await _repository.upsertDonor(data: payload);
+                } else if (selectedSubject != null) {
+                  switch (selectedSubject!.type) {
+                    case _DonationSearchResultType.donor:
+                      donorId = selectedSubject!.donor?.id;
+                      break;
+                    case _DonationSearchResultType.member:
+                      final member = selectedSubject!.member;
+                      if (member != null) {
+                        donorId = await _ensureDonorForMember(member);
+                      }
+                      break;
+                    case _DonationSearchResultType.attendee:
+                      final attendee = selectedSubject!.attendee;
+                      if (attendee != null) {
+                        donorId = await _ensureDonorForAttendee(attendee);
+                      }
+                      break;
+                  }
+                }
+
+                await _repository.addManualDonation(
+                  donorId: donorId,
+                  amount: amount,
+                  donationDate: donationDate,
+                  paymentMethod: method,
+                  checkNumber: checkNumber,
+                  notes: notesController.text.trim().isEmpty
+                      ? null
+                      : notesController.text.trim(),
+                  eventId: selectedEvent?.id,
                 );
-                return;
-              }
-
-              final payload = {
-                'name': name,
-                'email': newDonorEmailController.text.trim().isEmpty
-                    ? null
-                    : newDonorEmailController.text.trim(),
-                'phone': newDonorPhoneController.text.trim().isEmpty
-                    ? null
-                    : newDonorPhoneController.text.trim(),
-                'phone_e164': newDonorPhoneController.text.trim().isEmpty
-                    ? null
-                    : newDonorPhoneController.text.trim(),
-                'address': newDonorAddressController.text.trim().isEmpty
-                    ? null
-                    : newDonorAddressController.text.trim(),
-                'city': newDonorCityController.text.trim().isEmpty
-                    ? null
-                    : newDonorCityController.text.trim(),
-                'state': newDonorStateController.text.trim().isEmpty
-                    ? null
-                    : newDonorStateController.text.trim(),
-                'zip_code': newDonorZipController.text.trim().isEmpty
-                    ? null
-                    : newDonorZipController.text.trim(),
-                'employer': newDonorEmployerController.text.trim().isEmpty
-                    ? null
-                    : newDonorEmployerController.text.trim(),
-                'occupation': newDonorOccupationController.text.trim().isEmpty
-                    ? null
-                    : newDonorOccupationController.text.trim(),
-              };
-
-              donorId = await _repository.upsertDonor(data: payload);
-            } else if (selectedSubject != null) {
-              switch (selectedSubject!.type) {
-                case _DonationSearchResultType.donor:
-                  donorId = selectedSubject!.donor?.id;
-                  break;
-                case _DonationSearchResultType.member:
-                  final member = selectedSubject!.member;
-                  if (member != null) {
-                    donorId = await _ensureDonorForMember(member);
-                  }
-                  break;
-                case _DonationSearchResultType.attendee:
-                  final attendee = selectedSubject!.attendee;
-                  if (attendee != null) {
-                    donorId = await _ensureDonorForAttendee(attendee);
-                  }
-                  break;
-              }
-            }
-
-            await _repository.addManualDonation(
-              donorId: donorId,
-              amount: amount,
-              donationDate: donationDate,
-              paymentMethod: method,
-              checkNumber: checkNumber,
-              notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-              eventId: selectedEvent?.id,
-            );
-            if (!mounted) return;
-            Navigator.of(context).pop();
-            await _loadData();
-          },
-          child: const Text('Save donation'),
-        ),
-      ],
-    );
-  },
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                await _loadData();
+              },
+              child: const Text('Save donation'),
+            ),
+          ],
+        );
+      },
     );
     debounce?.cancel();
   }
@@ -1100,12 +1286,16 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
         IconButton(
           tooltip: 'Email donor',
           icon: const Icon(Icons.email_outlined),
-          onPressed: donor.email == null ? null : () => _launch(Uri.parse('mailto:${donor.email}')),
+          onPressed: donor.email == null
+              ? null
+              : () => _launch(Uri.parse('mailto:${donor.email}')),
         ),
         IconButton(
           tooltip: 'Call donor',
           icon: const Icon(Icons.call_outlined),
-          onPressed: donor.phone == null ? null : () => _launch(Uri.parse('tel:${donor.phone}')),
+          onPressed: donor.phone == null
+              ? null
+              : () => _launch(Uri.parse('tel:${donor.phone}')),
         ),
         IconButton(
           tooltip: 'Copy phone',
@@ -1138,12 +1328,15 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final supabaseReady = CRMConfig.crmEnabled && CRMSupabaseService().isInitialized;
+    final supabaseReady =
+        CRMConfig.crmEnabled && CRMSupabaseService().isInitialized;
 
     if (!supabaseReady) {
       return _buildScaffold(
         child: const Center(
-          child: Text('CRM Supabase is not configured. Add Supabase credentials to enable Donors.'),
+          child: Text(
+            'CRM Supabase is not configured. Add Supabase credentials to enable Donors.',
+          ),
         ),
       );
     }
@@ -1155,9 +1348,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     }
 
     if (_error != null) {
-      return _buildScaffold(
-        child: Center(child: Text(_error!)),
-      );
+      return _buildScaffold(child: Center(child: Text(_error!)));
     }
 
     final currency = NumberFormat.compactSimpleCurrency();
@@ -1169,131 +1360,167 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
           padding: const EdgeInsets.all(24),
           children: [
             Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Fundraising', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('Track donor relationships and giving performance.', style: theme.textTheme.bodyMedium),
-                ],
-              ),
-              IconButton(
-                tooltip: 'Refresh donors',
-                icon: const Icon(Icons.refresh),
-                onPressed: _loadData,
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          LayoutBuilder(builder: (context, constraints) {
-            final isWide = constraints.maxWidth > 900;
-            final cards = [
-              _buildHeroCard(
-                title: 'Total Raised',
-                value: currency.format(_totalRaised),
-                subtitle: 'Across $_totalDonors donors',
-                color: _momentumBlue,
-                icon: Icons.volunteer_activism,
-              ),
-              _buildHeroCard(
-                title: 'Recurring Donors',
-                value: _recurringCount.toString(),
-                subtitle:
-                    '${((_recurringCount / (_totalDonors == 0 ? 1 : _totalDonors)) * 100).toStringAsFixed(1)}% of base • ${currency.format(_recurringTotal)} lifetime',
-                color: _grassrootsGreen,
-                icon: Icons.autorenew,
-              ),
-              _buildHeroCard(
-                title: 'Linked to CRM',
-                value: _linkedCount.toString(),
-                subtitle: 'Connected to member profiles',
-                color: _justicePurple,
-                icon: Icons.hub_outlined,
-              ),
-              _buildHeroCard(
-                title: 'Average Gift',
-                value: currency.format(averageGift),
-                subtitle: 'Per donor lifetime total',
-                color: _sunriseGold,
-                icon: Icons.attach_money,
-              ),
-            ];
-
-            if (isWide) {
-              final children = <Widget>[];
-              for (var i = 0; i < cards.length; i++) {
-                children.add(Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(right: i == cards.length - 1 ? 0 : 12),
-                    child: cards[i],
-                  ),
-                ));
-              }
-              return Row(children: children);
-            }
-
-            // Mobile: 2x2 grid layout
-            return Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 6, bottom: 12),
-                        child: cards[0],
+                    Text(
+                      'Fundraising',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 6, bottom: 12),
-                        child: cards[1],
-                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Track donor relationships and giving performance.',
+                      style: theme.textTheme.bodyMedium,
                     ),
                   ],
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: cards[2],
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: cards[3],
-                      ),
-                    ),
-                  ],
+                IconButton(
+                  tooltip: 'Refresh donors',
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadData,
                 ),
               ],
-            );
-          }),
-          const SizedBox(height: 24),
-          _buildFilters(),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton.icon(
-              onPressed: _showAddDonationDialog,
-              icon: const Icon(Icons.add),
-              label: const Text('Add manual donation'),
-              style: ElevatedButton.styleFrom(backgroundColor: _unityBlue, foregroundColor: Colors.white),
             ),
-          ),
-          const SizedBox(height: 18),
-          Card(
-            elevation: 3,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: _buildDonationList(context),
+            const SizedBox(height: 18),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth > 900;
+                final cards = [
+                  _buildHeroCard(
+                    title: 'Total Raised',
+                    value: currency.format(_totalRaised),
+                    subtitle: 'Across $_totalDonors donors',
+                    color: _momentumBlue,
+                    icon: Icons.volunteer_activism,
+                  ),
+                  _buildHeroCard(
+                    title: 'Recurring Donors',
+                    value: _recurringCount.toString(),
+                    subtitle:
+                        '${((_recurringCount / (_totalDonors == 0 ? 1 : _totalDonors)) * 100).toStringAsFixed(1)}% of base • ${currency.format(_recurringTotal)} lifetime',
+                    color: _grassrootsGreen,
+                    icon: Icons.autorenew,
+                  ),
+                  _buildHeroCard(
+                    title: 'Linked to CRM',
+                    value: _linkedCount.toString(),
+                    subtitle: 'Connected to member profiles',
+                    color: _justicePurple,
+                    icon: Icons.hub_outlined,
+                  ),
+                  _buildHeroCard(
+                    title: 'Average Gift',
+                    value: currency.format(averageGift),
+                    subtitle: 'Per donor lifetime total',
+                    color: _sunriseGold,
+                    icon: Icons.attach_money,
+                  ),
+                ];
+
+                if (isWide) {
+                  final children = <Widget>[];
+                  for (var i = 0; i < cards.length; i++) {
+                    children.add(
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: i == cards.length - 1 ? 0 : 12,
+                          ),
+                          child: cards[i],
+                        ),
+                      ),
+                    );
+                  }
+                  return Row(children: children);
+                }
+
+                // Mobile: 2x2 grid layout
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(
+                              right: 6,
+                              bottom: 12,
+                            ),
+                            child: cards[0],
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 6, bottom: 12),
+                            child: cards[1],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: cards[2],
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: cards[3],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            _buildFilters(),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _recentDonations.isEmpty
+                      ? null
+                      : _showExportDialog,
+                  icon: const Icon(Icons.file_download_outlined),
+                  label: const Text('Export'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _unityBlue,
+                    side: const BorderSide(color: _unityBlue),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: _showAddDonationDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add manual donation'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _unityBlue,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: _buildDonationList(context),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1303,9 +1530,7 @@ class _DonorsListScreenState extends State<DonorsListScreen> {
     if (widget.embed) return child;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Donors'),
-      ),
+      appBar: AppBar(title: const Text('Donors')),
       body: child,
     );
   }
