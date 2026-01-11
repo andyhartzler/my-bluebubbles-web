@@ -46,7 +46,7 @@ class DonorExportService {
       0,
       (sum, d) => sum + (d.amount ?? 0),
     );
-    final avgAmount = donations.isEmpty ? 0 : totalAmount / donations.length;
+    final double avgAmount = donations.isEmpty ? 0.0 : totalAmount / donations.length;
     final dateFormat = DateFormat.yMMMd();
     final now = DateTime.now();
 
