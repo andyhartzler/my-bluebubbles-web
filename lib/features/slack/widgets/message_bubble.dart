@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -87,17 +88,7 @@ class SlackMessageBubble extends StatelessWidget {
               // Header row
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundImage:
-                        avatarUrl != null && avatarUrl.isNotEmpty
-                            ? NetworkImage(avatarUrl)
-                            : null,
-                    backgroundColor: primaryColor.withOpacity(0.2),
-                    child: avatarUrl == null || avatarUrl.isEmpty
-                        ? Icon(Icons.person, size: 20, color: primaryColor)
-                        : null,
-                  ),
+                  _buildAvatar(avatarUrl, primaryColor),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -433,6 +424,40 @@ class SlackMessageBubble extends StatelessWidget {
             child: const Text('Close'),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Builds an avatar with CORS-safe image loading
+  Widget _buildAvatar(String? avatarUrl, Color primaryColor) {
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return CircleAvatar(
+        radius: 18,
+        backgroundColor: primaryColor.withOpacity(0.2),
+        child: Icon(Icons.person, size: 20, color: primaryColor),
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: avatarUrl,
+      imageBuilder: (context, imageProvider) => CircleAvatar(
+        radius: 18,
+        backgroundImage: imageProvider,
+        backgroundColor: primaryColor.withOpacity(0.2),
+      ),
+      placeholder: (context, url) => CircleAvatar(
+        radius: 18,
+        backgroundColor: primaryColor.withOpacity(0.2),
+        child: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      errorWidget: (context, url, error) => CircleAvatar(
+        radius: 18,
+        backgroundColor: primaryColor.withOpacity(0.2),
+        child: Icon(Icons.person, size: 20, color: primaryColor),
       ),
     );
   }

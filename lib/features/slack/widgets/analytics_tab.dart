@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -870,28 +871,57 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   Widget _buildUserAvatar(MembershipChange change) {
     final theme = Theme.of(context);
     final avatarUrl = change.avatarUrl;
+    final backgroundColor = change.isLinkedMember
+        ? theme.colorScheme.primary.withOpacity(0.2)
+        : Colors.orange.withOpacity(0.2);
+    final textColor = change.isLinkedMember
+        ? theme.colorScheme.primary
+        : Colors.orange[700];
+    final initial = change.displayName.isNotEmpty
+        ? change.displayName.substring(0, 1).toUpperCase()
+        : '?';
 
-    return CircleAvatar(
-      radius: 20,
-      backgroundColor: change.isLinkedMember
-          ? theme.colorScheme.primary.withOpacity(0.2)
-          : Colors.orange.withOpacity(0.2),
-      backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-          ? NetworkImage(avatarUrl)
-          : null,
-      child: avatarUrl == null || avatarUrl.isEmpty
-          ? Text(
-              change.displayName.isNotEmpty
-                  ? change.displayName.substring(0, 1).toUpperCase()
-                  : '?',
-              style: TextStyle(
-                color: change.isLinkedMember
-                    ? theme.colorScheme.primary
-                    : Colors.orange[700],
-                fontWeight: FontWeight.w600,
-              ),
-            )
-          : null,
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundColor: backgroundColor,
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: avatarUrl,
+      imageBuilder: (context, imageProvider) => CircleAvatar(
+        radius: 20,
+        backgroundImage: imageProvider,
+        backgroundColor: backgroundColor,
+      ),
+      placeholder: (context, url) => CircleAvatar(
+        radius: 20,
+        backgroundColor: backgroundColor,
+        child: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      errorWidget: (context, url, error) => CircleAvatar(
+        radius: 20,
+        backgroundColor: backgroundColor,
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 
@@ -1378,16 +1408,7 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                             itemBuilder: (context, index) {
                               final member = _results[index];
                               return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundImage: member.primaryProfilePhotoUrl != null
-                                      ? NetworkImage(member.primaryProfilePhotoUrl!)
-                                      : null,
-                                  child: member.primaryProfilePhotoUrl == null
-                                      ? Text(member.name.isNotEmpty
-                                          ? member.name[0].toUpperCase()
-                                          : '?')
-                                      : null,
-                                ),
+                                leading: _buildMemberAvatar(member),
                                 title: Text(member.name),
                                 subtitle: Text(
                                   member.email ?? 'No email',
@@ -1411,6 +1432,34 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMemberAvatar(Member member) {
+    final photoUrl = member.primaryProfilePhotoUrl;
+    final initial = member.name.isNotEmpty ? member.name[0].toUpperCase() : '?';
+
+    if (photoUrl == null) {
+      return CircleAvatar(
+        child: Text(initial),
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: photoUrl,
+      imageBuilder: (context, imageProvider) => CircleAvatar(
+        backgroundImage: imageProvider,
+      ),
+      placeholder: (context, url) => CircleAvatar(
+        child: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      errorWidget: (context, url, error) => CircleAvatar(
+        child: Text(initial),
       ),
     );
   }
