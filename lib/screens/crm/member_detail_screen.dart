@@ -1969,6 +1969,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_member.name),
+        backgroundColor: _member.membershipEligible == false ? Colors.red : null,
+        foregroundColor: _member.membershipEligible == false ? Colors.white : null,
         actions: [
           IconButton(
             icon: _refreshingMember
@@ -2658,6 +2660,15 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                 alignment: isWide ? Alignment.centerLeft : Alignment.center,
                 child: const Chip(
                   label: Text('OPTED OUT'),
+                  backgroundColor: Colors.red,
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+              ),
+            if (_member.membershipEligible == false)
+              Align(
+                alignment: isWide ? Alignment.centerLeft : Alignment.center,
+                child: const Chip(
+                  label: Text('INELIGIBLE'),
                   backgroundColor: Colors.red,
                   labelStyle: TextStyle(color: Colors.white),
                 ),

@@ -145,6 +145,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   bool get _shouldUsePaging => !_hasActiveFilters;
 
   static const List<Color> _memberCardGradient = [Color(0xFF0F4C75), Color(0xFF3282B8)];
+  static const List<Color> _ineligibleMemberCardGradient = [Color(0xFFB71C1C), Color(0xFFE53935)];
   static const Color _executiveAccentColor = Color(0xFFFDB813);
   static const int _minAllowedAge = 14;
   static const int _maxAllowedAge = 36;
@@ -694,7 +695,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
         if (_maxAgeFilter != null && age > _maxAgeFilter!) continue;
       }
 
-      if (age != null && age > _maxAllowedAge) {
+      // Use membership_eligible field to determine eligibility
+      // false = ineligible (aged out), true or null = eligible
+      if (member.membershipEligible == false) {
         agedOutMembers.add(member);
       } else {
         primaryMembers.add(member);
@@ -1799,11 +1802,11 @@ class _MembersListScreenState extends State<MembersListScreen> {
             });
           },
           title: Text(
-            'Aged-Out Members (${_agedOutMembers.length})',
+            'Ineligible Members (${_agedOutMembers.length})',
             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           subtitle: Text(
-            'Members older than $_maxAllowedAge are hidden from the main list.',
+            'Members marked as ineligible are hidden from the main list.',
             style: theme.textTheme.bodySmall,
           ),
           children: [
@@ -2105,7 +2108,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   Widget _buildMemberCard(Member member, int index, {required bool isMobile}) {
     final theme = Theme.of(context);
-    const gradient = _memberCardGradient;
+    final isIneligible = member.membershipEligible == false;
+    final gradient = isIneligible ? _ineligibleMemberCardGradient : _memberCardGradient;
     final phoneDisplay = _formatMemberPhone(member);
     final emailDisplay = _cleanValue(member.preferredEmail);
     final county = _cleanValue(member.county);
@@ -2121,6 +2125,15 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final chapterAffiliation = _formatChapterAffiliation(member);
 
     final metaChips = <Widget>[];
+    if (isIneligible) {
+      metaChips.add(
+        _buildInfoChip(
+          Icons.block,
+          'INELIGIBLE',
+          backgroundColor: Colors.white.withOpacity(0.25),
+        ),
+      );
+    }
     if (districtLabel != null) {
       metaChips.add(
         _buildInfoChip(
@@ -2345,8 +2358,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
       columnChildren.addAll(detailLines);
     }
 
-    final gradientBackground = const LinearGradient(
-      colors: _memberCardGradient,
+    final gradientBackground = LinearGradient(
+      colors: gradient,
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     );
