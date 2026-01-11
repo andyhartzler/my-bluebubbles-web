@@ -690,7 +690,7 @@ class SlackManagementRepository {
     try {
       final data = await _readClient
           .from('members')
-          .select('*, slack_user_mapping!slack_user_id(slack_user_id, slack_display_name, slack_real_name, slack_email, slack_avatar_url)')
+          .select()
           .eq('membership_eligible', false)
           .not('slack_user_id', 'is', null)
           .order('name', ascending: true);
