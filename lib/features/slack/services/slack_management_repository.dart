@@ -596,7 +596,7 @@ class SlackManagementRepository {
             *,
             slack_channel_committee_mapping!slack_channel_id(slack_channel_name),
             slack_user_mapping!slack_user_id(slack_display_name, slack_real_name, slack_avatar_url),
-            members!member_id(name, profile_photos)
+            members!member_id(name, profile_pictures)
           ''')
           .order('created_at', ascending: false)
           .limit(limit);
@@ -685,7 +685,7 @@ class SlackManagementRepository {
     try {
       final data = await _readClient
           .from('slack_user_mapping')
-          .select('*, members!member_id(id, name, profile_photos)')
+          .select('*, members!member_id(id, name, profile_pictures)')
           .eq('slack_user_id', slackUserId)
           .maybeSingle();
 
