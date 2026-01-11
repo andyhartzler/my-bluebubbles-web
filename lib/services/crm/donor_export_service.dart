@@ -196,27 +196,113 @@ class DonorExportService {
     pw.Font font,
     pw.Font boldFont,
   ) {
-    // Calculate column widths based on content
     final columnCount = headers.length;
+
+    // Calculate column widths based on content type
+    // Page width in landscape is ~720 points (792 - 72 margins)
+    final columnWidths = <int, pw.TableColumnWidth>{};
+    for (var i = 0; i < headers.length; i++) {
+      final header = headers[i];
+      double width;
+      switch (header) {
+        case 'Amount':
+          width = 55;
+          break;
+        case 'Date':
+          width = 65;
+          break;
+        case 'Check #':
+          width = 45;
+          break;
+        case 'Thank You Sent':
+        case 'Recurring':
+          width = 35;
+          break;
+        case 'State':
+          width = 30;
+          break;
+        case 'ZIP Code':
+          width = 45;
+          break;
+        case 'Phone':
+          width = 75;
+          break;
+        case 'Email':
+          width = 120;
+          break;
+        case 'Donor Name':
+          width = 90;
+          break;
+        case 'Address':
+          width = 100;
+          break;
+        case 'City':
+        case 'County':
+          width = 60;
+          break;
+        case 'Employer':
+        case 'Occupation':
+          width = 80;
+          break;
+        case 'Congressional District':
+          width = 40;
+          break;
+        case 'Payment Method':
+          width = 60;
+          break;
+        case 'Event':
+          width = 80;
+          break;
+        case 'Notes':
+          width = 100;
+          break;
+        default:
+          width = 60;
+      }
+      columnWidths[i] = pw.FixedColumnWidth(width);
+    }
+
+    // Adjust font size based on number of columns
+    final double headerFontSize;
+    final double cellFontSize;
+    final double cellHeight;
+    if (columnCount <= 6) {
+      headerFontSize = 9;
+      cellFontSize = 8;
+      cellHeight = 22;
+    } else if (columnCount <= 10) {
+      headerFontSize = 7;
+      cellFontSize = 6.5;
+      cellHeight = 18;
+    } else {
+      headerFontSize = 6;
+      cellFontSize = 5.5;
+      cellHeight = 16;
+    }
 
     return pw.TableHelper.fromTextArray(
       headers: headers,
       data: data,
+      columnWidths: columnWidths,
       headerStyle: pw.TextStyle(
         font: boldFont,
-        fontSize: 9,
+        fontSize: headerFontSize,
         color: PdfColors.white,
       ),
       headerDecoration: const pw.BoxDecoration(color: _unityBlue),
-      headerHeight: 30,
-      cellStyle: pw.TextStyle(font: font, fontSize: 8),
-      cellHeight: 24,
-      cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      headerHeight: cellHeight + 4,
+      cellStyle: pw.TextStyle(font: font, fontSize: cellFontSize),
+      cellHeight: cellHeight,
+      cellPadding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2),
       cellAlignments: Map.fromIterables(
         List.generate(columnCount, (i) => i),
         headers.map((h) {
           // Right-align Amount column
           if (h == 'Amount') return pw.Alignment.centerRight;
+          // Center-align short columns
+          if (h == 'Thank You Sent' || h == 'Recurring' || h == 'State') {
+            return pw.Alignment.center;
+          }
           return pw.Alignment.centerLeft;
         }),
       ),

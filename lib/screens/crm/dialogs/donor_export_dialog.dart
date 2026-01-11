@@ -447,16 +447,101 @@ class _DonorExportDialogState extends State<DonorExportDialog>
   }
 
   Widget _buildFieldsTab(ThemeData theme) {
+    // Check if all fields are selected
+    final allSelected = _fields.donorName &&
+        _fields.email &&
+        _fields.phone &&
+        _fields.address &&
+        _fields.city &&
+        _fields.state &&
+        _fields.zipCode &&
+        _fields.employer &&
+        _fields.occupation &&
+        _fields.county &&
+        _fields.congressionalDistrict &&
+        _fields.amount &&
+        _fields.donationDate &&
+        _fields.paymentMethod &&
+        _fields.checkNumber &&
+        _fields.eventName &&
+        _fields.notes &&
+        _fields.thankYouSent &&
+        _fields.isRecurring;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Select which fields to include in your export:',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Select which fields to include in your export:',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    if (allSelected) {
+                      // Deselect all (keep only required fields)
+                      _fields = const DonorExportFields(
+                        donorName: true,
+                        email: false,
+                        phone: false,
+                        address: false,
+                        city: false,
+                        state: false,
+                        zipCode: false,
+                        employer: false,
+                        occupation: false,
+                        county: false,
+                        congressionalDistrict: false,
+                        amount: true,
+                        donationDate: true,
+                        paymentMethod: false,
+                        checkNumber: false,
+                        eventName: false,
+                        notes: false,
+                        thankYouSent: false,
+                        isRecurring: false,
+                      );
+                    } else {
+                      // Select all
+                      _fields = const DonorExportFields(
+                        donorName: true,
+                        email: true,
+                        phone: true,
+                        address: true,
+                        city: true,
+                        state: true,
+                        zipCode: true,
+                        employer: true,
+                        occupation: true,
+                        county: true,
+                        congressionalDistrict: true,
+                        amount: true,
+                        donationDate: true,
+                        paymentMethod: true,
+                        checkNumber: true,
+                        eventName: true,
+                        notes: true,
+                        thankYouSent: true,
+                        isRecurring: true,
+                      );
+                    }
+                  });
+                },
+                icon: Icon(
+                  allSelected ? Icons.deselect : Icons.select_all,
+                  size: 18,
+                ),
+                label: Text(allSelected ? 'Deselect All' : 'Select All'),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
 
