@@ -163,6 +163,7 @@ dependencies:
   path: ^1.9.0
   path_provider: ^2.1.2 # no web support
   pdf: ^3.10.8
+  excel: ^4.0.3  # For XLSX export
   permission_handler:
     path: packages/permission_handler_stub
   photo_manager:
