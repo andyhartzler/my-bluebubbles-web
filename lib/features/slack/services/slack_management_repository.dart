@@ -695,4 +695,30 @@ class SlackManagementRepository {
       return null;
     }
   }
+
+  // ============================================
+  // INELIGIBLE MEMBERS TAB
+  // ============================================
+
+  /// Get members who are ineligible but have Slack accounts
+  Future<List<Member>> getIneligibleSlackMembers() async {
+    if (!isReady) return [];
+
+    try {
+      final data = await _readClient
+          .from('members')
+          .select('*, slack_user_mapping!slack_user_id(slack_user_id, slack_display_name, slack_real_name, slack_email, slack_avatar_url)')
+          .eq('membership_eligible', false)
+          .not('slack_user_id', 'is', null)
+          .order('name', ascending: true);
+
+      return (data as List<dynamic>)
+          .map((e) => Member.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching ineligible Slack members: $e');
+      return [];
+    }
+  }
+
 }

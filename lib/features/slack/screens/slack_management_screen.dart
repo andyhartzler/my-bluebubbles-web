@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/slack/widgets/channels_tab.dart';
 import 'package:bluebubbles/features/slack/widgets/unmatched_users_tab.dart';
+import 'package:bluebubbles/features/slack/widgets/ineligible_members_tab.dart';
 import 'package:bluebubbles/features/slack/widgets/analytics_tab.dart';
 
 /// Main screen for Slack management with tabbed interface
@@ -27,7 +28,7 @@ class _SlackManagementScreenState extends State<SlackManagementScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -57,6 +58,10 @@ class _SlackManagementScreenState extends State<SlackManagementScreen>
                 text: 'Unmatched Users',
               ),
               Tab(
+                icon: Icon(Icons.person_off),
+                text: 'Ineligible',
+              ),
+              Tab(
                 icon: Icon(Icons.analytics),
                 text: 'Analytics',
               ),
@@ -73,6 +78,7 @@ class _SlackManagementScreenState extends State<SlackManagementScreen>
             children: [
               ChannelsTab(initialChannelId: widget.initialChannelId),
               const UnmatchedUsersTab(),
+              const IneligibleMembersTab(),
               AnalyticsTab(
                 onSwitchToUnmatchedTab: () => _tabController.animateTo(1),
               ),

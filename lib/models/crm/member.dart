@@ -42,6 +42,7 @@ class Member {
   final String? whyJoin;
   final DateTime? lastContacted;
   final bool optOut;
+  final bool? membershipEligible;
   final List<String>? committee;
   final String? notes;
   final DateTime? introSentAt;
@@ -113,6 +114,7 @@ class Member {
     this.whyJoin,
     this.lastContacted,
     this.optOut = false,
+    this.membershipEligible,
     this.committee,
     this.notes,
     this.introSentAt,
@@ -395,6 +397,7 @@ class Member {
           ? DateTime.parse(json['last_contacted'] as String)
           : null,
       optOut: _normalizeBool(json['opt_out']) ?? false,
+      membershipEligible: _normalizeBool(json['membership_eligible']),
       committee: committees,
       notes: _normalizeText(json['notes']),
       introSentAt: json['intro_sent_at'] != null
@@ -487,6 +490,7 @@ class Member {
       'why_join': whyJoin,
       'last_contacted': lastContacted?.toIso8601String(),
       'opt_out': optOut,
+      'membership_eligible': membershipEligible,
       'committee': committee,
       'notes': notes,
       'intro_sent_at': introSentAt?.toIso8601String(),
@@ -597,6 +601,7 @@ class Member {
     String? whyJoin,
     DateTime? lastContacted,
     bool? optOut,
+    bool? membershipEligible,
     List<String>? committee,
     String? notes,
     DateTime? introSentAt,
@@ -669,6 +674,7 @@ class Member {
       whyJoin: whyJoin ?? this.whyJoin,
       lastContacted: lastContacted ?? this.lastContacted,
       optOut: optOut ?? this.optOut,
+      membershipEligible: membershipEligible ?? this.membershipEligible,
       committee: committee ?? this.committee,
       notes: notes ?? this.notes,
       introSentAt: introSentAt ?? this.introSentAt,
