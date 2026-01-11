@@ -45,6 +45,7 @@ class MemberRepository {
     'current_chapter_member',
     'registered_voter',
     'opt_out',
+    'membership_eligible',
     'date_of_birth',
     'community_type',
     'notes',
