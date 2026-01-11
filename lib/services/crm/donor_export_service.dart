@@ -212,17 +212,19 @@ class DonorExportService {
           width = 65;
           break;
         case 'Check #':
-          width = 45;
+          width = 50;
           break;
         case 'Thank You Sent':
+          width = 70;
+          break;
         case 'Recurring':
-          width = 35;
+          width = 55;
           break;
         case 'State':
-          width = 30;
+          width = 38;
           break;
         case 'ZIP Code':
-          width = 45;
+          width = 55;
           break;
         case 'Phone':
           width = 75;
@@ -245,7 +247,7 @@ class DonorExportService {
           width = 80;
           break;
         case 'Congressional District':
-          width = 40;
+          width = 95;
           break;
         case 'Payment Method':
           width = 60;
