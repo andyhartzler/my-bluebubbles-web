@@ -275,27 +275,44 @@ class SlackManagementRepository {
       // Check if slack_user_id is already in slack_user_mapping
       final existingMapping = await _readClient
           .from('slack_user_mapping')
-          .select('id')
+          .select('id, member_id')
           .eq('slack_user_id', slackUserId)
           .maybeSingle();
 
       if (existingMapping != null) {
-        debugPrint('Slack user ID already mapped');
-        return false;
+        final existingMemberId = existingMapping['member_id']?.toString();
+        if (existingMemberId == memberId) {
+          // Already mapped to this member, update the mapping
+          debugPrint('Slack user already mapped to this member, updating...');
+          await _writeClient
+              .from('slack_user_mapping')
+              .update({
+                'slack_email': slackEmail,
+                'slack_display_name': slackDisplayName,
+                'slack_real_name': slackRealName,
+                'manually_verified': true,
+                'last_synced_at': DateTime.now().toIso8601String(),
+              })
+              .eq('slack_user_id', slackUserId);
+        } else {
+          // Mapped to a different member - this is a conflict
+          debugPrint('Slack user ID already mapped to a different member');
+          return false;
+        }
+      } else {
+        // Insert new mapping
+        await _writeClient.from('slack_user_mapping').insert({
+          'member_id': memberId,
+          'slack_user_id': slackUserId,
+          'slack_email': slackEmail,
+          'slack_display_name': slackDisplayName,
+          'slack_real_name': slackRealName,
+          'matched_by': 'manual',
+          'match_confidence': 1.0,
+          'manually_verified': true,
+          'last_synced_at': DateTime.now().toIso8601String(),
+        });
       }
-
-      // Insert into slack_user_mapping
-      await _writeClient.from('slack_user_mapping').insert({
-        'member_id': memberId,
-        'slack_user_id': slackUserId,
-        'slack_email': slackEmail,
-        'slack_display_name': slackDisplayName,
-        'slack_real_name': slackRealName,
-        'matched_by': 'manual',
-        'match_confidence': 1.0,
-        'manually_verified': true,
-        'last_synced_at': DateTime.now().toIso8601String(),
-      });
 
       // Update members table with slack_user_id
       await _writeClient

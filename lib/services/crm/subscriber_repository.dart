@@ -293,17 +293,28 @@ class SubscriberRepository {
       // Use the standard Supabase client (not service role) to avoid web auth issues
       // This query works with authenticated RLS policies
       final client = _supabase.isInitialized ? _supabase.client : _readClient;
-      final response = await client
-          .from('event_attendees')
-          .select('email')
-          .inFilter('email', emails);
 
+      // Batch emails to avoid URL length limits (max ~50 emails per query)
+      const batchSize = 50;
       final counts = <String, int>{};
-      for (final row in (response as List<dynamic>?) ?? []) {
-        final map = row as Map<String, dynamic>;
-        final email = map['email'] as String?;
-        if (email == null) continue;
-        counts[email] = (counts[email] ?? 0) + 1;
+
+      for (var i = 0; i < emails.length; i += batchSize) {
+        final batch = emails.sublist(
+          i,
+          i + batchSize > emails.length ? emails.length : i + batchSize,
+        );
+
+        final response = await client
+            .from('event_attendees')
+            .select('email')
+            .inFilter('email', batch);
+
+        for (final row in (response as List<dynamic>?) ?? []) {
+          final map = row as Map<String, dynamic>;
+          final email = map['email'] as String?;
+          if (email == null) continue;
+          counts[email] = (counts[email] ?? 0) + 1;
+        }
       }
 
       return subscribers

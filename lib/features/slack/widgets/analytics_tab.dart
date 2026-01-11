@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -871,48 +872,54 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   Widget _buildUserAvatar(MembershipChange change) {
     final theme = Theme.of(context);
     final avatarUrl = change.avatarUrl;
-    final initials = change.displayName.isNotEmpty
-        ? change.displayName.substring(0, 1).toUpperCase()
-        : '?';
-    final color = change.isLinkedMember
-        ? theme.colorScheme.primary
-        : Colors.orange[700]!;
-    final bgColor = change.isLinkedMember
+    final backgroundColor = change.isLinkedMember
         ? theme.colorScheme.primary.withOpacity(0.2)
         : Colors.orange.withOpacity(0.2);
+    final textColor = change.isLinkedMember
+        ? theme.colorScheme.primary
+        : Colors.orange[700];
+    final initial = change.displayName.isNotEmpty
+        ? change.displayName.substring(0, 1).toUpperCase()
+        : '?';
 
     if (avatarUrl == null || avatarUrl.isEmpty) {
       return CircleAvatar(
         radius: 20,
-        backgroundColor: bgColor,
+        backgroundColor: backgroundColor,
         child: Text(
-          initials,
-          style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          initial,
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       );
     }
 
-    return ClipOval(
-      child: CachedNetworkImage(
-        imageUrl: avatarUrl,
-        width: 40,
-        height: 40,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => CircleAvatar(
-          radius: 20,
-          backgroundColor: bgColor,
-          child: const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+    return CachedNetworkImage(
+      imageUrl: avatarUrl,
+      imageBuilder: (context, imageProvider) => CircleAvatar(
+        radius: 20,
+        backgroundImage: imageProvider,
+        backgroundColor: backgroundColor,
+      ),
+      placeholder: (context, url) => CircleAvatar(
+        radius: 20,
+        backgroundColor: backgroundColor,
+        child: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
         ),
-        errorWidget: (context, url, error) => CircleAvatar(
-          radius: 20,
-          backgroundColor: bgColor,
-          child: Text(
-            initials,
-            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+      ),
+      errorWidget: (context, url, error) => CircleAvatar(
+        radius: 20,
+        backgroundColor: backgroundColor,
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -1402,11 +1409,7 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                             itemBuilder: (context, index) {
                               final member = _results[index];
                               return ListTile(
-                                leading: _buildMemberAvatar(
-                                  member.primaryProfilePhotoUrl,
-                                  member.name,
-                                  theme,
-                                ),
+                                leading: _buildMemberAvatar(member),
                                 title: Text(member.name),
                                 subtitle: Text(
                                   member.email ?? 'No email',
@@ -1434,44 +1437,30 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
     );
   }
 
-  Widget _buildMemberAvatar(String? photoUrl, String name, ThemeData theme) {
-    const double radius = 20;
-    final initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
+  Widget _buildMemberAvatar(Member member) {
+    final photoUrl = member.primaryProfilePhotoUrl;
+    final initial = member.name.isNotEmpty ? member.name[0].toUpperCase() : '?';
 
-    if (photoUrl == null || photoUrl.isEmpty) {
+    if (photoUrl == null) {
       return CircleAvatar(
-        radius: radius,
-        backgroundColor: theme.colorScheme.primaryContainer,
-        child: Text(
-          initials,
-          style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-        ),
+        child: Text(initial),
       );
     }
 
-    return ClipOval(
-      child: CachedNetworkImage(
-        imageUrl: photoUrl,
-        width: radius * 2,
-        height: radius * 2,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => CircleAvatar(
-          radius: radius,
-          backgroundColor: theme.colorScheme.primaryContainer,
-          child: const SizedBox(
-            width: radius,
-            height: radius,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+    return CachedNetworkImage(
+      imageUrl: photoUrl,
+      imageBuilder: (context, imageProvider) => CircleAvatar(
+        backgroundImage: imageProvider,
+      ),
+      placeholder: (context, url) => CircleAvatar(
+        child: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
         ),
-        errorWidget: (context, url, error) => CircleAvatar(
-          radius: radius,
-          backgroundColor: theme.colorScheme.primaryContainer,
-          child: Text(
-            initials,
-            style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-          ),
-        ),
+      ),
+      errorWidget: (context, url, error) => CircleAvatar(
+        child: Text(initial),
       ),
     );
   }
