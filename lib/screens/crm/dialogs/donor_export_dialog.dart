@@ -1,10 +1,6 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
+import 'package:universal_html/html.dart' as html;
 
 import 'package:bluebubbles/models/crm/donation.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
@@ -233,30 +229,23 @@ class _DonorExportDialogState extends State<DonorExportDialog>
 
       // Save file
       final extension = _format == ExportFormat.pdf ? 'pdf' : 'xlsx';
+      final mimeType = _format == ExportFormat.pdf
+          ? 'application/pdf'
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       final now = DateTime.now();
       final filename =
           'donations_export_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour}${now.minute}${now.second}.$extension';
 
-      String filePath;
-      if (kIsWeb) {
-        // Web download handling would go here
-        // For now, show a message
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Web export not yet supported')),
-        );
-        return;
-      } else {
-        final downloadsDir = await getDownloadsDirectory();
-        if (downloadsDir == null) {
-          throw Exception('Could not access downloads directory');
-        }
-        filePath = p.join(downloadsDir.path, filename);
-      }
-
-      final file = File(filePath);
-      await file.create(recursive: true);
-      await file.writeAsBytes(bytes);
+      // Web download using browser APIs
+      final blob = html.Blob([bytes], mimeType);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', filename)
+        ..style.display = 'none';
+      html.document.body?.append(anchor);
+      anchor.click();
+      anchor.remove();
+      html.Url.revokeObjectUrl(url);
 
       if (!mounted) return;
 
@@ -264,7 +253,7 @@ class _DonorExportDialogState extends State<DonorExportDialog>
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Export saved: $filename'),
+          content: Text('Export downloaded: $filename'),
           action: SnackBarAction(label: 'OK', onPressed: () {}),
         ),
       );
