@@ -17,10 +17,10 @@ class MessageFilter {
 
   MessageFilter({
     this.county,
-    this.congressionalDistricts,
+    List<String>? congressionalDistricts,
     this.committees,
-    this.highSchools,
-    this.colleges,
+    List<String>? highSchools,
+    List<String>? colleges,
     this.anyHighSchool = false,
     this.chapterName,
     this.chapterStatus,
