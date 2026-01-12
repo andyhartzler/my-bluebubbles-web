@@ -57,10 +57,11 @@ class CRMMessageService {
     try {
       final result = await _memberRepo.getAllMembers(
         county: filter.county,
-        congressionalDistrict: filter.congressionalDistrict,
+        congressionalDistricts: filter.congressionalDistricts,
         committees: filter.committees,
-        highSchool: filter.highSchool,
-        college: filter.college,
+        highSchools: filter.highSchools,
+        colleges: filter.colleges,
+        anyHighSchool: filter.anyHighSchool,
         chapterName: filter.chapterName,
         chapterStatus: filter.chapterStatus,
         minAge: filter.minAge,

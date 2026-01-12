@@ -707,11 +707,11 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       case _RecipientMode.county:
         return _buildCountyDropdown();
       case _RecipientMode.district:
-        return _buildDistrictDropdown();
+        return _buildDistrictSelector();
       case _RecipientMode.highSchool:
-        return _buildHighSchoolDropdown();
+        return _buildHighSchoolSelector();
       case _RecipientMode.college:
-        return _buildCollegeDropdown();
+        return _buildCollegeSelector();
       case _RecipientMode.committee:
         return _buildCommitteesSelector();
       case _RecipientMode.chapter:
@@ -976,88 +976,232 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
     );
   }
 
-  Widget _buildDistrictDropdown() {
-    final items = <DropdownMenuItem<String?>>[
-      const DropdownMenuItem<String?>(value: null, child: Text('All Districts')),
-      ..._districts.map(
-        (d) => DropdownMenuItem<String?>(value: d, child: Text('District $d')),
-      ),
-    ];
+  Widget _buildDistrictSelector() {
+    final label = (_filter.congressionalDistricts == null || _filter.congressionalDistricts!.isEmpty)
+        ? 'Select districts'
+        : '${_filter.congressionalDistricts!.length} districts selected';
 
-    return DropdownButtonFormField<String?>(
-      value: _filter.congressionalDistrict,
-      decoration: const InputDecoration(
-        labelText: 'Congressional District',
-        border: OutlineInputBorder(),
-      ),
-      items: items,
-      onChanged: (value) {
-        setState(() {
-          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.district, notify: false);
-          _filter = _filter.copyWithOverrides(
-            congressionalDistrict: value,
-            clearCongressionalDistrict: value == null,
-          );
-        });
-        _updatePreview();
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.how_to_vote),
+      label: Text(label),
+      onPressed: () {
+        final tempSelected = List<String>.from(_filter.congressionalDistricts ?? []);
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Select Congressional Districts'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: StatefulBuilder(
+                builder: (context, setDialogState) => ListView(
+                  shrinkWrap: true,
+                  children: _districts.map((district) {
+                    final isSelected = tempSelected.contains(district);
+                    return CheckboxListTile(
+                      title: Text('District $district'),
+                      value: isSelected,
+                      onChanged: (checked) {
+                        setDialogState(() {
+                          if (checked == true) {
+                            tempSelected.add(district);
+                          } else {
+                            tempSelected.remove(district);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _setMode(
+                      tempSelected.isEmpty ? _RecipientMode.manual : _RecipientMode.district,
+                      notify: false,
+                    );
+                    _filter = _filter.copyWithOverrides(
+                      congressionalDistricts: tempSelected.isEmpty ? null : tempSelected,
+                      clearCongressionalDistricts: tempSelected.isEmpty,
+                    );
+                  });
+                  _updatePreview();
+                  Navigator.pop(context);
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
 
-  Widget _buildHighSchoolDropdown() {
-    final items = <DropdownMenuItem<String?>>[
-      const DropdownMenuItem<String?>(value: null, child: Text('All High Schools')),
-      ..._highSchools.map(
-        (s) => DropdownMenuItem<String?>(value: s, child: Text(s)),
-      ),
-    ];
+  Widget _buildHighSchoolSelector() {
+    final label = _filter.anyHighSchool
+        ? 'All High School Members'
+        : (_filter.highSchools == null || _filter.highSchools!.isEmpty)
+            ? 'Select high schools'
+            : '${_filter.highSchools!.length} high schools selected';
 
-    return DropdownButtonFormField<String?>(
-      value: _filter.highSchool,
-      decoration: const InputDecoration(
-        labelText: 'High School',
-        border: OutlineInputBorder(),
-      ),
-      items: items,
-      onChanged: (value) {
-        setState(() {
-          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.highSchool, notify: false);
-          _filter = _filter.copyWithOverrides(
-            highSchool: value,
-            clearHighSchool: value == null,
-            clearCollege: true,
-          );
-        });
-        _updatePreview();
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.school),
+      label: Text(label),
+      onPressed: () {
+        var tempAnyHighSchool = _filter.anyHighSchool;
+        final tempSelected = List<String>.from(_filter.highSchools ?? []);
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Select High Schools'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: StatefulBuilder(
+                builder: (context, setDialogState) => ListView(
+                  shrinkWrap: true,
+                  children: [
+                    // "All High School Members" option
+                    CheckboxListTile(
+                      title: const Text('All High School Members'),
+                      subtitle: const Text('Any member with a high school listed'),
+                      value: tempAnyHighSchool,
+                      onChanged: (checked) {
+                        setDialogState(() {
+                          tempAnyHighSchool = checked == true;
+                          if (tempAnyHighSchool) {
+                            tempSelected.clear();
+                          }
+                        });
+                      },
+                    ),
+                    const Divider(),
+                    // Individual high schools
+                    ..._highSchools.map((school) {
+                      final isSelected = tempSelected.contains(school);
+                      return CheckboxListTile(
+                        title: Text(school),
+                        value: isSelected,
+                        enabled: !tempAnyHighSchool,
+                        onChanged: tempAnyHighSchool
+                            ? null
+                            : (checked) {
+                                setDialogState(() {
+                                  if (checked == true) {
+                                    tempSelected.add(school);
+                                  } else {
+                                    tempSelected.remove(school);
+                                  }
+                                });
+                              },
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    final hasFilter = tempAnyHighSchool || tempSelected.isNotEmpty;
+                    _setMode(
+                      hasFilter ? _RecipientMode.highSchool : _RecipientMode.manual,
+                      notify: false,
+                    );
+                    _filter = _filter.copyWithOverrides(
+                      anyHighSchool: tempAnyHighSchool,
+                      highSchools: tempSelected.isEmpty ? null : tempSelected,
+                      clearHighSchools: tempSelected.isEmpty && !tempAnyHighSchool,
+                      clearColleges: true,
+                    );
+                  });
+                  _updatePreview();
+                  Navigator.pop(context);
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
 
-  Widget _buildCollegeDropdown() {
-    final items = <DropdownMenuItem<String?>>[
-      const DropdownMenuItem<String?>(value: null, child: Text('All Colleges')),
-      ..._colleges.map(
-        (s) => DropdownMenuItem<String?>(value: s, child: Text(s)),
-      ),
-    ];
+  Widget _buildCollegeSelector() {
+    final label = (_filter.colleges == null || _filter.colleges!.isEmpty)
+        ? 'Select colleges'
+        : '${_filter.colleges!.length} colleges selected';
 
-    return DropdownButtonFormField<String?>(
-      value: _filter.college,
-      decoration: const InputDecoration(
-        labelText: 'College',
-        border: OutlineInputBorder(),
-      ),
-      items: items,
-      onChanged: (value) {
-        setState(() {
-          _setMode(value == null ? _RecipientMode.manual : _RecipientMode.college, notify: false);
-          _filter = _filter.copyWithOverrides(
-            college: value,
-            clearCollege: value == null,
-            clearHighSchool: true,
-          );
-        });
-        _updatePreview();
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.account_balance),
+      label: Text(label),
+      onPressed: () {
+        final tempSelected = List<String>.from(_filter.colleges ?? []);
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Select Colleges'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: StatefulBuilder(
+                builder: (context, setDialogState) => ListView(
+                  shrinkWrap: true,
+                  children: _colleges.map((college) {
+                    final isSelected = tempSelected.contains(college);
+                    return CheckboxListTile(
+                      title: Text(college),
+                      value: isSelected,
+                      onChanged: (checked) {
+                        setDialogState(() {
+                          if (checked == true) {
+                            tempSelected.add(college);
+                          } else {
+                            tempSelected.remove(college);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _setMode(
+                      tempSelected.isEmpty ? _RecipientMode.manual : _RecipientMode.college,
+                      notify: false,
+                    );
+                    _filter = _filter.copyWithOverrides(
+                      colleges: tempSelected.isEmpty ? null : tempSelected,
+                      clearColleges: tempSelected.isEmpty,
+                      clearHighSchools: true,
+                      anyHighSchool: false,
+                    );
+                  });
+                  _updatePreview();
+                  Navigator.pop(context);
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          ),
+        );
       },
     );
   }

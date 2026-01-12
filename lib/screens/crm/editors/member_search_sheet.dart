@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
@@ -123,10 +124,18 @@ class _MemberSearchSheetState extends State<_MemberSearchSheet> {
                   itemCount: _results.length,
                   itemBuilder: (context, index) {
                     final member = _results[index];
+                    final profilePhotoUrl = member.primaryProfilePhotoUrl;
                     return ListTile(
-                      leading: CircleAvatar(child: Text(member.name.isNotEmpty ? member.name[0].toUpperCase() : '?')),
+                      leading: CircleAvatar(
+                        backgroundImage: profilePhotoUrl != null
+                            ? CachedNetworkImageProvider(profilePhotoUrl)
+                            : null,
+                        child: profilePhotoUrl == null
+                            ? Text(member.name.isNotEmpty ? member.name[0].toUpperCase() : '?')
+                            : null,
+                      ),
                       title: Text(member.name),
-                      subtitle: Text(member.phoneE164 ?? member.phone ?? 'No phone available'),
+                      subtitle: Text(member.phoneE164 ?? member.phone ?? member.email ?? 'No contact info'),
                       onTap: () => Navigator.of(context).pop(member),
                     );
                   },

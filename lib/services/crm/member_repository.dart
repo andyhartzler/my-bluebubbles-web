@@ -45,6 +45,7 @@ class MemberRepository {
     'current_chapter_member',
     'registered_voter',
     'opt_out',
+    'membership_eligible',
     'date_of_birth',
     'community_type',
     'notes',
@@ -66,10 +67,11 @@ class MemberRepository {
   /// Get all members (with optional filters)
   Future<MemberFetchResult> getAllMembers({
     String? county,
-    String? congressionalDistrict,
+    List<String>? congressionalDistricts,
     List<String>? committees,
-    String? highSchool,
-    String? college,
+    List<String>? highSchools,
+    List<String>? colleges,
+    bool anyHighSchool = false,
     String? chapterName,
     String? chapterStatus,
     int? minAge,
@@ -92,10 +94,11 @@ class MemberRepository {
       final baseQuery = _applyMemberFilters(
         _readClient.from('members').select(selection),
         county: county,
-        congressionalDistrict: congressionalDistrict,
+        congressionalDistricts: congressionalDistricts,
         committees: committees,
-        highSchool: highSchool,
-        college: college,
+        highSchools: highSchools,
+        colleges: colleges,
+        anyHighSchool: anyHighSchool,
         chapterName: chapterName,
         chapterStatus: chapterStatus,
         minAge: minAge,
@@ -128,10 +131,11 @@ class MemberRepository {
         dynamic countQuery = _applyMemberFilters(
           _readClient.from('members').select(selectionWithCount),
           county: county,
-          congressionalDistrict: congressionalDistrict,
+          congressionalDistricts: congressionalDistricts,
           committees: committees,
-          highSchool: highSchool,
-          college: college,
+          highSchools: highSchools,
+          colleges: colleges,
+          anyHighSchool: anyHighSchool,
           chapterName: chapterName,
           chapterStatus: chapterStatus,
           minAge: minAge,
@@ -183,10 +187,11 @@ class MemberRepository {
   PostgrestFilterBuilder<T> _applyMemberFilters<T>(
     PostgrestFilterBuilder<T> query, {
     String? county,
-    String? congressionalDistrict,
+    List<String>? congressionalDistricts,
     List<String>? committees,
-    String? highSchool,
-    String? college,
+    List<String>? highSchools,
+    List<String>? colleges,
+    bool anyHighSchool = false,
     String? chapterName,
     String? chapterStatus,
     int? minAge,
@@ -199,20 +204,35 @@ class MemberRepository {
       query = query.eq('county', county);
     }
 
-    if (congressionalDistrict != null && congressionalDistrict.isNotEmpty) {
-      query = query.eq('congressional_district', congressionalDistrict);
+    if (congressionalDistricts != null && congressionalDistricts.isNotEmpty) {
+      if (congressionalDistricts.length == 1) {
+        query = query.eq('congressional_district', congressionalDistricts.first);
+      } else {
+        query = query.inFilter('congressional_district', congressionalDistricts);
+      }
     }
 
     if (committees != null && committees.isNotEmpty) {
       query = query.overlaps('committee', committees);
     }
 
-    if (highSchool != null && highSchool.isNotEmpty) {
-      query = query.eq('high_school', highSchool);
+    // anyHighSchool = true means all members with any high school set
+    if (anyHighSchool) {
+      query = query.not('high_school', 'is', null);
+    } else if (highSchools != null && highSchools.isNotEmpty) {
+      if (highSchools.length == 1) {
+        query = query.eq('high_school', highSchools.first);
+      } else {
+        query = query.inFilter('high_school', highSchools);
+      }
     }
 
-    if (college != null && college.isNotEmpty) {
-      query = query.eq('college', college);
+    if (colleges != null && colleges.isNotEmpty) {
+      if (colleges.length == 1) {
+        query = query.eq('college', colleges.first);
+      } else {
+        query = query.inFilter('college', colleges);
+      }
     }
 
     if (chapterName != null && chapterName.isNotEmpty) {
