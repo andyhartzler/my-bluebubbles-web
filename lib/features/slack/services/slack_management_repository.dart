@@ -708,12 +708,12 @@ class SlackManagementRepository {
     }
 
     try {
-      // Query members where membership_eligible IS FALSE (not null, explicitly false)
+      // Query members where membership_eligible = false (explicitly false, not null)
       // and slack_user_id is not null (they have a Slack account)
       final data = await _readClient
           .from('members')
           .select()
-          .is_('membership_eligible', false)
+          .eq('membership_eligible', false)
           .neq('slack_user_id', '')
           .not('slack_user_id', 'is', null)
           .order('name', ascending: true);

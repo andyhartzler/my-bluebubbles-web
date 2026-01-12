@@ -29,7 +29,24 @@ class MessageFilter {
     this.excludeOptedOut = true,
     this.excludeRecentlyContacted = false,
     this.recentContactThreshold = const Duration(days: 7),
-  });
+    // Backward-compatible single-value parameters
+    String? congressionalDistrict,
+    String? highSchool,
+    String? college,
+  })  : congressionalDistricts = congressionalDistricts ??
+            (congressionalDistrict != null ? [congressionalDistrict] : null),
+        highSchools = highSchools ??
+            (highSchool != null ? [highSchool] : null),
+        colleges = colleges ??
+            (college != null ? [college] : null);
+
+  // Backward-compatible single-value getters
+  String? get congressionalDistrict =>
+      congressionalDistricts?.isNotEmpty == true ? congressionalDistricts!.first : null;
+  String? get highSchool =>
+      highSchools?.isNotEmpty == true ? highSchools!.first : null;
+  String? get college =>
+      colleges?.isNotEmpty == true ? colleges!.first : null;
 
   /// Check if any filters are active
   bool get hasActiveFilters =>
@@ -97,13 +114,33 @@ class MessageFilter {
     bool? excludeOptedOut,
     bool? excludeRecentlyContacted,
     Duration? recentContactThreshold,
+    // Backward-compatible single-value parameters
+    String? congressionalDistrict,
+    String? highSchool,
+    String? college,
   }) {
+    // Handle single-value backward compatibility
+    List<String>? newDistricts = congressionalDistricts ?? this.congressionalDistricts;
+    if (congressionalDistrict != null) {
+      newDistricts = [congressionalDistrict];
+    }
+
+    List<String>? newHighSchools = highSchools ?? this.highSchools;
+    if (highSchool != null) {
+      newHighSchools = [highSchool];
+    }
+
+    List<String>? newColleges = colleges ?? this.colleges;
+    if (college != null) {
+      newColleges = [college];
+    }
+
     return MessageFilter(
       county: county ?? this.county,
-      congressionalDistricts: congressionalDistricts ?? this.congressionalDistricts,
+      congressionalDistricts: newDistricts,
       committees: committees ?? this.committees,
-      highSchools: highSchools ?? this.highSchools,
-      colleges: colleges ?? this.colleges,
+      highSchools: newHighSchools,
+      colleges: newColleges,
       anyHighSchool: anyHighSchool ?? this.anyHighSchool,
       chapterName: chapterName ?? this.chapterName,
       chapterStatus: chapterStatus ?? this.chapterStatus,
@@ -138,14 +175,53 @@ class MessageFilter {
     bool? excludeOptedOut,
     bool? excludeRecentlyContacted,
     Duration? recentContactThreshold,
+    // Backward-compatible single-value parameters
+    String? congressionalDistrict,
+    bool clearCongressionalDistrict = false,
+    String? highSchool,
+    bool clearHighSchool = false,
+    String? college,
+    bool clearCollege = false,
   }) {
+    // Handle backward-compatible clear flags
+    final shouldClearDistricts = clearCongressionalDistricts || clearCongressionalDistrict;
+    final shouldClearHighSchools = clearHighSchools || clearHighSchool;
+    final shouldClearColleges = clearColleges || clearCollege;
+
+    // Handle single-value backward compatibility
+    List<String>? newDistricts;
+    if (shouldClearDistricts) {
+      newDistricts = null;
+    } else if (congressionalDistrict != null) {
+      newDistricts = [congressionalDistrict];
+    } else {
+      newDistricts = congressionalDistricts ?? this.congressionalDistricts;
+    }
+
+    List<String>? newHighSchools;
+    if (shouldClearHighSchools) {
+      newHighSchools = null;
+    } else if (highSchool != null) {
+      newHighSchools = [highSchool];
+    } else {
+      newHighSchools = highSchools ?? this.highSchools;
+    }
+
+    List<String>? newColleges;
+    if (shouldClearColleges) {
+      newColleges = null;
+    } else if (college != null) {
+      newColleges = [college];
+    } else {
+      newColleges = colleges ?? this.colleges;
+    }
+
     return MessageFilter(
       county: clearCounty ? null : (county ?? this.county),
-      congressionalDistricts:
-          clearCongressionalDistricts ? null : (congressionalDistricts ?? this.congressionalDistricts),
+      congressionalDistricts: newDistricts,
       committees: clearCommittees ? null : (committees ?? this.committees),
-      highSchools: clearHighSchools ? null : (highSchools ?? this.highSchools),
-      colleges: clearColleges ? null : (colleges ?? this.colleges),
+      highSchools: newHighSchools,
+      colleges: newColleges,
       anyHighSchool: anyHighSchool ?? this.anyHighSchool,
       chapterName: clearChapterName ? null : (chapterName ?? this.chapterName),
       chapterStatus: clearChapterStatus ? null : (chapterStatus ?? this.chapterStatus),
