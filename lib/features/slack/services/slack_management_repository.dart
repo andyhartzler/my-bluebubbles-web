@@ -685,21 +685,30 @@ class SlackManagementRepository {
 
   /// Get members who are ineligible but have Slack accounts
   Future<List<Member>> getIneligibleSlackMembers() async {
-    if (!isReady) return [];
+    if (!isReady) {
+      debugPrint('SlackManagementRepository not ready');
+      return [];
+    }
 
     try {
+      // Query members where membership_eligible IS FALSE (not null, explicitly false)
+      // and slack_user_id is not null (they have a Slack account)
       final data = await _readClient
           .from('members')
           .select()
-          .eq('membership_eligible', false)
+          .is_('membership_eligible', false)
+          .neq('slack_user_id', '')
           .not('slack_user_id', 'is', null)
           .order('name', ascending: true);
+
+      debugPrint('Ineligible Slack members query returned ${(data as List).length} results');
 
       return (data as List<dynamic>)
           .map((e) => Member.fromJson(e as Map<String, dynamic>))
           .toList();
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Error fetching ineligible Slack members: $e');
+      debugPrint('Stack trace: $stackTrace');
       return [];
     }
   }

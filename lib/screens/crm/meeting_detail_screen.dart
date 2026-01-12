@@ -881,11 +881,24 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         child: Padding(
           padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: const [
-              Icon(Icons.groups_outlined),
-              SizedBox(width: 12),
-              Expanded(child: Text('No attendance has been recorded for this meeting.')),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.groups_outlined),
+                  SizedBox(width: 12),
+                  Expanded(child: Text('No attendance has been recorded for this meeting.')),
+                ],
+              ),
+              if (_isCrmReady) ...[
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () => _addMemberParticipant(meeting),
+                  icon: const Icon(Icons.person_add_alt_1),
+                  label: const Text('Add Attendee'),
+                ),
+              ],
             ],
           ),
         ),
@@ -909,6 +922,12 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
+                if (_isCrmReady)
+                  TextButton.icon(
+                    onPressed: () => _addMemberParticipant(meeting),
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: const Text('Add'),
+                  ),
                 TextButton.icon(
                   onPressed: () => _showMemberParticipants(meeting),
                   icon: const Icon(Icons.open_in_new),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -241,24 +242,50 @@ class _MeetingEditSheetState extends State<MeetingEditSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (selectedMember != null) ...[
-            Text(
-              selectedMember.name,
-              style: theme.textTheme.titleMedium,
-            ),
-            if ((selectedMember.phoneE164 ?? selectedMember.phone)?.isNotEmpty ?? false)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  selectedMember.phoneE164 ?? selectedMember.phone!,
-                  style: theme.textTheme.bodyMedium,
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundImage: selectedMember.primaryProfilePhotoUrl != null
+                      ? CachedNetworkImageProvider(selectedMember.primaryProfilePhotoUrl!)
+                      : null,
+                  child: selectedMember.primaryProfilePhotoUrl == null
+                      ? Text(
+                          selectedMember.name.isNotEmpty
+                              ? selectedMember.name[0].toUpperCase()
+                              : '?',
+                          style: theme.textTheme.titleMedium,
+                        )
+                      : null,
                 ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                'ID: ${selectedMember.id}',
-                style: theme.textTheme.bodySmall?.copyWith(color: subtleColor),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        selectedMember.name,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      if ((selectedMember.phoneE164 ?? selectedMember.phone)?.isNotEmpty ?? false)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            selectedMember.phoneE164 ?? selectedMember.phone!,
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'ID: ${selectedMember.id}',
+                          style: theme.textTheme.bodySmall?.copyWith(color: subtleColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ] else if (idText.isNotEmpty) ...[
             Text(
