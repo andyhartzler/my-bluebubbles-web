@@ -84,7 +84,19 @@ class MemberRepository {
     bool fetchTotalCount = false,
     bool fetchAll = false,
     List<String>? columns,
+    // Backward-compatible single-value parameters
+    String? congressionalDistrict,
+    String? highSchool,
+    String? college,
   }) async {
+    // Handle backward-compatible single values
+    final effectiveDistricts = congressionalDistricts ??
+        (congressionalDistrict != null ? [congressionalDistrict] : null);
+    final effectiveHighSchools = highSchools ??
+        (highSchool != null ? [highSchool] : null);
+    final effectiveColleges = colleges ??
+        (college != null ? [college] : null);
+
     if (!_isReady) {
       return const MemberFetchResult(members: []);
     }
@@ -94,10 +106,10 @@ class MemberRepository {
       final baseQuery = _applyMemberFilters(
         _readClient.from('members').select(selection),
         county: county,
-        congressionalDistricts: congressionalDistricts,
+        congressionalDistricts: effectiveDistricts,
         committees: committees,
-        highSchools: highSchools,
-        colleges: colleges,
+        highSchools: effectiveHighSchools,
+        colleges: effectiveColleges,
         anyHighSchool: anyHighSchool,
         chapterName: chapterName,
         chapterStatus: chapterStatus,
@@ -131,10 +143,10 @@ class MemberRepository {
         dynamic countQuery = _applyMemberFilters(
           _readClient.from('members').select(selectionWithCount),
           county: county,
-          congressionalDistricts: congressionalDistricts,
+          congressionalDistricts: effectiveDistricts,
           committees: committees,
-          highSchools: highSchools,
-          colleges: colleges,
+          highSchools: effectiveHighSchools,
+          colleges: effectiveColleges,
           anyHighSchool: anyHighSchool,
           chapterName: chapterName,
           chapterStatus: chapterStatus,
