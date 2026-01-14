@@ -212,6 +212,10 @@ class MemberRepository {
     bool? registeredVoter,
     String? searchQuery,
   }) {
+    // CRITICAL: Always filter to only membership eligible members
+    // This ensures bulk messaging never includes ineligible members
+    query = query.eq('membership_eligible', true);
+
     if (county != null && county.isNotEmpty) {
       query = query.eq('county', county);
     }
@@ -496,6 +500,7 @@ class MemberRepository {
   }
 
   /// Get all unique counties (for filter UI)
+  /// Only includes counties from membership eligible members
   Future<List<String>> getUniqueCounties() async {
     if (!_isReady) return [];
 
@@ -503,6 +508,7 @@ class MemberRepository {
       final response = await _readClient
           .from('members')
           .select('county')
+          .eq('membership_eligible', true)
           .not('county', 'is', null);
 
       final counties = (response as List<dynamic>)
@@ -549,7 +555,11 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
-      final response = await _readClient.from('members').select('committee');
+      // Only aggregate from membership eligible members for bulk messaging safety
+      final response = await _readClient
+          .from('members')
+          .select('committee')
+          .eq('membership_eligible', true);
       final counts = <String, int>{};
 
       for (final item in response as List<dynamic>) {
@@ -572,9 +582,11 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
+      // Only aggregate from membership eligible members for bulk messaging safety
       final response = await _readClient
           .from('members')
           .select('chapter_name, chapter_position')
+          .eq('membership_eligible', true)
           .not('chapter_position', 'is', null);
 
       final counts = <String, int>{};
@@ -598,7 +610,11 @@ class MemberRepository {
     if (!_isReady) return const AgeBounds();
 
     try {
-      final response = await _readClient.from('members').select('date_of_birth');
+      // Only aggregate from membership eligible members for bulk messaging safety
+      final response = await _readClient
+          .from('members')
+          .select('date_of_birth')
+          .eq('membership_eligible', true);
       int? minAge;
       int? maxAge;
       final now = DateTime.now();
@@ -681,7 +697,11 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
-      final response = await _readClient.from('members').select('date_of_birth');
+      // Only aggregate from membership eligible members for bulk messaging safety
+      final response = await _readClient
+          .from('members')
+          .select('date_of_birth')
+          .eq('membership_eligible', true);
       final now = DateTime.now();
       final buckets = LinkedHashMap<String, int>.fromEntries([
         MapEntry('14-17', 0),
@@ -807,6 +827,7 @@ class MemberRepository {
   }
 
   /// Get all unique congressional districts (for filter UI)
+  /// Only includes districts from membership eligible members
   Future<List<String>> getUniqueCongressionalDistricts() async {
     if (!_isReady) return [];
 
@@ -814,6 +835,7 @@ class MemberRepository {
       final response = await _readClient
           .from('members')
           .select('congressional_district')
+          .eq('membership_eligible', true)
           .not('congressional_district', 'is', null);
 
       final districts = (response as List<dynamic>)
@@ -834,6 +856,7 @@ class MemberRepository {
   }
 
   /// Get all unique committees (for filter UI)
+  /// Only includes committees from membership eligible members
   Future<List<String>> getUniqueCommittees() async {
     if (!_isReady) return [];
 
@@ -841,6 +864,7 @@ class MemberRepository {
       final response = await _readClient
           .from('members')
           .select('committee')
+          .eq('membership_eligible', true)
           .not('committee', 'is', null);
 
       final allCommittees = <String>{};
@@ -858,6 +882,8 @@ class MemberRepository {
     }
   }
 
+  /// Get all unique high schools (for filter UI)
+  /// Only includes high schools from membership eligible members
   Future<List<String>> getUniqueHighSchools() async {
     if (!_isReady) return [];
 
@@ -865,6 +891,7 @@ class MemberRepository {
       final response = await _readClient
           .from('members')
           .select('high_school')
+          .eq('membership_eligible', true)
           .not('high_school', 'is', null);
 
       final schools = (response as List<dynamic>)
@@ -883,6 +910,8 @@ class MemberRepository {
     }
   }
 
+  /// Get all unique colleges (for filter UI)
+  /// Only includes colleges from membership eligible members
   Future<List<String>> getUniqueColleges() async {
     if (!_isReady) return [];
 
@@ -890,6 +919,7 @@ class MemberRepository {
       final response = await _readClient
           .from('members')
           .select('college')
+          .eq('membership_eligible', true)
           .not('college', 'is', null);
 
       final colleges = (response as List<dynamic>)
@@ -908,6 +938,8 @@ class MemberRepository {
     }
   }
 
+  /// Get all unique chapter names (for filter UI)
+  /// Only includes chapters from membership eligible members
   Future<List<String>> getUniqueChapterNames() async {
     if (!_isReady) return [];
 
@@ -915,6 +947,7 @@ class MemberRepository {
       final response = await _readClient
           .from('members')
           .select('chapter_name')
+          .eq('membership_eligible', true)
           .not('chapter_name', 'is', null);
 
       final chapters = (response as List<dynamic>)
@@ -1289,6 +1322,7 @@ class MemberRepository {
   }
 
   /// Search members by name or phone
+  /// Only returns membership eligible members for bulk messaging safety
   Future<List<Member>> searchMembers(String query) async {
     if (!_isReady) return [];
 
@@ -1296,6 +1330,7 @@ class MemberRepository {
       final response = await _readClient
           .from('members')
           .select()
+          .eq('membership_eligible', true)
           .or('name.ilike.%$query%,phone.ilike.%$query%,phone_e164.ilike.%$query%');
 
       return (response as List<dynamic>)
@@ -1315,7 +1350,11 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
-      final response = await _readClient.from('members').select(column);
+      // Only aggregate from membership eligible members for bulk messaging safety
+      final response = await _readClient
+          .from('members')
+          .select(column)
+          .eq('membership_eligible', true);
       final counts = <String, int>{};
 
       for (final item in response as List<dynamic>) {
@@ -1341,7 +1380,11 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
-      final response = await _readClient.from('members').select(column);
+      // Only aggregate from membership eligible members for bulk messaging safety
+      final response = await _readClient
+          .from('members')
+          .select(column)
+          .eq('membership_eligible', true);
       final counts = <String, int>{};
       final delimiter = RegExp(r'[;,/\n|]+');
 
@@ -1386,7 +1429,11 @@ class MemberRepository {
     if (!_isReady) return {};
 
     try {
-      final response = await _readClient.from('members').select(column);
+      // Only aggregate from membership eligible members for bulk messaging safety
+      final response = await _readClient
+          .from('members')
+          .select(column)
+          .eq('membership_eligible', true);
       int trueCount = 0;
       int falseCount = 0;
 
