@@ -541,7 +541,12 @@ class Member {
   }
 
   /// Helper: Check if member can be contacted
-  bool get canContact => !optOut && phoneE164 != null && phoneE164!.isNotEmpty;
+  /// Member must not be opted out, have a valid phone, AND be membership eligible
+  bool get canContact =>
+      !optOut &&
+      phoneE164 != null &&
+      phoneE164!.isNotEmpty &&
+      (membershipEligible == true);
 
   /// Helper: Format committees as string
   String get committeesString => committee?.join(', ') ?? 'None';
