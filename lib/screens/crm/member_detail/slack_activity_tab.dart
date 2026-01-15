@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -215,18 +216,19 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
     final theme = Theme.of(context);
     final shouldShowLinkButton = widget.member.slackUserId == null;
 
+    // Prioritize member's main profile photo, fall back to Slack avatar
+    final avatarUrl = widget.member.primaryProfilePhotoUrl ?? profile?.avatarUrl;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
           children: [
-            CircleAvatar(
+            CorsAwareAvatar(
+              imageUrl: avatarUrl,
               radius: 28,
-              backgroundImage:
-                  profile?.avatarUrl != null ? NetworkImage(profile!.avatarUrl!) : null,
-              child: profile?.avatarUrl == null
-                  ? const Icon(Icons.chat_bubble_outline)
-                  : null,
+              fallbackText: widget.member.name,
+              fallbackIcon: Icons.chat_bubble_outline,
             ),
             const SizedBox(width: 16),
             Expanded(

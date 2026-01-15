@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/models/slack_analytics.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/features/slack/widgets/message_bubble.dart';
@@ -869,29 +870,17 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
 
   Widget _buildUserAvatar(MembershipChange change) {
     final theme = Theme.of(context);
-    final avatarUrl = change.avatarUrl;
+    final accentColor = change.isLinkedMember
+        ? theme.colorScheme.primary
+        : Colors.orange[700]!;
 
-    return CircleAvatar(
+    return CorsAwareAvatar(
+      imageUrl: change.avatarUrl,
       radius: 20,
-      backgroundColor: change.isLinkedMember
-          ? theme.colorScheme.primary.withOpacity(0.2)
-          : Colors.orange.withOpacity(0.2),
-      backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-          ? NetworkImage(avatarUrl)
-          : null,
-      child: avatarUrl == null || avatarUrl.isEmpty
-          ? Text(
-              change.displayName.isNotEmpty
-                  ? change.displayName.substring(0, 1).toUpperCase()
-                  : '?',
-              style: TextStyle(
-                color: change.isLinkedMember
-                    ? theme.colorScheme.primary
-                    : Colors.orange[700],
-                fontWeight: FontWeight.w600,
-              ),
-            )
-          : null,
+      backgroundColor: accentColor.withOpacity(0.2),
+      fallbackText: change.displayName,
+      fallbackIconColor: accentColor,
+      fallbackTextColor: accentColor,
     );
   }
 
@@ -1195,16 +1184,11 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
+                  CorsAwareAvatar(
                     radius: 20,
                     backgroundColor: Colors.orange.withOpacity(0.2),
-                    child: Text(
-                      widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        color: Colors.orange[700],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    fallbackText: widget.userName,
+                    fallbackTextColor: Colors.orange[700]!,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1378,15 +1362,10 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                             itemBuilder: (context, index) {
                               final member = _results[index];
                               return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundImage: member.primaryProfilePhotoUrl != null
-                                      ? NetworkImage(member.primaryProfilePhotoUrl!)
-                                      : null,
-                                  child: member.primaryProfilePhotoUrl == null
-                                      ? Text(member.name.isNotEmpty
-                                          ? member.name[0].toUpperCase()
-                                          : '?')
-                                      : null,
+                                leading: CorsAwareAvatar(
+                                  imageUrl: member.primaryProfilePhotoUrl,
+                                  radius: 20,
+                                  fallbackText: member.name,
                                 ),
                                 title: Text(member.name),
                                 subtitle: Text(

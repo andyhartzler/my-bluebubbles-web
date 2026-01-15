@@ -15,11 +15,13 @@ import 'package:bluebubbles/features/committees/screens/tabs/committee_meetings_
 import 'package:bluebubbles/features/committees/screens/tabs/committee_votes_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/social_media/social_media_analytics_tab.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/canvas_board/screens/committee_canvas_tab.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/screens/legislation_tracker_screen.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/legislation_provider.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/bill_search_provider.dart';
+import 'package:bluebubbles/features/committees/screens/committee_tools_config_screen.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
   final Committee committee;
@@ -407,6 +409,31 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        // Settings button for mobile
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+                          padding: EdgeInsets.zero,
+                          offset: const Offset(0, 40),
+                          onSelected: (value) {
+                            if (value == 'member_tools') {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => CommitteeToolsConfigScreen(committee: committee),
+                                ),
+                              );
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'member_tools',
+                              child: ListTile(
+                                leading: Icon(Icons.build_outlined),
+                                title: Text('Member Tools'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -500,10 +527,44 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
 
               // Right side: Leadership section
               _buildLeadershipSection(context),
+
+              // Settings button
+              if (!isMobile) ...[
+                const SizedBox(width: 12),
+                _buildSettingsButton(context),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSettingsButton(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.settings_outlined, color: Colors.white),
+      tooltip: 'Committee Settings',
+      offset: const Offset(0, 40),
+      onSelected: (value) {
+        if (value == 'member_tools') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CommitteeToolsConfigScreen(committee: committee),
+            ),
+          );
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'member_tools',
+          child: ListTile(
+            leading: Icon(Icons.build_outlined),
+            title: Text('Configure Member Tools'),
+            subtitle: Text('Control what committee members can access'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
     );
   }
 
@@ -576,16 +637,13 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(
+              CorsAwareAvatar(
+                imageUrl: leader.photoUrl,
                 radius: 14,
-                backgroundImage: leader.photoUrl != null ? NetworkImage(leader.photoUrl!) : null,
                 backgroundColor: Colors.white.withOpacity(0.3),
-                child: leader.photoUrl == null
-                    ? Text(
-                        leader.name.isNotEmpty ? leader.name[0].toUpperCase() : '?',
-                        style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
-                      )
-                    : null,
+                fallbackText: leader.name,
+                fallbackIconColor: Colors.white,
+                fallbackTextColor: Colors.white,
               ),
               const SizedBox(width: 8),
               Column(

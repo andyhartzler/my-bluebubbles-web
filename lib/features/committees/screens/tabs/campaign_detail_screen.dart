@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/subscriber.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
@@ -1281,31 +1282,13 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     final photoUrl = participant.profilePhotoUrl ??
         participant.linkedMember?.primaryProfilePhotoUrl;
 
-    if (photoUrl != null && photoUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: 28,
-        backgroundImage: NetworkImage(photoUrl),
-        onBackgroundImageError: (_, __) {},
-        child: null,
-      );
-    }
-
-    // Fallback to initials
-    final initials = participant.name.isNotEmpty
-        ? participant.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
-        : '?';
-
-    return CircleAvatar(
+    return CorsAwareAvatar(
+      imageUrl: photoUrl,
       radius: 28,
       backgroundColor: Colors.purple.withOpacity(0.2),
-      child: Text(
-        initials,
-        style: const TextStyle(
-          color: Colors.purple,
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-        ),
-      ),
+      fallbackText: participant.name,
+      fallbackIconColor: Colors.purple,
+      fallbackTextColor: Colors.purple,
     );
   }
 

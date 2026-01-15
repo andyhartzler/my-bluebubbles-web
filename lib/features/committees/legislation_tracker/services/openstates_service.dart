@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bluebubbles/config/crm_config.dart';
 
 /// Service for interacting with Open States API via Edge Functions
 class OpenStatesService {
@@ -7,6 +8,11 @@ class OpenStatesService {
   factory OpenStatesService() => _instance;
 
   SupabaseClient get _supabase => Supabase.instance.client;
+
+  /// Get headers for Edge Function calls
+  Map<String, String> get _functionHeaders => {
+    'apikey': CRMConfig.supabaseAnonKey,
+  };
 
   /// Search for bills in the Missouri legislature
   Future<BillSearchResult> searchBills({
@@ -23,6 +29,7 @@ class OpenStatesService {
     try {
       final response = await _supabase.functions.invoke(
         'openstates-search-bills',
+        headers: _functionHeaders,
         body: {
           'query': query,
           'session': session,
@@ -57,6 +64,7 @@ class OpenStatesService {
     try {
       final response = await _supabase.functions.invoke(
         'openstates-get-bill',
+        headers: _functionHeaders,
         body: {
           'openstates_bill_id': openstatesBillId,
           'jurisdiction': jurisdiction,
@@ -87,6 +95,7 @@ class OpenStatesService {
     try {
       final response = await _supabase.functions.invoke(
         'openstates-get-legislators',
+        headers: _functionHeaders,
         body: {
           'lat': lat,
           'lng': lng,
@@ -115,6 +124,7 @@ class OpenStatesService {
     try {
       final response = await _supabase.functions.invoke(
         'openstates-sync-tracked-bills',
+        headers: _functionHeaders,
         body: billId != null ? {'bill_id': billId} : {},
       );
 

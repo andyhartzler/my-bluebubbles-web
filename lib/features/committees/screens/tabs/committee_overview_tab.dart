@@ -5,6 +5,7 @@ import 'package:bluebubbles/features/calendar/widgets/event_create_dialog.dart';
 import 'package:bluebubbles/features/calendar/widgets/responsive_calendar_widget.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/meetings/widgets/upcoming_meetings_widget.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 
@@ -768,12 +769,10 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           child: Row(
             children: [
-              CircleAvatar(
+              CorsAwareAvatar(
+                imageUrl: leader.photoUrl,
                 radius: 20,
-                backgroundImage: leader.photoUrl != null ? NetworkImage(leader.photoUrl!) : null,
-                child: leader.photoUrl == null
-                    ? Text(leader.name.isNotEmpty ? leader.name[0].toUpperCase() : '?')
-                    : null,
+                fallbackText: leader.name,
               ),
               const SizedBox(width: 12),
               Expanded(

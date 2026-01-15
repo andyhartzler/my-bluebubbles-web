@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bluebubbles/config/crm_config.dart';
 import '../models/tracked_bill.dart';
 
 /// Result of an AI analysis request
@@ -77,6 +78,11 @@ class AiAnalysisService {
 
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  /// Get headers for Edge Function calls
+  Map<String, String> get _functionHeaders => {
+    'apikey': CRMConfig.supabaseAnonKey,
+  };
+
   /// Analyze a single bill with Claude AI
   Future<AiAnalysisResult> analyzeBill({
     required String billId,
@@ -85,6 +91,7 @@ class AiAnalysisService {
     try {
       final response = await _supabase.functions.invoke(
         'analyze-bill',
+        headers: _functionHeaders,
         body: {
           'billId': billId,
           'forceReanalyze': forceReanalyze,
@@ -112,6 +119,7 @@ class AiAnalysisService {
     try {
       final response = await _supabase.functions.invoke(
         'analyze-bills-batch',
+        headers: _functionHeaders,
         body: {
           'batchSize': batchSize,
           'onlyUnanalyzed': onlyUnanalyzed,
