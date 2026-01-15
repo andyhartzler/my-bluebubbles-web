@@ -221,13 +221,14 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
                   Icon(
                     committee.id == 'College Democrats' ? Icons.school : Icons.domain,
                     size: 20,
-                    color: _momentumBlue,
+                    color: Colors.white,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Filter by $schoolLabel:',
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: _unityBlue,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -267,7 +268,7 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
                   if (_selectedSchoolFilter != null) ...[
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.clear, size: 20, color: _momentumBlue),
+                      icon: const Icon(Icons.clear, size: 20, color: Colors.white),
                       onPressed: () => _setSchoolFilter(null),
                       tooltip: 'Clear filter',
                       padding: EdgeInsets.zero,
@@ -289,18 +290,18 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _momentumBlue.withOpacity(0.1),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.people_outline, size: 16, color: _momentumBlue),
+                      const Icon(Icons.people_outline, size: 16, color: Colors.white),
                       const SizedBox(width: 6),
                       Text(
                         '${_filteredMembers.length} member${_filteredMembers.length == 1 ? '' : 's'}',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: _unityBlue,
+                          color: Colors.white,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -309,7 +310,7 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.refresh, color: _momentumBlue),
+                  icon: const Icon(Icons.refresh, color: Colors.white),
                   onPressed: _loadMembers,
                   tooltip: 'Refresh',
                 ),
@@ -329,7 +330,7 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
                         Icon(
                           Icons.people_outline,
                           size: 64,
-                          color: _unityBlue.withOpacity(0.3),
+                          color: Colors.white.withOpacity(0.5),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -337,7 +338,7 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
                               ? 'No members match your search'
                               : 'No members in this committee',
                           style: theme.textTheme.titleMedium?.copyWith(
-                            color: _unityBlue,
+                            color: Colors.white,
                           ),
                         ),
                       ],
@@ -361,22 +362,26 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
     final theme = Theme.of(context);
     final photoUrl = member.primaryProfilePhotoUrl;
     final schoolName = _getSchoolDisplayName(member);
+    final cd = member.congressionalDistrict;
+    final age = _calculateAge(member.dateOfBirth);
+    final dateJoined = _formatDateJoined(member.createdAt);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: _unityBlue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
             CorsAwareAvatar(
               imageUrl: photoUrl,
-              radius: 24,
-              backgroundColor: _momentumBlue.withOpacity(0.2),
+              radius: 26,
+              backgroundColor: Colors.white.withOpacity(0.2),
               fallbackText: member.name,
-              fallbackIconColor: _unityBlue,
-              fallbackTextColor: _unityBlue,
+              fallbackIconColor: Colors.white,
+              fallbackTextColor: Colors.white,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -385,31 +390,31 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
                 children: [
                   Text(
                     member.name,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: _unityBlue,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
                   ),
-                  if (schoolName != null && schoolName.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _momentumBlue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        schoolName,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _momentumBlue,
-                          fontWeight: FontWeight.w500,
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      if (schoolName != null && schoolName.isNotEmpty)
+                        _buildInfoChip(
+                          _isSchoolCommittee && committee.id == 'College Democrats'
+                              ? Icons.school
+                              : Icons.domain,
+                          schoolName,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                      if (cd != null && cd.isNotEmpty)
+                        _buildInfoChip(Icons.how_to_vote_outlined, 'CD $cd'),
+                      if (age != null)
+                        _buildInfoChip(Icons.cake_outlined, '$age yrs'),
+                      if (dateJoined != null)
+                        _buildInfoChip(Icons.calendar_today_outlined, dateJoined),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -417,5 +422,50 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
         ),
       ),
     );
+  }
+
+  Widget _buildInfoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  int? _calculateAge(DateTime? dateOfBirth) {
+    if (dateOfBirth == null) return null;
+    final now = DateTime.now();
+    int age = now.year - dateOfBirth.year;
+    if (now.month < dateOfBirth.month ||
+        (now.month == dateOfBirth.month && now.day < dateOfBirth.day)) {
+      age--;
+    }
+    return age > 0 ? age : null;
+  }
+
+  String? _formatDateJoined(DateTime? createdAt) {
+    if (createdAt == null) return null;
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[createdAt.month - 1]} ${createdAt.year}';
   }
 }

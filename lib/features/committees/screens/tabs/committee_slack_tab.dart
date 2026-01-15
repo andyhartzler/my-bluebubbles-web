@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -64,6 +65,7 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
 
   // Shared state
   Map<String, Map<String, String>> _slackUserMappings = {};
+  Map<String, Map<String, String>> _unmatchedUsers = {};
   Map<String, Member> _memberCache = {};
 
   // Tab controller for committees with multiple channels
@@ -140,6 +142,9 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
       // Fetch member data for users with linked member_id
       await _loadMemberData(userMappings);
 
+      // Load unmatched Slack users for better name/avatar display
+      await _loadUnmatchedUsers();
+
       if (!mounted) return;
 
       setState(() {
@@ -196,6 +201,34 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
       }
     } catch (e) {
       debugPrint('Error loading member data: $e');
+    }
+  }
+
+  /// Load unmatched Slack users from the slack_users_unmatched table
+  /// This provides name and avatar for users not in slack_user_mapping
+  Future<void> _loadUnmatchedUsers() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('slack_users_unmatched')
+          .select('slack_user_id, slack_real_name, slack_display_name, cached_avatar_path')
+          .eq('manually_rejected', false);
+
+      final unmatchedMap = <String, Map<String, String>>{};
+      for (final item in (response as List)) {
+        final slackUserId = item['slack_user_id'] as String?;
+        if (slackUserId != null) {
+          unmatchedMap[slackUserId] = {
+            'real_name': item['slack_real_name']?.toString() ?? '',
+            'display_name': item['slack_display_name']?.toString() ?? '',
+            'cached_avatar_path': item['cached_avatar_path']?.toString() ?? '',
+          };
+        }
+      }
+
+      _unmatchedUsers = unmatchedMap;
+    } catch (e) {
+      debugPrint('Error loading unmatched users: $e');
     }
   }
 
@@ -525,6 +558,18 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
           avatarUrl = userMapping['avatar_url'];
         }
       }
+    } else if (slackUserId != null && _unmatchedUsers.containsKey(slackUserId)) {
+      // No user mapping, but we have data from slack_users_unmatched
+      final unmatchedData = _unmatchedUsers[slackUserId]!;
+      userName = unmatchedData['real_name']?.isNotEmpty == true
+          ? unmatchedData['real_name']
+          : unmatchedData['display_name'];
+
+      // Get cached avatar from unmatched users table
+      final cachedPath = unmatchedData['cached_avatar_path'];
+      if (cachedPath != null && cachedPath.isNotEmpty) {
+        avatarUrl = '$_supabaseAvatarStorageUrl$cachedPath';
+      }
     }
 
     // Only allow navigation if member is linked AND not in member view
@@ -554,8 +599,8 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
                     fallbackIconColor: Colors.white,
                     fallbackTextColor: Colors.white,
                   ),
-                  // Unmatched user indicator
-                  if (isUnmatchedUser) ...[
+                  // Unmatched user indicator - only show to executives, not members
+                  if (isUnmatchedUser && !widget.isMemberView) ...[
                     const SizedBox(width: 4),
                     Tooltip(
                       message: 'Unmatched Slack user',

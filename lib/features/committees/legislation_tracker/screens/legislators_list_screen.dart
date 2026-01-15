@@ -34,6 +34,10 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
   bool _isLoading = false;
   String? _error;
 
+  // For debouncing search
+  DateTime? _lastSearchTime;
+  static const _searchDebounceMs = 300;
+
   List<Legislator> _senateLegislators = [];
   List<Legislator> _houseLegislators = [];
   LegislatorStats? _stats;
@@ -42,14 +46,37 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _searchController.addListener(_onSearchChanged);
     _loadLegislators();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text;
+    if (query == _searchQuery) return;
+
+    // Debounce search
+    final now = DateTime.now();
+    _lastSearchTime = now;
+
+    Future.delayed(const Duration(milliseconds: _searchDebounceMs), () {
+      if (_lastSearchTime == now && mounted) {
+        setState(() => _searchQuery = query);
+        _loadLegislators();
+      }
+    });
+  }
+
+  void _setPartyFilter(String? party) {
+    setState(() => _partyFilter = party);
+    _loadLegislators();
   }
 
   Future<void> _loadLegislators() async {
@@ -134,10 +161,7 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
                     filled: true,
                     fillColor: Colors.white,
                   ),
-                  onSubmitted: (value) {
-                    setState(() => _searchQuery = value);
-                    _loadLegislators();
-                  },
+                  // No onSubmitted - search happens as you type via listener
                 ),
               ),
               const SizedBox(width: 12),
@@ -241,10 +265,12 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
       child: Row(
         children: [
           Expanded(
-            child: _buildStatItem(
+            child: _buildClickableStatItem(
               '${_stats!.totalLegislators}',
               'Total',
               Icons.people,
+              isSelected: _partyFilter == null,
+              onTap: () => _setPartyFilter(null),
             ),
           ),
           Container(
@@ -253,11 +279,13 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
             color: Colors.white.withOpacity(0.2),
           ),
           Expanded(
-            child: _buildStatItem(
+            child: _buildClickableStatItem(
               '${_stats!.republicanCount}',
               'Republican',
               Icons.circle,
               color: const Color(0xFFEF4444),
+              isSelected: _partyFilter == 'Republican',
+              onTap: () => _setPartyFilter('Republican'),
             ),
           ),
           Container(
@@ -266,14 +294,65 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
             color: Colors.white.withOpacity(0.2),
           ),
           Expanded(
-            child: _buildStatItem(
+            child: _buildClickableStatItem(
               '${_stats!.democratCount}',
               'Democrat',
               Icons.circle,
               color: const Color(0xFF3B82F6),
+              isSelected: _partyFilter == 'Democratic',
+              onTap: () => _setPartyFilter('Democratic'),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildClickableStatItem(
+    String value,
+    String label,
+    IconData icon, {
+    Color? color,
+    bool isSelected = false,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: isSelected
+            ? BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              )
+            : null,
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 14, color: color ?? _momentumBlue),
+                const SizedBox(width: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: color ?? Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.8),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

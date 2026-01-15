@@ -248,42 +248,58 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
     final legislator = _legislator!;
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // App bar with photo
-          SliverAppBar(
-            expandedHeight: 280,
-            pinned: true,
-            backgroundColor: _unityBlue,
-            iconTheme: const IconThemeData(color: Colors.white),
-            flexibleSpace: FlexibleSpaceBar(
-              background: _buildHeader(theme, legislator),
+      body: Stack(
+        children: [
+          // Gradient background
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/Blue-Gradient-Background.png',
+              fit: BoxFit.cover,
             ),
-            actions: [
-              if (legislator.legislatureUrl != null)
-                IconButton(
-                  icon: const Icon(Icons.open_in_new, color: Colors.white),
-                  onPressed: () => _launchUrl(legislator.legislatureUrl!),
-                  tooltip: 'View on Legislature website',
-                ),
-            ],
           ),
-
-          // Content
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Contact section
-                _buildContactSection(theme, legislator),
-
-                // Biography section (always show with edit capability)
-                _buildBiographySection(theme, legislator),
-
-                // Bills section
-                _buildBillsSection(theme, legislator),
-              ],
+          Positioned.fill(
+            child: Container(
+              color: Colors.white.withOpacity(0.18),
             ),
+          ),
+          // Content
+          CustomScrollView(
+            slivers: [
+              // App bar with photo
+              SliverAppBar(
+                expandedHeight: 280,
+                pinned: true,
+                backgroundColor: _unityBlue,
+                iconTheme: const IconThemeData(color: Colors.white),
+                flexibleSpace: FlexibleSpaceBar(
+                  background: _buildHeader(theme, legislator),
+                ),
+                actions: [
+                  if (legislator.legislatureUrl != null)
+                    IconButton(
+                      icon: const Icon(Icons.open_in_new, color: Colors.white),
+                      onPressed: () => _launchUrl(legislator.legislatureUrl!),
+                      tooltip: 'View on Legislature website',
+                    ),
+                ],
+              ),
+              // Content
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Contact section
+                    _buildContactSection(theme, legislator),
+
+                    // Biography section (always show with edit capability)
+                    _buildBiographySection(theme, legislator),
+
+                    // Bills section
+                    _buildBillsSection(theme, legislator),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

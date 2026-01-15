@@ -105,45 +105,64 @@ class LegislationService {
 
   /// Get a single tracked bill by ID
   Future<TrackedBill?> getTrackedBill(String id) async {
-    // First try with position_setter join
-    try {
-      final response = await _supabase
-          .from('legislation_tracked_bills')
-          .select('*, position_setter:position_set_by(id, name, profile_pictures, slack_profile_photo)')
-          .eq('id', id)
-          .maybeSingle();
+    // Get bill data without join (more reliable)
+    final response = await _supabase
+        .from('legislation_tracked_bills')
+        .select()
+        .eq('id', id)
+        .maybeSingle();
 
-      return response != null ? TrackedBill.fromJson(response) : null;
-    } catch (e) {
-      // Fallback: get bill without join, then fetch setter info separately
-      final response = await _supabase
-          .from('legislation_tracked_bills')
-          .select()
-          .eq('id', id)
-          .maybeSingle();
+    if (response == null) return null;
 
-      if (response == null) return null;
+    // Try to get position setter info separately if set
+    final positionSetBy = response['position_set_by'] as String?;
+    if (positionSetBy != null && positionSetBy.isNotEmpty) {
+      try {
+        // Only select columns that exist on members table
+        final memberResponse = await _supabase
+            .from('members')
+            .select('id, name, profile_pictures')
+            .eq('id', positionSetBy)
+            .maybeSingle();
 
-      // Try to get position setter info separately
-      final positionSetBy = response['position_set_by'] as String?;
-      if (positionSetBy != null) {
-        try {
-          final memberResponse = await _supabase
-              .from('members')
-              .select('id, name, profile_pictures, slack_profile_photo')
-              .eq('id', positionSetBy)
-              .maybeSingle();
+        if (memberResponse != null) {
+          final Map<String, dynamic> setter = Map<String, dynamic>.from(memberResponse);
 
-          if (memberResponse != null) {
-            response['position_setter'] = memberResponse;
+          // Check if member has profile_pictures, if not try slack_user_mapping
+          final profilePics = setter['profile_pictures'];
+          bool hasProfilePic = false;
+          if (profilePics is List && profilePics.isNotEmpty) {
+            hasProfilePic = true;
           }
-        } catch (_) {
-          // Ignore - position setter info is optional
-        }
-      }
 
-      return TrackedBill.fromJson(response);
+          // If no profile picture, try to get from slack_user_mapping
+          if (!hasProfilePic) {
+            try {
+              final slackMapping = await _supabase
+                  .from('slack_user_mapping')
+                  .select('cached_avatar_path')
+                  .eq('member_id', positionSetBy)
+                  .maybeSingle();
+
+              if (slackMapping != null && slackMapping['cached_avatar_path'] != null) {
+                // Store the full Supabase storage URL
+                setter['slack_cached_avatar'] =
+                    'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/avatars/${slackMapping['cached_avatar_path']}';
+              }
+            } catch (_) {
+              // Ignore - slack avatar is optional fallback
+            }
+          }
+
+          response['position_setter'] = setter;
+        }
+      } catch (e) {
+        // Ignore - position setter info is optional
+        print('Could not fetch position setter: $e');
+      }
     }
+
+    return TrackedBill.fromJson(response);
   }
 
   /// Get a tracked bill by Open States ID
@@ -648,9 +667,10 @@ class LegislationService {
     Map<String, Map<String, dynamic>> authorInfo = {};
     if (authorIds.isNotEmpty) {
       try {
+        // Only select columns that exist on members table
         final membersResponse = await _supabase
             .from('members')
-            .select('id, name, profile_pictures, slack_profile_photo')
+            .select('id, name, profile_pictures')
             .inFilter('id', authorIds);
 
         for (final member in (membersResponse as List)) {
@@ -677,8 +697,6 @@ class LegislationService {
           if (firstPic is Map) {
             noteJson['author_avatar_url'] = firstPic['public_url'] ?? firstPic['url'];
           }
-        } else if (author['slack_profile_photo'] != null) {
-          noteJson['author_avatar_url'] = author['slack_profile_photo'];
         }
       }
       return BillNote.fromJson(noteJson);

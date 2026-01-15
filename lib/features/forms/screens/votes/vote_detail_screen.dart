@@ -22,12 +22,15 @@ class VoteDetailScreen extends StatefulWidget {
   final VoidCallback? onSendAsEmail;
   /// Optional callback to navigate to the messages tab (when opened from committee context)
   final VoidCallback? onSendAsMessage;
+  /// If true, this is a member view - hide voter identities and edit functionality
+  final bool isMemberView;
 
   const VoteDetailScreen({
     Key? key,
     required this.voteId,
     this.onSendAsEmail,
     this.onSendAsMessage,
+    this.isMemberView = false,
   }) : super(key: key);
 
   @override
@@ -48,7 +51,8 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    // Member view has only 2 tabs (no Analytics)
+    _tabController = TabController(length: widget.isMemberView ? 2 : 3, vsync: this);
     _loadVote();
   }
 
@@ -294,11 +298,12 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
       appBar: AppBar(
         title: Text(_vote?.title ?? 'Vote Details'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: _editVote,
-            tooltip: 'Edit Vote',
-          ),
+          if (!widget.isMemberView)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: _editVote,
+              tooltip: 'Edit Vote',
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadVote,
@@ -319,17 +324,18 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit_outlined),
-                    SizedBox(width: 12),
-                    Text('Edit Vote'),
-                  ],
+              if (!widget.isMemberView)
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined),
+                      SizedBox(width: 12),
+                      Text('Edit Vote'),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuDivider(),
+              if (!widget.isMemberView) const PopupMenuDivider(),
               const PopupMenuItem(
                 value: 'share',
                 child: Row(
@@ -355,10 +361,10 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Results', icon: Icon(Icons.bar_chart)),
-            Tab(text: 'Analytics', icon: Icon(Icons.analytics)),
-            Tab(text: 'Details', icon: Icon(Icons.info_outline)),
+          tabs: [
+            const Tab(text: 'Results', icon: Icon(Icons.bar_chart)),
+            if (!widget.isMemberView) const Tab(text: 'Analytics', icon: Icon(Icons.analytics)),
+            const Tab(text: 'Details', icon: Icon(Icons.info_outline)),
           ],
         ),
       ),
@@ -370,7 +376,7 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
                   controller: _tabController,
                   children: [
                     _buildResultsTab(theme, colorScheme),
-                    VoteAnalyticsTab(formId: widget.voteId),
+                    if (!widget.isMemberView) VoteAnalyticsTab(formId: widget.voteId),
                     _buildDetailsTab(theme, colorScheme),
                   ],
                 ),
@@ -439,8 +445,9 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
                 calculatedQuestions: _questionsWithVoteCounts,
               ),
               const SizedBox(height: 24),
-              // Voters list
-              _buildVotersList(theme, colorScheme, vote),
+              // Voters list - hidden for member view (they only see percentages)
+              if (!widget.isMemberView)
+                _buildVotersList(theme, colorScheme, vote),
             ] else ...[
               _buildResultsHidden(theme, colorScheme),
             ],

@@ -513,8 +513,15 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
 
   Widget _buildCommitteeChip(Meeting meeting) {
     final hasCommittee = meeting.committee != null && meeting.committee!.isNotEmpty;
+    final canEdit = _isCrmReady && !widget.isMemberView;
+
+    // In member view, only show chip if committee is assigned
+    if (widget.isMemberView && !hasCommittee) {
+      return const SizedBox.shrink();
+    }
+
     return InkWell(
-      onTap: _isCrmReady ? () => _assignCommittee(meeting) : null,
+      onTap: canEdit ? () => _assignCommittee(meeting) : null,
       borderRadius: BorderRadius.circular(999),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -535,7 +542,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (_isCrmReady) ...[
+            if (canEdit) ...[
               const SizedBox(width: 4),
               const Icon(Icons.arrow_drop_down, size: 18, color: Colors.white70),
             ],
@@ -897,7 +904,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
                   Expanded(child: Text('No attendance has been recorded for this meeting.')),
                 ],
               ),
-              if (_isCrmReady) ...[
+              if (_isCrmReady && !widget.isMemberView) ...[
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: () => _addMemberParticipant(meeting),
@@ -928,7 +935,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
-                if (_isCrmReady)
+                if (_isCrmReady && !widget.isMemberView)
                   TextButton.icon(
                     onPressed: () => _addMemberParticipant(meeting),
                     icon: const Icon(Icons.person_add_alt_1),
@@ -1171,7 +1178,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
                   ],
                 ),
               ),
-              if (_isCrmReady)
+              if (_isCrmReady && !widget.isMemberView)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Align(
@@ -1183,7 +1190,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
                     ),
                   ),
                 ),
-              if (_isCrmReady) const SizedBox(height: 12),
+              if (_isCrmReady && !widget.isMemberView) const SizedBox(height: 12),
               const Divider(height: 1),
               Expanded(
                 child: ListView.separated(

@@ -28,10 +28,15 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
 
+  // For debouncing search
+  DateTime? _lastSearchTime;
+  static const _searchDebounceMs = 400;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _searchController.addListener(_onSearchChanged);
 
     // Initialize the search provider with tracked bill IDs
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -45,9 +50,28 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text;
+    if (query.isEmpty) return;
+
+    // Debounce search - wait for user to stop typing
+    final now = DateTime.now();
+    _lastSearchTime = now;
+
+    Future.delayed(const Duration(milliseconds: _searchDebounceMs), () {
+      if (_lastSearchTime == now && mounted && query.isNotEmpty) {
+        context.read<BillSearchProvider>().quickSearch(query);
+      }
+    });
+
+    // Update UI for clear button
+    setState(() {});
   }
 
   void _onScroll() {
@@ -95,41 +119,51 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
               ),
-              onSubmitted: (value) {
-                if (value.isNotEmpty) {
-                  context.read<BillSearchProvider>().quickSearch(value);
-                }
-              },
-              onChanged: (value) {
-                setState(() {}); // Update clear button visibility
-              },
+              // Search happens automatically as you type via listener
             ),
           ),
         ),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Filters
-          _buildFilters(context, theme),
-          // Results
-          Expanded(
-            child: Consumer<BillSearchProvider>(
-              builder: (context, provider, child) {
-                if (provider.isSearching && provider.searchResults.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (provider.error != null) {
-                  return _buildErrorState(context, theme, provider);
-                }
-
-                if (provider.searchResults.isEmpty && !provider.isSearching) {
-                  return _buildEmptyState(context, theme, provider);
-                }
-
-                return _buildResultsList(context, theme, provider);
-              },
+          // Gradient background
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/Blue-Gradient-Background.png',
+              fit: BoxFit.cover,
             ),
+          ),
+          Positioned.fill(
+            child: Container(
+              color: Colors.white.withOpacity(0.18),
+            ),
+          ),
+          // Content
+          Column(
+            children: [
+              // Filters
+              _buildFilters(context, theme),
+              // Results
+              Expanded(
+                child: Consumer<BillSearchProvider>(
+                  builder: (context, provider, child) {
+                    if (provider.isSearching && provider.searchResults.isEmpty) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (provider.error != null) {
+                      return _buildErrorState(context, theme, provider);
+                    }
+
+                    if (provider.searchResults.isEmpty && !provider.isSearching) {
+                      return _buildEmptyState(context, theme, provider);
+                    }
+
+                    return _buildResultsList(context, theme, provider);
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),
