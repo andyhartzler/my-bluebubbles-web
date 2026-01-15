@@ -25,6 +25,7 @@ import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
@@ -73,6 +74,8 @@ import 'package:bluebubbles/screens/crm/member_detail/email_history_provider.dar
 import 'package:bluebubbles/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:bluebubbles/features/ai_assistant/screens/ai_assistant_screen.dart';
 import 'package:bluebubbles/features/ai_assistant/screens/knowledge_admin_screen.dart';
+import 'package:bluebubbles/providers/user_session_provider.dart';
+import 'package:bluebubbles/features/committees/screens/committee_hub_screen.dart';
 import 'package:windows_taskbar/windows_taskbar.dart';
 
 bool isAuthing = false;
@@ -325,6 +328,9 @@ class Main extends StatelessWidget {
         ChangeNotifierProvider<AIAssistantProvider>(
           create: (_) => AIAssistantProvider(),
         ),
+        ChangeNotifierProvider<UserSessionProvider>(
+          create: (_) => UserSessionProvider(),
+        ),
       ],
       child: AdaptiveTheme(
         light: lightTheme.copyWith(
@@ -356,7 +362,7 @@ class Main extends StatelessWidget {
             GetPage(name: '/ai-assistant', page: () => const AIAssistantScreen()),
             GetPage(name: '/ai-assistant/admin', page: () => const KnowledgeAdminScreen()),
           ],
-          home: SupabaseAuthGate(child: Home()),
+          home: SupabaseAuthGate(child: const AuthenticatedApp()),
           shortcuts: {
             LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.comma): const OpenSettingsIntent(),
             LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyN): const OpenNewChatCreatorIntent(),
@@ -1642,6 +1648,262 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       ThemeSwitcher.buildPageRoute(
         fullscreenDialog: true,
         builder: (_) => const GlobalCrmSearchDialog(),
+      ),
+    );
+  }
+}
+
+/// Wrapper widget that handles routing based on user role after authentication
+///
+/// This widget is shown after successful Supabase authentication.
+/// It loads the user session to determine if they're an executive or committee member,
+/// then routes them to the appropriate screen.
+class AuthenticatedApp extends StatefulWidget {
+  const AuthenticatedApp({super.key});
+
+  @override
+  State<AuthenticatedApp> createState() => _AuthenticatedAppState();
+}
+
+class _AuthenticatedAppState extends State<AuthenticatedApp> {
+  bool _hasLoadedSession = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserSession();
+  }
+
+  Future<void> _loadUserSession() async {
+    final provider = context.read<UserSessionProvider>();
+    await provider.loadUserSession();
+    if (mounted) {
+      setState(() {
+        _hasLoadedSession = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<UserSessionProvider>(
+      builder: (context, session, _) {
+        // Show loading while session is being loaded
+        if (!_hasLoadedSession || session.isLoading) {
+          return const _SessionLoadingScreen();
+        }
+
+        // Handle errors
+        if (session.error != null && !session.hasValidAccess) {
+          return _SessionErrorScreen(
+            error: session.error!,
+            onRetry: () async {
+              setState(() => _hasLoadedSession = false);
+              await _loadUserSession();
+            },
+          );
+        }
+
+        // Route based on user role
+        if (session.isExecutive) {
+          // Executive users get the full CRM dashboard
+          return Home();
+        }
+
+        if (session.isCommitteeMember) {
+          // Committee members get the Committee Hub
+          return const CommitteeHubScreen();
+        }
+
+        // Fallback: no valid access (shouldn't happen if auth gate worked correctly)
+        return _NoAccessScreen(
+          onLogout: () async {
+            await Supabase.instance.client.auth.signOut();
+            session.clearSession();
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Loading screen shown while user session is being loaded
+class _SessionLoadingScreen extends StatelessWidget {
+  const _SessionLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const momentumBlue = Color(0xFF32A6DE);
+    const unityBlue = Color(0xFF273351);
+
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [unityBlue, momentumBlue],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 60,
+                width: 200,
+                child: Image.asset(
+                  'assets/images/text-logo-1320x440.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+              const SizedBox(height: 32),
+              const SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  strokeWidth: 3,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Loading your workspace...',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withOpacity(0.9),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Error screen shown when session loading fails
+class _SessionErrorScreen extends StatelessWidget {
+  final String error;
+  final VoidCallback onRetry;
+
+  const _SessionErrorScreen({
+    required this.error,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const unityBlue = Color(0xFF273351);
+
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: unityBlue),
+              const SizedBox(height: 24),
+              Text(
+                'Unable to load your session',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: unityBlue,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: unityBlue.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try Again'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: unityBlue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Screen shown when user has no valid access
+class _NoAccessScreen extends StatelessWidget {
+  final VoidCallback onLogout;
+
+  const _NoAccessScreen({required this.onLogout});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const unityBlue = Color(0xFF273351);
+    const momentumBlue = Color(0xFF32A6DE);
+
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: unityBlue.withOpacity(0.1),
+                ),
+                padding: const EdgeInsets.all(24),
+                child: const Icon(Icons.lock_outline, size: 64, color: unityBlue),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Access Restricted',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: unityBlue,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Your account does not have access to this application. Please contact an administrator if you believe this is an error.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: unityBlue.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'info@moyoungdemocrats.org',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: momentumBlue,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: onLogout,
+                icon: const Icon(Icons.logout),
+                label: const Text('Sign Out'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: unityBlue,
+                  side: const BorderSide(color: unityBlue),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bluebubbles/config/crm_config.dart';
 
 /// Result of a talking points generation request
 class TalkingPointsResult {
@@ -38,6 +39,11 @@ class TalkingPointsService {
 
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  /// Get headers for Edge Function calls
+  Map<String, String> get _functionHeaders => {
+    'apikey': CRMConfig.supabaseAnonKey,
+  };
+
   /// Generate talking points for a bill
   Future<TalkingPointsResult> generateTalkingPoints({
     required String billId,
@@ -46,6 +52,7 @@ class TalkingPointsService {
     try {
       final response = await _supabase.functions.invoke(
         'generate-talking-points',
+        headers: _functionHeaders,
         body: {
           'billId': billId,
           'regenerate': regenerate,

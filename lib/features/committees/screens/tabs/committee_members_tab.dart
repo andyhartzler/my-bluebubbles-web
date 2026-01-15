@@ -4,6 +4,7 @@ import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 
@@ -575,20 +576,13 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              CircleAvatar(
+              CorsAwareAvatar(
+                imageUrl: photoUrl,
                 radius: 28,
-                backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
                 backgroundColor: committee.primaryColor.withOpacity(0.2),
-                child: photoUrl == null
-                    ? Text(
-                        member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-                        style: TextStyle(
-                          color: committee.primaryColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      )
-                    : null,
+                fallbackText: member.name,
+                fallbackIconColor: committee.primaryColor,
+                fallbackTextColor: committee.primaryColor,
               ),
               const SizedBox(width: 16),
               Expanded(

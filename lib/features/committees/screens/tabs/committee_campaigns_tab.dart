@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/campaign_detail_screen.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/subscriber.dart';
 
@@ -568,49 +569,24 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
     final photoUrl = participant.profilePhotoUrl ??
         participant.linkedMember?.primaryProfilePhotoUrl;
 
-    if (photoUrl != null && photoUrl.isNotEmpty) {
-      return Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2),
-        ),
-        child: CircleAvatar(
-          radius: 18,
-          backgroundImage: NetworkImage(photoUrl),
-          onBackgroundImageError: (_, __) {},
-        ),
-      );
-    }
-
-    // Fallback to initials
-    final initials = participant.name.isNotEmpty
-        ? participant.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
-        : '?';
+    final accentColor = participant.isMember
+        ? Colors.blue
+        : participant.isSubscriber
+            ? Colors.orange
+            : Colors.purple;
 
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 2),
       ),
-      child: CircleAvatar(
+      child: CorsAwareAvatar(
+        imageUrl: photoUrl,
         radius: 18,
-        backgroundColor: participant.isMember
-            ? Colors.blue.withOpacity(0.2)
-            : participant.isSubscriber
-                ? Colors.orange.withOpacity(0.2)
-                : Colors.purple.withOpacity(0.2),
-        child: Text(
-          initials,
-          style: TextStyle(
-            color: participant.isMember
-                ? Colors.blue
-                : participant.isSubscriber
-                    ? Colors.orange
-                    : Colors.purple,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
-        ),
+        backgroundColor: accentColor.withOpacity(0.2),
+        fallbackText: participant.name,
+        fallbackIconColor: accentColor,
+        fallbackTextColor: accentColor,
       ),
     );
   }

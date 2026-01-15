@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import '../models/legislator.dart';
 
 /// Card widget displaying legislator information
@@ -384,20 +385,13 @@ class LegislatorChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Small avatar
-              CircleAvatar(
+              CorsAwareAvatar(
+                imageUrl: photoUrl,
                 radius: 12,
                 backgroundColor: legislator.partyColor.withOpacity(0.2),
-                backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-                child: photoUrl == null
-                    ? Text(
-                        legislator.initials.substring(0, 1),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: legislator.partyColor,
-                        ),
-                      )
-                    : null,
+                fallbackText: legislator.initials,
+                fallbackIconColor: legislator.partyColor,
+                fallbackTextColor: legislator.partyColor,
               ),
               const SizedBox(width: 6),
               // Name

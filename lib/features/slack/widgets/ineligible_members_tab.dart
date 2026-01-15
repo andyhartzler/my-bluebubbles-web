@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
@@ -230,22 +230,12 @@ class _IneligibleMemberCard extends StatelessWidget {
               Row(
                 children: [
                   // Avatar
-                  CircleAvatar(
+                  CorsAwareAvatar(
+                    imageUrl: member.primaryProfilePhotoUrl,
                     radius: 24,
                     backgroundColor: theme.colorScheme.errorContainer,
-                    backgroundImage: member.primaryProfilePhotoUrl != null
-                        ? CachedNetworkImageProvider(member.primaryProfilePhotoUrl!)
-                        : null,
-                    child: member.primaryProfilePhotoUrl == null
-                        ? Text(
-                            member.name.isNotEmpty
-                                ? member.name[0].toUpperCase()
-                                : '?',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: theme.colorScheme.onErrorContainer,
-                            ),
-                          )
-                        : null,
+                    fallbackText: member.name,
+                    fallbackTextColor: theme.colorScheme.onErrorContainer,
                   ),
                   const SizedBox(width: 12),
                   // Name and details

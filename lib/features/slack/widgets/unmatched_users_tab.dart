@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/slack_activity.dart';
@@ -694,7 +695,11 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                             itemBuilder: (context, index) {
                               final member = _results[index];
                               return ListTile(
-                                leading: _buildMemberAvatar(member),
+                                leading: CorsAwareAvatar(
+                                  imageUrl: member.primaryProfilePhotoUrl,
+                                  radius: 20,
+                                  fallbackText: member.name,
+                                ),
                                 title: Text(member.name),
                                 subtitle: Text(
                                   member.email ?? 'No email',

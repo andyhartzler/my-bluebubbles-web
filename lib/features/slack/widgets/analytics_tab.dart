@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/models/slack_analytics.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/features/slack/widgets/message_bubble.dart';
@@ -871,58 +872,17 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
 
   Widget _buildUserAvatar(MembershipChange change) {
     final theme = Theme.of(context);
-    final avatarUrl = change.avatarUrl;
-    final backgroundColor = change.isLinkedMember
-        ? theme.colorScheme.primary.withOpacity(0.2)
-        : Colors.orange.withOpacity(0.2);
-    final textColor = change.isLinkedMember
+    final accentColor = change.isLinkedMember
         ? theme.colorScheme.primary
-        : Colors.orange[700];
-    final initial = change.displayName.isNotEmpty
-        ? change.displayName.substring(0, 1).toUpperCase()
-        : '?';
+        : Colors.orange[700]!;
 
-    if (avatarUrl == null || avatarUrl.isEmpty) {
-      return CircleAvatar(
-        radius: 20,
-        backgroundColor: backgroundColor,
-        child: Text(
-          initial,
-          style: TextStyle(
-            color: textColor,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
-    }
-
-    return CachedNetworkImage(
-      imageUrl: avatarUrl,
-      imageBuilder: (context, imageProvider) => CircleAvatar(
-        radius: 20,
-        backgroundImage: imageProvider,
-        backgroundColor: backgroundColor,
-      ),
-      placeholder: (context, url) => CircleAvatar(
-        radius: 20,
-        backgroundColor: backgroundColor,
-        child: const SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-      errorWidget: (context, url, error) => CircleAvatar(
-        radius: 20,
-        backgroundColor: backgroundColor,
-        child: Text(
-          initial,
-          style: TextStyle(
-            color: textColor,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+    return CorsAwareAvatar(
+      imageUrl: change.avatarUrl,
+      radius: 20,
+      backgroundColor: accentColor.withOpacity(0.2),
+      fallbackText: change.displayName,
+      fallbackIconColor: accentColor,
+      fallbackTextColor: accentColor,
     );
   }
 
@@ -1226,16 +1186,11 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
+                  CorsAwareAvatar(
                     radius: 20,
                     backgroundColor: Colors.orange.withOpacity(0.2),
-                    child: Text(
-                      widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        color: Colors.orange[700],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    fallbackText: widget.userName,
+                    fallbackTextColor: Colors.orange[700]!,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1409,7 +1364,11 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                             itemBuilder: (context, index) {
                               final member = _results[index];
                               return ListTile(
-                                leading: _buildMemberAvatar(member),
+                                leading: CorsAwareAvatar(
+                                  imageUrl: member.primaryProfilePhotoUrl,
+                                  radius: 20,
+                                  fallbackText: member.name,
+                                ),
                                 title: Text(member.name),
                                 subtitle: Text(
                                   member.email ?? 'No email',

@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/widgets/slack_file_attachment.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
@@ -89,7 +90,14 @@ class SlackMessageBubble extends StatelessWidget {
               // Header row
               Row(
                 children: [
-                  _buildAvatar(avatarUrl, primaryColor),
+                  CorsAwareAvatar(
+                    imageUrl: avatarUrl,
+                    radius: 18,
+                    backgroundColor: primaryColor.withOpacity(0.2),
+                    fallbackText: userName,
+                    fallbackIconColor: primaryColor,
+                    fallbackTextColor: primaryColor,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

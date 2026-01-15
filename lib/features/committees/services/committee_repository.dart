@@ -1192,6 +1192,239 @@ class CommitteeRepository {
       return null;
     }
   }
+
+  /// Get committee configuration from the committees table
+  Future<Map<String, dynamic>?> getCommitteeConfig(String committeeName) async {
+    if (!isReady) return null;
+
+    try {
+      final data = await _readClient
+          .from('committees')
+          .select()
+          .or('name.ilike.%$committeeName%,slug.ilike.%$committeeName%')
+          .maybeSingle();
+
+      return data;
+    } catch (e) {
+      print('Error fetching committee config: $e');
+      return null;
+    }
+  }
+
+  /// Get tools enabled for a specific committee
+  /// Returns default tools if none configured
+  Future<List<String>> getCommitteeTools(String committeeName) async {
+    if (!isReady) {
+      return _defaultCommitteeTools;
+    }
+
+    try {
+      final data = await _readClient
+          .from('committees')
+          .select('tools')
+          .or('name.ilike.%$committeeName%,slug.ilike.%$committeeName%')
+          .maybeSingle();
+
+      if (data == null) return _defaultCommitteeTools;
+
+      final toolsRaw = data['tools'];
+      if (toolsRaw is List) {
+        return toolsRaw.map((e) => e.toString()).toList();
+      }
+      return _defaultCommitteeTools;
+    } catch (e) {
+      print('Error fetching committee tools: $e');
+      return _defaultCommitteeTools;
+    }
+  }
+
+  /// Update tools enabled for a committee (executive only)
+  Future<bool> updateCommitteeTools(String committeeName, List<String> tools) async {
+    if (!isReady) return false;
+
+    try {
+      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+
+      // First find the committee by name
+      final existing = await _readClient
+          .from('committees')
+          .select('id')
+          .or('name.ilike.%$committeeName%,slug.ilike.%$committeeName%')
+          .maybeSingle();
+
+      if (existing == null) {
+        print('Committee not found: $committeeName');
+        return false;
+      }
+
+      await writeClient
+          .from('committees')
+          .update({'tools': tools})
+          .eq('id', existing['id']);
+
+      return true;
+    } catch (e) {
+      print('Error updating committee tools: $e');
+      return false;
+    }
+  }
+
+  /// Default tools available for committee members
+  static const List<String> _defaultCommitteeTools = [
+    'overview',
+    'members',
+    'slack',
+    'meetings',
+  ];
+
+  /// All available tools that can be enabled for committees
+  /// These map to tabs in the committee workspace
+  static const List<CommitteeTool> allAvailableTools = [
+    // Core tools available to all committees
+    CommitteeTool(
+      slug: 'overview',
+      name: 'Overview',
+      description: 'Dashboard with calendar, stats, and leadership',
+      icon: 'dashboard_outlined',
+      isDefault: true,
+      category: 'Core',
+    ),
+    CommitteeTool(
+      slug: 'members',
+      name: 'Members',
+      description: 'View committee member directory (read-only)',
+      icon: 'people_outline',
+      isDefault: true,
+      category: 'Core',
+    ),
+    CommitteeTool(
+      slug: 'slack',
+      name: 'Slack',
+      description: 'View archived Slack messages',
+      icon: 'chat_outlined',
+      isDefault: true,
+      category: 'Communication',
+    ),
+    CommitteeTool(
+      slug: 'meetings',
+      name: 'Meetings',
+      description: 'View meeting schedule and attendance',
+      icon: 'video_camera_front_outlined',
+      isDefault: true,
+      category: 'Core',
+    ),
+    CommitteeTool(
+      slug: 'board',
+      name: 'Board',
+      description: 'Collaborative whiteboard and planning',
+      icon: 'space_dashboard_outlined',
+      isDefault: false,
+      category: 'Collaboration',
+    ),
+    CommitteeTool(
+      slug: 'votes',
+      name: 'Votes',
+      description: 'View and participate in committee votes',
+      icon: 'how_to_vote_outlined',
+      isDefault: false,
+      category: 'Core',
+    ),
+    // Communication tools (view-only for members)
+    CommitteeTool(
+      slug: 'email',
+      name: 'Email History',
+      description: 'View email communication history',
+      icon: 'email_outlined',
+      isDefault: false,
+      category: 'Communication',
+    ),
+    CommitteeTool(
+      slug: 'messages',
+      name: 'Messages',
+      description: 'View message history',
+      icon: 'message_outlined',
+      isDefault: false,
+      category: 'Communication',
+    ),
+    // Committee-specific tools
+    CommitteeTool(
+      slug: 'donors',
+      name: 'Donors',
+      description: 'View donor information and statistics',
+      icon: 'volunteer_activism_outlined',
+      isDefault: false,
+      category: 'Fundraising',
+      committeeFilter: ['Fundraising'],
+    ),
+    CommitteeTool(
+      slug: 'chapters',
+      name: 'Chapters',
+      description: 'View chapter directory and status',
+      icon: 'account_tree_outlined',
+      isDefault: false,
+      category: 'Organization',
+      committeeFilter: ['College Democrats', 'High School Democrats'],
+    ),
+    CommitteeTool(
+      slug: 'campaigns',
+      name: 'Campaigns',
+      description: 'View advocacy campaign analytics',
+      icon: 'campaign_outlined',
+      isDefault: false,
+      category: 'Advocacy',
+      committeeFilter: ['Policy & Advocacy'],
+    ),
+    CommitteeTool(
+      slug: 'legislation',
+      name: 'Legislation',
+      description: 'Track bills and legislative activity',
+      icon: 'gavel_outlined',
+      isDefault: false,
+      category: 'Advocacy',
+      committeeFilter: ['Policy & Advocacy'],
+    ),
+    CommitteeTool(
+      slug: 'social-media',
+      name: 'Social Media',
+      description: 'View social media analytics',
+      icon: 'analytics_outlined',
+      isDefault: false,
+      category: 'Communication',
+      committeeFilter: ['Communications'],
+    ),
+  ];
+
+  /// Get tools available for a specific committee
+  /// Filters out committee-specific tools that don't apply
+  static List<CommitteeTool> getAvailableToolsForCommittee(String committeeName) {
+    return allAvailableTools.where((tool) {
+      if (tool.committeeFilter == null || tool.committeeFilter!.isEmpty) {
+        return true; // Available to all committees
+      }
+      return tool.committeeFilter!.contains(committeeName);
+    }).toList();
+  }
+}
+
+/// Represents a tool that can be enabled for committee members
+class CommitteeTool {
+  final String slug;
+  final String name;
+  final String description;
+  final String icon;
+  final bool isDefault;
+  final String category;
+  final List<String>? committeeFilter;
+
+  const CommitteeTool({
+    required this.slug,
+    required this.name,
+    required this.description,
+    required this.icon,
+    this.isDefault = false,
+    this.category = 'Core',
+    this.committeeFilter,
+  });
 }
 
 /// Simple subscriber model for campaign participant lookups
