@@ -269,4 +269,10 @@ class UserSessionProvider extends ChangeNotifier {
     _isInitialized = false;
     await loadUserSession();
   }
+
+  /// Update the current member (e.g., after profile photo upload)
+  void refreshMember(Member updatedMember) {
+    _currentMember = updatedMember;
+    notifyListeners();
+  }
 }

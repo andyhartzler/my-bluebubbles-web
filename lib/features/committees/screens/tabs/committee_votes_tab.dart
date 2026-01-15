@@ -309,8 +309,9 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
       MaterialPageRoute(
         builder: (_) => VoteDetailScreen(
           voteId: vote.id,
-          onSendAsEmail: widget.onNavigateToEmail,
-          onSendAsMessage: widget.onNavigateToMessages,
+          onSendAsEmail: widget.isMemberView ? null : widget.onNavigateToEmail,
+          onSendAsMessage: widget.isMemberView ? null : widget.onNavigateToMessages,
+          isMemberView: widget.isMemberView,
         ),
       ),
     );

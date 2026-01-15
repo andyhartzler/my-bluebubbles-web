@@ -18,7 +18,10 @@ const _justicePurple = Color(0xFF6A1B9A);
 /// Campaigns tab for the Policy & Advocacy committee
 /// Displays an overview of all advocacy campaigns with drill-down to detailed views
 class CommitteeCampaignsTab extends StatefulWidget {
-  const CommitteeCampaignsTab({super.key});
+  /// If true, this is a member view - hide participants list and profile navigation
+  final bool isMemberView;
+
+  const CommitteeCampaignsTab({super.key, this.isMemberView = false});
 
   @override
   State<CommitteeCampaignsTab> createState() => _CommitteeCampaignsTabState();
@@ -153,39 +156,72 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
-        ),
+      return Stack(
+        children: [
+          _buildGradientBackground(),
+          Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
+            ),
+          ),
+        ],
       );
     }
 
     if (_error != null) {
-      return _buildErrorState();
+      return Stack(
+        children: [
+          _buildGradientBackground(),
+          _buildErrorState(),
+        ],
+      );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      color: _momentumBlue,
-      child: CustomScrollView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        slivers: [
-          // Header section
-          SliverToBoxAdapter(
-            child: _buildHeader(),
-          ),
+    return Stack(
+      children: [
+        _buildGradientBackground(),
+        RefreshIndicator(
+          onRefresh: _loadData,
+          color: _momentumBlue,
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+            slivers: [
+              // Header section
+              SliverToBoxAdapter(
+                child: _buildHeader(),
+              ),
 
-          // Stats cards
-          SliverToBoxAdapter(
-            child: _buildStatsRow(),
-          ),
+              // Stats cards
+              SliverToBoxAdapter(
+                child: _buildStatsRow(),
+              ),
 
-          // Campaigns section
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            sliver: SliverToBoxAdapter(
-              child: _buildCampaignsSection(),
-            ),
+              // Campaigns section
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                sliver: SliverToBoxAdapter(
+                  child: _buildCampaignsSection(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGradientBackground() {
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          Image.asset(
+            'assets/images/Blue-Gradient-Background.png',
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          ),
+          Container(
+            color: Colors.white.withOpacity(0.18),
           ),
         ],
       ),
@@ -200,11 +236,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [_unityBlue, _momentumBlue],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Icon(Icons.campaign_rounded, color: Colors.white, size: 26),
@@ -219,7 +251,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
-                    color: _unityBlue,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -227,7 +259,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
                   '${_campaigns.length} campaign${_campaigns.length == 1 ? '' : 's'} active',
                   style: TextStyle(
                     fontSize: 14,
-                    color: _unityBlue.withOpacity(0.6),
+                    color: Colors.white.withOpacity(0.8),
                   ),
                 ),
               ],
@@ -236,7 +268,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
           IconButton(
             onPressed: _loadData,
             icon: const Icon(Icons.refresh_rounded),
-            color: _unityBlue,
+            color: Colors.white,
             tooltip: 'Refresh',
           ),
         ],
@@ -406,14 +438,14 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
           padding: const EdgeInsets.only(bottom: 12),
           child: Row(
             children: [
-              Icon(Icons.folder_open_rounded, size: 20, color: _unityBlue.withOpacity(0.7)),
+              Icon(Icons.folder_open_rounded, size: 20, color: Colors.white.withOpacity(0.8)),
               const SizedBox(width: 8),
-              Text(
+              const Text(
                 'Active Campaigns',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: _unityBlue,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -641,13 +673,13 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: _momentumBlue.withOpacity(0.1),
+                color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.campaign_outlined,
                 size: 56,
-                color: _momentumBlue.withOpacity(0.5),
+                color: Colors.white.withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 20),
@@ -656,7 +688,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: _unityBlue,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 8),
@@ -664,7 +696,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
               'Advocacy campaigns will appear here once created',
               style: TextStyle(
                 fontSize: 14,
-                color: _unityBlue.withOpacity(0.6),
+                color: Colors.white.withOpacity(0.8),
               ),
               textAlign: TextAlign.center,
             ),
@@ -684,10 +716,10 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: _actionRed.withOpacity(0.1),
+                color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.error_outline, size: 48, color: _actionRed),
+              child: const Icon(Icons.error_outline, size: 48, color: Colors.white),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -695,7 +727,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: _unityBlue,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 8),
@@ -703,7 +735,7 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
               _error ?? 'An unknown error occurred',
               style: TextStyle(
                 fontSize: 14,
-                color: _unityBlue.withOpacity(0.6),
+                color: Colors.white.withOpacity(0.8),
               ),
               textAlign: TextAlign.center,
             ),
@@ -713,8 +745,8 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _momentumBlue,
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.white,
+                foregroundColor: _unityBlue,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -731,7 +763,10 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => CampaignDetailScreen(campaign: campaign),
+        builder: (_) => CampaignDetailScreen(
+          campaign: campaign,
+          isMemberView: widget.isMemberView,
+        ),
       ),
     );
   }

@@ -1,10 +1,17 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart' as file_picker;
+import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
+import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/providers/user_session_provider.dart';
+import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 
 // Brand colors
@@ -32,8 +39,10 @@ class CommitteeMemberOverviewTab extends StatefulWidget {
 class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab> {
   final MeetingRepository _meetingRepository = MeetingRepository();
   final CommitteeRepository _committeeRepository = CommitteeRepository();
+  final MemberRepository _memberRepository = MemberRepository();
 
   bool _isLoading = true;
+  bool _uploadingPhoto = false;
   List<Meeting> _meetings = [];
   Map<DateTime, List<Meeting>> _meetingsByDate = {};
   DateTime _focusedDay = DateTime.now();
@@ -93,6 +102,70 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
   List<Meeting> _getMeetingsForDay(DateTime day) {
     final normalized = DateTime(day.year, day.month, day.day);
     return _meetingsByDate[normalized] ?? [];
+  }
+
+  Future<void> _selectProfilePhoto() async {
+    if (_uploadingPhoto) return;
+
+    final userSession = context.read<UserSessionProvider>();
+    final currentMember = userSession.currentMember;
+    if (currentMember == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to load member info')),
+      );
+      return;
+    }
+
+    final result = await file_picker.FilePicker.platform.pickFiles(
+      type: file_picker.FileType.custom,
+      allowedExtensions: const ['png', 'jpg', 'jpeg', 'heic', 'heif', 'webp'],
+      withData: true,
+      withReadStream: !kIsWeb,
+    );
+
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+
+    final picked = result.files.first;
+    final platformFile = await materializePickedPlatformFile(picked, source: result);
+    if (platformFile == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to read the selected photo')),
+      );
+      return;
+    }
+
+    setState(() => _uploadingPhoto = true);
+
+    try {
+      final updated = await _memberRepository.uploadProfilePhoto(
+        member: currentMember,
+        file: platformFile,
+      );
+      if (!mounted) return;
+      if (updated != null) {
+        // Update the user session with new member data
+        userSession.refreshMember(updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile photo updated')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to update profile photo')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading photo: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingPhoto = false);
+      }
+    }
   }
 
   @override
@@ -183,6 +256,11 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
   }
 
   Widget _buildWelcomeCard(ThemeData theme) {
+    final userSession = context.watch<UserSessionProvider>();
+    final currentMember = userSession.currentMember;
+    final photoUrl = currentMember?.primaryProfilePhotoUrl;
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+
     return Card(
       elevation: 4,
       color: _unityBlue,
@@ -191,13 +269,60 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: committee.primaryColor.withOpacity(0.3),
+            // User's profile photo with upload capability
+            GestureDetector(
+              onTap: _uploadingPhoto ? null : _selectProfilePhoto,
+              child: Stack(
+                children: [
+                  if (_uploadingPhoto)
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.2),
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    CorsAwareAvatar(
+                      imageUrl: photoUrl,
+                      radius: 28,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      fallbackText: currentMember?.name ?? '',
+                      fallbackIconColor: Colors.white,
+                      fallbackTextColor: Colors.white,
+                    ),
+                  // Camera icon overlay
+                  if (!_uploadingPhoto)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: _momentumBlue,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: _unityBlue, width: 2),
+                        ),
+                        child: Icon(
+                          hasPhoto ? Icons.photo_camera : Icons.add_a_photo,
+                          color: Colors.white,
+                          size: 12,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              padding: const EdgeInsets.all(12),
-              child: Icon(committee.icon, color: Colors.white, size: 28),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -205,21 +330,29 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Welcome to ${committee.displayName}',
+                    currentMember?.name ?? 'Welcome',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
-                  if (committee.description.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    committee.displayName,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withOpacity(0.8),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (!_uploadingPhoto) ...[
                     const SizedBox(height: 4),
                     Text(
-                      committee.description,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withOpacity(0.8),
+                      'Tap photo to ${hasPhoto ? 'change' : 'add'}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white.withOpacity(0.6),
+                        fontStyle: FontStyle.italic,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],
@@ -234,6 +367,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
   Widget _buildCalendarCard(ThemeData theme) {
     return Card(
       elevation: 2,
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -320,6 +454,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
 
     return Card(
       elevation: 2,
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -432,6 +567,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
 
     return Card(
       elevation: 2,
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -519,6 +655,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
   Widget _buildLeadershipCard(ThemeData theme) {
     return Card(
       elevation: 2,
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -597,6 +734,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
 
     return Card(
       elevation: 2,
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),

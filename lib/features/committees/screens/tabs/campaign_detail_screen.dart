@@ -73,10 +73,13 @@ class CampaignParticipant {
 /// Detailed campaign view with charts and full participant list
 class CampaignDetailScreen extends StatefulWidget {
   final CampaignData campaign;
+  /// If true, hide participants tab (member view)
+  final bool isMemberView;
 
   const CampaignDetailScreen({
     super.key,
     required this.campaign,
+    this.isMemberView = false,
   });
 
   @override
@@ -128,7 +131,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    // Member view has only 2 tabs (no Participants)
+    _tabController = TabController(length: widget.isMemberView ? 2 : 3, vsync: this);
   }
 
   @override
@@ -201,11 +205,12 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                         text: isMobile ? null : 'Geography',
                         iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
                       ),
-                      Tab(
-                        icon: const Icon(Icons.people, size: 20),
-                        text: isMobile ? null : 'Participants',
-                        iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
-                      ),
+                      if (!widget.isMemberView)
+                        Tab(
+                          icon: const Icon(Icons.people, size: 20),
+                          text: isMobile ? null : 'Participants',
+                          iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
+                        ),
                     ],
                   ),
                 ],
@@ -220,7 +225,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
               children: [
                 _buildOverviewTab(theme, colorScheme),
                 _buildGeographyTab(theme, colorScheme),
-                _buildParticipantsTab(theme, colorScheme),
+                if (!widget.isMemberView) _buildParticipantsTab(theme, colorScheme),
               ],
             ),
           ),
