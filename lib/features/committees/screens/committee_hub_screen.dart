@@ -5,19 +5,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/screens/committee_member_workspace_screen.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
+import 'package:bluebubbles/models/crm/meeting.dart';
+import 'package:bluebubbles/services/crm/meeting_repository.dart';
 
-// Brand colors matching the meetings page
+// Brand colors
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
 const _backgroundAsset = 'assets/images/Blue-Gradient-Background.png';
-const _overlayOpacity = 0.18;
+const _overlayOpacity = 0.12;
 
-/// Committee Hub screen for non-executive committee members
+/// Committee Hub Dashboard for non-executive committee members
 ///
-/// This is the main view shown to committee members after login.
-/// It displays their committee(s) as beautiful cards and allows
-/// navigation to each committee's workspace.
+/// A modern dashboard showing committee assignments, upcoming meetings,
+/// and personalized welcome message.
 class CommitteeHubScreen extends StatefulWidget {
   const CommitteeHubScreen({super.key});
 
@@ -27,10 +29,13 @@ class CommitteeHubScreen extends StatefulWidget {
 
 class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
   final CommitteeRepository _repository = CommitteeRepository();
+  final MeetingRepository _meetingRepository = MeetingRepository();
 
   bool _isLoading = true;
   String? _error;
   Map<String, int> _committeeMemberCounts = {};
+  List<Meeting> _upcomingMeetings = [];
+  int _totalMeetingsThisMonth = 0;
 
   @override
   void initState() {
@@ -47,15 +52,44 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
     try {
       final session = context.read<UserSessionProvider>();
       final counts = <String, int>{};
+      final allMeetings = <Meeting>[];
 
       for (final committee in session.userCommittees) {
         final count = await _repository.getMemberCountForCommittee(committee.name);
         counts[committee.name] = count;
+
+        // Load meetings for each committee
+        try {
+          final committeeDef = CommitteeDefinitions.findByName(committee.name);
+          if (committeeDef != null) {
+            final meetings = await _meetingRepository.getMeetingsByCommittee(
+              committeeDef.meetingsFilterName,
+              includeAttendance: false,
+            );
+            allMeetings.addAll(meetings);
+          }
+        } catch (_) {
+          // Ignore meeting load errors
+        }
       }
+
+      // Get upcoming meetings (next 7 days)
+      final now = DateTime.now();
+      final weekFromNow = now.add(const Duration(days: 7));
+      final upcoming = allMeetings
+          .where((m) => m.meetingDate.isAfter(now) && m.meetingDate.isBefore(weekFromNow))
+          .toList()
+        ..sort((a, b) => a.meetingDate.compareTo(b.meetingDate));
+
+      // Count meetings this month
+      final thisMonthMeetings = allMeetings.where((m) =>
+          m.meetingDate.year == now.year && m.meetingDate.month == now.month).length;
 
       if (!mounted) return;
       setState(() {
         _committeeMemberCounts = counts;
+        _upcomingMeetings = upcoming.take(3).toList();
+        _totalMeetingsThisMonth = thisMonthMeetings;
         _isLoading = false;
       });
     } catch (e) {
@@ -81,9 +115,7 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
   }
 
   void _navigateToCommittee(UserCommitteeInfo committeeInfo) {
-    // Find matching committee definition
     final committee = CommitteeDefinitions.findByName(committeeInfo.name);
-
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => CommitteeMemberWorkspaceScreen(
@@ -92,6 +124,13 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
         ),
       ),
     );
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
   @override
@@ -117,14 +156,10 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
           ),
           // White overlay
           Positioned.fill(
-            child: Container(
-              color: Colors.white.withOpacity(_overlayOpacity),
-            ),
+            child: Container(color: Colors.white.withOpacity(_overlayOpacity)),
           ),
           // Content
-          Positioned.fill(
-            child: _buildContent(),
-          ),
+          Positioned.fill(child: _buildContent()),
         ],
       ),
     );
@@ -142,33 +177,7 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: _unityBlue),
-              const SizedBox(height: 16),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: _unityBlue),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _loadData,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _momentumBlue,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return _buildErrorView();
     }
 
     final committees = session.userCommittees;
@@ -178,8 +187,9 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 720;
-        final horizontalPadding = isCompact ? 16.0 : 32.0;
+        final isDesktop = constraints.maxWidth >= 900;
+        final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 900;
+        final horizontalPadding = isDesktop ? 48.0 : (isTablet ? 32.0 : 20.0);
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -189,17 +199,34 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
+              // Welcome header
+              SliverToBoxAdapter(
+                child: _buildWelcomeHeader(session, horizontalPadding),
+              ),
+
+              // Quick stats row
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 0),
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 24),
                 sliver: SliverToBoxAdapter(
-                  child: _buildHeader(session, committees.length),
+                  child: _buildQuickStats(session, committees.length),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 32),
-                sliver: _buildCommitteeList(committees),
-              ),
+
+              // Main content - responsive layout
+              if (isDesktop)
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 32),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildDesktopLayout(committees),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 32),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildMobileLayout(committees),
+                  ),
+                ),
             ],
           ),
         );
@@ -207,179 +234,554 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
     );
   }
 
-  Widget _buildHeader(UserSessionProvider session, int committeeCount) {
+  Widget _buildWelcomeHeader(UserSessionProvider session, double horizontalPadding) {
     final theme = Theme.of(context);
     final greeting = _getGreeting();
+    final firstName = session.displayName.split(' ').first;
 
-    return Row(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: _momentumBlue,
+    return Container(
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 48, horizontalPadding, 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Avatar
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: _unityBlue.withOpacity(0.2),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: CorsAwareAvatar(
+              imageUrl: null,
+              radius: 32,
+              backgroundColor: _momentumBlue,
+              fallbackText: session.displayName,
+              fallbackIconColor: Colors.white,
+              fallbackTextColor: Colors.white,
+            ),
           ),
-          padding: const EdgeInsets.all(12),
-          child: const Icon(Icons.groups_outlined, color: Colors.white, size: 28),
+          const SizedBox(width: 20),
+          // Greeting
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  greeting,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: _unityBlue.withOpacity(0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  firstName,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: _unityBlue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Logout button
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: _unityBlue.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              onPressed: _handleLogout,
+              icon: const Icon(Icons.logout_rounded, color: _unityBlue),
+              tooltip: 'Sign out',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickStats(UserSessionProvider session, int committeeCount) {
+    final theme = Theme.of(context);
+    final totalMembers = _committeeMemberCounts.values.fold(0, (a, b) => a + b);
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        _buildStatCard(
+          icon: Icons.groups_outlined,
+          label: 'Committees',
+          value: '$committeeCount',
+          color: _momentumBlue,
+          theme: theme,
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
+        _buildStatCard(
+          icon: Icons.people_outline,
+          label: 'Fellow Members',
+          value: '$totalMembers',
+          color: const Color(0xFF4CAF50),
+          theme: theme,
+        ),
+        if (_upcomingMeetings.isNotEmpty)
+          _buildStatCard(
+            icon: Icons.event_outlined,
+            label: 'This Week',
+            value: '${_upcomingMeetings.length} meeting${_upcomingMeetings.length == 1 ? '' : 's'}',
+            color: const Color(0xFFFF9800),
+            theme: theme,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    required ThemeData theme,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '$greeting, ${session.displayName.split(' ').first}',
-                style: theme.textTheme.titleLarge?.copyWith(
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: _unityBlue,
                 ),
               ),
-              const SizedBox(height: 4),
               Text(
-                committeeCount == 1
-                    ? 'Your Committee'
-                    : 'Your $committeeCount Committees',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: _unityBlue.withOpacity(0.7),
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: _unityBlue.withOpacity(0.6),
                 ),
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout(List<UserCommitteeInfo> committees) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Committees section
+        Expanded(
+          flex: 3,
+          child: _buildCommitteesSection(committees),
         ),
-        // Logout button
-        IconButton(
-          onPressed: _handleLogout,
-          icon: const Icon(Icons.logout, color: _unityBlue),
-          tooltip: 'Sign out',
+        const SizedBox(width: 24),
+        // Upcoming meetings section
+        Expanded(
+          flex: 2,
+          child: _buildUpcomingMeetingsSection(),
         ),
       ],
     );
   }
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+  Widget _buildMobileLayout(List<UserCommitteeInfo> committees) {
+    return Column(
+      children: [
+        _buildCommitteesSection(committees),
+        const SizedBox(height: 24),
+        _buildUpcomingMeetingsSection(),
+      ],
+    );
   }
 
-  Widget _buildCommitteeList(List<UserCommitteeInfo> committees) {
-    if (committees.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
+  Widget _buildCommitteesSection(List<UserCommitteeInfo> committees) {
+    final theme = Theme.of(context);
 
-    final itemCount = committees.length * 2 - 1;
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          if (index.isOdd) {
-            return const SizedBox(height: 16);
-          }
-          final itemIndex = index ~/ 2;
-          return _buildCommitteeCard(committees[itemIndex]);
-        },
-        childCount: itemCount > 0 ? itemCount : 0,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _momentumBlue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.dashboard_outlined, color: _momentumBlue, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Your Committees',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: _unityBlue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Committee list
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: committees.length,
+            separatorBuilder: (_, __) => const Divider(height: 1, indent: 24, endIndent: 24),
+            itemBuilder: (context, index) => _buildCommitteeRow(committees[index]),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCommitteeCard(UserCommitteeInfo committeeInfo) {
+  Widget _buildCommitteeRow(UserCommitteeInfo committeeInfo) {
     final theme = Theme.of(context);
     final memberCount = _committeeMemberCounts[committeeInfo.name] ?? 0;
-    final toolCount = committeeInfo.tools.length;
-
-    // Get committee definition for icon and colors
     final committee = CommitteeDefinitions.findByName(committeeInfo.name);
     final icon = committee?.icon ?? Icons.groups_outlined;
     final primaryColor = committee?.primaryColor ?? _momentumBlue;
 
-    return Card(
-      elevation: 4,
-      color: _unityBlue,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => _navigateToCommittee(committeeInfo),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Row(
-            children: [
-              // Committee icon
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: primaryColor.withOpacity(0.3),
+    return InkWell(
+      onTap: () => _navigateToCommittee(committeeInfo),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            // Committee icon
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [primaryColor, primaryColor.withOpacity(0.7)],
                 ),
-                padding: const EdgeInsets.all(14),
-                child: Icon(icon, color: Colors.white, size: 28),
+                borderRadius: BorderRadius.circular(14),
               ),
-              const SizedBox(width: 20),
-              // Committee info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      committeeInfo.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
+              child: Icon(icon, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 16),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    committeeInfo.name,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: _unityBlue,
                     ),
-                    const SizedBox(height: 8),
-                    if (committeeInfo.description != null && committeeInfo.description!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          committeeInfo.description!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withOpacity(0.8),
-                          ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.people_outline, size: 14, color: _unityBlue.withOpacity(0.5)),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$memberCount members',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: _unityBlue.withOpacity(0.6),
                         ),
                       ),
-                    // Stats chips
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        _buildInfoChip(Icons.people_outline, '$memberCount members'),
-                        _buildInfoChip(Icons.build_outlined, '$toolCount tools'),
-                      ],
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.white),
-            ],
-          ),
+            ),
+            // Arrow
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _momentumBlue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.arrow_forward_rounded, size: 18, color: _momentumBlue),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String label) {
+  Widget _buildUpcomingMeetingsSection() {
+    final theme = Theme.of(context);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(999),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          // Section header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF9800).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.calendar_today_rounded, color: Color(0xFFFF9800), size: 22),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Upcoming This Week',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: _unityBlue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Meeting list
+          if (_upcomingMeetings.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.event_available_outlined,
+                      size: 48,
+                      color: _unityBlue.withOpacity(0.2),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No meetings this week',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: _unityBlue.withOpacity(0.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _upcomingMeetings.length,
+              separatorBuilder: (_, __) => const Divider(height: 1, indent: 24, endIndent: 24),
+              itemBuilder: (context, index) => _buildMeetingRow(_upcomingMeetings[index]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMeetingRow(Meeting meeting) {
+    final theme = Theme.of(context);
+    final isToday = _isToday(meeting.meetingDate);
+    final isTomorrow = _isTomorrow(meeting.meetingDate);
+
+    String dateLabel;
+    if (isToday) {
+      dateLabel = 'Today';
+    } else if (isTomorrow) {
+      dateLabel = 'Tomorrow';
+    } else {
+      dateLabel = _formatWeekday(meeting.meetingDate);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Row(
+        children: [
+          // Date badge
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: isToday ? _momentumBlue : _unityBlue,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${meeting.meetingDate.day}',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  _formatMonthShort(meeting.meetingDate),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  meeting.meetingTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: _unityBlue,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (isToday || isTomorrow) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isToday ? _momentumBlue.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          dateLabel,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: isToday ? _momentumBlue : Colors.orange,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      meeting.formattedTime,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: _unityBlue.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month && date.day == now.day;
+  }
+
+  bool _isTomorrow(DateTime date) {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    return date.year == tomorrow.year && date.month == tomorrow.month && date.day == tomorrow.day;
+  }
+
+  String _formatWeekday(DateTime date) {
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return weekdays[date.weekday - 1];
+  }
+
+  String _formatMonthShort(DateTime date) {
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return months[date.month - 1];
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: _unityBlue),
+            const SizedBox(height: 16),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: _unityBlue),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _momentumBlue,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -390,48 +792,64 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _unityBlue.withOpacity(0.1),
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: _unityBlue.withOpacity(0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
-              padding: const EdgeInsets.all(24),
-              child: const Icon(
-                Icons.groups_outlined,
-                size: 64,
-                color: _unityBlue,
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _momentumBlue.withOpacity(0.1),
+                ),
+                padding: const EdgeInsets.all(24),
+                child: const Icon(
+                  Icons.groups_outlined,
+                  size: 56,
+                  color: _momentumBlue,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Committee Access',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: _unityBlue,
+              const SizedBox(height: 24),
+              Text(
+                'No Committee Access',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: _unityBlue,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              "You don't appear to be assigned to any committees yet. Please contact your committee chair or reach out to info@moyoungdemocrats.org for assistance.",
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: _unityBlue.withOpacity(0.7),
+              const SizedBox(height: 12),
+              Text(
+                "You don't appear to be assigned to any committees yet.\nPlease contact your committee chair for assistance.",
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: _unityBlue.withOpacity(0.7),
+                  height: 1.5,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: _handleLogout,
-              icon: const Icon(Icons.logout),
-              label: const Text('Sign Out'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _unityBlue,
-                side: const BorderSide(color: _unityBlue),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: _handleLogout,
+                icon: const Icon(Icons.logout),
+                label: const Text('Sign Out'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _unityBlue,
+                  side: const BorderSide(color: _unityBlue),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

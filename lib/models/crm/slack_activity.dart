@@ -211,6 +211,8 @@ class SlackUnmatchedUser {
     this.email,
     this.displayName,
     this.realName,
+    this.slackAvatarUrl,
+    this.cachedAvatarPath,
     this.notes,
     this.manuallyRejected = false,
     this.createdAt,
@@ -222,6 +224,8 @@ class SlackUnmatchedUser {
       email: json['slack_email'] as String?,
       displayName: json['slack_display_name'] as String?,
       realName: json['slack_real_name'] as String?,
+      slackAvatarUrl: json['slack_avatar_url'] as String?,
+      cachedAvatarPath: json['cached_avatar_path'] as String?,
       notes: json['notes'] as String?,
       manuallyRejected: _coerceBool(json['manually_rejected']) ?? false,
       createdAt: _parseDate(json['created_at']),
@@ -232,9 +236,19 @@ class SlackUnmatchedUser {
   final String? email;
   final String? displayName;
   final String? realName;
+  final String? slackAvatarUrl;
+  final String? cachedAvatarPath;
   final String? notes;
   final bool manuallyRejected;
   final DateTime? createdAt;
+
+  /// Get the best avatar URL - uses cached Supabase storage URL if available
+  String? get avatarUrl {
+    if (cachedAvatarPath != null && cachedAvatarPath!.isNotEmpty) {
+      return 'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/avatars/$cachedAvatarPath';
+    }
+    return slackAvatarUrl; // Fallback to direct Slack URL (may cause CORS)
+  }
 
   String? get usernameDisplay =>
       displayName != null && displayName!.isNotEmpty ? '@$displayName' : null;

@@ -438,12 +438,15 @@ class _CommitteeMessagesTabState extends State<CommitteeMessagesTab>
                             controller: _messageController,
                             maxLines: isMobile ? 3 : 6,
                             maxLength: 500,
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                             decoration: InputDecoration(
                               hintText: 'Type your message here...',
+                              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               filled: true,
+                              fillColor: Theme.of(context).colorScheme.surface,
                             ),
                             enabled: !_sending && recipients.isNotEmpty,
                             onChanged: (_) => setState(() {}),

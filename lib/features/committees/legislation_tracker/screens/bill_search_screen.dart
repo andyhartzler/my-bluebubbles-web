@@ -7,6 +7,10 @@ import '../models/tracked_bill.dart';
 import '../utils/legislation_constants.dart';
 import '../utils/bill_helpers.dart';
 
+// Brand colors
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 /// Screen for searching and tracking bills from Open States
 class BillSearchScreen extends StatefulWidget {
   final String committeeId;
@@ -60,18 +64,23 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search Bills'),
+        backgroundColor: _unityBlue,
+        foregroundColor: Colors.white,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: TextField(
               controller: _searchController,
+              // Dark text on white background for search
+              style: const TextStyle(color: Colors.black87),
               decoration: InputDecoration(
                 hintText: 'Search Missouri bills...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(color: Colors.grey.shade600),
+                prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: Icon(Icons.clear, color: Colors.grey.shade600),
                         onPressed: () {
                           _searchController.clear();
                           context.read<BillSearchProvider>().clearSearch();
@@ -80,9 +89,10 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(28),
+                  borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: theme.colorScheme.surface,
+                fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
               ),
               onSubmitted: (value) {
@@ -132,9 +142,9 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
+            color: _unityBlue.withOpacity(0.05),
             border: Border(
-              bottom: BorderSide(color: theme.dividerColor),
+              bottom: BorderSide(color: _unityBlue.withOpacity(0.1)),
             ),
           ),
           child: SingleChildScrollView(
@@ -142,35 +152,32 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
             child: Row(
               children: [
                 // Session filter
-                _buildFilterDropdown(
+                _buildFilterChip(
                   context,
-                  theme,
                   label: 'Session',
                   value: provider.session,
                   items: ['2026', '2025', '2024', '2023'],
-                  onChanged: (value) => provider.setSession(value ?? '2026'),
+                  onSelected: (value) => provider.setSession(value ?? '2026'),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 // Chamber filter
-                _buildFilterDropdown(
+                _buildFilterChip(
                   context,
-                  theme,
                   label: 'Chamber',
-                  value: provider.chamber,
+                  value: provider.chamber ?? '',
                   items: const ['', 'lower', 'upper'],
-                  itemLabels: const ['All', 'House', 'Senate'],
-                  onChanged: (value) => provider.setChamber(value?.isEmpty == true ? null : value),
+                  itemLabels: const ['All Chambers', 'House', 'Senate'],
+                  onSelected: (value) => provider.setChamber(value?.isEmpty == true ? null : value),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 // Classification filter
-                _buildFilterDropdown(
+                _buildFilterChip(
                   context,
-                  theme,
                   label: 'Type',
-                  value: provider.classification,
+                  value: provider.classification ?? '',
                   items: const ['', 'bill', 'resolution', 'joint resolution', 'concurrent resolution'],
-                  itemLabels: const ['All', 'Bill', 'Resolution', 'Joint Resolution', 'Concurrent Resolution'],
-                  onChanged: (value) => provider.setClassification(value?.isEmpty == true ? null : value),
+                  itemLabels: const ['All Types', 'Bill', 'Resolution', 'Joint Resolution', 'Concurrent Resolution'],
+                  onSelected: (value) => provider.setClassification(value?.isEmpty == true ? null : value),
                 ),
               ],
             ),
@@ -180,34 +187,70 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
     );
   }
 
-  Widget _buildFilterDropdown(
-    BuildContext context,
-    ThemeData theme, {
+  Widget _buildFilterChip(
+    BuildContext context, {
     required String label,
     required String? value,
     required List<String> items,
     List<String>? itemLabels,
-    required ValueChanged<String?> onChanged,
+    required ValueChanged<String?> onSelected,
   }) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 120),
-      child: DropdownButtonFormField<String>(
-        value: value ?? '',
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
+    final displayValue = value?.isEmpty == true || value == null
+        ? itemLabels?.first ?? 'All'
+        : (itemLabels != null ? itemLabels[items.indexOf(value)] : value);
+
+    return PopupMenuButton<String>(
+      tooltip: label,
+      offset: const Offset(0, 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      itemBuilder: (context) => List.generate(items.length, (i) {
+        final isSelected = items[i] == value || (items[i].isEmpty && value?.isEmpty != false);
+        return PopupMenuItem<String>(
+          value: items[i],
+          child: Row(
+            children: [
+              if (isSelected)
+                Icon(Icons.check, size: 18, color: _momentumBlue)
+              else
+                const SizedBox(width: 18),
+              const SizedBox(width: 8),
+              Text(
+                itemLabels?[i] ?? items[i],
+                style: const TextStyle(color: Colors.black87), // Dark text in popup
+              ),
+            ],
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          isDense: true,
+        );
+      }),
+      onSelected: onSelected,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: value?.isNotEmpty == true ? _momentumBlue.withOpacity(0.15) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: value?.isNotEmpty == true ? _momentumBlue : _unityBlue.withOpacity(0.2),
+          ),
         ),
-        items: List.generate(items.length, (i) {
-          return DropdownMenuItem(
-            value: items[i],
-            child: Text(itemLabels?[i] ?? items[i]),
-          );
-        }),
-        onChanged: onChanged,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              displayValue,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: value?.isNotEmpty == true ? FontWeight.w600 : FontWeight.normal,
+                color: value?.isNotEmpty == true ? _momentumBlue : _unityBlue,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: value?.isNotEmpty == true ? _momentumBlue : _unityBlue,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -243,9 +286,12 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
   ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: _unityBlue,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: () => _showBillDetails(context, bill),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -254,133 +300,134 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
               // Header row
               Row(
                 children: [
-                  // Bill identifier
-                  Text(
-                    bill.billIdentifier,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
+                  // Bill identifier - Momentum Blue badge with white text
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: _momentumBlue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      bill.billIdentifier,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Chamber badge
+                  // Chamber badge - subtle with white text
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(4),
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       bill.chamber == 'lower' ? 'House' : 'Senate',
-                      style: theme.textTheme.labelSmall,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
                     ),
                   ),
                   const Spacer(),
                   // Tracked badge or track button
                   if (isTracked)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
+                        color: Colors.green.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.green.withOpacity(0.5)),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.check_circle,
-                            size: 14,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 4),
+                          Icon(Icons.check_circle, size: 14, color: Colors.green),
+                          SizedBox(width: 4),
                           Text(
                             'Tracked',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.primary,
+                              color: Colors.green,
                             ),
                           ),
                         ],
                       ),
                     )
                   else
-                    OutlinedButton.icon(
+                    ElevatedButton.icon(
                       onPressed: () => _trackBill(context, bill),
                       icon: const Icon(Icons.add, size: 16),
                       label: const Text('Track'),
-                      style: OutlinedButton.styleFrom(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _momentumBlue,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       ),
                     ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
 
-              // Title
+              // Title - white text on dark card
               Text(
                 bill.title,
-                style: theme.textTheme.bodyMedium,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
+                ),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
 
-              // Meta info
+              // Meta info - lighter white text
               Row(
                 children: [
-                  Icon(
-                    Icons.calendar_today,
-                    size: 14,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  Icon(Icons.calendar_today, size: 14, color: Colors.white.withOpacity(0.7)),
                   const SizedBox(width: 4),
                   Text(
                     'Session: ${bill.session}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7)),
                   ),
                   const SizedBox(width: 16),
                   if (bill.latestActionDate != null) ...[
-                    Icon(
-                      Icons.update,
-                      size: 14,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    Icon(Icons.update, size: 14, color: Colors.white.withOpacity(0.7)),
                     const SizedBox(width: 4),
                     Text(
                       BillHelpers.formatDate(DateTime.tryParse(bill.latestActionDate!)),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7)),
                     ),
                   ],
                 ],
               ),
 
-              // Latest action
+              // Latest action - subtle background with white text
               if (bill.latestActionDescription != null) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerLow,
+                    color: Colors.white.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.arrow_forward,
-                        size: 14,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      Icon(Icons.arrow_forward_rounded, size: 16, color: _momentumBlue),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           bill.latestActionDescription!,
-                          style: theme.textTheme.bodySmall,
+                          style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.9)),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -405,16 +452,24 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              hasSearched ? Icons.search_off : Icons.search,
-              size: 64,
-              color: theme.colorScheme.outline.withOpacity(0.5),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: _unityBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                hasSearched ? Icons.search_off : Icons.search,
+                size: 48,
+                color: _unityBlue.withOpacity(0.5),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               hasSearched ? 'No bills found' : 'Search for bills',
               style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: _unityBlue,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
@@ -423,20 +478,25 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
                   ? 'Try different search terms or filters'
                   : 'Enter a search term to find Missouri legislation',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                color: _unityBlue.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
             if (!hasSearched) ...[
               const SizedBox(height: 24),
+              Text(
+                'Popular Topics',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _momentumBlue),
+              ),
+              const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _buildSuggestionChip(context, theme, 'Education'),
-                  _buildSuggestionChip(context, theme, 'Healthcare'),
-                  _buildSuggestionChip(context, theme, 'Tax'),
-                  _buildSuggestionChip(context, theme, 'Environment'),
+                  _buildSuggestionChip(context, 'Education'),
+                  _buildSuggestionChip(context, 'Healthcare'),
+                  _buildSuggestionChip(context, 'Tax'),
+                  _buildSuggestionChip(context, 'Environment'),
                 ],
               ),
             ],
@@ -446,9 +506,11 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
     );
   }
 
-  Widget _buildSuggestionChip(BuildContext context, ThemeData theme, String label) {
+  Widget _buildSuggestionChip(BuildContext context, String label) {
     return ActionChip(
-      label: Text(label),
+      label: Text(label, style: TextStyle(color: _unityBlue)),
+      backgroundColor: _unityBlue.withOpacity(0.1),
+      side: BorderSide(color: _unityBlue.withOpacity(0.3)),
       onPressed: () {
         _searchController.text = label;
         context.read<BillSearchProvider>().quickSearch(label);
@@ -463,28 +525,30 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: theme.colorScheme.error,
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.error_outline, size: 48, color: Colors.red.shade700),
             ),
             const SizedBox(height: 16),
             Text(
               'Search failed',
               style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: _unityBlue,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               provider.error ?? 'An error occurred while searching',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
-              ),
+              style: theme.textTheme.bodyMedium?.copyWith(color: _unityBlue.withOpacity(0.7)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            FilledButton.icon(
+            ElevatedButton.icon(
               onPressed: () {
                 if (_searchController.text.isNotEmpty) {
                   provider.quickSearch(_searchController.text);
@@ -492,6 +556,10 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
               },
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _momentumBlue,
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
         ),
@@ -503,6 +571,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         maxChildSize: 0.9,
@@ -524,22 +593,18 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
     final searchProvider = context.read<BillSearchProvider>();
 
     try {
-      await legislationProvider.trackBill(
-        bill: bill,
-        position: 'watching',
-      );
-
+      await legislationProvider.trackBill(bill: bill, position: 'watching');
       searchProvider.addTrackedBillId(bill.openstatesBillId);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Now tracking ${bill.billIdentifier}'),
+            backgroundColor: _unityBlue,
             action: SnackBarAction(
               label: 'View',
-              onPressed: () {
-                // Navigate to bill detail
-              },
+              textColor: _momentumBlue,
+              onPressed: () {},
             ),
           ),
         );
@@ -547,10 +612,7 @@ class _BillSearchScreenState extends State<BillSearchScreen> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to track bill: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+          SnackBar(content: Text('Failed to track bill: $e'), backgroundColor: Colors.red.shade700),
         );
       }
     }
@@ -577,166 +639,162 @@ class _BillDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Column(
-      children: [
-        // Handle
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          width: 40,
-          height: 4,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        // Header
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: theme.dividerColor),
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      bill.billIdentifier,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      '${bill.chamber == 'lower' ? 'House' : 'Senate'} • Session ${bill.session}',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isTracked)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+          // Header - Unity Blue background with white text
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: _unityBlue,
+              border: Border(bottom: BorderSide(color: Colors.white10)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.check_circle,
-                        size: 18,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Tracked',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.primary,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _momentumBlue,
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                        child: Text(
+                          bill.billIdentifier,
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${bill.chamber == 'lower' ? 'House' : 'Senate'} • Session ${bill.session}',
+                        style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.7)),
                       ),
                     ],
                   ),
-                )
-              else
-                FilledButton.icon(
-                  onPressed: () {
-                    onTrack();
-                    Navigator.pop(context);
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Track Bill'),
                 ),
-            ],
-          ),
-        ),
-        // Content
-        Expanded(
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(16),
-            children: [
-              // Title
-              Text(
-                'Title',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(bill.title, style: theme.textTheme.bodyLarge),
-              const SizedBox(height: 24),
-
-              // Latest action
-              if (bill.latestActionDescription != null) ...[
-                Text(
-                  'Latest Action',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Card(
-                  elevation: 0,
-                  color: theme.colorScheme.surfaceContainerLow,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                if (isTracked)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.green.withOpacity(0.5)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.timeline,
-                          size: 20,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (bill.latestActionDate != null)
-                                Text(
-                                  BillHelpers.formatDate(DateTime.tryParse(bill.latestActionDate!)),
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              const SizedBox(height: 2),
-                              Text(bill.latestActionDescription!),
-                            ],
-                          ),
-                        ),
+                        Icon(Icons.check_circle, size: 18, color: Colors.green),
+                        SizedBox(width: 6),
+                        Text('Tracked', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.green)),
                       ],
                     ),
+                  )
+                else
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      onTrack();
+                      Navigator.pop(context);
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Track Bill'),
+                    style: ElevatedButton.styleFrom(backgroundColor: _momentumBlue, foregroundColor: Colors.white),
                   ),
-                ),
-                const SizedBox(height: 24),
               ],
-
-              // Primary sponsor
-              if (bill.primarySponsor != null) ...[
+            ),
+          ),
+          // Content - Light background with dark text
+          Expanded(
+            child: ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.all(16),
+              children: [
+                // Title section
                 Text(
-                  'Primary Sponsor',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.primary,
-                  ),
+                  'Title',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _momentumBlue),
                 ),
                 const SizedBox(height: 4),
-                Text(bill.primarySponsor!, style: theme.textTheme.bodyMedium),
+                Text(
+                  bill.title,
+                  style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500, color: _unityBlue),
+                ),
+                const SizedBox(height: 24),
+
+                // Latest action
+                if (bill.latestActionDescription != null) ...[
+                  Text(
+                    'Latest Action',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _momentumBlue),
+                  ),
+                  const SizedBox(height: 4),
+                  Card(
+                    elevation: 0,
+                    color: _unityBlue.withOpacity(0.05),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.timeline, size: 20, color: _momentumBlue),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (bill.latestActionDate != null)
+                                  Text(
+                                    BillHelpers.formatDate(DateTime.tryParse(bill.latestActionDate!)),
+                                    style: TextStyle(fontSize: 12, color: _unityBlue.withOpacity(0.6)),
+                                  ),
+                                const SizedBox(height: 2),
+                                Text(bill.latestActionDescription!, style: TextStyle(color: _unityBlue)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // Primary sponsor
+                if (bill.primarySponsor != null) ...[
+                  Text(
+                    'Primary Sponsor',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _momentumBlue),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.person, size: 18, color: _unityBlue.withOpacity(0.6)),
+                      const SizedBox(width: 8),
+                      Text(bill.primarySponsor!, style: TextStyle(color: _unityBlue, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

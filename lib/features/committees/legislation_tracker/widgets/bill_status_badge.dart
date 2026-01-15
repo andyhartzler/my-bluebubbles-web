@@ -6,11 +6,13 @@ import '../utils/bill_helpers.dart';
 class BillStatusBadge extends StatelessWidget {
   final TrackedBill bill;
   final bool expanded;
+  final bool darkBackground;
 
   const BillStatusBadge({
     super.key,
     required this.bill,
     this.expanded = false,
+    this.darkBackground = false,
   });
 
   @override
@@ -128,7 +130,9 @@ class BillStatusBadge extends StatelessWidget {
       color = Colors.green;
       icon = Icons.check;
     } else {
-      color = theme.colorScheme.outline.withOpacity(0.5);
+      color = darkBackground
+          ? Colors.white.withOpacity(0.5)
+          : theme.colorScheme.outline.withOpacity(0.5);
       icon = null;
     }
 
@@ -162,7 +166,9 @@ class BillStatusBadge extends StatelessWidget {
     return Container(
       width: 16,
       height: 2,
-      color: theme.colorScheme.outline.withOpacity(0.3),
+      color: darkBackground
+          ? Colors.white.withOpacity(0.3)
+          : theme.colorScheme.outline.withOpacity(0.3),
     );
   }
 

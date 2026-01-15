@@ -93,6 +93,8 @@ class TrackedBill {
   // MOYD Committee Position & Tracking
   final String position; // 'support', 'oppose', 'watching', 'neutral'
   final String? positionSetBy;
+  final String? positionSetByName; // Member name who set the position
+  final String? positionSetByPhotoUrl; // Member photo URL who set the position
   final DateTime? positionSetAt;
   final String? positionRationale;
 
@@ -211,6 +213,8 @@ class TrackedBill {
     this.latestVoteDate,
     this.position = 'watching',
     this.positionSetBy,
+    this.positionSetByName,
+    this.positionSetByPhotoUrl,
     this.positionSetAt,
     this.positionRationale,
     this.priority = 'medium',
@@ -300,6 +304,8 @@ class TrackedBill {
       latestVoteDate: _parseDate(json['latest_vote_date']),
       position: json['position'] as String? ?? 'watching',
       positionSetBy: json['position_set_by'] as String?,
+      positionSetByName: _parsePositionSetByName(json),
+      positionSetByPhotoUrl: _parsePositionSetByPhotoUrl(json),
       positionSetAt: _parseDate(json['position_set_at']),
       positionRationale: json['position_rationale'] as String?,
       priority: json['priority'] as String? ?? 'medium',
@@ -390,6 +396,8 @@ class TrackedBill {
       'latest_vote_date': latestVoteDate?.toIso8601String(),
       'position': position,
       'position_set_by': positionSetBy,
+      'position_set_by_name': positionSetByName,
+      'position_set_by_photo_url': positionSetByPhotoUrl,
       'position_set_at': positionSetAt?.toIso8601String(),
       'position_rationale': positionRationale,
       'priority': priority,
@@ -479,6 +487,8 @@ class TrackedBill {
     DateTime? latestVoteDate,
     String? position,
     String? positionSetBy,
+    String? positionSetByName,
+    String? positionSetByPhotoUrl,
     DateTime? positionSetAt,
     String? positionRationale,
     String? priority,
@@ -566,6 +576,8 @@ class TrackedBill {
       latestVoteDate: latestVoteDate ?? this.latestVoteDate,
       position: position ?? this.position,
       positionSetBy: positionSetBy ?? this.positionSetBy,
+      positionSetByName: positionSetByName ?? this.positionSetByName,
+      positionSetByPhotoUrl: positionSetByPhotoUrl ?? this.positionSetByPhotoUrl,
       positionSetAt: positionSetAt ?? this.positionSetAt,
       positionRationale: positionRationale ?? this.positionRationale,
       priority: priority ?? this.priority,
@@ -660,6 +672,57 @@ class TrackedBill {
           (val as List).map((e) => e.toString()).toList(),
         ),
       );
+    }
+    return null;
+  }
+
+  /// Parse position setter name from joined member data
+  static String? _parsePositionSetByName(Map<String, dynamic> json) {
+    // Direct field if available
+    if (json['position_set_by_name'] != null) {
+      return json['position_set_by_name'] as String?;
+    }
+    // From joined member data
+    final memberData = json['position_setter'];
+    if (memberData is Map) {
+      return memberData['name'] as String?;
+    }
+    return null;
+  }
+
+  /// Parse position setter photo URL from joined member data
+  /// Priority: profile_pictures > slack_profile_photo
+  static String? _parsePositionSetByPhotoUrl(Map<String, dynamic> json) {
+    // Direct field if available
+    if (json['position_set_by_photo_url'] != null) {
+      return json['position_set_by_photo_url'] as String?;
+    }
+    // From joined member data
+    final memberData = json['position_setter'];
+    if (memberData is Map) {
+      // Try profile_pictures first
+      final profilePictures = memberData['profile_pictures'];
+      if (profilePictures is List && profilePictures.isNotEmpty) {
+        final firstPic = profilePictures.first;
+        if (firstPic is Map) {
+          // Try public_url first, then url
+          final url = firstPic['public_url'] ?? firstPic['url'];
+          if (url != null && url.toString().isNotEmpty) {
+            return url.toString();
+          }
+        }
+      } else if (profilePictures is Map && profilePictures.isNotEmpty) {
+        // Handle case where profile_pictures might be a single object
+        final url = profilePictures['public_url'] ?? profilePictures['url'];
+        if (url != null && url.toString().isNotEmpty) {
+          return url.toString();
+        }
+      }
+      // Fallback to slack_profile_photo
+      final slackPhoto = memberData['slack_profile_photo'];
+      if (slackPhoto != null && slackPhoto.toString().isNotEmpty) {
+        return slackPhoto.toString();
+      }
     }
     return null;
   }

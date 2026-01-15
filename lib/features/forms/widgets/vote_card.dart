@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/voting_form.dart';
 
+// Brand colors matching the main dashboard
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 /// Strip HTML tags from a string for plain text display
 String _stripHtmlTags(String htmlString) {
   // Remove HTML tags
@@ -22,6 +26,7 @@ class VoteCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final bool darkBackground;
 
   const VoteCard({
     Key? key,
@@ -29,10 +34,171 @@ class VoteCard extends StatelessWidget {
     required this.onTap,
     this.onEdit,
     this.onDelete,
+    this.darkBackground = true,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    if (darkBackground) {
+      return _buildDarkCard(context);
+    }
+    return _buildLightCard(context);
+  }
+
+  Widget _buildDarkCard(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      color: _unityBlue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      vote.title,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  _buildStatusChip(vote.status),
+                  if (onEdit != null || onDelete != null) ...[
+                    const SizedBox(width: 8),
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                      onSelected: (value) {
+                        switch (value) {
+                          case 'edit':
+                            onEdit?.call();
+                            break;
+                          case 'delete':
+                            onDelete?.call();
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        if (onEdit != null)
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_outlined),
+                                SizedBox(width: 12),
+                                Text('Edit'),
+                              ],
+                            ),
+                          ),
+                        if (onDelete != null) ...[
+                          if (onEdit != null) const PopupMenuDivider(),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline, color: Colors.red),
+                                SizedBox(width: 12),
+                                Text('Delete', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+              if (vote.description != null && vote.description!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _stripHtmlTags(vote.description!),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 14,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      vote.questionCount == 1
+                          ? '${vote.totalOptionCount} options'
+                          : '${vote.questionCount} questions',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                  ),
+                  if (vote.isVotingActive)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'VOTING OPEN',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              if (vote.votingEndsAt != null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(Icons.event, size: 16, color: Colors.white.withOpacity(0.7)),
+                    const SizedBox(width: 6),
+                    Text(
+                      vote.isVotingActive
+                          ? 'Ends: ${vote.votingEndsAt!.toLocal().toString().split(' ')[0]}'
+                          : vote.hasEnded
+                              ? 'Ended: ${vote.votingEndsAt!.toLocal().toString().split(' ')[0]}'
+                              : 'Starts: ${vote.votingStartsAt != null ? vote.votingStartsAt!.toLocal().toString().split(' ')[0] : "TBD"}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLightCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
@@ -118,8 +284,8 @@ class VoteCard extends StatelessWidget {
                 children: [
                   Chip(
                     label: Text(vote.questionCount == 1
-                      ? '${vote.totalOptionCount} options'
-                      : '${vote.questionCount} questions'),
+                        ? '${vote.totalOptionCount} options'
+                        : '${vote.questionCount} questions'),
                     visualDensity: VisualDensity.compact,
                   ),
                   if (vote.isVotingActive)
@@ -143,10 +309,10 @@ class VoteCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       vote.isVotingActive
-                        ? 'Ends: ${vote.votingEndsAt!.toLocal().toString().split(' ')[0]}'
-                        : vote.hasEnded
-                          ? 'Ended: ${vote.votingEndsAt!.toLocal().toString().split(' ')[0]}'
-                          : 'Starts: ${vote.votingStartsAt != null ? vote.votingStartsAt!.toLocal().toString().split(' ')[0] : "TBD"}',
+                          ? 'Ends: ${vote.votingEndsAt!.toLocal().toString().split(' ')[0]}'
+                          : vote.hasEnded
+                              ? 'Ended: ${vote.votingEndsAt!.toLocal().toString().split(' ')[0]}'
+                              : 'Starts: ${vote.votingStartsAt != null ? vote.votingStartsAt!.toLocal().toString().split(' ')[0] : "TBD"}',
                       style: const TextStyle(fontSize: 14),
                     ),
                   ],
@@ -175,8 +341,13 @@ class VoteCard extends StatelessWidget {
         color = Colors.grey;
     }
 
-    return Chip(
-      label: Text(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
         status.toUpperCase(),
         style: const TextStyle(
           color: Colors.white,
@@ -184,8 +355,6 @@ class VoteCard extends StatelessWidget {
           fontWeight: FontWeight.bold,
         ),
       ),
-      backgroundColor: color,
-      visualDensity: VisualDensity.compact,
     );
   }
 }

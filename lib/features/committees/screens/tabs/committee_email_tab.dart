@@ -378,13 +378,16 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
                   padding: const EdgeInsets.all(16),
                   child: TextField(
                     controller: _subjectController,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                     decoration: InputDecoration(
                       labelText: 'Subject',
                       hintText: 'Enter email subject...',
+                      hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                       filled: true,
+                      fillColor: Theme.of(context).colorScheme.surface,
                     ),
                     enabled: !_sending && recipients.isNotEmpty,
                   ),

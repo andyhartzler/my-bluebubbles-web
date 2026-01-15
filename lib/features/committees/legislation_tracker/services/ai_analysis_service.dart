@@ -195,11 +195,13 @@ class AiAnalysisService {
   }
 
   /// Apply AI recommendations to a bill (update position, priority, categories)
+  /// [memberId] is the ID of the member applying the recommendations (from members table)
   Future<bool> applyAiRecommendations({
     required String billId,
     bool applyPosition = true,
     bool applyPriority = true,
     bool applyCategories = true,
+    String? memberId,
   }) async {
     try {
       // Get current bill with AI recommendations
@@ -217,6 +219,7 @@ class AiAnalysisService {
 
       if (applyPosition && response['ai_position_recommendation'] != null) {
         updates['position'] = response['ai_position_recommendation'];
+        updates['position_set_by'] = memberId;
         updates['position_set_at'] = DateTime.now().toIso8601String();
         updates['position_rationale'] = 'Set by AI recommendation';
       }
@@ -246,9 +249,11 @@ class AiAnalysisService {
   }
 
   /// Apply AI recommendations to all bills that have them
+  /// [memberId] is the ID of the member applying the recommendations (from members table)
   Future<int> applyAllAiRecommendations({
     String? session,
     bool onlyWatching = true, // Only apply to bills currently set to "watching"
+    String? memberId,
   }) async {
     var query = _supabase
         .from('legislation_tracked_bills')
@@ -268,7 +273,10 @@ class AiAnalysisService {
     int appliedCount = 0;
 
     for (final bill in (bills as List)) {
-      final success = await applyAiRecommendations(billId: bill['id'] as String);
+      final success = await applyAiRecommendations(
+        billId: bill['id'] as String,
+        memberId: memberId,
+      );
       if (success) appliedCount++;
     }
 

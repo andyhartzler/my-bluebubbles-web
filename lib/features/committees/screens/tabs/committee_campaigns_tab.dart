@@ -7,6 +7,14 @@ import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/subscriber.dart';
 
+// Brand colors matching the main dashboard
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+const _grassrootsGreen = Color(0xFF43A047);
+const _actionRed = Color(0xFFE63946);
+const _sunriseGold = Color(0xFFFDB813);
+const _justicePurple = Color(0xFF6A1B9A);
+
 /// Campaigns tab for the Policy & Advocacy committee
 /// Displays an overview of all advocacy campaigns with drill-down to detailed views
 class CommitteeCampaignsTab extends StatefulWidget {
@@ -145,52 +153,102 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error != null) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
-              const SizedBox(height: 16),
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _loadData,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-              ),
-            ],
-          ),
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
         ),
       );
     }
 
+    if (_error != null) {
+      return _buildErrorState();
+    }
+
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          _buildOverviewHeader(),
-          const SizedBox(height: 24),
-          _buildCampaignsList(),
+      color: _momentumBlue,
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        slivers: [
+          // Header section
+          SliverToBoxAdapter(
+            child: _buildHeader(),
+          ),
+
+          // Stats cards
+          SliverToBoxAdapter(
+            child: _buildStatsRow(),
+          ),
+
+          // Campaigns section
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            sliver: SliverToBoxAdapter(
+              child: _buildCampaignsSection(),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildOverviewHeader() {
-    final theme = Theme.of(context);
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_unityBlue, _momentumBlue],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.campaign_rounded, color: Colors.white, size: 26),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Advocacy Campaigns',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: _unityBlue,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${_campaigns.length} campaign${_campaigns.length == 1 ? '' : 's'} active',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _unityBlue.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: _loadData,
+            icon: const Icon(Icons.refresh_rounded),
+            color: _unityBlue,
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildStatsRow() {
     // Calculate totals across all campaigns
     int totalGenerated = 0;
     int totalSent = 0;
     int totalParticipants = 0;
-    int totalCampaigns = _campaigns.length;
 
     for (final campaign in _campaigns) {
       totalGenerated += campaign.totalGenerated;
@@ -198,164 +256,167 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
       totalParticipants += campaign.uniqueParticipants;
     }
 
-    final overallSendRate = totalGenerated > 0 ? (totalSent / totalGenerated * 100) : 0.0;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 500;
 
-    // Blue gradient colors matching Policy & Advocacy committee
-    const primaryBlue = Color(0xFF2B4B8C);  // royalBlue
-    const secondaryBlue = Color(0xFF5A7FA3);  // slateBlue
+          if (isNarrow) {
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: _buildStatCard(
+                      icon: Icons.edit_note_rounded,
+                      label: 'Generated',
+                      value: '$totalGenerated',
+                      colors: [_momentumBlue, _unityBlue],
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildStatCard(
+                      icon: Icons.send_rounded,
+                      label: 'Sent',
+                      value: '$totalGenerated',
+                      colors: [_grassrootsGreen, _momentumBlue],
+                    )),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: _buildStatCard(
+                      icon: Icons.people_rounded,
+                      label: 'Participants',
+                      value: '$totalParticipants',
+                      colors: [_justicePurple, _momentumBlue],
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildStatCard(
+                      icon: Icons.percent_rounded,
+                      label: 'Send Rate',
+                      value: '100%',
+                      colors: [_sunriseGold, _actionRed],
+                    )),
+                  ],
+                ),
+              ],
+            );
+          }
 
+          return Row(
+            children: [
+              Expanded(child: _buildStatCard(
+                icon: Icons.edit_note_rounded,
+                label: 'Generated',
+                value: '$totalGenerated',
+                colors: [_momentumBlue, _unityBlue],
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: _buildStatCard(
+                icon: Icons.send_rounded,
+                label: 'Sent',
+                value: '$totalGenerated',
+                colors: [_grassrootsGreen, _momentumBlue],
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: _buildStatCard(
+                icon: Icons.people_rounded,
+                label: 'Participants',
+                value: '$totalParticipants',
+                colors: [_justicePurple, _momentumBlue],
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: _buildStatCard(
+                icon: Icons.percent_rounded,
+                label: 'Send Rate',
+                value: '100%',
+                colors: [_sunriseGold, _actionRed],
+              )),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required List<Color> colors,
+  }) {
     return Card(
-      elevation: 2,
+      elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
       child: Container(
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            colors: [primaryBlue, secondaryBlue],
+          gradient: LinearGradient(
+            colors: colors,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.campaign, color: Colors.white, size: 32),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Advocacy Campaigns',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Overview of all Policy & Advocacy email campaigns',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white70,
-                ),
+              child: Icon(icon, color: Colors.white, size: 20),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 24),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth > 400;
-                  final cards = [
-                    _buildOverviewStat(
-                      icon: Icons.folder_open,
-                      label: 'Campaigns',
-                      value: '$totalCampaigns',
-                    ),
-                    _buildOverviewStat(
-                      icon: Icons.edit_note,
-                      label: 'Generated',
-                      value: '$totalGenerated',
-                    ),
-                    // Per user request: sent should equal generated
-                    _buildOverviewStat(
-                      icon: Icons.send,
-                      label: 'Sent',
-                      value: '$totalGenerated',
-                    ),
-                    _buildOverviewStat(
-                      icon: Icons.people,
-                      label: 'Participants',
-                      value: '$totalParticipants',
-                    ),
-                  ];
-
-                  if (isWide) {
-                    return Row(
-                      children: cards.map((card) => Expanded(child: card)).toList(),
-                    );
-                  }
-
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: cards.map((card) => SizedBox(
-                      width: (constraints.maxWidth - 12) / 2,
-                      child: card,
-                    )).toList(),
-                  );
-                },
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildOverviewStat({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.white70, size: 20),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCampaignsList() {
-    final theme = Theme.of(context);
-
+  Widget _buildCampaignsSection() {
     if (_campaigns.isEmpty) {
-      return Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            children: [
-              Icon(Icons.folder_off, size: 48, color: theme.disabledColor),
-              const SizedBox(height: 16),
-              Text(
-                'No campaigns yet',
-                style: theme.textTheme.titleMedium,
-              ),
-            ],
-          ),
-        ),
-      );
+      return _buildEmptyState();
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Text(
-            'All Campaigns',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            children: [
+              Icon(Icons.folder_open_rounded, size: 20, color: _unityBlue.withOpacity(0.7)),
+              const SizedBox(width: 8),
+              Text(
+                'Active Campaigns',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: _unityBlue,
+                ),
+              ),
+            ],
           ),
         ),
         ..._campaigns.map((campaign) => _buildCampaignCard(campaign)),
@@ -364,14 +425,12 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
   }
 
   Widget _buildCampaignCard(CampaignData campaign) {
-    final theme = Theme.of(context);
-    final dateFormat = DateFormat('MMM d, y');
-
     // Get some recent participants for preview
     final recentParticipants = campaign.participants.take(5).toList();
 
     return Card(
       elevation: 2,
+      color: _unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
@@ -386,29 +445,32 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2B4B8C).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: _momentumBlue,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.campaign, color: Color(0xFF2B4B8C)),
+                    child: const Icon(Icons.campaign, color: Colors.white, size: 22),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           campaign.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          style: const TextStyle(
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
+                            fontSize: 17,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           campaign.description,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 13,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -416,107 +478,91 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: Colors.grey),
+                  const Icon(Icons.chevron_right, color: Colors.white54, size: 24),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               // Stats row
-              // Per user request: sent should equal generated
               Row(
                 children: [
                   _buildCampaignStat(
                     icon: Icons.edit_note,
                     label: 'Generated',
                     value: '${campaign.totalGenerated}',
-                    color: Colors.blue,
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   _buildCampaignStat(
                     icon: Icons.send,
                     label: 'Sent',
                     value: '${campaign.totalGenerated}',
-                    color: Colors.green,
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   _buildCampaignStat(
                     icon: Icons.people,
                     label: 'Participants',
                     value: '${campaign.uniqueParticipants}',
-                    color: Colors.purple,
-                  ),
-                  const SizedBox(width: 16),
-                  _buildCampaignStat(
-                    icon: Icons.percent,
-                    label: 'Send Rate',
-                    value: '${campaign.totalGenerated > 0 ? '100.0' : '0.0'}%',
-                    color: Colors.orange,
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
 
               // Recent participants preview
               if (recentParticipants.isNotEmpty) ...[
-                const Divider(),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(Icons.people_outline, size: 18, color: Colors.grey),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Recent Participants',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    // Avatar stack
-                    SizedBox(
-                      width: 120,
-                      height: 40,
-                      child: Stack(
-                        children: recentParticipants.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final participant = entry.value;
-                          return Positioned(
-                            left: index * 24.0,
-                            child: _buildParticipantAvatar(participant),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        campaign.participants.length > 5
-                            ? '${recentParticipants.first.name} and ${campaign.participants.length - 1} more'
-                            : recentParticipants.map((p) => p.name.split(' ').first).join(', '),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      // Avatar stack
+                      SizedBox(
+                        width: 100,
+                        height: 32,
+                        child: Stack(
+                          children: recentParticipants.asMap().entries.take(4).map((entry) {
+                            final index = entry.key;
+                            final participant = entry.value;
+                            return Positioned(
+                              left: index * 20.0,
+                              child: _buildParticipantAvatar(participant),
+                            );
+                          }).toList(),
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          campaign.participants.length > 5
+                              ? '${recentParticipants.first.name} and ${campaign.participants.length - 1} more'
+                              : recentParticipants.map((p) => p.name.split(' ').first).join(', '),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               // View details button
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => _openCampaignDetail(campaign),
-                  icon: const Icon(Icons.analytics),
+                  icon: const Icon(Icons.analytics, size: 18),
                   label: const Text('View Detailed Analytics'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.purple,
-                    side: const BorderSide(color: Colors.purple),
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withOpacity(0.5)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
@@ -531,32 +577,32 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
     required IconData icon,
     required String label,
     required String value,
-    required Color color,
   }) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 18),
+            Icon(icon, color: Colors.white.withOpacity(0.8), size: 16),
             const SizedBox(height: 6),
             Text(
               value,
-              style: TextStyle(
-                fontSize: 16,
+              style: const TextStyle(
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: color,
+                color: Colors.white,
               ),
             ),
+            const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
-                color: color.withOpacity(0.8),
+                fontSize: 11,
+                color: Colors.white.withOpacity(0.7),
               ),
             ),
           ],
@@ -569,24 +615,114 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
     final photoUrl = participant.profilePhotoUrl ??
         participant.linkedMember?.primaryProfilePhotoUrl;
 
-    final accentColor = participant.isMember
-        ? Colors.blue
-        : participant.isSubscriber
-            ? Colors.orange
-            : Colors.purple;
-
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(color: _unityBlue, width: 2),
       ),
       child: CorsAwareAvatar(
         imageUrl: photoUrl,
-        radius: 18,
-        backgroundColor: accentColor.withOpacity(0.2),
+        radius: 14,
+        backgroundColor: _momentumBlue.withOpacity(0.3),
         fallbackText: participant.name,
-        fallbackIconColor: accentColor,
-        fallbackTextColor: accentColor,
+        fallbackIconColor: Colors.white,
+        fallbackTextColor: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: _momentumBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.campaign_outlined,
+                size: 56,
+                color: _momentumBlue.withOpacity(0.5),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'No campaigns yet',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: _unityBlue,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Advocacy campaigns will appear here once created',
+              style: TextStyle(
+                fontSize: 14,
+                color: _unityBlue.withOpacity(0.6),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: _actionRed.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.error_outline, size: 48, color: _actionRed),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Error loading campaigns',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: _unityBlue,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error ?? 'An unknown error occurred',
+              style: TextStyle(
+                fontSize: 14,
+                color: _unityBlue.withOpacity(0.6),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _momentumBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

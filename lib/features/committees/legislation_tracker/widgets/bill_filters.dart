@@ -74,8 +74,10 @@ class BillFilters extends StatelessWidget {
             children: [
               Expanded(
                 child: TextField(
+                  style: TextStyle(color: theme.colorScheme.onSurface),
                   decoration: InputDecoration(
                     hintText: searchBillText ? 'Search bills & text...' : 'Search bills...',
+                    hintStyle: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.5)),
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: searchQuery.isNotEmpty
                         ? IconButton(
@@ -88,6 +90,8 @@ class BillFilters extends StatelessWidget {
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     isDense: true,
+                    filled: true,
+                    fillColor: theme.colorScheme.surface,
                   ),
                   onChanged: onSearchChanged,
                   controller: TextEditingController(text: searchQuery)

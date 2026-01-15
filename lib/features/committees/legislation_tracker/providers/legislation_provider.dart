@@ -373,14 +373,17 @@ class LegislationProvider extends ChangeNotifier {
   }
 
   // Update bill position
+  /// [memberId] is the ID of the member setting the position (from members table)
   Future<void> updatePosition({
     required String billId,
     required String position,
+    String? memberId,
     String? rationale,
   }) async {
     await _service.updatePosition(
       billId: billId,
       position: position,
+      memberId: memberId,
       rationale: rationale,
     );
 
@@ -648,11 +651,13 @@ class LegislationProvider extends ChangeNotifier {
   }
 
   /// Apply AI recommendations to a bill
+  /// [memberId] is the ID of the member applying the recommendations (from members table)
   Future<bool> applyAiRecommendations({
     required String billId,
     bool applyPosition = true,
     bool applyPriority = true,
     bool applyCategories = true,
+    String? memberId,
   }) async {
     try {
       final success = await _aiService.applyAiRecommendations(
@@ -660,6 +665,7 @@ class LegislationProvider extends ChangeNotifier {
         applyPosition: applyPosition,
         applyPriority: applyPriority,
         applyCategories: applyCategories,
+        memberId: memberId,
       );
 
       if (success) {
@@ -680,11 +686,13 @@ class LegislationProvider extends ChangeNotifier {
   }
 
   /// Apply all AI recommendations to bills in watching status
-  Future<int> applyAllAiRecommendations({bool onlyWatching = true}) async {
+  /// [memberId] is the ID of the member applying the recommendations (from members table)
+  Future<int> applyAllAiRecommendations({bool onlyWatching = true, String? memberId}) async {
     try {
       final count = await _aiService.applyAllAiRecommendations(
         session: _sessionFilter,
         onlyWatching: onlyWatching,
+        memberId: memberId,
       );
 
       if (count > 0) {

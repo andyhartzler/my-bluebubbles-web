@@ -6,6 +6,10 @@ import '../services/legislation_service.dart';
 import '../widgets/legislator_card.dart';
 import 'legislator_detail_screen.dart';
 
+// Brand colors
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 /// Screen displaying list of all Missouri legislators
 class LegislatorsListScreen extends StatefulWidget {
   final String committeeId;
@@ -98,19 +102,22 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
         if (_stats != null) _buildStatsBanner(theme),
 
         // Search and filters
-        Padding(
+        Container(
           padding: const EdgeInsets.all(12),
+          color: _unityBlue,
           child: Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _searchController,
+                  style: const TextStyle(color: Colors.black87),
                   decoration: InputDecoration(
                     hintText: 'Search legislators...',
-                    prefixIcon: const Icon(Icons.search),
+                    hintStyle: TextStyle(color: Colors.black.withOpacity(0.5)),
+                    prefixIcon: Icon(Icons.search, color: _unityBlue.withOpacity(0.7)),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear),
+                            icon: Icon(Icons.clear, color: _unityBlue.withOpacity(0.7)),
                             onPressed: () {
                               _searchController.clear();
                               setState(() => _searchQuery = '');
@@ -120,9 +127,12 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
                         : null,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
                     ),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    filled: true,
+                    fillColor: Colors.white,
                   ),
                   onSubmitted: (value) {
                     setState(() => _searchQuery = value);
@@ -135,17 +145,20 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  border: Border.all(color: theme.colorScheme.outline.withOpacity(0.5)),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String?>(
                     value: _partyFilter,
-                    hint: const Text('Party'),
-                    items: const [
-                      DropdownMenuItem(value: null, child: Text('All')),
-                      DropdownMenuItem(value: 'Republican', child: Text('Republican')),
-                      DropdownMenuItem(value: 'Democratic', child: Text('Democratic')),
+                    hint: Text('Party', style: TextStyle(color: _unityBlue.withOpacity(0.7))),
+                    style: TextStyle(color: _unityBlue, fontWeight: FontWeight.w500),
+                    dropdownColor: Colors.white,
+                    icon: Icon(Icons.arrow_drop_down, color: _unityBlue),
+                    items: [
+                      DropdownMenuItem(value: null, child: Text('All', style: TextStyle(color: _unityBlue))),
+                      DropdownMenuItem(value: 'Republican', child: Text('Republican', style: TextStyle(color: _unityBlue))),
+                      DropdownMenuItem(value: 'Democratic', child: Text('Democratic', style: TextStyle(color: _unityBlue))),
                     ],
                     onChanged: (value) {
                       setState(() => _partyFilter = value);
@@ -159,30 +172,37 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
         ),
 
         // Chamber tabs
-        TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Senate'),
-                  const SizedBox(width: 8),
-                  _buildCountBadge(theme, _senateLegislators.length),
-                ],
+        Container(
+          color: _unityBlue,
+          child: TabBar(
+            controller: _tabController,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white60,
+            indicatorColor: _momentumBlue,
+            indicatorWeight: 3,
+            tabs: [
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Senate'),
+                    const SizedBox(width: 8),
+                    _buildCountBadge(_senateLegislators.length),
+                  ],
+                ),
               ),
-            ),
-            Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('House'),
-                  const SizedBox(width: 8),
-                  _buildCountBadge(theme, _houseLegislators.length),
-                ],
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('House'),
+                    const SizedBox(width: 8),
+                    _buildCountBadge(_houseLegislators.length),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
 
         // Legislator lists
@@ -208,19 +228,20 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer,
-            theme.colorScheme.secondaryContainer,
-          ],
-        ),
+        color: _unityBlue,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Expanded(
             child: _buildStatItem(
-              theme,
               '${_stats!.totalLegislators}',
               'Total',
               Icons.people,
@@ -229,11 +250,10 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
           Container(
             width: 1,
             height: 40,
-            color: theme.colorScheme.onPrimaryContainer.withOpacity(0.2),
+            color: Colors.white.withOpacity(0.2),
           ),
           Expanded(
             child: _buildStatItem(
-              theme,
               '${_stats!.republicanCount}',
               'Republican',
               Icons.circle,
@@ -243,11 +263,10 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
           Container(
             width: 1,
             height: 40,
-            color: theme.colorScheme.onPrimaryContainer.withOpacity(0.2),
+            color: Colors.white.withOpacity(0.2),
           ),
           Expanded(
             child: _buildStatItem(
-              theme,
               '${_stats!.democratCount}',
               'Democrat',
               Icons.circle,
@@ -259,46 +278,48 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
     );
   }
 
-  Widget _buildStatItem(ThemeData theme, String value, String label, IconData icon, {Color? color}) {
+  Widget _buildStatItem(String value, String label, IconData icon, {Color? color}) {
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 14, color: color ?? theme.colorScheme.onPrimaryContainer),
+            Icon(icon, size: 14, color: color ?? _momentumBlue),
             const SizedBox(width: 4),
             Text(
               value,
-              style: theme.textTheme.titleLarge?.copyWith(
+              style: TextStyle(
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: color ?? theme.colorScheme.onPrimaryContainer,
+                color: color ?? Colors.white,
               ),
             ),
           ],
         ),
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onPrimaryContainer.withOpacity(0.8),
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.white.withOpacity(0.8),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildCountBadge(ThemeData theme, int count) {
+  Widget _buildCountBadge(int count) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withOpacity(0.2),
+        color: _momentumBlue.withOpacity(0.3),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         '$count',
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          color: theme.colorScheme.primary,
+          color: Colors.white,
         ),
       ),
     );
@@ -326,7 +347,6 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
   }
 
   Widget _buildEmptyState(String chamber) {
-    final theme = Theme.of(context);
     final hasFilters = _partyFilter != null || _searchQuery.isNotEmpty;
 
     return Center(
@@ -335,21 +355,30 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              hasFilters ? Icons.filter_list_off : Icons.people_outline,
-              size: 64,
-              color: theme.colorScheme.outline.withOpacity(0.5),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: _unityBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                hasFilters ? Icons.filter_list_off : Icons.people_outline,
+                size: 48,
+                color: _unityBlue.withOpacity(0.5),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               hasFilters ? 'No legislators match your filters' : 'No $chamber legislators found',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: _unityBlue,
               ),
             ),
             if (hasFilters) ...[
               const SizedBox(height: 16),
-              OutlinedButton.icon(
+              ElevatedButton.icon(
                 onPressed: () {
                   _searchController.clear();
                   setState(() {
@@ -358,8 +387,12 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
                   });
                   _loadLegislators();
                 },
-                icon: const Icon(Icons.clear_all),
-                label: const Text('Clear Filters'),
+                icon: const Icon(Icons.clear_all, color: Colors.white),
+                label: const Text('Clear Filters', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _momentumBlue,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
               ),
             ],
           ],
@@ -375,31 +408,45 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: theme.colorScheme.error,
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Colors.red,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               'Error loading legislators',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: _unityBlue,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               _error ?? 'An unknown error occurred',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+              style: TextStyle(
+                fontSize: 14,
+                color: _unityBlue.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            FilledButton.icon(
+            ElevatedButton.icon(
               onPressed: _loadLegislators,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              label: const Text('Try Again', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _momentumBlue,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
             ),
           ],
         ),

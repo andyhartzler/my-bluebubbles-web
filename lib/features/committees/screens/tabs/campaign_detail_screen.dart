@@ -88,9 +88,11 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
   late TabController _tabController;
   final ScrollController _scrollController = ScrollController();
 
-  // Blue gradient colors matching Policy & Advocacy committee
-  static const _primaryBlue = Color(0xFF2B4B8C);  // royalBlue
-  static const _secondaryBlue = Color(0xFF5A7FA3);  // slateBlue
+  // Brand colors - using Unity Blue consistently
+  static const _unityBlue = Color(0xFF273351);
+  static const _momentumBlue = Color(0xFF32A6DE);
+  static const _grassrootsGreen = Color(0xFF43A047);
+  static const _actionRed = Color(0xFFE63946);
 
   static const List<Color> _chartColors = [
     Color(0xFF2B4B8C), // Royal Blue
@@ -146,14 +148,10 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     return Scaffold(
       body: Column(
         children: [
-          // Custom AppBar with gradient
+          // Custom AppBar with Unity Blue
           Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [_primaryBlue, _secondaryBlue],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+            decoration: BoxDecoration(
+              color: _unityBlue,
             ),
             child: SafeArea(
               bottom: false,
@@ -187,9 +185,10 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                   // Tab bar
                   TabBar(
                     controller: _tabController,
-                    indicatorColor: Colors.white,
+                    indicatorColor: _momentumBlue,
+                    indicatorWeight: 3,
                     labelColor: Colors.white,
-                    unselectedLabelColor: Colors.white70,
+                    unselectedLabelColor: Colors.white60,
                     labelPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
                     tabs: [
                       Tab(
@@ -280,25 +279,25 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
             icon: Icons.edit_note,
             label: 'Generated',
             value: '${widget.campaign.totalGenerated}',
-            color: _primaryBlue,
+            color: _momentumBlue,
           ),
           _buildMetricCard(
             icon: Icons.send,
             label: 'Sent',
             value: '$displaySent',
-            color: const Color(0xFF32A6DE), // momentumBlue
+            color: _grassrootsGreen,
           ),
           _buildMetricCard(
             icon: Icons.people,
             label: 'Participants',
             value: '${widget.campaign.uniqueParticipants}',
-            color: _secondaryBlue,
+            color: const Color(0xFF6A1B9A), // justicePurple
           ),
           _buildMetricCard(
             icon: Icons.percent,
             label: 'Send Rate',
             value: displayRate.toStringAsFixed(0),
-            color: const Color(0xFF4682B4), // steelBlue
+            color: const Color(0xFFFDB813), // sunriseGold
           ),
         ];
 
@@ -382,6 +381,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
 
     return Card(
       elevation: 2,
+      color: _unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -390,13 +390,15 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           children: [
             Row(
               children: [
-                Icon(Icons.pie_chart, color: _primaryBlue, size: isMobile ? 20 : 24),
+                Icon(Icons.pie_chart, color: _momentumBlue, size: isMobile ? 20 : 24),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Send Method Analysis',
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: TextStyle(
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -457,7 +459,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                       const SizedBox(width: 4),
                       Text(
                         '$label ($count)',
-                        style: theme.textTheme.bodySmall,
+                        style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
                       ),
                     ],
                   );
@@ -525,14 +527,16 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                                 Expanded(
                                   child: Text(
                                     label,
-                                    style: theme.textTheme.bodySmall,
+                                    style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 Text(
                                   '$count',
-                                  style: theme.textTheme.bodySmall?.copyWith(
+                                  style: const TextStyle(
+                                    fontSize: 12,
                                     fontWeight: FontWeight.bold,
+                                    color: Colors.white,
                                   ),
                                 ),
                               ],
@@ -570,6 +574,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
 
     return Card(
       elevation: 2,
+      color: _unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -578,12 +583,14 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.timeline, color: Colors.blue),
+                Icon(Icons.timeline, color: _momentumBlue),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'Participation Over Time',
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: TextStyle(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ],
@@ -598,10 +605,11 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                   barTouchData: BarTouchData(
                     enabled: true,
                     touchTooltipData: BarTouchTooltipData(
+                      tooltipBgColor: Colors.white,
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
                         return BarTooltipItem(
                           '${displayEntries[groupIndex].key}\n${rod.toY.toInt()} participants',
-                          const TextStyle(color: Colors.white),
+                          TextStyle(color: _unityBlue, fontWeight: FontWeight.w600),
                         );
                       },
                     ),
@@ -618,7 +626,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
                               displayEntries[value.toInt()].key,
-                              style: const TextStyle(fontSize: 10),
+                              style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.7)),
                             ),
                           );
                         },
@@ -631,7 +639,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                         getTitlesWidget: (value, meta) {
                           return Text(
                             value.toInt().toString(),
-                            style: const TextStyle(fontSize: 10),
+                            style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.7)),
                           );
                         },
                       ),
@@ -643,6 +651,10 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                     show: true,
                     drawVerticalLine: false,
                     horizontalInterval: maxValue > 0 ? maxValue / 5 : 1,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.white.withOpacity(0.1),
+                      strokeWidth: 1,
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   barGroups: displayEntries.asMap().entries.map((entry) {
@@ -651,7 +663,11 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                       barRods: [
                         BarChartRodData(
                           toY: entry.value.value.toDouble(),
-                          color: Colors.purple,
+                          gradient: LinearGradient(
+                            colors: [_momentumBlue, _momentumBlue.withOpacity(0.6)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
                           width: 16,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                         ),
@@ -693,17 +709,19 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     if (byCounty.isEmpty) {
       return Card(
         elevation: 2,
+        color: _unityBlue,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              Icon(Icons.map_outlined, size: 48, color: colorScheme.onSurfaceVariant.withOpacity(0.5)),
+              Icon(Icons.map_outlined, size: 48, color: Colors.white.withOpacity(0.5)),
               const SizedBox(height: 16),
               Text(
                 'No county data available',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.white.withOpacity(0.7),
                 ),
               ),
             ],
@@ -719,6 +737,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
 
     return Card(
       elevation: 2,
+      color: _unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -727,25 +746,27 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.location_city, color: Colors.indigo),
+                Icon(Icons.location_city, color: _momentumBlue),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'County Distribution',
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: TextStyle(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.indigo.withOpacity(0.1),
+                    color: _momentumBlue.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     '${byCounty.length} counties',
-                    style: TextStyle(
-                      color: Colors.indigo,
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -814,14 +835,16 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                                 Expanded(
                                   child: Text(
                                     county,
-                                    style: theme.textTheme.bodySmall,
+                                    style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 Text(
                                   '$count',
-                                  style: theme.textTheme.bodySmall?.copyWith(
+                                  style: const TextStyle(
+                                    fontSize: 12,
                                     fontWeight: FontWeight.bold,
+                                    color: Colors.white,
                                   ),
                                 ),
                               ],
@@ -851,6 +874,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
 
     return Card(
       elevation: 2,
+      color: _unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -859,25 +883,27 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.pin_drop, color: Colors.red),
+                Icon(Icons.pin_drop, color: _actionRed),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'Top ZIP Codes',
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: TextStyle(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: _actionRed.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     '${byZip.length} ZIP codes',
                     style: const TextStyle(
-                      color: Colors.red,
+                      color: Colors.white,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -894,10 +920,11 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                   barTouchData: BarTouchData(
                     enabled: true,
                     touchTooltipData: BarTouchTooltipData(
+                      tooltipBgColor: Colors.white,
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
                         return BarTooltipItem(
                           'ZIP ${topZips[groupIndex].key}\n${rod.toY.toInt()} participants',
-                          const TextStyle(color: Colors.white),
+                          TextStyle(color: _unityBlue, fontWeight: FontWeight.w600),
                         );
                       },
                     ),
@@ -916,7 +943,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                               angle: -0.5,
                               child: Text(
                                 topZips[value.toInt()].key,
-                                style: const TextStyle(fontSize: 10),
+                                style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.7)),
                               ),
                             ),
                           );
@@ -930,7 +957,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                         getTitlesWidget: (value, meta) {
                           return Text(
                             value.toInt().toString(),
-                            style: const TextStyle(fontSize: 10),
+                            style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.7)),
                           );
                         },
                       ),
@@ -941,6 +968,10 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.white.withOpacity(0.1),
+                      strokeWidth: 1,
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   barGroups: topZips.asMap().entries.map((entry) {
@@ -950,7 +981,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                         BarChartRodData(
                           toY: entry.value.value.toDouble(),
                           gradient: LinearGradient(
-                            colors: [Colors.red.shade400, Colors.red.shade700],
+                            colors: [_actionRed, _actionRed.withOpacity(0.6)],
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                           ),
@@ -978,6 +1009,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
 
     return Card(
       elevation: 2,
+      color: _unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -986,12 +1018,14 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.list_alt, color: Colors.teal),
+                Icon(Icons.list_alt, color: _grassrootsGreen),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'All ZIP Codes',
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: TextStyle(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ],
@@ -1004,22 +1038,22 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.teal.withOpacity(0.1),
+                    color: _grassrootsGreen.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                    border: Border.all(color: _grassrootsGreen.withOpacity(0.4)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         entry.key,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
                       ),
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.teal,
+                          color: _grassrootsGreen,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
@@ -1051,12 +1085,21 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline, size: 64, color: colorScheme.onSurfaceVariant.withOpacity(0.5)),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: _unityBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.people_outline, size: 48, color: _unityBlue.withOpacity(0.5)),
+            ),
             const SizedBox(height: 16),
             Text(
               'No participants yet',
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: _unityBlue,
               ),
             ),
           ],
@@ -1075,26 +1118,21 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
         // Summary bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            border: Border(
-              bottom: BorderSide(color: colorScheme.outlineVariant),
-            ),
-          ),
+          color: _unityBlue,
           child: Row(
             children: [
               _buildParticipantStat(
                 icon: Icons.people,
                 label: 'Total',
                 value: '${participants.length}',
-                color: Colors.purple,
+                color: _momentumBlue,
               ),
               const SizedBox(width: 24),
               _buildParticipantStat(
                 icon: Icons.card_membership,
                 label: 'Members',
                 value: '$membersCount',
-                color: Colors.blue,
+                color: Colors.lightBlue,
               ),
               const SizedBox(width: 24),
               _buildParticipantStat(
@@ -1108,7 +1146,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                 icon: Icons.check_circle,
                 label: 'Generated',
                 value: '$displaySentCount',
-                color: Colors.green,
+                color: _grassrootsGreen,
               ),
             ],
           ),
@@ -1145,7 +1183,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
-            color: color,
+            color: Colors.white,
           ),
         ),
         const SizedBox(width: 4),
@@ -1153,7 +1191,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
           label,
           style: TextStyle(
             fontSize: 12,
-            color: color.withOpacity(0.7),
+            color: Colors.white.withOpacity(0.7),
           ),
         ),
       ],
@@ -1168,6 +1206,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
   ) {
     return Card(
       elevation: 1,
+      color: _unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: participant.hasProfile
@@ -1191,8 +1230,10 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                         Expanded(
                           child: Text(
                             participant.name,
-                            style: theme.textTheme.titleMedium?.copyWith(
+                            style: const TextStyle(
+                              fontSize: 16,
                               fontWeight: FontWeight.w600,
+                              color: Colors.white,
                             ),
                           ),
                         ),
@@ -1200,13 +1241,13 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
+                              color: _momentumBlue.withOpacity(0.3),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Member',
                               style: TextStyle(
-                                color: Colors.blue,
+                                color: _momentumBlue,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -1216,7 +1257,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
+                              color: Colors.orange.withOpacity(0.3),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Text(
@@ -1233,8 +1274,9 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                     const SizedBox(height: 4),
                     Text(
                       participant.email,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.7),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1268,7 +1310,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                 const SizedBox(width: 8),
                 Icon(
                   Icons.chevron_right,
-                  color: colorScheme.onSurfaceVariant,
+                  color: Colors.white.withOpacity(0.5),
                 ),
               ],
             ],
@@ -1285,10 +1327,10 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     return CorsAwareAvatar(
       imageUrl: photoUrl,
       radius: 28,
-      backgroundColor: Colors.purple.withOpacity(0.2),
+      backgroundColor: _momentumBlue.withOpacity(0.3),
       fallbackText: participant.name,
-      fallbackIconColor: Colors.purple,
-      fallbackTextColor: Colors.purple,
+      fallbackIconColor: _momentumBlue,
+      fallbackTextColor: Colors.white,
     );
   }
 

@@ -3,6 +3,12 @@ import 'package:fl_chart/fl_chart.dart';
 import '../models/bill_vote.dart';
 import '../utils/bill_helpers.dart';
 
+// Brand colors
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+const _grassrootsGreen = Color(0xFF43A047);
+const _actionRed = Color(0xFFE63946);
+
 /// Widget displaying vote breakdown with chart and details
 class VoteBreakdownChart extends StatelessWidget {
   final List<BillVote> votes;
@@ -42,23 +48,31 @@ class VoteBreakdownChart extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.how_to_vote,
-            size: 48,
-            color: theme.colorScheme.outline.withOpacity(0.5),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _unityBlue.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.how_to_vote,
+              size: 48,
+              color: _unityBlue.withOpacity(0.5),
+            ),
           ),
           const SizedBox(height: 16),
           Text(
             'No votes yet',
             style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: _unityBlue,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Floor votes will appear here when they occur',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+              color: _unityBlue.withOpacity(0.7),
             ),
           ),
         ],
@@ -70,265 +84,272 @@ class VoteBreakdownChart extends StatelessWidget {
     final passed = vote.passed;
 
     return Card(
-      elevation: vote.isNew ? 2 : 0,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                // Result badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: passed ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: passed ? Colors.green : Colors.red,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        passed ? Icons.check_circle : Icons.cancel,
-                        size: 16,
-                        color: passed ? Colors.green : Colors.red,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        passed ? 'PASSED' : 'FAILED',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: passed ? Colors.green : Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Chamber badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    vote.chamberDisplay,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                // Date
-                Text(
-                  BillHelpers.formatDate(vote.voteDate),
-                  style: theme.textTheme.labelMedium,
-                ),
-                if (vote.isNew) ...[
-                  const SizedBox(width: 8),
+      elevation: vote.isNew ? 3 : 2,
+      color: _unityBlue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        decoration: vote.isNew
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _momentumBlue, width: 2),
+              )
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  // Result badge - passed/failed
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(4),
+                      color: passed ? _grassrootsGreen.withOpacity(0.2) : _actionRed.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: passed ? _grassrootsGreen : _actionRed),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          passed ? Icons.check_circle : Icons.cancel,
+                          size: 16,
+                          color: passed ? _grassrootsGreen : _actionRed,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          passed ? 'PASSED' : 'FAILED',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: passed ? _grassrootsGreen : _actionRed,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Chamber badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      'NEW',
+                      vote.chamberDisplay,
                       style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.9),
                       ),
                     ),
                   ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Motion text
-            Text(
-              vote.motionText,
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-
-            // Vote counts and pie chart
-            Row(
-              children: [
-                // Pie chart
-                SizedBox(
-                  width: 120,
-                  height: 120,
-                  child: PieChart(
-                    PieChartData(
-                      sectionsSpace: 2,
-                      centerSpaceRadius: 30,
-                      sections: [
-                        PieChartSectionData(
-                          value: vote.yesCount.toDouble(),
-                          title: '${vote.yesCount}',
-                          color: Colors.green,
-                          radius: 30,
-                          titleStyle: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        PieChartSectionData(
-                          value: vote.noCount.toDouble(),
-                          title: '${vote.noCount}',
-                          color: Colors.red,
-                          radius: 30,
-                          titleStyle: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        if (vote.abstainCount > 0 || vote.notVotingCount > 0)
-                          PieChartSectionData(
-                            value: (vote.abstainCount + vote.notVotingCount).toDouble(),
-                            title: '',
-                            color: Colors.grey,
-                            radius: 30,
-                          ),
-                      ],
+                  const Spacer(),
+                  // Date - white text
+                  Text(
+                    BillHelpers.formatDate(vote.voteDate),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white.withOpacity(0.7),
                     ),
                   ),
-                ),
-                const SizedBox(width: 24),
-
-                // Vote counts breakdown
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildCountRow(
-                        theme,
-                        label: 'Yes',
-                        count: vote.yesCount,
-                        color: Colors.green,
+                  if (vote.isNew) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _momentumBlue,
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      const SizedBox(height: 8),
-                      _buildCountRow(
-                        theme,
-                        label: 'No',
-                        count: vote.noCount,
-                        color: Colors.red,
-                      ),
-                      if (vote.abstainCount > 0) ...[
-                        const SizedBox(height: 8),
-                        _buildCountRow(
-                          theme,
-                          label: 'Abstain',
-                          count: vote.abstainCount,
-                          color: Colors.orange,
-                        ),
-                      ],
-                      if (vote.notVotingCount > 0) ...[
-                        const SizedBox(height: 8),
-                        _buildCountRow(
-                          theme,
-                          label: 'Not Voting',
-                          count: vote.notVotingCount,
-                          color: Colors.grey,
-                        ),
-                      ],
-                      if (vote.absentCount > 0) ...[
-                        const SizedBox(height: 8),
-                        _buildCountRow(
-                          theme,
-                          label: 'Absent',
-                          count: vote.absentCount,
-                          color: Colors.grey.shade400,
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      Text(
-                        'Total: ${vote.totalVotes}',
-                        style: theme.textTheme.labelMedium?.copyWith(
+                      child: const Text(
+                        'NEW',
+                        style: TextStyle(
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
-                    ],
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Motion text - white on dark
+              Text(
+                vote.motionText,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.9),
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Vote counts and pie chart
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    // Pie chart with dashboard styling
+                    SizedBox(
+                      width: 120,
+                      height: 120,
+                      child: PieChart(
+                        PieChartData(
+                          sectionsSpace: 3,
+                          centerSpaceRadius: 28,
+                          sections: [
+                            PieChartSectionData(
+                              value: vote.yesCount.toDouble(),
+                              title: '${vote.yesCount}',
+                              color: _grassrootsGreen,
+                              radius: 32,
+                              titleStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            PieChartSectionData(
+                              value: vote.noCount.toDouble(),
+                              title: '${vote.noCount}',
+                              color: _actionRed,
+                              radius: 32,
+                              titleStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (vote.abstainCount > 0 || vote.notVotingCount > 0)
+                              PieChartSectionData(
+                                value: (vote.abstainCount + vote.notVotingCount).toDouble(),
+                                title: '',
+                                color: Colors.grey,
+                                radius: 28,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+
+                    // Vote counts breakdown - white text
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildCountRow(label: 'Yes', count: vote.yesCount, color: _grassrootsGreen),
+                          const SizedBox(height: 8),
+                          _buildCountRow(label: 'No', count: vote.noCount, color: _actionRed),
+                          if (vote.abstainCount > 0) ...[
+                            const SizedBox(height: 8),
+                            _buildCountRow(label: 'Abstain', count: vote.abstainCount, color: Colors.orange),
+                          ],
+                          if (vote.notVotingCount > 0) ...[
+                            const SizedBox(height: 8),
+                            _buildCountRow(label: 'Not Voting', count: vote.notVotingCount, color: Colors.grey),
+                          ],
+                          if (vote.absentCount > 0) ...[
+                            const SizedBox(height: 8),
+                            _buildCountRow(label: 'Absent', count: vote.absentCount, color: Colors.grey.shade400),
+                          ],
+                          const SizedBox(height: 12),
+                          Text(
+                            'Total: ${vote.totalVotes}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Party breakdown (if available)
+              if (vote.votesDetail != null && vote.votesDetail!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Divider(color: Colors.white.withOpacity(0.2)),
+                const SizedBox(height: 12),
+                Text(
+                  'By Party',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: _momentumBlue,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildPartyBreakdown(vote),
+              ],
+
+              // Individual votes expand button
+              if (vote.votesDetail != null && vote.votesDetail!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Center(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showIndividualVotes(context, theme, vote),
+                    icon: const Icon(Icons.people, size: 18),
+                    label: const Text('View Individual Votes'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _momentumBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
                   ),
                 ),
               ],
-            ),
-
-            // Party breakdown (if available)
-            if (vote.votesDetail != null && vote.votesDetail!.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              Text(
-                'By Party',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildPartyBreakdown(theme, vote),
             ],
-
-            // Individual votes expand button
-            if (vote.votesDetail != null && vote.votesDetail!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton.icon(
-                  onPressed: () => _showIndividualVotes(context, theme, vote),
-                  icon: const Icon(Icons.people, size: 18),
-                  label: const Text('View Individual Votes'),
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCountRow(
-    ThemeData theme, {
-    required String label,
-    required int count,
-    required Color color,
-  }) {
+  Widget _buildCountRow({required String label, required int count, required Color color}) {
     return Row(
       children: [
         Container(
           width: 12,
           height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 8),
-        Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.8)),
+          ),
+        ),
         Text(
           '$count',
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: const TextStyle(
+            fontSize: 14,
             fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPartyBreakdown(ThemeData theme, BillVote vote) {
+  Widget _buildPartyBreakdown(BillVote vote) {
     final partyVotes = vote.votesByParty;
 
     return Wrap(
-      spacing: 16,
+      spacing: 12,
       runSpacing: 8,
       children: partyVotes.entries.map((entry) {
         final party = entry.key;
@@ -340,39 +361,23 @@ class VoteBreakdownChart extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withOpacity(0.4)),
           ),
           child: Column(
             children: [
               Text(
                 party,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
               ),
               const SizedBox(height: 4),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    '$yes',
-                    style: const TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Text(' - '),
-                  Text(
-                    '$no',
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Text('$yes', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                  Text(' - ', style: TextStyle(color: Colors.white.withOpacity(0.7))),
+                  Text('$no', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
@@ -386,81 +391,105 @@ class VoteBreakdownChart extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         maxChildSize: 0.9,
         minChildSize: 0.5,
         expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                border: Border(
-                  bottom: BorderSide(color: theme.dividerColor),
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              child: Row(
-                children: [
-                  Text(
-                    'Individual Votes',
-                    style: theme.textTheme.titleLarge,
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _unityBlue,
+                  border: const Border(bottom: BorderSide(color: Colors.white10)),
+                ),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Individual Votes',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                itemCount: vote.votesDetail!.length,
-                itemBuilder: (context, index) {
-                  final detail = vote.votesDetail![index];
-                  final color = BillHelpers.getPartyColor(detail.party);
-                  final voteColor = detail.option.toLowerCase() == 'yes'
-                      ? Colors.green
-                      : detail.option.toLowerCase() == 'no'
-                          ? Colors.red
-                          : Colors.grey;
+              // List - light background with dark text
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: vote.votesDetail!.length,
+                  itemBuilder: (context, index) {
+                    final detail = vote.votesDetail![index];
+                    final color = BillHelpers.getPartyColor(detail.party);
+                    final voteColor = detail.option.toLowerCase() == 'yes'
+                        ? _grassrootsGreen
+                        : detail.option.toLowerCase() == 'no'
+                            ? _actionRed
+                            : Colors.grey;
 
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: color.withOpacity(0.2),
-                      child: Text(
-                        BillHelpers.getPartyAbbreviation(detail.party),
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.bold,
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: color.withOpacity(0.2),
+                        child: Text(
+                          BillHelpers.getPartyAbbreviation(detail.party),
+                          style: TextStyle(color: color, fontWeight: FontWeight.bold),
                         ),
                       ),
-                    ),
-                    title: Text(detail.voterNameFull ?? detail.voterName),
-                    subtitle: detail.party != null ? Text(detail.party!) : null,
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: voteColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(16),
+                      title: Text(
+                        detail.voterNameFull ?? detail.voterName,
+                        style: TextStyle(color: _unityBlue, fontWeight: FontWeight.w500),
                       ),
-                      child: Text(
-                        detail.option.toUpperCase(),
-                        style: TextStyle(
-                          color: voteColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                      subtitle: detail.party != null
+                          ? Text(detail.party!, style: TextStyle(color: _unityBlue.withOpacity(0.6)))
+                          : null,
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: voteColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: voteColor.withOpacity(0.4)),
+                        ),
+                        child: Text(
+                          detail.option.toUpperCase(),
+                          style: TextStyle(
+                            color: voteColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
