@@ -3,6 +3,8 @@
   publish = "build/web"
 
 [build.environment]
+  # Use Ubuntu 22.04 (Jammy) for GLIBCXX_3.4.30 required by Flutter 3.24/Dart 3.5
+  NETLIFY_USE_JAMMY = "true"
   # Flutter requires Git
   GIT_LFS_ENABLED = "true"
   # Pin the Flutter version so Netlify uses the same toolchain as local builds
