@@ -691,7 +691,7 @@ class TrackedBill {
   }
 
   /// Parse position setter photo URL from joined member data
-  /// Priority: profile_pictures > slack_profile_photo
+  /// Priority: profile_pictures > slack_cached_avatar
   static String? _parsePositionSetByPhotoUrl(Map<String, dynamic> json) {
     // Direct field if available
     if (json['position_set_by_photo_url'] != null) {
@@ -718,10 +718,10 @@ class TrackedBill {
           return url.toString();
         }
       }
-      // Fallback to slack_profile_photo
-      final slackPhoto = memberData['slack_profile_photo'];
-      if (slackPhoto != null && slackPhoto.toString().isNotEmpty) {
-        return slackPhoto.toString();
+      // Fallback to slack_cached_avatar (from slack_user_mapping)
+      final slackCachedAvatar = memberData['slack_cached_avatar'];
+      if (slackCachedAvatar != null && slackCachedAvatar.toString().isNotEmpty) {
+        return slackCachedAvatar.toString();
       }
     }
     return null;

@@ -177,19 +177,39 @@ class _BillDetailScreenState extends State<BillDetailScreen>
             ],
           ),
         ),
-        // Tab content
+        // Tab content with gradient background
         Expanded(
-          child: TabBarView(
-            controller: _tabController,
+          child: Stack(
             children: [
-              _buildOverviewTab(context, theme, provider, bill),
-              _buildAiAnalysisTab(context, theme, provider, bill),
-              _buildTalkingPointsTab(context, theme, provider, bill),
-              _buildBillTextTab(context, theme, bill),
-              _buildActionsTab(context, theme, provider, bill),
-              _buildVotesTab(context, theme, provider, bill),
-              _buildDocumentsTab(context, theme, provider, bill),
-              _buildNotesTab(context, theme, provider, bill),
+              // Gradient background
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/images/Blue-Gradient-Background.png',
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Positioned.fill(
+                child: Container(
+                  color: Colors.white.withOpacity(0.18),
+                ),
+              ),
+              // Tab content - disable swiping
+              Positioned.fill(
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(), // Disable swipe
+                  children: [
+                    _buildOverviewTab(context, theme, provider, bill),
+                    _buildAiAnalysisTab(context, theme, provider, bill),
+                    _buildTalkingPointsTab(context, theme, provider, bill),
+                    _buildBillTextTab(context, theme, bill),
+                    _buildActionsTab(context, theme, provider, bill),
+                    _buildVotesTab(context, theme, provider, bill),
+                    _buildDocumentsTab(context, theme, provider, bill),
+                    _buildNotesTab(context, theme, provider, bill),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -396,17 +416,37 @@ class _BillDetailScreenState extends State<BillDetailScreen>
                 ),
               ),
               Expanded(
-                child: TabBarView(
-                  controller: _tabController,
+                child: Stack(
                   children: [
-                    _buildOverviewTab(context, theme, provider, bill),
-                    _buildAiAnalysisTab(context, theme, provider, bill),
-                    _buildTalkingPointsTab(context, theme, provider, bill),
-                    _buildBillTextTab(context, theme, bill),
-                    _buildActionsTab(context, theme, provider, bill),
-                    _buildVotesTab(context, theme, provider, bill),
-                    _buildDocumentsTab(context, theme, provider, bill),
-                    _buildNotesTab(context, theme, provider, bill),
+                    // Gradient background
+                    Positioned.fill(
+                      child: Image.asset(
+                        'assets/images/Blue-Gradient-Background.png',
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.white.withOpacity(0.18),
+                      ),
+                    ),
+                    // Tab content - disable swiping
+                    Positioned.fill(
+                      child: TabBarView(
+                        controller: _tabController,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          _buildOverviewTab(context, theme, provider, bill),
+                          _buildAiAnalysisTab(context, theme, provider, bill),
+                          _buildTalkingPointsTab(context, theme, provider, bill),
+                          _buildBillTextTab(context, theme, bill),
+                          _buildActionsTab(context, theme, provider, bill),
+                          _buildVotesTab(context, theme, provider, bill),
+                          _buildDocumentsTab(context, theme, provider, bill),
+                          _buildNotesTab(context, theme, provider, bill),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
