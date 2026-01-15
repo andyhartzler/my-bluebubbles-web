@@ -78,6 +78,7 @@ dependencies:
   flutter_image_compress: ^2.2.0
   webview_flutter: ^4.4.0
   flutter_secure_storage: ^9.0.0
+  table_calendar: ^3.1.2
   flutter_improved_scrolling: ^0.0.3
   flutter_isolate:
     path: packages/flutter_isolate
