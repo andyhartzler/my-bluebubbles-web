@@ -96,16 +96,17 @@ class SlackFileAttachments extends StatelessWidget {
     super.key,
     required this.files,
     this.maxVisible = 3,
+    this.darkBackground = false,
   });
 
   final List<SlackArchivedFile> files;
   final int maxVisible;
+  final bool darkBackground;
 
   @override
   Widget build(BuildContext context) {
     if (files.isEmpty) return const SizedBox.shrink();
 
-    final theme = Theme.of(context);
     final visibleFiles = files.take(maxVisible).toList();
     final remainingCount = files.length - maxVisible;
 
@@ -114,7 +115,7 @@ class SlackFileAttachments extends StatelessWidget {
       children: [
         ...visibleFiles.map((file) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
-              child: SlackFileAttachmentTile(file: file),
+              child: SlackFileAttachmentTile(file: file, darkBackground: darkBackground),
             )),
         if (remainingCount > 0)
           Padding(
@@ -126,8 +127,9 @@ class SlackFileAttachments extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                 child: Text(
                   '+$remainingCount more file${remainingCount > 1 ? 's' : ''}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.primary,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: darkBackground ? const Color(0xFF32A6DE) : Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -170,9 +172,11 @@ class SlackFileAttachmentTile extends StatelessWidget {
   const SlackFileAttachmentTile({
     super.key,
     required this.file,
+    this.darkBackground = false,
   });
 
   final SlackArchivedFile file;
+  final bool darkBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -184,11 +188,13 @@ class SlackFileAttachmentTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+          color: darkBackground
+              ? Colors.white.withOpacity(0.15)
+              : theme.colorScheme.surfaceVariant.withOpacity(0.5),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: theme.colorScheme.outline.withOpacity(0.2),
-          ),
+          border: darkBackground
+              ? null
+              : Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
         ),
         child: Row(
           children: [
@@ -200,17 +206,26 @@ class SlackFileAttachmentTile extends StatelessWidget {
                 children: [
                   Text(
                     file.name,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: darkBackground
+                        ? const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                          )
+                        : theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${_getMimeTypeLabel()} • ${file.formattedSize}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: darkBackground
+                          ? Colors.white.withOpacity(0.7)
+                          : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -219,7 +234,9 @@ class SlackFileAttachmentTile extends StatelessWidget {
             Icon(
               Icons.open_in_new,
               size: 18,
-              color: theme.colorScheme.onSurfaceVariant,
+              color: darkBackground
+                  ? Colors.white.withOpacity(0.7)
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ],
         ),

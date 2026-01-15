@@ -697,7 +697,7 @@ class CommitteeRepository {
       // Use correct column names from slack_user_mapping table
       final data = await _readClient
           .from('slack_user_mapping')
-          .select('slack_user_id, slack_real_name, slack_display_name, slack_avatar_url, member_id');
+          .select('slack_user_id, slack_real_name, slack_display_name, slack_avatar_url, cached_avatar_path, member_id');
 
       final mappings = <String, Map<String, String>>{};
       for (final item in data as List<dynamic>) {
@@ -708,6 +708,7 @@ class CommitteeRepository {
               'real_name': item['slack_real_name']?.toString() ?? '',
               'display_name': item['slack_display_name']?.toString() ?? '',
               'avatar_url': item['slack_avatar_url']?.toString() ?? '',
+              'cached_avatar_path': item['cached_avatar_path']?.toString() ?? '',
               'member_id': item['member_id']?.toString() ?? '',
             };
           }

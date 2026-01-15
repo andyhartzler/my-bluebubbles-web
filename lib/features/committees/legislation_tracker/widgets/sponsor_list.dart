@@ -4,11 +4,16 @@ import '../models/bill_sponsor.dart';
 import '../models/legislator.dart';
 import '../utils/bill_helpers.dart';
 
+// Brand colors
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 /// Widget displaying list of bill sponsors with legislator photos
 class SponsorList extends StatelessWidget {
   final List<BillSponsor> sponsors;
   final bool showTitle;
   final bool compact;
+  final bool darkBackground;
   final Function(Legislator)? onLegislatorTap;
 
   const SponsorList({
@@ -16,6 +21,7 @@ class SponsorList extends StatelessWidget {
     required this.sponsors,
     this.showTitle = true,
     this.compact = false,
+    this.darkBackground = false,
     this.onLegislatorTap,
   });
 
@@ -34,6 +40,9 @@ class SponsorList extends StatelessWidget {
       return _buildCompactList(context, theme, primarySponsors, coSponsors);
     }
 
+    final textColor = darkBackground ? Colors.white : theme.colorScheme.onSurface;
+    final subtitleColor = darkBackground ? Colors.white70 : theme.colorScheme.onSurfaceVariant;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -44,6 +53,7 @@ class SponsorList extends StatelessWidget {
               'Sponsors',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: textColor,
               ),
             ),
           ),
@@ -52,7 +62,7 @@ class SponsorList extends StatelessWidget {
             'Primary Sponsor${primarySponsors.length > 1 ? 's' : ''}',
             style: theme.textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.w600,
-              color: theme.colorScheme.primary,
+              color: darkBackground ? _momentumBlue : theme.colorScheme.primary,
             ),
           ),
           const SizedBox(height: 8),
@@ -64,6 +74,7 @@ class SponsorList extends StatelessWidget {
             'Co-Sponsors (${coSponsors.length})',
             style: theme.textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.w600,
+              color: subtitleColor,
             ),
           ),
           const SizedBox(height: 8),
@@ -74,6 +85,9 @@ class SponsorList extends StatelessWidget {
   }
 
   Widget _buildEmptyState(BuildContext context, ThemeData theme) {
+    final iconColor = darkBackground ? Colors.white38 : theme.colorScheme.outline.withOpacity(0.5);
+    final textColor = darkBackground ? Colors.white60 : theme.colorScheme.onSurfaceVariant;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -83,13 +97,13 @@ class SponsorList extends StatelessWidget {
             Icon(
               Icons.person_outline,
               size: 48,
-              color: theme.colorScheme.outline.withOpacity(0.5),
+              color: iconColor,
             ),
             const SizedBox(height: 16),
             Text(
               'No sponsors listed',
               style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: textColor,
               ),
             ),
           ],
@@ -162,6 +176,7 @@ class SponsorList extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: isPrimary ? FontWeight.w600 : FontWeight.normal,
+                  color: darkBackground ? Colors.white : null,
                 ),
               ),
               const SizedBox(width: 4),
@@ -178,7 +193,7 @@ class SponsorList extends StatelessWidget {
                 Icon(
                   Icons.star,
                   size: 12,
-                  color: theme.colorScheme.primary,
+                  color: darkBackground ? _momentumBlue : theme.colorScheme.primary,
                 ),
               ],
             ],
@@ -210,10 +225,16 @@ class SponsorList extends StatelessWidget {
     final photoUrl = legislator?.getPhotoPublicUrl();
     final hasPhoto = photoUrl != null;
 
+    final cardColor = darkBackground ? Colors.white.withOpacity(0.1) : null;
+    final textColor = darkBackground ? Colors.white : theme.colorScheme.onSurface;
+    final subtitleColor = darkBackground ? Colors.white70 : theme.colorScheme.onSurfaceVariant;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Card(
-        elevation: 0,
+        elevation: darkBackground ? 0 : 1,
+        color: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: ListTile(
           onTap: legislator != null && onLegislatorTap != null
               ? () => onLegislatorTap!(legislator)
@@ -239,7 +260,10 @@ class SponsorList extends StatelessWidget {
               Expanded(
                 child: Text(
                   legislator?.name ?? sponsor.name,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: textColor,
+                  ),
                 ),
               ),
               // Party badge
@@ -267,7 +291,7 @@ class SponsorList extends StatelessWidget {
               Text(
                 _buildSubtitle(sponsor, legislator),
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: subtitleColor,
                 ),
               ),
               // Leadership role
@@ -295,7 +319,7 @@ class SponsorList extends StatelessWidget {
               ? Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
+                    color: darkBackground ? _momentumBlue.withOpacity(0.3) : theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -303,7 +327,7 @@ class SponsorList extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onPrimaryContainer,
+                      color: darkBackground ? _momentumBlue : theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
                 )
@@ -346,11 +370,13 @@ class SponsorList extends StatelessWidget {
 class SponsorSummary extends StatelessWidget {
   final List<BillSponsor> sponsors;
   final int maxDisplay;
+  final bool darkBackground;
 
   const SponsorSummary({
     super.key,
     required this.sponsors,
     this.maxDisplay = 2,
+    this.darkBackground = false,
   });
 
   @override
@@ -361,7 +387,7 @@ class SponsorSummary extends StatelessWidget {
       return Text(
         'No sponsors',
         style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
+          color: darkBackground ? Colors.white60 : theme.colorScheme.onSurfaceVariant,
         ),
       );
     }
@@ -410,7 +436,7 @@ class SponsorSummary extends StatelessWidget {
             displaySponsors.map((s) => s.legislator?.name ?? s.name).join(', ') +
                 (remainingCount > 0 ? ' +$remainingCount' : ''),
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: darkBackground ? Colors.white70 : theme.colorScheme.onSurfaceVariant,
             ),
             overflow: TextOverflow.ellipsis,
           ),

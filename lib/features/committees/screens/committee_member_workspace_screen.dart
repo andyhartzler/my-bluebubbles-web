@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_slack_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_meetings_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_votes_tab.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/committee_email_tab.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/committee_messages_tab.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/committee_donors_tab.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/committee_chapters_tab.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/committee_campaigns_tab.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/social_media/social_media_analytics_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/member/committee_member_overview_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/member/committee_member_members_tab.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/canvas_board/screens/committee_canvas_tab.dart';
+import 'package:bluebubbles/features/committees/legislation_tracker/screens/legislation_tracker_screen.dart';
+import 'package:bluebubbles/features/committees/legislation_tracker/providers/legislation_provider.dart';
+import 'package:bluebubbles/features/committees/legislation_tracker/providers/bill_search_provider.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
 
 // Brand colors
@@ -90,7 +100,7 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
       ));
     }
 
-    // Slack
+    // Slack - with member view restrictions
     if (tools.contains('slack')) {
       tabs.add(_TabDefinition(
         label: 'Slack',
@@ -101,17 +111,23 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
           colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
         ),
         slug: 'slack',
-        builder: () => CommitteeSlackTab(committee: committee),
+        builder: () => CommitteeSlackTab(
+          committee: committee,
+          isMemberView: true, // Disable profile navigation for members
+        ),
       ));
     }
 
-    // Meetings
+    // Meetings - with member view restrictions (no editing, no profile navigation)
     if (tools.contains('meetings')) {
       tabs.add(_TabDefinition(
         label: 'Meetings',
         icon: Icons.video_camera_front_outlined,
         slug: 'meetings',
-        builder: () => CommitteeMeetingsTab(committee: committee),
+        builder: () => CommitteeMeetingsTab(
+          committee: committee,
+          isMemberView: true,
+        ),
       ));
     }
 
@@ -129,7 +145,7 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
       ));
     }
 
-    // Votes
+    // Votes - member view can only see results, not create/edit/delete
     if (tools.contains('votes')) {
       tabs.add(_TabDefinition(
         label: 'Votes',
@@ -137,9 +153,92 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
         slug: 'votes',
         builder: () => CommitteeVotesTab(
           committee: committee,
-          onNavigateToEmail: null,
-          onNavigateToMessages: null,
+          isMemberView: true,
+          onNavigateToEmail: tools.contains('email')
+              ? () => _navigateToTabBySlug('email')
+              : null,
+          onNavigateToMessages: tools.contains('messages')
+              ? () => _navigateToTabBySlug('messages')
+              : null,
         ),
+      ));
+    }
+
+    // Email
+    if (tools.contains('email')) {
+      tabs.add(_TabDefinition(
+        label: 'Email',
+        icon: Icons.email_outlined,
+        slug: 'email',
+        builder: () => CommitteeEmailTab(committee: committee),
+      ));
+    }
+
+    // Messages
+    if (tools.contains('messages')) {
+      tabs.add(_TabDefinition(
+        label: 'Messages',
+        icon: Icons.message_outlined,
+        slug: 'messages',
+        builder: () => CommitteeMessagesTab(committee: committee),
+      ));
+    }
+
+    // Donors
+    if (tools.contains('donors')) {
+      tabs.add(_TabDefinition(
+        label: 'Donors',
+        icon: Icons.volunteer_activism_outlined,
+        slug: 'donors',
+        builder: () => const CommitteeDonorsTab(),
+      ));
+    }
+
+    // Chapters
+    if (tools.contains('chapters')) {
+      tabs.add(_TabDefinition(
+        label: 'Chapters',
+        icon: Icons.account_tree_outlined,
+        slug: 'chapters',
+        builder: () => CommitteeChaptersTab(
+          chapterTypeFilter: committee.chapterTypeFilter,
+        ),
+      ));
+    }
+
+    // Campaigns
+    if (tools.contains('campaigns')) {
+      tabs.add(_TabDefinition(
+        label: 'Campaigns',
+        icon: Icons.campaign_outlined,
+        slug: 'campaigns',
+        builder: () => const CommitteeCampaignsTab(),
+      ));
+    }
+
+    // Legislation
+    if (tools.contains('legislation')) {
+      tabs.add(_TabDefinition(
+        label: 'Legislation',
+        icon: Icons.gavel_outlined,
+        slug: 'legislation',
+        builder: () => MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => LegislationProvider()),
+            ChangeNotifierProvider(create: (_) => BillSearchProvider()),
+          ],
+          child: LegislationTrackerScreen(committeeId: committee.id),
+        ),
+      ));
+    }
+
+    // Social Media
+    if (tools.contains('social-media')) {
+      tabs.add(_TabDefinition(
+        label: 'Social Media',
+        icon: Icons.analytics_outlined,
+        slug: 'social-media',
+        builder: () => SocialMediaAnalyticsTab(committee: committee),
       ));
     }
 

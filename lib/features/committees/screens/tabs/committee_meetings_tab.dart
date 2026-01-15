@@ -17,7 +17,14 @@ enum _DateRangeFilter { all, last30, last90, upcoming }
 class CommitteeMeetingsTab extends StatefulWidget {
   final Committee committee;
 
-  const CommitteeMeetingsTab({super.key, required this.committee});
+  /// If true, this is the member view and profile navigation is disabled
+  final bool isMemberView;
+
+  const CommitteeMeetingsTab({
+    super.key,
+    required this.committee,
+    this.isMemberView = false,
+  });
 
   @override
   State<CommitteeMeetingsTab> createState() => _CommitteeMeetingsTabState();
@@ -99,7 +106,10 @@ class _CommitteeMeetingsTabState extends State<CommitteeMeetingsTab> {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
         builder: (context) => TitleBarWrapper(
-          child: MeetingDetailScreen(initialMeeting: meeting),
+          child: MeetingDetailScreen(
+            initialMeeting: meeting,
+            isMemberView: widget.isMemberView,
+          ),
         ),
       ),
     );

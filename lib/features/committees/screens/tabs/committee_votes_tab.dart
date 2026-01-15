@@ -6,18 +6,25 @@ import 'package:bluebubbles/features/forms/widgets/vote_card.dart';
 import 'package:bluebubbles/features/forms/screens/votes/vote_builder_screen.dart';
 import 'package:bluebubbles/features/forms/screens/votes/vote_detail_screen.dart';
 
+// Brand colors matching the main dashboard
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 class CommitteeVotesTab extends StatefulWidget {
   final Committee committee;
   /// Callback to navigate to the email tab
   final VoidCallback? onNavigateToEmail;
   /// Callback to navigate to the messages tab
   final VoidCallback? onNavigateToMessages;
+  /// If true, this is the member view - no create/edit/delete, view results only
+  final bool isMemberView;
 
   const CommitteeVotesTab({
     Key? key,
     required this.committee,
     this.onNavigateToEmail,
     this.onNavigateToMessages,
+    this.isMemberView = false,
   }) : super(key: key);
 
   @override
@@ -41,26 +48,11 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
     super.build(context);
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Column(
         children: [
-          // Filter Chips
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildFilterChip('All', 'all'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Active', 'active'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Draft', 'draft'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Closed', 'closed'),
-                ],
-              ),
-            ),
-          ),
+          // Filter tabs
+          _buildFilterTabs(),
 
           // Votes List
           Expanded(
@@ -71,57 +63,28 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
               ),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
+                    ),
+                  );
                 }
 
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return _buildErrorState(snapshot.error.toString());
                 }
 
                 final votes = snapshot.data ?? [];
 
                 if (votes.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.how_to_vote_outlined,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No votes yet',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Create a vote for ${widget.committee.displayName} members',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _createNewVote,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Create Vote'),
-                        ),
-                      ],
-                    ),
-                  );
+                  return _buildEmptyState();
                 }
 
                 return RefreshIndicator(
                   onRefresh: () async {
                     setState(() {});
                   },
+                  color: _momentumBlue,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: votes.length,
@@ -130,8 +93,9 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
                       return VoteCard(
                         vote: vote,
                         onTap: () => _viewVote(vote),
-                        onEdit: () => _editVote(vote),
-                        onDelete: () => _confirmDeleteVote(vote),
+                        // Members cannot edit or delete votes
+                        onEdit: widget.isMemberView ? null : () => _editVote(vote),
+                        onDelete: widget.isMemberView ? null : () => _confirmDeleteVote(vote),
                       );
                     },
                   ),
@@ -141,24 +105,190 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createNewVote,
-        child: const Icon(Icons.add),
+      // Members cannot create votes
+      floatingActionButton: widget.isMemberView
+          ? null
+          : FloatingActionButton(
+              onPressed: _createNewVote,
+              backgroundColor: _momentumBlue,
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
+    );
+  }
+
+  Widget _buildFilterTabs() {
+    final filters = widget.isMemberView
+        ? ['all', 'active', 'closed']
+        : ['all', 'active', 'draft', 'closed'];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Row(
+          children: filters.map((filter) => _buildFilterTab(filter)).toList(),
+        ),
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _statusFilter == value;
+  Widget _buildFilterTab(String filter) {
+    final isSelected = _statusFilter == filter;
+    final label = filter[0].toUpperCase() + filter.substring(1);
 
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _statusFilter = value;
-        });
-      },
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() => _statusFilter = filter);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? _unityBlue : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : _unityBlue,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: _momentumBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.how_to_vote_outlined,
+                size: 56,
+                color: _momentumBlue.withOpacity(0.5),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              widget.isMemberView
+                  ? 'There are no votes to display'
+                  : _statusFilter == 'all'
+                      ? 'No votes yet'
+                      : 'No $_statusFilter votes',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: _unityBlue,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.isMemberView
+                  ? 'Check back later for committee votes'
+                  : 'Create a vote for ${widget.committee.displayName} members',
+              style: TextStyle(
+                fontSize: 14,
+                color: _unityBlue.withOpacity(0.6),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (!widget.isMemberView) ...[
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _createNewVote,
+                icon: const Icon(Icons.add),
+                label: const Text('Create Vote'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _momentumBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Error loading votes',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: _unityBlue,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              style: TextStyle(
+                fontSize: 14,
+                color: _unityBlue.withOpacity(0.6),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => setState(() {}),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _momentumBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

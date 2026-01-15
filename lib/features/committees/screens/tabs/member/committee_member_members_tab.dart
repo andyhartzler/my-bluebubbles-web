@@ -189,8 +189,10 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
+              style: const TextStyle(color: _unityBlue), // Dark text on white background
               decoration: InputDecoration(
                 hintText: 'Search members...',
+                hintStyle: TextStyle(color: _unityBlue.withOpacity(0.5)),
                 prefixIcon: const Icon(Icons.search, color: _momentumBlue),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),

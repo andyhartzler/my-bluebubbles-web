@@ -11,6 +11,10 @@ import '../services/legislation_service.dart';
 import '../widgets/bill_card.dart';
 import 'bill_detail_screen.dart';
 
+// Brand colors
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 /// Detail screen for a single legislator
 class LegislatorDetailScreen extends StatefulWidget {
   final String legislatorId;
@@ -192,26 +196,48 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Legislator')),
-        body: const Center(child: CircularProgressIndicator()),
+        appBar: AppBar(
+          title: const Text('Legislator', style: TextStyle(color: Colors.white)),
+          backgroundColor: _unityBlue,
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        body: Center(child: CircularProgressIndicator(color: _momentumBlue)),
       );
     }
 
     if (_error != null || _legislator == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Legislator')),
+        appBar: AppBar(
+          title: const Text('Legislator', style: TextStyle(color: Colors.white)),
+          backgroundColor: _unityBlue,
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              ),
               const SizedBox(height: 16),
-              Text(_error ?? 'Legislator not found'),
+              Text(
+                _error ?? 'Legislator not found',
+                style: TextStyle(color: _unityBlue),
+              ),
               const SizedBox(height: 16),
-              FilledButton.icon(
+              ElevatedButton.icon(
                 onPressed: _loadLegislator,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                label: const Text('Retry', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _momentumBlue,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
               ),
             ],
           ),
@@ -228,13 +254,15 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
+            backgroundColor: _unityBlue,
+            iconTheme: const IconThemeData(color: Colors.white),
             flexibleSpace: FlexibleSpaceBar(
               background: _buildHeader(theme, legislator),
             ),
             actions: [
               if (legislator.legislatureUrl != null)
                 IconButton(
-                  icon: const Icon(Icons.open_in_new),
+                  icon: const Icon(Icons.open_in_new, color: Colors.white),
                   onPressed: () => _launchUrl(legislator.legislatureUrl!),
                   tooltip: 'View on Legislature website',
                 ),
@@ -271,8 +299,8 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            legislator.partyColor.withOpacity(0.8),
-            legislator.partyColor.withOpacity(0.4),
+            _unityBlue,
+            _unityBlue.withOpacity(0.9),
           ],
         ),
       ),
@@ -376,13 +404,14 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: legislator.partyColor.withOpacity(0.3),
                             borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: legislator.partyColor.withOpacity(0.5)),
                           ),
                           child: Text(
                             legislator.party ?? 'Unknown Party',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: legislator.partyColor,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -396,15 +425,15 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.amber,
+                          color: Colors.amber.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           legislator.leadershipRole!,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.amber.shade900,
+                            color: Colors.amber,
                           ),
                         ),
                       ),
@@ -471,15 +500,22 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
 
     if (!hasContact) return const SizedBox.shrink();
 
-    return Padding(
+    return Container(
+      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _unityBlue,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Contact',
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: TextStyle(
+              fontSize: 18,
               fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 12),
@@ -488,11 +524,11 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
           if (legislator.capitolEmail != null)
             ListTile(
               leading: CircleAvatar(
-                backgroundColor: theme.colorScheme.primaryContainer,
-                child: Icon(Icons.email, color: theme.colorScheme.primary),
+                backgroundColor: _momentumBlue.withOpacity(0.3),
+                child: Icon(Icons.email, color: _momentumBlue),
               ),
-              title: Text(legislator.capitolEmail!),
-              subtitle: const Text('Capitol Email'),
+              title: Text(legislator.capitolEmail!, style: const TextStyle(color: Colors.white)),
+              subtitle: Text('Capitol Email', style: TextStyle(color: Colors.white.withOpacity(0.7))),
               onTap: () => _launchUrl('mailto:${legislator.capitolEmail}'),
               contentPadding: EdgeInsets.zero,
             ),
@@ -501,11 +537,11 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
           if (legislator.capitolPhone != null)
             ListTile(
               leading: CircleAvatar(
-                backgroundColor: theme.colorScheme.secondaryContainer,
-                child: Icon(Icons.phone, color: theme.colorScheme.secondary),
+                backgroundColor: Colors.green.withOpacity(0.3),
+                child: const Icon(Icons.phone, color: Colors.green),
               ),
-              title: Text(legislator.capitolPhone!),
-              subtitle: const Text('Capitol Phone'),
+              title: Text(legislator.capitolPhone!, style: const TextStyle(color: Colors.white)),
+              subtitle: Text('Capitol Phone', style: TextStyle(color: Colors.white.withOpacity(0.7))),
               onTap: () => _launchUrl('tel:${legislator.capitolPhone}'),
               contentPadding: EdgeInsets.zero,
             ),
@@ -514,28 +550,31 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
           if (legislator.capitolAddress != null)
             ListTile(
               leading: CircleAvatar(
-                backgroundColor: theme.colorScheme.tertiaryContainer,
-                child: Icon(Icons.location_on, color: theme.colorScheme.tertiary),
+                backgroundColor: Colors.orange.withOpacity(0.3),
+                child: const Icon(Icons.location_on, color: Colors.orange),
               ),
-              title: Text(legislator.capitolAddress!),
-              subtitle: Text(legislator.room != null ? 'Room ${legislator.room}' : 'Capitol Office'),
+              title: Text(legislator.capitolAddress!, style: const TextStyle(color: Colors.white)),
+              subtitle: Text(
+                legislator.room != null ? 'Room ${legislator.room}' : 'Capitol Office',
+                style: TextStyle(color: Colors.white.withOpacity(0.7)),
+              ),
               contentPadding: EdgeInsets.zero,
             ),
 
           // Social media
           if (legislator.twitter != null || legislator.facebook != null) ...[
-            const Divider(height: 32),
+            Divider(height: 32, color: Colors.white.withOpacity(0.2)),
             Row(
               children: [
                 if (legislator.twitter != null)
                   IconButton(
-                    icon: const Icon(Icons.alternate_email),
+                    icon: const Icon(Icons.alternate_email, color: Colors.white),
                     onPressed: () => _launchUrl('https://twitter.com/${legislator.twitter}'),
                     tooltip: 'Twitter',
                   ),
                 if (legislator.facebook != null)
                   IconButton(
-                    icon: const Icon(Icons.facebook),
+                    icon: const Icon(Icons.facebook, color: Colors.white),
                     onPressed: () => _launchUrl('https://facebook.com/${legislator.facebook}'),
                     tooltip: 'Facebook',
                   ),
@@ -550,29 +589,36 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
   Widget _buildBiographySection(ThemeData theme, Legislator legislator) {
     final hasBiography = legislator.biography != null && legislator.biography!.isNotEmpty;
 
-    return Padding(
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _unityBlue,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(
+              const Text(
                 'Biography',
-                style: theme.textTheme.titleLarge?.copyWith(
+                style: TextStyle(
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
               const Spacer(),
               if (_isSavingBio)
-                const SizedBox(
+                SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: _momentumBlue),
                 )
               else
                 IconButton(
-                  icon: Icon(hasBiography ? Icons.edit : Icons.add),
+                  icon: Icon(hasBiography ? Icons.edit : Icons.add, color: _momentumBlue),
                   onPressed: _editBiography,
                   tooltip: hasBiography ? 'Edit biography' : 'Add biography',
                 ),
@@ -582,15 +628,17 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
           if (hasBiography)
             Text(
               legislator.biography!,
-              style: theme.textTheme.bodyMedium?.copyWith(
+              style: TextStyle(
+                fontSize: 14,
                 height: 1.5,
+                color: Colors.white.withOpacity(0.9),
               ),
             )
           else
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
+                color: Colors.white.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
@@ -599,20 +647,25 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
                     Icon(
                       Icons.article_outlined,
                       size: 48,
-                      color: theme.colorScheme.outline.withOpacity(0.5),
+                      color: Colors.white.withOpacity(0.5),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'No biography available',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.7),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    FilledButton.icon(
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
                       onPressed: _editBiography,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Biography'),
+                      icon: const Icon(Icons.add, color: Colors.white),
+                      label: const Text('Add Biography', style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _momentumBlue,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
                     ),
                   ],
                 ),
@@ -624,33 +677,60 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
   }
 
   Widget _buildBillsSection(ThemeData theme, Legislator legislator) {
-    return Padding(
+    return Container(
+      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _unityBlue,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(
+              const Text(
                 'Sponsored Bills',
-                style: theme.textTheme.titleLarge?.copyWith(
+                style: TextStyle(
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
               const Spacer(),
               // Stats chips
               if (legislator.billsSponsoredCount > 0)
-                Chip(
-                  label: Text('${legislator.billsSponsoredCount} primary'),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _momentumBlue.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${legislator.billsSponsoredCount} primary',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               if (legislator.billsCosponsoredCount > 0) ...[
                 const SizedBox(width: 8),
-                Chip(
-                  label: Text('${legislator.billsCosponsoredCount} co-sponsor'),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${legislator.billsCosponsoredCount} co-sponsor',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
                 ),
               ],
             ],
@@ -661,7 +741,7 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
+                color: Colors.white.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
@@ -670,20 +750,22 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
                     Icon(
                       Icons.gavel_outlined,
                       size: 48,
-                      color: theme.colorScheme.outline.withOpacity(0.5),
+                      color: Colors.white.withOpacity(0.5),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'No tracked bills sponsored',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.9),
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Bills will appear here when tracked',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.7),
                       ),
                     ),
                   ],

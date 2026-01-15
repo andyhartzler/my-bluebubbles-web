@@ -130,13 +130,16 @@ class _CommitteeChaptersTabState extends State<CommitteeChaptersTab> {
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               decoration: InputDecoration(
                 hintText: 'Search $_typeLabel chapters...',
+                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
+                fillColor: Theme.of(context).colorScheme.surface,
               ),
             ),
           ),

@@ -31,62 +31,68 @@ class LegislationService {
     bool includeArchived = false,
     String? searchQuery,
     bool searchBillText = false,
-    int limit = 5000,
+    int limit = 2000,
   }) async {
     List<TrackedBill> allBills = [];
     int offset = 0;
-    const batchSize = 1000; // Supabase max per request
+    const batchSize = 500; // Reduced batch size for better reliability
 
     while (allBills.length < limit) {
-      var query = _supabase
-          .from('legislation_tracked_bills')
-          .select();
+      try {
+        var query = _supabase
+            .from('legislation_tracked_bills')
+            .select();
 
-      if (!includeArchived) {
-        query = query.eq('is_archived', false);
-      }
-      if (session != null) {
-        query = query.eq('session', session);
-      }
-      if (position != null) {
-        query = query.eq('position', position);
-      }
-      if (priority != null) {
-        query = query.eq('priority', priority);
-      }
-      if (category != null) {
-        query = query.contains('categories', [category]);
-      }
-      if (sponsor != null) {
-        query = query.eq('primary_sponsor_name', sponsor);
-      }
-      if (searchQuery != null && searchQuery.isNotEmpty) {
-        if (searchBillText) {
-          // Search in title, bill identifier, and bill text
-          query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%,current_bill_text.ilike.%$searchQuery%');
-        } else {
-          // Search in title and bill identifier only
-          query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%');
+        if (!includeArchived) {
+          query = query.eq('is_archived', false);
         }
-      }
+        if (session != null) {
+          query = query.eq('session', session);
+        }
+        if (position != null) {
+          query = query.eq('position', position);
+        }
+        if (priority != null) {
+          query = query.eq('priority', priority);
+        }
+        if (category != null) {
+          query = query.contains('categories', [category]);
+        }
+        if (sponsor != null) {
+          query = query.eq('primary_sponsor_name', sponsor);
+        }
+        if (searchQuery != null && searchQuery.isNotEmpty) {
+          if (searchBillText) {
+            // Search in title, bill identifier, and bill text
+            query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%,current_bill_text.ilike.%$searchQuery%');
+          } else {
+            // Search in title and bill identifier only
+            query = query.or('title.ilike.%$searchQuery%,bill_identifier.ilike.%$searchQuery%');
+          }
+        }
 
-      final response = await query
-          .order('priority', ascending: true) // critical first
-          .order('latest_action_date', ascending: false)
-          .range(offset, offset + batchSize - 1);
+        final response = await query
+            .order('priority', ascending: true) // critical first
+            .order('latest_action_date', ascending: false)
+            .range(offset, offset + batchSize - 1);
 
-      final bills = (response as List)
-          .map((json) => TrackedBill.fromJson(json as Map<String, dynamic>))
-          .toList();
+        final bills = (response as List)
+            .map((json) => TrackedBill.fromJson(json as Map<String, dynamic>))
+            .toList();
 
-      allBills.addAll(bills);
+        allBills.addAll(bills);
 
-      // If we got fewer than batchSize, we've reached the end
-      if (bills.length < batchSize) {
+        // If we got fewer than batchSize, we've reached the end
+        if (bills.length < batchSize) {
+          break;
+        }
+
+        offset += batchSize;
+      } catch (e) {
+        // If pagination fails, return what we have so far
+        print('Error fetching bills at offset $offset: $e');
         break;
       }
-
-      offset += batchSize;
     }
 
     // Apply limit if we fetched more than requested
@@ -99,13 +105,45 @@ class LegislationService {
 
   /// Get a single tracked bill by ID
   Future<TrackedBill?> getTrackedBill(String id) async {
-    final response = await _supabase
-        .from('legislation_tracked_bills')
-        .select()
-        .eq('id', id)
-        .maybeSingle();
+    // First try with position_setter join
+    try {
+      final response = await _supabase
+          .from('legislation_tracked_bills')
+          .select('*, position_setter:position_set_by(id, name, profile_pictures, slack_profile_photo)')
+          .eq('id', id)
+          .maybeSingle();
 
-    return response != null ? TrackedBill.fromJson(response) : null;
+      return response != null ? TrackedBill.fromJson(response) : null;
+    } catch (e) {
+      // Fallback: get bill without join, then fetch setter info separately
+      final response = await _supabase
+          .from('legislation_tracked_bills')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      // Try to get position setter info separately
+      final positionSetBy = response['position_set_by'] as String?;
+      if (positionSetBy != null) {
+        try {
+          final memberResponse = await _supabase
+              .from('members')
+              .select('id, name, profile_pictures, slack_profile_photo')
+              .eq('id', positionSetBy)
+              .maybeSingle();
+
+          if (memberResponse != null) {
+            response['position_setter'] = memberResponse;
+          }
+        } catch (_) {
+          // Ignore - position setter info is optional
+        }
+      }
+
+      return TrackedBill.fromJson(response);
+    }
   }
 
   /// Get a tracked bill by Open States ID
@@ -193,16 +231,16 @@ class LegislationService {
   }
 
   /// Update bill position
+  /// [memberId] is the ID of the member setting the position (from members table)
   Future<TrackedBill> updatePosition({
     required String billId,
     required String position,
+    String? memberId,
     String? rationale,
   }) async {
-    final userId = _supabase.auth.currentUser?.id;
-
     final response = await _supabase.from('legislation_tracked_bills').update({
       'position': position,
-      'position_set_by': userId,
+      'position_set_by': memberId,
       'position_set_at': DateTime.now().toIso8601String(),
       'position_rationale': rationale,
     }).eq('id', billId).select().single();
@@ -589,26 +627,58 @@ class LegislationService {
 
   /// Get notes for a bill
   Future<List<BillNote>> getBillNotes(String billId) async {
+    // Get notes first
     final response = await _supabase
         .from('legislation_bill_notes')
-        .select('*, members!author_id(id, name, profile_pictures)')
+        .select()
         .eq('bill_id', billId)
         .order('is_pinned', ascending: false)
         .order('created_at', ascending: false);
 
-    return (response as List).map((json) {
-      final authorData = json['members'];
+    final notes = (response as List).map((json) => json as Map<String, dynamic>).toList();
+
+    // Get unique author IDs to look up member info
+    final authorIds = notes
+        .map((n) => n['author_id'] as String?)
+        .where((id) => id != null)
+        .toSet()
+        .toList();
+
+    // Look up member info for authors
+    Map<String, Map<String, dynamic>> authorInfo = {};
+    if (authorIds.isNotEmpty) {
+      try {
+        final membersResponse = await _supabase
+            .from('members')
+            .select('id, name, profile_pictures, slack_profile_photo')
+            .inFilter('id', authorIds);
+
+        for (final member in (membersResponse as List)) {
+          final memberId = member['id'] as String;
+          authorInfo[memberId] = member as Map<String, dynamic>;
+        }
+      } catch (e) {
+        // Silently fail - author info is optional
+        print('Error fetching author info: $e');
+      }
+    }
+
+    // Build notes with author info
+    return notes.map((json) {
       final Map<String, dynamic> noteJson = Map<String, dynamic>.from(json);
-      noteJson.remove('members');
-      if (authorData != null && authorData is Map) {
-        noteJson['author_name'] = authorData['name'];
+      final authorId = json['author_id'] as String?;
+      if (authorId != null && authorInfo.containsKey(authorId)) {
+        final author = authorInfo[authorId]!;
+        noteJson['author_name'] = author['name'];
         // Handle profile pictures - get first photo URL if available
-        final profilePics = authorData['profile_pictures'];
+        final profilePics = author['profile_pictures'];
         if (profilePics is List && profilePics.isNotEmpty) {
           final firstPic = profilePics.first;
           if (firstPic is Map) {
             noteJson['author_avatar_url'] = firstPic['public_url'] ?? firstPic['url'];
           }
+        } else if (author['slack_profile_photo'] != null) {
+          noteJson['author_avatar_url'] = author['slack_profile_photo'];
         }
       }
       return BillNote.fromJson(noteJson);

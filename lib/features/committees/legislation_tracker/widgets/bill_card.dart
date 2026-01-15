@@ -3,7 +3,11 @@ import '../models/tracked_bill.dart';
 import '../utils/bill_helpers.dart';
 import 'bill_status_badge.dart';
 
-/// Card widget displaying a tracked bill summary
+// Brand colors matching committee views
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
+/// Modern card widget displaying a tracked bill summary
 class BillCard extends StatelessWidget {
   final TrackedBill bill;
   final VoidCallback? onTap;
@@ -22,11 +26,16 @@ class BillCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final position = BillPosition.fromString(bill.position);
     final priority = BillPriority.fromString(bill.priority);
 
     return Card(
+      elevation: 2,
+      margin: EdgeInsets.only(bottom: compact ? 8 : 12),
+      color: _unityBlue,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -44,21 +53,21 @@ class BillCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top row: Bill ID, Priority, Chamber
+                // Top row: Bill ID, Chamber, Priority, Position
                 Row(
                   children: [
                     // Bill identifier
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(4),
+                        color: _momentumBlue,
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         bill.billIdentifier,
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                           fontSize: compact ? 12 : 14,
                         ),
                       ),
@@ -68,16 +77,17 @@ class BillCard extends StatelessWidget {
                     // Chamber badge
                     if (bill.chamber != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(4),
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           BillHelpers.getChamberName(bill.chamber),
                           style: TextStyle(
                             fontSize: 11,
-                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.9),
                           ),
                         ),
                       ),
@@ -85,98 +95,75 @@ class BillCard extends StatelessWidget {
 
                     // Priority badge
                     if (showPriority)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: priority.color.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: priority.color.withOpacity(0.5)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(priority.emoji, style: const TextStyle(fontSize: 12)),
-                            const SizedBox(width: 4),
-                            Text(
-                              priority.label,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: priority.color,
-                              ),
-                            ),
-                          ],
-                        ),
+                      _buildBadge(
+                        emoji: priority.emoji,
+                        label: priority.label,
+                        color: priority.color,
                       ),
                     if (showPosition) ...[
                       const SizedBox(width: 8),
-                      // Position badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: position.color.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(position.emoji, style: const TextStyle(fontSize: 12)),
-                            const SizedBox(width: 4),
-                            Text(
-                              position.label,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: position.color,
-                              ),
-                            ),
-                          ],
-                        ),
+                      _buildBadge(
+                        emoji: position.emoji,
+                        label: position.label,
+                        color: position.color,
                       ),
                     ],
                   ],
                 ),
-                SizedBox(height: compact ? 8 : 12),
+                SizedBox(height: compact ? 10 : 14),
 
                 // Title
                 Text(
                   bill.title,
-                  style: compact
-                      ? theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)
-                      : theme.textTheme.titleMedium,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: compact ? 14 : 16,
+                    color: Colors.white,
+                    height: 1.3,
+                  ),
                   maxLines: compact ? 1 : 2,
                   overflow: TextOverflow.ellipsis,
                 ),
 
                 if (!compact) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
 
                   // Sponsor and action info
                   Row(
                     children: [
                       if (bill.primarySponsorName != null) ...[
                         Icon(
-                          Icons.person,
+                          Icons.person_outline,
                           size: 16,
-                          color: theme.colorScheme.onSurfaceVariant,
+                          color: Colors.white.withOpacity(0.7),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          '${bill.primarySponsorName}${bill.primarySponsorParty != null ? ' (${BillHelpers.getPartyAbbreviation(bill.primarySponsorParty)})' : ''}',
-                          style: theme.textTheme.bodySmall,
+                        Flexible(
+                          child: Text(
+                            '${bill.primarySponsorName}${bill.primarySponsorParty != null ? ' (${BillHelpers.getPartyAbbreviation(bill.primarySponsorParty)})' : ''}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         const SizedBox(width: 16),
                       ],
                       if (bill.latestActionDate != null) ...[
                         Icon(
-                          Icons.update,
+                          Icons.schedule_outlined,
                           size: 16,
-                          color: theme.colorScheme.onSurfaceVariant,
+                          color: Colors.white.withOpacity(0.7),
                         ),
                         const SizedBox(width: 4),
                         Text(
                           BillHelpers.formatRelativeTime(bill.latestActionDate),
-                          style: theme.textTheme.bodySmall,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white.withOpacity(0.8),
+                          ),
                         ),
                       ],
                     ],
@@ -184,25 +171,28 @@ class BillCard extends StatelessWidget {
 
                   // Latest action
                   if (bill.latestActionDescription != null) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(4),
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
                           Icon(
-                            Icons.play_arrow,
+                            Icons.arrow_forward_rounded,
                             size: 16,
-                            color: theme.colorScheme.onSurfaceVariant,
+                            color: _momentumBlue,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               bill.latestActionDescription!,
-                              style: theme.textTheme.bodySmall,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white.withOpacity(0.9),
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -214,20 +204,24 @@ class BillCard extends StatelessWidget {
 
                   // Categories
                   if (bill.categories.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
+                      spacing: 6,
+                      runSpacing: 6,
                       children: bill.categories.take(4).map((cat) {
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(4),
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             cat,
-                            style: theme.textTheme.labelSmall,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
                           ),
                         );
                       }).toList(),
@@ -236,14 +230,44 @@ class BillCard extends StatelessWidget {
 
                   // Passage indicators
                   if (bill.passedLower || bill.passedUpper || bill.signedByGovernor || bill.vetoed) ...[
-                    const SizedBox(height: 8),
-                    BillStatusBadge(bill: bill),
+                    const SizedBox(height: 10),
+                    BillStatusBadge(bill: bill, darkBackground: true),
                   ],
                 ],
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBadge({
+    required String emoji,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

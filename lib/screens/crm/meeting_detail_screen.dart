@@ -32,10 +32,16 @@ class MeetingDetailScreen extends StatefulWidget {
   final Meeting initialMeeting;
   final String? highlightMemberId;
 
+  /// If true, this is a read-only view for committee members
+  /// - Editing is disabled (no edit buttons)
+  /// - Profile navigation is disabled (can't tap to view member profiles)
+  final bool isMemberView;
+
   const MeetingDetailScreen({
     Key? key,
     required this.initialMeeting,
     this.highlightMemberId,
+    this.isMemberView = false,
   }) : super(key: key);
 
   @override
@@ -56,7 +62,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
   }
 
   Future<void> _editMeeting(Meeting meeting) async {
-    if (!_isCrmReady) return;
+    if (!_isCrmReady || widget.isMemberView) return;
 
     final updated = await showModalBottomSheet<Meeting?>(
       context: context,
@@ -74,7 +80,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
   }
 
   Future<void> _editAttendance(MeetingAttendance attendance) async {
-    if (!_isCrmReady) return;
+    if (!_isCrmReady || widget.isMemberView) return;
 
     final updated = await showModalBottomSheet<MeetingAttendance?>(
       context: context,
@@ -482,7 +488,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
                   ],
                 ),
               ),
-              if (_isCrmReady)
+              if (_isCrmReady && !widget.isMemberView)
                 FilledButton.icon(
                   onPressed: () => _editMeeting(meeting),
                   icon: const Icon(Icons.edit_outlined),
@@ -990,19 +996,19 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (attendance.member != null)
+            if (attendance.member != null && !widget.isMemberView)
               IconButton(
                 tooltip: 'View member profile',
                 icon: const Icon(Icons.person_search_outlined),
                 onPressed: () => _openMemberProfile(attendance.member!),
               ),
-            if (_isCrmReady)
+            if (_isCrmReady && !widget.isMemberView)
               IconButton(
                 tooltip: 'Edit attendance',
                 icon: const Icon(Icons.edit_outlined),
                 onPressed: () => _editAttendance(attendance),
               ),
-            if (_isCrmReady)
+            if (_isCrmReady && !widget.isMemberView)
               IconButton(
                 tooltip: 'Remove from meeting',
                 icon: const Icon(Icons.delete_outline),
@@ -1265,6 +1271,9 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
   }
 
   void _openMemberProfile(Member member) {
+    // Disable profile navigation in member view
+    if (widget.isMemberView) return;
+
     _memberLookup.cacheMember(member);
     Navigator.of(context, rootNavigator: true).push(
       ThemeSwitcher.buildPageRoute(

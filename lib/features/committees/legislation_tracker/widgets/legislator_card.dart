@@ -3,7 +3,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import '../models/legislator.dart';
 
-/// Card widget displaying legislator information
+// Brand colors
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
+/// Card widget displaying legislator information with Unity Blue styling
 class LegislatorCard extends StatelessWidget {
   final Legislator legislator;
   final VoidCallback? onTap;
@@ -28,8 +32,13 @@ class LegislatorCard extends StatelessWidget {
 
     return Card(
       clipBehavior: Clip.antiAlias,
+      color: _unityBlue,
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -49,13 +58,15 @@ class LegislatorCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             legislator.name,
-                            style: theme.textTheme.titleMedium?.copyWith(
+                            style: const TextStyle(
+                              fontSize: 16,
                               fontWeight: FontWeight.w600,
+                              color: Colors.white,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        _buildPartyBadge(theme),
+                        _buildPartyBadge(),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -63,8 +74,9 @@ class LegislatorCard extends StatelessWidget {
                     // Title and district
                     Text(
                       '${legislator.displayTitle} - District ${legislator.district}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withOpacity(0.7),
                       ),
                     ),
 
@@ -72,17 +84,17 @@ class LegislatorCard extends StatelessWidget {
                     if (legislator.leadershipRole != null) ...[
                       const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.2),
+                          color: Colors.amber.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           legislator.leadershipRole!,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.amber.shade800,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.amber,
                           ),
                         ),
                       ),
@@ -94,22 +106,31 @@ class LegislatorCard extends StatelessWidget {
               // Bill count
               if (showBillCounts && legislator.billsSponsoredCount > 0) ...[
                 const SizedBox(width: 12),
-                Column(
-                  children: [
-                    Text(
-                      '${legislator.billsSponsoredCount}',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '${legislator.billsSponsoredCount}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: _momentumBlue,
+                        ),
                       ),
-                    ),
-                    Text(
-                      'bills',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      Text(
+                        'bills',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ],
@@ -122,8 +143,13 @@ class LegislatorCard extends StatelessWidget {
   Widget _buildCompactCard(BuildContext context, ThemeData theme) {
     return Card(
       clipBehavior: Clip.antiAlias,
+      color: _unityBlue,
+      elevation: 1,
+      margin: const EdgeInsets.only(bottom: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Row(
@@ -140,19 +166,22 @@ class LegislatorCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             legislator.name,
-                            style: theme.textTheme.bodyMedium?.copyWith(
+                            style: const TextStyle(
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
+                              color: Colors.white,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        _buildPartyBadge(theme, small: true),
+                        _buildPartyBadge(small: true),
                       ],
                     ),
                     Text(
                       '${legislator.chamberName} Dist. ${legislator.district}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.7),
                       ),
                     ),
                   ],
@@ -170,7 +199,7 @@ class LegislatorCard extends StatelessWidget {
 
     return CircleAvatar(
       radius: radius / 2,
-      backgroundColor: legislator.partyColor.withOpacity(0.2),
+      backgroundColor: legislator.partyColor.withOpacity(0.3),
       child: photoUrl != null
           ? ClipOval(
               child: CachedNetworkImage(
@@ -197,15 +226,16 @@ class LegislatorCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPartyBadge(ThemeData theme, {bool small = false}) {
+  Widget _buildPartyBadge({bool small = false}) {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: small ? 6 : 8,
-        vertical: small ? 2 : 3,
+        vertical: small ? 2 : 4,
       ),
       decoration: BoxDecoration(
-        color: legislator.partyColor.withOpacity(0.2),
+        color: legislator.partyColor.withOpacity(0.25),
         borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: legislator.partyColor.withOpacity(0.4)),
       ),
       child: Text(
         legislator.partyAbbr,
@@ -219,7 +249,7 @@ class LegislatorCard extends StatelessWidget {
   }
 }
 
-/// Grid tile version of legislator card
+/// Grid tile version of legislator card with Unity Blue styling
 class LegislatorGridTile extends StatelessWidget {
   final Legislator legislator;
   final VoidCallback? onTap;
@@ -237,8 +267,12 @@ class LegislatorGridTile extends StatelessWidget {
 
     return Card(
       clipBehavior: Clip.antiAlias,
+      color: _unityBlue,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -246,7 +280,7 @@ class LegislatorGridTile extends StatelessWidget {
             Expanded(
               flex: 3,
               child: Container(
-                color: legislator.partyColor.withOpacity(0.1),
+                color: legislator.partyColor.withOpacity(0.15),
                 child: photoUrl != null
                     ? CachedNetworkImage(
                         imageUrl: photoUrl,
@@ -270,8 +304,10 @@ class LegislatorGridTile extends StatelessWidget {
                         Expanded(
                           child: Text(
                             legislator.name,
-                            style: theme.textTheme.titleSmall?.copyWith(
+                            style: const TextStyle(
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
+                              color: Colors.white,
                             ),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
@@ -280,7 +316,7 @@ class LegislatorGridTile extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                           decoration: BoxDecoration(
-                            color: legislator.partyColor.withOpacity(0.2),
+                            color: legislator.partyColor.withOpacity(0.25),
                             borderRadius: BorderRadius.circular(2),
                           ),
                           child: Text(
@@ -297,18 +333,19 @@ class LegislatorGridTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${legislator.chamberName} Dist. ${legislator.district}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withOpacity(0.7),
                       ),
                     ),
                     if (legislator.leadershipRole != null) ...[
                       const SizedBox(height: 4),
                       Text(
                         legislator.leadershipRole!,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
-                          color: Colors.amber.shade800,
+                          color: Colors.amber,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -331,7 +368,7 @@ class LegislatorGridTile extends StatelessWidget {
           Icon(
             Icons.person,
             size: 48,
-            color: legislator.partyColor.withOpacity(0.5),
+            color: legislator.partyColor.withOpacity(0.6),
           ),
           const SizedBox(height: 4),
           Text(
@@ -353,21 +390,24 @@ class LegislatorChip extends StatelessWidget {
   final Legislator legislator;
   final VoidCallback? onTap;
   final bool isPrimary;
+  final bool darkBackground;
 
   const LegislatorChip({
     super.key,
     required this.legislator,
     this.onTap,
     this.isPrimary = false,
+    this.darkBackground = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final photoUrl = legislator.getPhotoPublicUrl();
+    final textColor = darkBackground ? Colors.white : theme.colorScheme.onSurface;
 
     return Material(
-      color: legislator.partyColor.withOpacity(0.1),
+      color: legislator.partyColor.withOpacity(0.15),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
@@ -377,7 +417,7 @@ class LegislatorChip extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: legislator.partyColor.withOpacity(isPrimary ? 0.5 : 0.2),
+              color: legislator.partyColor.withOpacity(isPrimary ? 0.5 : 0.3),
               width: isPrimary ? 2 : 1,
             ),
           ),
@@ -400,6 +440,7 @@ class LegislatorChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: isPrimary ? FontWeight.w600 : FontWeight.normal,
+                  color: textColor,
                 ),
               ),
               const SizedBox(width: 4),
@@ -417,7 +458,7 @@ class LegislatorChip extends StatelessWidget {
                 Icon(
                   Icons.star,
                   size: 12,
-                  color: theme.colorScheme.primary,
+                  color: darkBackground ? _momentumBlue : theme.colorScheme.primary,
                 ),
               ],
             ],
