@@ -725,7 +725,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       try {
         final jobsResponse = await _supabaseService.privilegedClient
             .from('job_applications')
-            .select('*, form_schemas!inner(id, title)')
+            .select('*')
             .eq('member_id', _member.id)
             .order('created_at', ascending: false);
 

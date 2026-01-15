@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/models/slack_analytics.dart';
@@ -1390,6 +1392,34 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMemberAvatar(Member member) {
+    final photoUrl = member.primaryProfilePhotoUrl;
+    final initial = member.name.isNotEmpty ? member.name[0].toUpperCase() : '?';
+
+    if (photoUrl == null) {
+      return CircleAvatar(
+        child: Text(initial),
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: photoUrl,
+      imageBuilder: (context, imageProvider) => CircleAvatar(
+        backgroundImage: imageProvider,
+      ),
+      placeholder: (context, url) => CircleAvatar(
+        child: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      errorWidget: (context, url, error) => CircleAvatar(
+        child: Text(initial),
       ),
     );
   }

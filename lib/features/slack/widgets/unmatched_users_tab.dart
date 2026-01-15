@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -724,6 +726,34 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
       ),
     );
   }
+
+  Widget _buildMemberAvatar(Member member) {
+    final photoUrl = member.primaryProfilePhotoUrl;
+    final initial = member.name.isNotEmpty ? member.name[0].toUpperCase() : '?';
+
+    if (photoUrl == null) {
+      return CircleAvatar(
+        child: Text(initial),
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: photoUrl,
+      imageBuilder: (context, imageProvider) => CircleAvatar(
+        backgroundImage: imageProvider,
+      ),
+      placeholder: (context, url) => CircleAvatar(
+        child: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      errorWidget: (context, url, error) => CircleAvatar(
+        child: Text(initial),
+      ),
+    );
+  }
 }
 
 /// Dialog for creating a new member from Slack user data
@@ -851,6 +881,62 @@ class _CreateMemberDialogState extends State<_CreateMemberDialog> {
               : const Text('Create'),
         ),
       ],
+    );
+  }
+}
+
+/// Avatar widget that handles CORS errors gracefully for external image URLs
+class _MemberAvatar extends StatelessWidget {
+  const _MemberAvatar({
+    required this.photoUrl,
+    required this.name,
+    this.radius = 20,
+  });
+
+  final String? photoUrl;
+  final String name;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    if (photoUrl == null || photoUrl!.isEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Text(
+          initials,
+          style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+        ),
+      );
+    }
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: photoUrl!,
+        width: radius * 2,
+        height: radius * 2,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => CircleAvatar(
+          radius: radius,
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: SizedBox(
+            width: radius,
+            height: radius,
+            child: const CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        errorWidget: (context, url, error) => CircleAvatar(
+          radius: radius,
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: Text(
+            initials,
+            style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+          ),
+        ),
+      ),
     );
   }
 }
