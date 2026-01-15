@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 import '../providers/legislation_provider.dart';
 import '../models/tracked_bill.dart';
 import '../widgets/bill_status_badge.dart';
@@ -989,13 +990,28 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     );
   }
 
-  void _navigateToMemberProfile(String memberId) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MemberDetailScreen(memberId: memberId),
-      ),
-    );
+  Future<void> _navigateToMemberProfile(String memberId) async {
+    // Fetch the member from the repository
+    final memberRepo = MemberRepository();
+    final member = await memberRepo.getMemberById(memberId);
+
+    if (member == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Member not found')),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MemberDetailScreen(member: member),
+        ),
+      );
+    }
   }
 
   void _handleMenuAction(BuildContext context, LegislationProvider provider, TrackedBill bill, String action) {
