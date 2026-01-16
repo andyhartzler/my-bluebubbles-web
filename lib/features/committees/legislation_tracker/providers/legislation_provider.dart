@@ -191,10 +191,27 @@ class LegislationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Load statistics
+  // Load statistics - uses fast cached table by default
   Future<void> loadStats() async {
     try {
-      _stats = await _service.getStatistics(session: _sessionFilter);
+      // Use cached statistics from legislation_statistics table (fast)
+      _stats = await _service.getCachedStatistics();
+    } catch (e) {
+      debugPrint('Error loading cached stats: $e');
+      // Fall back to RPC method
+      try {
+        _stats = await _service.getStatistics(session: _sessionFilter);
+      } catch (_) {
+        _stats = LegislationStats.empty();
+      }
+    }
+    notifyListeners();
+  }
+
+  // Load statistics using legacy RPC method (for session-specific stats)
+  Future<void> loadStatsForSession({String? session}) async {
+    try {
+      _stats = await _service.getStatistics(session: session ?? _sessionFilter);
     } catch (e) {
       _stats = LegislationStats.empty();
     }

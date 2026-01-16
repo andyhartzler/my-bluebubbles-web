@@ -86,6 +86,7 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
     });
 
     try {
+      // Load legislators and cached stats in parallel
       final results = await Future.wait([
         _service.getLegislatorsFiltered(
           chamber: 'upper',
@@ -97,13 +98,23 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
           party: _partyFilter,
           searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
         ),
-        _service.getLegislatorStats(),
+        _service.getQuickStats(), // Use cached stats from legislation_statistics table
       ]);
+
+      final quickStats = results[2] as Map<String, dynamic>;
 
       setState(() {
         _senateLegislators = results[0] as List<Legislator>;
         _houseLegislators = results[1] as List<Legislator>;
-        _stats = results[2] as LegislatorStats;
+
+        // Build stats from cached table data
+        _stats = LegislatorStats(
+          totalLegislators: quickStats['total_legislators_count'] as int? ?? 0,
+          republicanCount: quickStats['republican_legislators_count'] as int? ?? 0,
+          democratCount: quickStats['democrat_legislators_count'] as int? ?? 0,
+          houseCount: quickStats['house_legislators_count'] as int? ?? 0,
+          senateCount: quickStats['senate_legislators_count'] as int? ?? 0,
+        );
 
         // Sort legislators numerically by district
         _senateLegislators.sort((a, b) => _compareDistricts(a.district, b.district));
@@ -123,125 +134,168 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Column(
+    return Stack(
       children: [
-        // Stats banner
-        if (_stats != null) _buildStatsBanner(theme),
-
-        // Search and filters
-        Container(
-          padding: const EdgeInsets.all(12),
-          color: _unityBlue,
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(color: Colors.black87),
-                  decoration: InputDecoration(
-                    hintText: 'Search legislators...',
-                    hintStyle: TextStyle(color: Colors.black.withOpacity(0.5)),
-                    prefixIcon: Icon(Icons.search, color: _unityBlue.withOpacity(0.7)),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.clear, color: _unityBlue.withOpacity(0.7)),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                              _loadLegislators();
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
+        // Gradient background
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/Blue-Gradient-Background.png',
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned.fill(
+          child: Container(color: Colors.white.withOpacity(0.18)),
+        ),
+        // Content
+        Column(
+          children: [
+            // Header with back button
+            Container(
+              padding: const EdgeInsets.fromLTRB(8, 12, 16, 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'Missouri Legislators',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    filled: true,
-                    fillColor: Colors.white,
                   ),
-                  // No onSubmitted - search happens as you type via listener
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Party filter dropdown
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String?>(
-                    value: _partyFilter,
-                    hint: Text('Party', style: TextStyle(color: _unityBlue.withOpacity(0.7))),
-                    style: TextStyle(color: _unityBlue, fontWeight: FontWeight.w500),
-                    dropdownColor: Colors.white,
-                    icon: Icon(Icons.arrow_drop_down, color: _unityBlue),
-                    items: [
-                      DropdownMenuItem(value: null, child: Text('All', style: TextStyle(color: _unityBlue))),
-                      DropdownMenuItem(value: 'Republican', child: Text('Republican', style: TextStyle(color: _unityBlue))),
-                      DropdownMenuItem(value: 'Democratic', child: Text('Democratic', style: TextStyle(color: _unityBlue))),
-                    ],
-                    onChanged: (value) {
-                      setState(() => _partyFilter = value);
-                      _loadLegislators();
-                    },
+                  // Refresh button
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    onPressed: _loadLegislators,
+                    tooltip: 'Refresh',
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
 
-        // Chamber tabs
-        Container(
-          color: _unityBlue,
-          child: TabBar(
-            controller: _tabController,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white60,
-            indicatorColor: _momentumBlue,
-            indicatorWeight: 3,
-            tabs: [
-              Tab(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Senate'),
-                    const SizedBox(width: 8),
-                    _buildCountBadge(_senateLegislators.length),
-                  ],
-                ),
-              ),
-              Tab(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('House'),
-                    const SizedBox(width: 8),
-                    _buildCountBadge(_houseLegislators.length),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+            // Stats banner
+            if (_stats != null) _buildStatsBanner(theme),
 
-        // Legislator lists
-        Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-                  ? _buildErrorState(theme)
-                  : TabBarView(
-                      controller: _tabController,
+            // Search and filters
+            Container(
+              padding: const EdgeInsets.all(12),
+              color: _unityBlue,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(color: Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'Search legislators...',
+                        hintStyle: TextStyle(color: Colors.black.withOpacity(0.5)),
+                        prefixIcon: Icon(Icons.search, color: _unityBlue.withOpacity(0.7)),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(Icons.clear, color: _unityBlue.withOpacity(0.7)),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                  _loadLegislators();
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Party filter dropdown
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String?>(
+                        value: _partyFilter,
+                        hint: Text('Party', style: TextStyle(color: _unityBlue.withOpacity(0.7))),
+                        style: TextStyle(color: _unityBlue, fontWeight: FontWeight.w500),
+                        dropdownColor: Colors.white,
+                        icon: Icon(Icons.arrow_drop_down, color: _unityBlue),
+                        items: [
+                          DropdownMenuItem(value: null, child: Text('All', style: TextStyle(color: _unityBlue))),
+                          DropdownMenuItem(value: 'Republican', child: Text('Republican', style: TextStyle(color: _unityBlue))),
+                          DropdownMenuItem(value: 'Democratic', child: Text('Democratic', style: TextStyle(color: _unityBlue))),
+                        ],
+                        onChanged: (value) {
+                          setState(() => _partyFilter = value);
+                          _loadLegislators();
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Chamber tabs
+            Container(
+              color: _unityBlue,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                indicatorColor: _momentumBlue,
+                indicatorWeight: 3,
+                tabs: [
+                  Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildLegislatorList(_senateLegislators, 'Senate'),
-                        _buildLegislatorList(_houseLegislators, 'House'),
+                        const Text('Senate'),
+                        const SizedBox(width: 8),
+                        _buildCountBadge(_senateLegislators.length),
                       ],
                     ),
+                  ),
+                  Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('House'),
+                        const SizedBox(width: 8),
+                        _buildCountBadge(_houseLegislators.length),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Legislator lists
+            Expanded(
+              child: _isLoading
+                  ? Center(child: CircularProgressIndicator(color: _momentumBlue))
+                  : _error != null
+                      ? _buildErrorState(theme)
+                      : TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildLegislatorList(_senateLegislators, 'Senate'),
+                            _buildLegislatorList(_houseLegislators, 'House'),
+                          ],
+                        ),
+            ),
+          ],
         ),
       ],
     );
@@ -340,6 +394,7 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: color ?? Colors.white,
+                    decoration: TextDecoration.none, // Remove any underline
                   ),
                 ),
               ],
@@ -349,6 +404,7 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.white.withOpacity(0.8),
+                decoration: TextDecoration.none, // Remove any underline
               ),
             ),
           ],

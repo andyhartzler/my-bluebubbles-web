@@ -14,6 +14,9 @@ import 'bill_detail_screen.dart';
 // Brand colors
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
+const _grassrootsGreen = Color(0xFF43A047);
+const _democratBlue = Color(0xFF3B82F6);
+const _republicanRed = Color(0xFFEF4444);
 
 /// Detail screen for a single legislator
 class LegislatorDetailScreen extends StatefulWidget {
@@ -267,19 +270,40 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
             slivers: [
               // App bar with photo
               SliverAppBar(
-                expandedHeight: 280,
+                expandedHeight: 300,
                 pinned: true,
                 backgroundColor: _unityBlue,
-                iconTheme: const IconThemeData(color: Colors.white),
+                leading: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Material(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Icon(Icons.arrow_back, color: Colors.white),
+                    ),
+                  ),
+                ),
                 flexibleSpace: FlexibleSpaceBar(
                   background: _buildHeader(theme, legislator),
                 ),
                 actions: [
                   if (legislator.legislatureUrl != null)
-                    IconButton(
-                      icon: const Icon(Icons.open_in_new, color: Colors.white),
-                      onPressed: () => _launchUrl(legislator.legislatureUrl!),
-                      tooltip: 'View on Legislature website',
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Material(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: () => _launchUrl(legislator.legislatureUrl!),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: Icon(Icons.open_in_new, color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -288,6 +312,9 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Quick stats pills
+                    _buildQuickStatsRow(legislator),
+
                     // Contact section
                     _buildContactSection(theme, legislator),
 
@@ -505,6 +532,91 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuickStatsRow(Legislator legislator) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildStatPill(
+              icon: Icons.gavel,
+              value: '${legislator.billsSponsoredCount}',
+              label: 'Bills Sponsored',
+              color: _momentumBlue,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildStatPill(
+              icon: Icons.group,
+              value: '${legislator.billsCosponsoredCount}',
+              label: 'Co-Sponsored',
+              color: _grassrootsGreen,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatPill({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _unityBlue,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
