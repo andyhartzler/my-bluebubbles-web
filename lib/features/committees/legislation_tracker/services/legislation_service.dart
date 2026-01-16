@@ -772,7 +772,81 @@ class LegislationService {
 
   // ==================== STATISTICS ====================
 
-  /// Get legislation statistics
+  /// Get pre-computed cached statistics from legislation_statistics table
+  /// This is MUCH faster than computing stats on the fly (~1ms vs 100-500ms)
+  Future<LegislationStats> getCachedStatistics() async {
+    try {
+      final response = await _supabase
+          .from('legislation_statistics')
+          .select()
+          .single();
+
+      return LegislationStats.fromJson(response);
+    } catch (e) {
+      debugPrint('Error fetching cached statistics: $e');
+      // Fall back to RPC method
+      return getStatistics();
+    }
+  }
+
+  /// Get quick stats subset for dashboards (smaller payload)
+  Future<Map<String, dynamic>> getQuickStats() async {
+    try {
+      final response = await _supabase
+          .from('legislation_statistics')
+          .select('''
+            total_active_bills,
+            support_count,
+            oppose_count,
+            watching_count,
+            neutral_count,
+            no_position_count,
+            critical_count,
+            high_count,
+            democrat_primary_sponsor_count,
+            republican_primary_sponsor_count,
+            democrat_legislators_count,
+            republican_legislators_count,
+            house_legislators_count,
+            senate_legislators_count,
+            total_legislators_count,
+            bills_introduced_this_week,
+            actions_this_week
+          ''')
+          .single();
+
+      return response;
+    } catch (e) {
+      debugPrint('Error fetching quick stats: $e');
+      return {};
+    }
+  }
+
+  /// Get leaderboards data for charts
+  Future<Map<String, dynamic>> getLeaderboards() async {
+    try {
+      final response = await _supabase
+          .from('legislation_statistics')
+          .select('''
+            top_10_democrat_primary_sponsors,
+            top_10_republican_primary_sponsors,
+            top_10_democrat_cosponsors,
+            top_10_republican_cosponsors,
+            top_10_most_sponsored_bills,
+            top_10_most_active_bills,
+            avg_bills_per_democrat_legislator,
+            avg_bills_per_republican_legislator
+          ''')
+          .single();
+
+      return response;
+    } catch (e) {
+      debugPrint('Error fetching leaderboards: $e');
+      return {};
+    }
+  }
+
+  /// Get legislation statistics (legacy method - uses RPC)
   Future<LegislationStats> getStatistics({String? session}) async {
     try {
       final response = await _supabase.rpc(
@@ -920,43 +994,414 @@ class LegislationService {
 
 // Statistics model
 class LegislationStats {
+  // === Basic Counts ===
   final int totalTracked;
+  final int totalBillsCount;
+  final int totalArchivedBillsCount;
+
+  // === Position Counts ===
   final int supportCount;
   final int opposeCount;
   final int watchingCount;
+  final int neutralCount;
+  final int noPositionCount;
+
+  // === Priority Counts ===
   final int criticalCount;
   final int highCount;
+  final int mediumCount;
+  final int lowCount;
+  final int noPriorityCount;
+
+  // === Legislative Status ===
   final int passedLowerCount;
   final int passedUpperCount;
+  final int passedBothChambersCount;
   final int signedCount;
   final int vetoedCount;
 
+  // === Chamber Origin ===
+  final int houseBillsCount;
+  final int senateBillsCount;
+
+  // === Party Sponsorship ===
+  final int democratPrimarySponsorCount;
+  final int republicanPrimarySponsorCount;
+  final int democratCosponsorCount;
+  final int republicanCosponsorCount;
+  final int totalDemocratSponsorships;
+  final int totalRepublicanSponsorships;
+  final double avgBillsPerDemocratLegislator;
+  final double avgBillsPerRepublicanLegislator;
+
+  // === Bipartisan ===
+  final int bipartisanBillsCount;
+  final int democratOnlyBillsCount;
+  final int republicanOnlyBillsCount;
+
+  // === Legislator Counts ===
+  final int totalLegislatorsCount;
+  final int houseLegislatorsCount;
+  final int senateLegislatorsCount;
+  final int democratLegislatorsCount;
+  final int republicanLegislatorsCount;
+
+  // === Text & PDF Stats ===
+  final int billsWithTextCount;
+  final int billsWithoutTextCount;
+  final int billsWithPdfCount;
+  final int billsTextDeferredCount;
+  final int totalBillTextWordCount;
+  final double avgBillTextWordCount;
+
+  // === AI Analysis ===
+  final int billsAiAnalyzedCount;
+  final int billsAiPendingCount;
+  final int billsAiErrorCount;
+  final int billsAwaitingAiAnalysisCount;
+
+  // === AI Recommendations ===
+  final int aiRecommendsSupportCount;
+  final int aiRecommendsOpposeCount;
+  final int aiRecommendsWatchingCount;
+  final int aiRecommendsNeutralCount;
+  final int aiRecommendsCriticalCount;
+  final int aiRecommendsHighCount;
+  final int aiRecommendsMediumCount;
+  final int aiRecommendsLowCount;
+
+  // === Session Stats ===
+  final String? currentSession;
+  final int billsCurrentSessionCount;
+
+  // === Activity / Timeline ===
+  final int billsIntroducedThisWeek;
+  final int billsIntroducedThisMonth;
+  final int billsIntroducedThisYear;
+  final int actionsThisWeek;
+  final int actionsThisMonth;
+  final int totalActionsCount;
+  final int billsWithRecentAction7dCount;
+  final int billsWithRecentAction30dCount;
+  final double avgActionsPerBill;
+
+  // === Vote Stats ===
+  final int totalVotesCount;
+  final int votesPassedCount;
+  final int votesFailedCount;
+  final double avgVotesPerBill;
+  final int votesThisWeek;
+  final int votesThisMonth;
+
+  // === Document Stats ===
+  final int totalDocumentsCount;
+  final int totalVersionsCount;
+
+  // === Sponsor Stats ===
+  final int totalSponsorsCount;
+  final int totalPrimarySponsorsCount;
+  final int totalCosponsorsCount;
+  final double avgSponsorsPerBill;
+  final int uniqueSponsorsCount;
+
+  // === Category & Tag Stats ===
+  final int billsWithCategoriesCount;
+  final int billsWithTagsCount;
+  final List<dynamic> topCategories;
+  final List<dynamic> topSubjects;
+
+  // === Alert Stats ===
+  final int totalAlertsCount;
+  final int activeAlertsCount;
+  final int alertsSentTodayCount;
+  final int alertsSentThisWeekCount;
+
+  // === Note Stats ===
+  final int totalNotesCount;
+  final int billsWithNotesCount;
+
+  // === Sync Stats ===
+  final int billsNeedingDetailSyncCount;
+  final int billsNeedingTextExtractCount;
+  final int billsNeedingSponsorLinkCount;
+  final int billsWithSyncErrorsCount;
+
+  // === Leaderboards ===
+  final List<SponsorLeaderboardEntry> top10DemocratPrimarySponsors;
+  final List<SponsorLeaderboardEntry> top10RepublicanPrimarySponsors;
+  final List<SponsorLeaderboardEntry> top10DemocratCosponsors;
+  final List<SponsorLeaderboardEntry> top10RepublicanCosponsors;
+  final List<BillLeaderboardEntry> top10MostSponsoredBills;
+  final List<BillLeaderboardEntry> top10MostActiveBills;
+
+  // === Metadata ===
+  final DateTime? lastComputedAt;
+
   LegislationStats({
     required this.totalTracked,
+    this.totalBillsCount = 0,
+    this.totalArchivedBillsCount = 0,
     required this.supportCount,
     required this.opposeCount,
     required this.watchingCount,
+    this.neutralCount = 0,
+    this.noPositionCount = 0,
     required this.criticalCount,
     required this.highCount,
+    this.mediumCount = 0,
+    this.lowCount = 0,
+    this.noPriorityCount = 0,
     required this.passedLowerCount,
     required this.passedUpperCount,
+    this.passedBothChambersCount = 0,
     required this.signedCount,
     required this.vetoedCount,
+    this.houseBillsCount = 0,
+    this.senateBillsCount = 0,
+    this.democratPrimarySponsorCount = 0,
+    this.republicanPrimarySponsorCount = 0,
+    this.democratCosponsorCount = 0,
+    this.republicanCosponsorCount = 0,
+    this.totalDemocratSponsorships = 0,
+    this.totalRepublicanSponsorships = 0,
+    this.avgBillsPerDemocratLegislator = 0.0,
+    this.avgBillsPerRepublicanLegislator = 0.0,
+    this.bipartisanBillsCount = 0,
+    this.democratOnlyBillsCount = 0,
+    this.republicanOnlyBillsCount = 0,
+    this.totalLegislatorsCount = 0,
+    this.houseLegislatorsCount = 0,
+    this.senateLegislatorsCount = 0,
+    this.democratLegislatorsCount = 0,
+    this.republicanLegislatorsCount = 0,
+    this.billsWithTextCount = 0,
+    this.billsWithoutTextCount = 0,
+    this.billsWithPdfCount = 0,
+    this.billsTextDeferredCount = 0,
+    this.totalBillTextWordCount = 0,
+    this.avgBillTextWordCount = 0.0,
+    this.billsAiAnalyzedCount = 0,
+    this.billsAiPendingCount = 0,
+    this.billsAiErrorCount = 0,
+    this.billsAwaitingAiAnalysisCount = 0,
+    this.aiRecommendsSupportCount = 0,
+    this.aiRecommendsOpposeCount = 0,
+    this.aiRecommendsWatchingCount = 0,
+    this.aiRecommendsNeutralCount = 0,
+    this.aiRecommendsCriticalCount = 0,
+    this.aiRecommendsHighCount = 0,
+    this.aiRecommendsMediumCount = 0,
+    this.aiRecommendsLowCount = 0,
+    this.currentSession,
+    this.billsCurrentSessionCount = 0,
+    this.billsIntroducedThisWeek = 0,
+    this.billsIntroducedThisMonth = 0,
+    this.billsIntroducedThisYear = 0,
+    this.actionsThisWeek = 0,
+    this.actionsThisMonth = 0,
+    this.totalActionsCount = 0,
+    this.billsWithRecentAction7dCount = 0,
+    this.billsWithRecentAction30dCount = 0,
+    this.avgActionsPerBill = 0.0,
+    this.totalVotesCount = 0,
+    this.votesPassedCount = 0,
+    this.votesFailedCount = 0,
+    this.avgVotesPerBill = 0.0,
+    this.votesThisWeek = 0,
+    this.votesThisMonth = 0,
+    this.totalDocumentsCount = 0,
+    this.totalVersionsCount = 0,
+    this.totalSponsorsCount = 0,
+    this.totalPrimarySponsorsCount = 0,
+    this.totalCosponsorsCount = 0,
+    this.avgSponsorsPerBill = 0.0,
+    this.uniqueSponsorsCount = 0,
+    this.billsWithCategoriesCount = 0,
+    this.billsWithTagsCount = 0,
+    this.topCategories = const [],
+    this.topSubjects = const [],
+    this.totalAlertsCount = 0,
+    this.activeAlertsCount = 0,
+    this.alertsSentTodayCount = 0,
+    this.alertsSentThisWeekCount = 0,
+    this.totalNotesCount = 0,
+    this.billsWithNotesCount = 0,
+    this.billsNeedingDetailSyncCount = 0,
+    this.billsNeedingTextExtractCount = 0,
+    this.billsNeedingSponsorLinkCount = 0,
+    this.billsWithSyncErrorsCount = 0,
+    this.top10DemocratPrimarySponsors = const [],
+    this.top10RepublicanPrimarySponsors = const [],
+    this.top10DemocratCosponsors = const [],
+    this.top10RepublicanCosponsors = const [],
+    this.top10MostSponsoredBills = const [],
+    this.top10MostActiveBills = const [],
+    this.lastComputedAt,
   });
 
   factory LegislationStats.fromJson(Map<String, dynamic> json) {
     return LegislationStats(
-      totalTracked: json['total_tracked'] as int? ?? 0,
+      // Basic Counts
+      totalTracked: json['total_tracked'] as int? ?? json['total_active_bills'] as int? ?? 0,
+      totalBillsCount: json['total_bills'] as int? ?? 0,
+      totalArchivedBillsCount: json['total_archived_bills'] as int? ?? 0,
+
+      // Position Counts
       supportCount: json['support_count'] as int? ?? 0,
       opposeCount: json['oppose_count'] as int? ?? 0,
       watchingCount: json['watching_count'] as int? ?? 0,
+      neutralCount: json['neutral_count'] as int? ?? 0,
+      noPositionCount: json['no_position_count'] as int? ?? 0,
+
+      // Priority Counts
       criticalCount: json['critical_count'] as int? ?? 0,
       highCount: json['high_count'] as int? ?? 0,
+      mediumCount: json['medium_count'] as int? ?? 0,
+      lowCount: json['low_count'] as int? ?? 0,
+      noPriorityCount: json['no_priority_count'] as int? ?? 0,
+
+      // Legislative Status
       passedLowerCount: json['passed_lower_count'] as int? ?? 0,
       passedUpperCount: json['passed_upper_count'] as int? ?? 0,
+      passedBothChambersCount: json['passed_both_chambers_count'] as int? ?? 0,
       signedCount: json['signed_count'] as int? ?? 0,
       vetoedCount: json['vetoed_count'] as int? ?? 0,
+
+      // Chamber Origin
+      houseBillsCount: json['house_bills_count'] as int? ?? 0,
+      senateBillsCount: json['senate_bills_count'] as int? ?? 0,
+
+      // Party Sponsorship
+      democratPrimarySponsorCount: json['democrat_primary_sponsor_count'] as int? ?? 0,
+      republicanPrimarySponsorCount: json['republican_primary_sponsor_count'] as int? ?? 0,
+      democratCosponsorCount: json['democrat_cosponsor_count'] as int? ?? 0,
+      republicanCosponsorCount: json['republican_cosponsor_count'] as int? ?? 0,
+      totalDemocratSponsorships: json['total_democrat_sponsorships'] as int? ?? 0,
+      totalRepublicanSponsorships: json['total_republican_sponsorships'] as int? ?? 0,
+      avgBillsPerDemocratLegislator: (json['avg_bills_per_democrat_legislator'] as num?)?.toDouble() ?? 0.0,
+      avgBillsPerRepublicanLegislator: (json['avg_bills_per_republican_legislator'] as num?)?.toDouble() ?? 0.0,
+
+      // Bipartisan
+      bipartisanBillsCount: json['bipartisan_bills_count'] as int? ?? 0,
+      democratOnlyBillsCount: json['democrat_only_bills_count'] as int? ?? 0,
+      republicanOnlyBillsCount: json['republican_only_bills_count'] as int? ?? 0,
+
+      // Legislator Counts
+      totalLegislatorsCount: json['total_legislators_count'] as int? ?? 0,
+      houseLegislatorsCount: json['house_legislators_count'] as int? ?? 0,
+      senateLegislatorsCount: json['senate_legislators_count'] as int? ?? 0,
+      democratLegislatorsCount: json['democrat_legislators_count'] as int? ?? 0,
+      republicanLegislatorsCount: json['republican_legislators_count'] as int? ?? 0,
+
+      // Text & PDF Stats
+      billsWithTextCount: json['bills_with_text_count'] as int? ?? 0,
+      billsWithoutTextCount: json['bills_without_text_count'] as int? ?? 0,
+      billsWithPdfCount: json['bills_with_pdf_count'] as int? ?? 0,
+      billsTextDeferredCount: json['bills_text_deferred_count'] as int? ?? 0,
+      totalBillTextWordCount: json['total_bill_text_word_count'] as int? ?? 0,
+      avgBillTextWordCount: (json['avg_bill_text_word_count'] as num?)?.toDouble() ?? 0.0,
+
+      // AI Analysis
+      billsAiAnalyzedCount: json['bills_ai_analyzed_count'] as int? ?? 0,
+      billsAiPendingCount: json['bills_ai_pending_count'] as int? ?? 0,
+      billsAiErrorCount: json['bills_ai_error_count'] as int? ?? 0,
+      billsAwaitingAiAnalysisCount: json['bills_awaiting_ai_analysis_count'] as int? ?? 0,
+
+      // AI Recommendations
+      aiRecommendsSupportCount: json['ai_recommends_support_count'] as int? ?? 0,
+      aiRecommendsOpposeCount: json['ai_recommends_oppose_count'] as int? ?? 0,
+      aiRecommendsWatchingCount: json['ai_recommends_watching_count'] as int? ?? 0,
+      aiRecommendsNeutralCount: json['ai_recommends_neutral_count'] as int? ?? 0,
+      aiRecommendsCriticalCount: json['ai_recommends_critical_count'] as int? ?? 0,
+      aiRecommendsHighCount: json['ai_recommends_high_count'] as int? ?? 0,
+      aiRecommendsMediumCount: json['ai_recommends_medium_count'] as int? ?? 0,
+      aiRecommendsLowCount: json['ai_recommends_low_count'] as int? ?? 0,
+
+      // Session Stats
+      currentSession: json['current_session'] as String?,
+      billsCurrentSessionCount: json['bills_current_session_count'] as int? ?? 0,
+
+      // Activity / Timeline
+      billsIntroducedThisWeek: json['bills_introduced_this_week'] as int? ?? 0,
+      billsIntroducedThisMonth: json['bills_introduced_this_month'] as int? ?? 0,
+      billsIntroducedThisYear: json['bills_introduced_this_year'] as int? ?? 0,
+      actionsThisWeek: json['actions_this_week'] as int? ?? 0,
+      actionsThisMonth: json['actions_this_month'] as int? ?? 0,
+      totalActionsCount: json['total_actions_count'] as int? ?? 0,
+      billsWithRecentAction7dCount: json['bills_with_recent_action_7d_count'] as int? ?? 0,
+      billsWithRecentAction30dCount: json['bills_with_recent_action_30d_count'] as int? ?? 0,
+      avgActionsPerBill: (json['avg_actions_per_bill'] as num?)?.toDouble() ?? 0.0,
+
+      // Vote Stats
+      totalVotesCount: json['total_votes_count'] as int? ?? 0,
+      votesPassedCount: json['votes_passed_count'] as int? ?? 0,
+      votesFailedCount: json['votes_failed_count'] as int? ?? 0,
+      avgVotesPerBill: (json['avg_votes_per_bill'] as num?)?.toDouble() ?? 0.0,
+      votesThisWeek: json['votes_this_week'] as int? ?? 0,
+      votesThisMonth: json['votes_this_month'] as int? ?? 0,
+
+      // Document Stats
+      totalDocumentsCount: json['total_documents_count'] as int? ?? 0,
+      totalVersionsCount: json['total_versions_count'] as int? ?? 0,
+
+      // Sponsor Stats
+      totalSponsorsCount: json['total_sponsors_count'] as int? ?? 0,
+      totalPrimarySponsorsCount: json['total_primary_sponsors_count'] as int? ?? 0,
+      totalCosponsorsCount: json['total_cosponsors_count'] as int? ?? 0,
+      avgSponsorsPerBill: (json['avg_sponsors_per_bill'] as num?)?.toDouble() ?? 0.0,
+      uniqueSponsorsCount: json['unique_sponsors_count'] as int? ?? 0,
+
+      // Category & Tag Stats
+      billsWithCategoriesCount: json['bills_with_categories_count'] as int? ?? 0,
+      billsWithTagsCount: json['bills_with_tags_count'] as int? ?? 0,
+      topCategories: json['top_categories'] as List<dynamic>? ?? [],
+      topSubjects: json['top_subjects'] as List<dynamic>? ?? [],
+
+      // Alert Stats
+      totalAlertsCount: json['total_alerts_count'] as int? ?? 0,
+      activeAlertsCount: json['active_alerts_count'] as int? ?? 0,
+      alertsSentTodayCount: json['alerts_sent_today_count'] as int? ?? 0,
+      alertsSentThisWeekCount: json['alerts_sent_this_week_count'] as int? ?? 0,
+
+      // Note Stats
+      totalNotesCount: json['total_notes_count'] as int? ?? 0,
+      billsWithNotesCount: json['bills_with_notes_count'] as int? ?? 0,
+
+      // Sync Stats
+      billsNeedingDetailSyncCount: json['bills_needing_detail_sync_count'] as int? ?? 0,
+      billsNeedingTextExtractCount: json['bills_needing_text_extract_count'] as int? ?? 0,
+      billsNeedingSponsorLinkCount: json['bills_needing_sponsor_link_count'] as int? ?? 0,
+      billsWithSyncErrorsCount: json['bills_with_sync_errors_count'] as int? ?? 0,
+
+      // Leaderboards
+      top10DemocratPrimarySponsors: _parseLeaderboard(json['top_10_democrat_primary_sponsors']),
+      top10RepublicanPrimarySponsors: _parseLeaderboard(json['top_10_republican_primary_sponsors']),
+      top10DemocratCosponsors: _parseLeaderboard(json['top_10_democrat_cosponsors']),
+      top10RepublicanCosponsors: _parseLeaderboard(json['top_10_republican_cosponsors']),
+      top10MostSponsoredBills: _parseBillLeaderboard(json['top_10_most_sponsored_bills']),
+      top10MostActiveBills: _parseBillLeaderboard(json['top_10_most_active_bills']),
+
+      // Metadata
+      lastComputedAt: json['last_computed_at'] != null
+          ? DateTime.tryParse(json['last_computed_at'] as String)
+          : null,
     );
+  }
+
+  static List<SponsorLeaderboardEntry> _parseLeaderboard(dynamic data) {
+    if (data == null) return [];
+    if (data is! List) return [];
+    return data
+        .map((item) => SponsorLeaderboardEntry.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  static List<BillLeaderboardEntry> _parseBillLeaderboard(dynamic data) {
+    if (data == null) return [];
+    if (data is! List) return [];
+    return data
+        .map((item) => BillLeaderboardEntry.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   factory LegislationStats.empty() => LegislationStats(
@@ -988,14 +1433,88 @@ class LegislationStats {
   }
 
   // Alias getters for UI compatibility
-  int get totalBills => totalTracked;
-  int get activeBills => totalTracked; // Tracked bills are active
+  int get totalBills => totalBillsCount > 0 ? totalBillsCount : totalTracked;
+  int get totalActiveBills => totalTracked;
+  int get activeBills => totalTracked;
   int get criticalBills => criticalCount;
   int get supportBills => supportCount;
   int get opposeBills => opposeCount;
   int get watchingBills => watchingCount;
-  int get newActionsThisWeek => 0; // Not tracked currently
-  int get recentVotesCount => 0; // Not tracked currently
+  int get newActionsThisWeek => actionsThisWeek;
+  int get recentVotesCount => votesThisWeek;
+}
+
+/// Sponsor leaderboard entry for top sponsors
+class SponsorLeaderboardEntry {
+  final String name;
+  final String party;
+  final String district;
+  final String chamber;
+  final int billsCount;
+  final String? legislatorId;
+  final String? photoUrl;
+
+  SponsorLeaderboardEntry({
+    required this.name,
+    required this.party,
+    required this.district,
+    required this.chamber,
+    required this.billsCount,
+    this.legislatorId,
+    this.photoUrl,
+  });
+
+  factory SponsorLeaderboardEntry.fromJson(Map<String, dynamic> json) {
+    // Try to construct photo URL from legislator_id if photo_storage_path exists
+    String? photoUrl = json['photo_url'] as String?;
+    if (photoUrl == null && json['photo_storage_path'] != null) {
+      final storagePath = json['photo_storage_path'] as String;
+      photoUrl = 'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/legislator-photos/$storagePath';
+    }
+
+    return SponsorLeaderboardEntry(
+      name: json['name'] as String? ?? '',
+      party: json['party'] as String? ?? '',
+      district: json['district'] as String? ?? '',
+      chamber: json['chamber'] as String? ?? '',
+      billsCount: json['bills_count'] as int? ?? 0,
+      legislatorId: json['legislator_id'] as String?,
+      photoUrl: photoUrl,
+    );
+  }
+}
+
+/// Bill leaderboard entry for most sponsored/active bills
+class BillLeaderboardEntry {
+  final String id;
+  final String billIdentifier;
+  final String title;
+  final int count;
+  final String? position;
+  final String? priority;
+  final String? latestActionDate;
+
+  BillLeaderboardEntry({
+    required this.id,
+    required this.billIdentifier,
+    required this.title,
+    required this.count,
+    this.position,
+    this.priority,
+    this.latestActionDate,
+  });
+
+  factory BillLeaderboardEntry.fromJson(Map<String, dynamic> json) {
+    return BillLeaderboardEntry(
+      id: json['id'] as String? ?? '',
+      billIdentifier: json['bill_identifier'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      count: json['sponsor_count'] as int? ?? json['action_count'] as int? ?? 0,
+      position: json['position'] as String?,
+      priority: json['priority'] as String?,
+      latestActionDate: json['latest_action_date'] as String?,
+    );
+  }
 }
 
 // Sync log model
