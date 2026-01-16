@@ -17,37 +17,6 @@ const _grassrootsGreen = Color(0xFF43A047);
 const _democratBlue = Color(0xFF3B82F6);
 const _republicanRed = Color(0xFFEF4444);
 
-/// Default gradient sets for widgets
-class LegislationWidgetGradients {
-  static const List<List<Color>> all = [
-    [_unityBlue, _momentumBlue],
-    [_momentumBlue, _justicePurple],
-    [_grassrootsGreen, _momentumBlue],
-    [_sunriseGold, _actionRed],
-    [_justicePurple, _actionRed],
-    [_actionRed, _sunriseGold],
-    [_grassrootsGreen, _sunriseGold],
-    [_unityBlue, _grassrootsGreen],
-    [_democratBlue, _momentumBlue],
-    [_republicanRed, _sunriseGold],
-  ];
-
-  static const List<String> names = [
-    'Unity Blue',
-    'Momentum Purple',
-    'Grassroots Teal',
-    'Sunrise Fire',
-    'Purple Heat',
-    'Warm Sunset',
-    'Nature Glow',
-    'Forest Blue',
-    'Democrat Blue',
-    'Republican Red',
-  ];
-
-  static List<Color> get random => all[math.Random().nextInt(all.length)];
-}
-
 /// Stat Card Widget
 class LegislationStatCardWidget extends StatelessWidget {
   final LegislationWidgetConfig config;
