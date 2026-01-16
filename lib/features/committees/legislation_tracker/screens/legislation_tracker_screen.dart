@@ -152,11 +152,17 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         slivers: [
-          // Position filter tabs
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: _buildPositionTabs(provider),
+          // Sticky position filter tabs
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _StickyPositionTabsDelegate(
+              child: Container(
+                color: Colors.transparent,
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: _buildPositionTabs(provider),
+                ),
+              ),
             ),
           ),
 
@@ -553,5 +559,43 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
         ),
       ),
     );
+  }
+}
+
+/// Delegate for sticky position filter tabs
+class _StickyPositionTabsDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  _StickyPositionTabsDelegate({required this.child});
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      decoration: BoxDecoration(
+        // Add subtle gradient background when sticky
+        gradient: overlapsContent || shrinkOffset > 0
+            ? LinearGradient(
+                colors: [
+                  _unityBlue.withOpacity(0.95),
+                  _momentumBlue.withOpacity(0.85),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              )
+            : null,
+      ),
+      child: child,
+    );
+  }
+
+  @override
+  double get maxExtent => 68;
+
+  @override
+  double get minExtent => 68;
+
+  @override
+  bool shouldRebuild(covariant _StickyPositionTabsDelegate oldDelegate) {
+    return child != oldDelegate.child;
   }
 }
