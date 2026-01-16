@@ -364,7 +364,6 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
     final schoolName = _getSchoolDisplayName(member);
     final cd = member.congressionalDistrict;
     final age = _calculateAge(member.dateOfBirth);
-    final dateJoined = _formatDateJoined(member.createdAt);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -411,8 +410,6 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
                         _buildInfoChip(Icons.how_to_vote_outlined, 'CD $cd'),
                       if (age != null)
                         _buildInfoChip(Icons.cake_outlined, '$age yrs'),
-                      if (dateJoined != null)
-                        _buildInfoChip(Icons.calendar_today_outlined, dateJoined),
                     ],
                   ),
                 ],
@@ -460,12 +457,5 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
       age--;
     }
     return age > 0 ? age : null;
-  }
-
-  String? _formatDateJoined(DateTime? createdAt) {
-    if (createdAt == null) return null;
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[createdAt.month - 1]} ${createdAt.year}';
   }
 }

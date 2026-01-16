@@ -1328,3 +1328,57 @@ class LegislationDataSources {
     }
   }
 }
+
+/// Pre-defined gradient color combinations for legislation dashboard widgets
+class LegislationWidgetGradients {
+  static const List<List<Color>> all = [
+    [Color(0xFF273351), Color(0xFF32A6DE)],    // Unity Blue
+    [Color(0xFF32A6DE), Color(0xFF43A047)],    // Momentum
+    [Color(0xFF43A047), Color(0xFFFDB813)],    // Grassroots
+    [Color(0xFFFDB813), Color(0xFFE63946)],    // Sunrise
+    [Color(0xFFE63946), Color(0xFF6A1B9A)],    // Action
+    [Color(0xFF6A1B9A), Color(0xFF32A6DE)],    // Justice
+    [Color(0xFF3B82F6), Color(0xFF1D4ED8)],    // Democrat Blue
+    [Color(0xFFEF4444), Color(0xFFB91C1C)],    // Republican Red
+    [Color(0xFF10B981), Color(0xFF059669)],    // Success Green
+    [Color(0xFFF59E0B), Color(0xFFD97706)],    // Warning Amber
+    [Color(0xFF8B5CF6), Color(0xFF7C3AED)],    // Purple
+    [Color(0xFF06B6D4), Color(0xFF0891B2)],    // Cyan
+  ];
+
+  static const List<String> names = [
+    'Unity Blue',
+    'Momentum',
+    'Grassroots',
+    'Sunrise',
+    'Action',
+    'Justice',
+    'Democrat',
+    'Republican',
+    'Success',
+    'Warning',
+    'Purple',
+    'Cyan',
+  ];
+
+  /// Find the index of a gradient in the predefined list
+  static int? indexOfColors(List<Color> colors) {
+    if (colors.length < 2) return null;
+    for (int i = 0; i < all.length; i++) {
+      if (all[i].length >= 2 &&
+          all[i][0].value == colors[0].value &&
+          all[i][1].value == colors[1].value) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /// Get gradient by index, with fallback
+  static List<Color> getGradient(int index) {
+    if (index >= 0 && index < all.length) {
+      return all[index];
+    }
+    return all[0]; // Default to Unity Blue
+  }
+}

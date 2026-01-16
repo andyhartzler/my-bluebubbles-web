@@ -281,27 +281,28 @@ class DashboardMetrics {
     return DashboardMetrics(
       id: json['id'] as String? ?? 'singleton',
       createdAt: _parseDateTime(json['created_at']),
-      updatedAt: _parseDateTime(json['updated_at']),
+      updatedAt: _parseDateTime(json['updated_at'] ?? json['last_updated_at']),
       totalMembers: _parseInt(json['total_members']) ?? 0,
-      totalMembersWithPhone: _parseInt(json['total_members_with_phone']) ?? 0,
+      // Try new name first, fall back to original DB column name
+      totalMembersWithPhone: _parseInt(json['total_members_with_phone'] ?? json['members_with_phone']) ?? 0,
       totalSubscribers: _parseInt(json['total_subscribers']) ?? 0,
       totalDonors: _parseInt(json['total_donors']) ?? 0,
       totalChapters: _parseInt(json['total_chapters']) ?? 0,
-      totalCharteredChapters: _parseInt(json['total_chartered_chapters']) ?? 0,
+      totalCharteredChapters: _parseInt(json['total_chartered_chapters'] ?? json['chartered_chapters']) ?? 0,
       totalCollegeChapters: _parseInt(json['total_college_chapters']) ?? 0,
       totalHighschoolChapters: _parseInt(json['total_highschool_chapters']) ?? 0,
       totalCountyChapters: _parseInt(json['total_county_chapters']) ?? 0,
       totalUniqueColleges: _parseInt(json['total_unique_colleges']) ?? 0,
       totalUniqueHighSchools: _parseInt(json['total_unique_high_schools']) ?? 0,
-      totalUniqueCounties: _parseInt(json['total_unique_counties']) ?? 0,
+      totalUniqueCounties: _parseInt(json['total_unique_counties'] ?? json['counties_represented']) ?? 0,
       totalUniqueCongressionalDistricts: _parseInt(json['total_unique_congressional_districts']) ?? 0,
       totalUniqueHouseDistricts: _parseInt(json['total_unique_house_districts']) ?? 0,
       totalUniqueSenateDistricts: _parseInt(json['total_unique_senate_districts']) ?? 0,
-      totalDonationsAmount: _parseDouble(json['total_donations_amount']) ?? 0.0,
-      totalDonationCount: _parseInt(json['total_donation_count']) ?? 0,
+      totalDonationsAmount: _parseDouble(json['total_donations_amount'] ?? json['total_donation_amount']) ?? 0.0,
+      totalDonationCount: _parseInt(json['total_donation_count'] ?? json['total_donations']) ?? 0,
       averageDonationAmount: _parseDouble(json['average_donation_amount']) ?? 0.0,
       totalRecurringDonors: _parseInt(json['total_recurring_donors']) ?? 0,
-      donationsThisMonth: _parseDouble(json['donations_this_month']) ?? 0.0,
+      donationsThisMonth: _parseDouble(json['donations_this_month'] ?? json['donation_amount_this_month']) ?? 0.0,
       donationsThisYear: _parseDouble(json['donations_this_year']) ?? 0.0,
       top5Donors: _parseTopDonors(json['top_5_donors']),
       totalSlackMessages: _parseInt(json['total_slack_messages']) ?? 0,
@@ -330,36 +331,37 @@ class DashboardMetrics {
       totalEvents: _parseInt(json['total_events']) ?? 0,
       upcomingEvents: _parseInt(json['upcoming_events']) ?? 0,
       totalEventAttendees: _parseInt(json['total_event_attendees']) ?? 0,
-      membersByCounty: _parseNameCounts(json['members_by_county']),
-      membersByCongressionalDistrict: _parseNameCounts(json['members_by_congressional_district']),
-      membersByHouseDistrict: _parseNameCounts(json['members_by_house_district']),
-      membersBySenateDistrict: _parseNameCounts(json['members_by_senate_district']),
-      membersByCommunityType: _parseNameCounts(json['members_by_community_type']),
-      membersByAge: _parseAgeCounts(json['members_by_age']),
-      membersByCollege: _parseNameCounts(json['members_by_college']),
-      membersByHighSchool: _parseNameCounts(json['members_by_high_school']),
-      membersByGraduationYear: _parseNameCounts(json['members_by_graduation_year']),
-      membersByEducationLevel: _parseNameCounts(json['members_by_education_level']),
-      membersByInSchoolStatus: _parseNameCounts(json['members_by_in_school_status']),
-      membersByChapter: _parseNameCounts(json['members_by_chapter']),
-      membersByChapterStatus: _parseNameCounts(json['members_by_chapter_status']),
-      membersByChapterPosition: _parseNameCounts(json['members_by_chapter_position']),
-      membersByCommittee: _parseNameCounts(json['members_by_committee']),
-      membersByGenderIdentity: _parseNameCounts(json['members_by_gender_identity']),
-      membersByPronouns: _parseNameCounts(json['members_by_pronouns']),
-      membersByRace: _parseNameCounts(json['members_by_race']),
-      membersBySexualOrientation: _parseNameCounts(json['members_by_sexual_orientation']),
-      membersByHispanicLatino: _parseNameCounts(json['members_by_hispanic_latino']),
-      membersByReligion: _parseNameCounts(json['members_by_religion']),
-      membersByDisability: _parseNameCounts(json['members_by_disability']),
-      membersByLanguages: _parseNameCounts(json['members_by_languages']),
-      membersByIndustry: _parseNameCounts(json['members_by_industry']),
-      membersByEmploymentStatus: _parseNameCounts(json['members_by_employment_status']),
-      membersByVoterRegistration: _parseNameCounts(json['members_by_voter_registration']),
-      membersByDesireToLead: _parseNameCounts(json['members_by_desire_to_lead']),
-      membersByHoursPerWeek: _parseNameCounts(json['members_by_hours_per_week']),
-      membersByReferralSource: _parseNameCounts(json['members_by_referral_source']),
-      membersByAreasOfInterest: _parseNameCounts(json['members_by_areas_of_interest']),
+      // Distribution fields - try new names first, fall back to original DB column names
+      membersByCounty: _parseNameCountsOrMap(json['members_by_county']),
+      membersByCongressionalDistrict: _parseNameCountsOrMap(json['members_by_congressional_district'] ?? json['members_by_district']),
+      membersByHouseDistrict: _parseNameCountsOrMap(json['members_by_house_district']),
+      membersBySenateDistrict: _parseNameCountsOrMap(json['members_by_senate_district']),
+      membersByCommunityType: _parseNameCountsOrMap(json['members_by_community_type']),
+      membersByAge: _parseAgeCounts(json['members_by_age'] ?? json['members_by_age_bucket']),
+      membersByCollege: _parseNameCountsOrMap(json['members_by_college']),
+      membersByHighSchool: _parseNameCountsOrMap(json['members_by_high_school']),
+      membersByGraduationYear: _parseNameCountsOrMap(json['members_by_graduation_year']),
+      membersByEducationLevel: _parseNameCountsOrMap(json['members_by_education_level']),
+      membersByInSchoolStatus: _parseNameCountsOrMap(json['members_by_in_school_status']),
+      membersByChapter: _parseNameCountsOrMap(json['members_by_chapter']),
+      membersByChapterStatus: _parseNameCountsOrMap(json['members_by_chapter_status']),
+      membersByChapterPosition: _parseNameCountsOrMap(json['members_by_chapter_position']),
+      membersByCommittee: _parseNameCountsOrMap(json['members_by_committee']),
+      membersByGenderIdentity: _parseNameCountsOrMap(json['members_by_gender_identity'] ?? json['members_by_gender']),
+      membersByPronouns: _parseNameCountsOrMap(json['members_by_pronouns'] ?? json['members_by_pronoun']),
+      membersByRace: _parseNameCountsOrMap(json['members_by_race']),
+      membersBySexualOrientation: _parseNameCountsOrMap(json['members_by_sexual_orientation']),
+      membersByHispanicLatino: _parseNameCountsOrMap(json['members_by_hispanic_latino']),
+      membersByReligion: _parseNameCountsOrMap(json['members_by_religion']),
+      membersByDisability: _parseNameCountsOrMap(json['members_by_disability']),
+      membersByLanguages: _parseNameCountsOrMap(json['members_by_languages'] ?? json['members_by_language']),
+      membersByIndustry: _parseNameCountsOrMap(json['members_by_industry']),
+      membersByEmploymentStatus: _parseNameCountsOrMap(json['members_by_employment_status']),
+      membersByVoterRegistration: _parseNameCountsOrMap(json['members_by_voter_registration'] ?? json['members_by_voter_status']),
+      membersByDesireToLead: _parseNameCountsOrMap(json['members_by_desire_to_lead']),
+      membersByHoursPerWeek: _parseNameCountsOrMap(json['members_by_hours_per_week']),
+      membersByReferralSource: _parseNameCountsOrMap(json['members_by_referral_source']),
+      membersByAreasOfInterest: _parseNameCountsOrMap(json['members_by_areas_of_interest']),
     );
   }
 
@@ -397,6 +399,52 @@ class DashboardMetrics {
   static List<NameCount> _parseNameCounts(dynamic value) {
     final list = _parseJsonList(value);
     return list.map((e) => NameCount.fromJson(e)).toList();
+  }
+
+  /// Parse name counts from either List<{name, count}> format or Map<String, int> format
+  static List<NameCount> _parseNameCountsOrMap(dynamic value) {
+    if (value == null) return [];
+
+    // If it's already a list (new format), parse as NameCount list
+    if (value is List) {
+      return _parseNameCounts(value);
+    }
+
+    // If it's a string, try to decode as JSON
+    if (value is String) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is List) {
+          return _parseNameCounts(decoded);
+        }
+        if (decoded is Map) {
+          return _mapToNameCounts(decoded);
+        }
+      } catch (_) {}
+      return [];
+    }
+
+    // If it's a Map (old format), convert to NameCount list
+    if (value is Map) {
+      return _mapToNameCounts(value);
+    }
+
+    return [];
+  }
+
+  /// Convert a Map<String, int> to List<NameCount>
+  static List<NameCount> _mapToNameCounts(Map<dynamic, dynamic> map) {
+    final result = <NameCount>[];
+    map.forEach((key, dynamic count) {
+      final name = key?.toString() ?? '';
+      final parsed = _parseInt(count);
+      if (name.isNotEmpty && parsed != null) {
+        result.add(NameCount(name: name, count: parsed));
+      }
+    });
+    // Sort by count descending for charts
+    result.sort((a, b) => b.count.compareTo(a.count));
+    return result;
   }
 
   static List<AgeCount> _parseAgeCounts(dynamic value) {

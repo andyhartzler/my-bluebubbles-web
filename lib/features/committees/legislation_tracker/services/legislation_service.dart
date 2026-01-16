@@ -439,6 +439,54 @@ class LegislationService {
     return (response as List).map((json) => Legislator.fromJson(json as Map<String, dynamic>)).toList();
   }
 
+  /// Get legislators by a list of IDs (for bulk lookup)
+  Future<Map<String, Legislator>> getLegislatorsByIds(List<String> ids) async {
+    if (ids.isEmpty) return {};
+
+    final response = await _supabase
+        .from('legislation_legislators')
+        .select()
+        .inFilter('id', ids);
+
+    final legislators = (response as List)
+        .map((json) => Legislator.fromJson(json as Map<String, dynamic>));
+
+    return {for (var leg in legislators) leg.id: leg};
+  }
+
+  /// Enrich leaderboard entries with photo URLs from legislators table
+  Future<List<SponsorLeaderboardEntry>> enrichLeaderboardWithPhotos(
+    List<SponsorLeaderboardEntry> entries,
+  ) async {
+    // Collect IDs of entries that need photos
+    final idsNeedingPhotos = entries
+        .where((e) => e.legislatorId != null && (e.photoUrl == null || e.photoUrl!.isEmpty))
+        .map((e) => e.legislatorId!)
+        .toSet()
+        .toList();
+
+    if (idsNeedingPhotos.isEmpty) return entries;
+
+    // Fetch legislators
+    final legislatorsMap = await getLegislatorsByIds(idsNeedingPhotos);
+
+    // Update entries with photo URLs
+    return entries.map((entry) {
+      if (entry.photoUrl != null && entry.photoUrl!.isNotEmpty) {
+        return entry;
+      }
+      if (entry.legislatorId == null) return entry;
+
+      final legislator = legislatorsMap[entry.legislatorId];
+      if (legislator == null) return entry;
+
+      final photoUrl = legislator.getPhotoPublicUrl();
+      if (photoUrl == null) return entry;
+
+      return entry.copyWith(photoUrl: photoUrl);
+    }).toList();
+  }
+
   /// Get legislators by chamber
   Future<List<Legislator>> getLegislatorsByChamber(String chamber) async {
     final response = await _supabase
@@ -1433,6 +1481,118 @@ class LegislationStats {
     };
   }
 
+  /// Creates a copy with updated leaderboard entries
+  LegislationStats copyWith({
+    List<SponsorLeaderboardEntry>? top10DemocratPrimarySponsors,
+    List<SponsorLeaderboardEntry>? top10RepublicanPrimarySponsors,
+    List<SponsorLeaderboardEntry>? top10DemocratCosponsors,
+    List<SponsorLeaderboardEntry>? top10RepublicanCosponsors,
+    List<BillLeaderboardEntry>? top10MostSponsoredBills,
+    List<BillLeaderboardEntry>? top10MostActiveBills,
+  }) {
+    return LegislationStats(
+      totalTracked: totalTracked,
+      totalBillsCount: totalBillsCount,
+      totalArchivedBillsCount: totalArchivedBillsCount,
+      supportCount: supportCount,
+      opposeCount: opposeCount,
+      watchingCount: watchingCount,
+      neutralCount: neutralCount,
+      noPositionCount: noPositionCount,
+      criticalCount: criticalCount,
+      highCount: highCount,
+      mediumCount: mediumCount,
+      lowCount: lowCount,
+      noPriorityCount: noPriorityCount,
+      passedLowerCount: passedLowerCount,
+      passedUpperCount: passedUpperCount,
+      passedBothChambersCount: passedBothChambersCount,
+      signedCount: signedCount,
+      vetoedCount: vetoedCount,
+      houseBillsCount: houseBillsCount,
+      senateBillsCount: senateBillsCount,
+      democratPrimarySponsorCount: democratPrimarySponsorCount,
+      republicanPrimarySponsorCount: republicanPrimarySponsorCount,
+      democratCosponsorCount: democratCosponsorCount,
+      republicanCosponsorCount: republicanCosponsorCount,
+      totalDemocratSponsorships: totalDemocratSponsorships,
+      totalRepublicanSponsorships: totalRepublicanSponsorships,
+      avgBillsPerDemocratLegislator: avgBillsPerDemocratLegislator,
+      avgBillsPerRepublicanLegislator: avgBillsPerRepublicanLegislator,
+      bipartisanBillsCount: bipartisanBillsCount,
+      democratOnlyBillsCount: democratOnlyBillsCount,
+      republicanOnlyBillsCount: republicanOnlyBillsCount,
+      totalLegislatorsCount: totalLegislatorsCount,
+      houseLegislatorsCount: houseLegislatorsCount,
+      senateLegislatorsCount: senateLegislatorsCount,
+      democratLegislatorsCount: democratLegislatorsCount,
+      republicanLegislatorsCount: republicanLegislatorsCount,
+      billsWithTextCount: billsWithTextCount,
+      billsWithoutTextCount: billsWithoutTextCount,
+      billsWithPdfCount: billsWithPdfCount,
+      billsTextDeferredCount: billsTextDeferredCount,
+      totalBillTextWordCount: totalBillTextWordCount,
+      avgBillTextWordCount: avgBillTextWordCount,
+      billsAiAnalyzedCount: billsAiAnalyzedCount,
+      billsAiPendingCount: billsAiPendingCount,
+      billsAiErrorCount: billsAiErrorCount,
+      billsAwaitingAiAnalysisCount: billsAwaitingAiAnalysisCount,
+      aiRecommendsSupportCount: aiRecommendsSupportCount,
+      aiRecommendsOpposeCount: aiRecommendsOpposeCount,
+      aiRecommendsWatchingCount: aiRecommendsWatchingCount,
+      aiRecommendsNeutralCount: aiRecommendsNeutralCount,
+      aiRecommendsCriticalCount: aiRecommendsCriticalCount,
+      aiRecommendsHighCount: aiRecommendsHighCount,
+      aiRecommendsMediumCount: aiRecommendsMediumCount,
+      aiRecommendsLowCount: aiRecommendsLowCount,
+      currentSession: currentSession,
+      billsCurrentSessionCount: billsCurrentSessionCount,
+      billsIntroducedThisWeek: billsIntroducedThisWeek,
+      billsIntroducedThisMonth: billsIntroducedThisMonth,
+      billsIntroducedThisYear: billsIntroducedThisYear,
+      actionsThisWeek: actionsThisWeek,
+      actionsThisMonth: actionsThisMonth,
+      totalActionsCount: totalActionsCount,
+      billsWithRecentAction7dCount: billsWithRecentAction7dCount,
+      billsWithRecentAction30dCount: billsWithRecentAction30dCount,
+      avgActionsPerBill: avgActionsPerBill,
+      totalVotesCount: totalVotesCount,
+      votesPassedCount: votesPassedCount,
+      votesFailedCount: votesFailedCount,
+      avgVotesPerBill: avgVotesPerBill,
+      votesThisWeek: votesThisWeek,
+      votesThisMonth: votesThisMonth,
+      totalDocumentsCount: totalDocumentsCount,
+      totalVersionsCount: totalVersionsCount,
+      totalSponsorsCount: totalSponsorsCount,
+      totalPrimarySponsorsCount: totalPrimarySponsorsCount,
+      totalCosponsorsCount: totalCosponsorsCount,
+      avgSponsorsPerBill: avgSponsorsPerBill,
+      uniqueSponsorsCount: uniqueSponsorsCount,
+      billsWithCategoriesCount: billsWithCategoriesCount,
+      billsWithTagsCount: billsWithTagsCount,
+      topCategories: topCategories,
+      topSubjects: topSubjects,
+      totalAlertsCount: totalAlertsCount,
+      activeAlertsCount: activeAlertsCount,
+      alertsSentTodayCount: alertsSentTodayCount,
+      alertsSentThisWeekCount: alertsSentThisWeekCount,
+      totalNotesCount: totalNotesCount,
+      billsWithNotesCount: billsWithNotesCount,
+      billsNeedingDetailSyncCount: billsNeedingDetailSyncCount,
+      billsNeedingTextExtractCount: billsNeedingTextExtractCount,
+      billsNeedingSponsorLinkCount: billsNeedingSponsorLinkCount,
+      billsWithSyncErrorsCount: billsWithSyncErrorsCount,
+      top10DemocratPrimarySponsors: top10DemocratPrimarySponsors ?? this.top10DemocratPrimarySponsors,
+      top10RepublicanPrimarySponsors: top10RepublicanPrimarySponsors ?? this.top10RepublicanPrimarySponsors,
+      top10DemocratCosponsors: top10DemocratCosponsors ?? this.top10DemocratCosponsors,
+      top10RepublicanCosponsors: top10RepublicanCosponsors ?? this.top10RepublicanCosponsors,
+      top10MostSponsoredBills: top10MostSponsoredBills ?? this.top10MostSponsoredBills,
+      top10MostActiveBills: top10MostActiveBills ?? this.top10MostActiveBills,
+      lastComputedAt: lastComputedAt,
+    );
+  }
+
   // Alias getters for UI compatibility
   int get totalBills => totalBillsCount > 0 ? totalBillsCount : totalTracked;
   int get totalActiveBills => totalTracked;
@@ -1481,6 +1641,26 @@ class SponsorLeaderboardEntry {
       billsCount: json['bills_count'] as int? ?? 0,
       legislatorId: json['legislator_id'] as String?,
       photoUrl: photoUrl,
+    );
+  }
+
+  SponsorLeaderboardEntry copyWith({
+    String? name,
+    String? party,
+    String? district,
+    String? chamber,
+    int? billsCount,
+    String? legislatorId,
+    String? photoUrl,
+  }) {
+    return SponsorLeaderboardEntry(
+      name: name ?? this.name,
+      party: party ?? this.party,
+      district: district ?? this.district,
+      chamber: chamber ?? this.chamber,
+      billsCount: billsCount ?? this.billsCount,
+      legislatorId: legislatorId ?? this.legislatorId,
+      photoUrl: photoUrl ?? this.photoUrl,
     );
   }
 }
