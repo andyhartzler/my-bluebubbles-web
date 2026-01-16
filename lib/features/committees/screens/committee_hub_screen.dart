@@ -34,8 +34,12 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
   bool _isLoading = true;
   String? _error;
   Map<String, int> _committeeMemberCounts = {};
+  Map<String, bool> _workspaceEnabledMap = {};
   List<Meeting> _upcomingMeetings = [];
   int _totalMeetingsThisMonth = 0;
+
+  /// Whether all the user's committees have workspace disabled
+  bool _allWorkspacesDisabled = false;
 
   @override
   void initState() {
@@ -54,24 +58,36 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
       final counts = <String, int>{};
       final allMeetings = <Meeting>[];
 
-      for (final committee in session.userCommittees) {
-        final count = await _repository.getMemberCountForCommittee(committee.name);
-        counts[committee.name] = count;
+      // Get committee names for workspace enabled check
+      final committeeNames = session.userCommittees.map((c) => c.name).toList();
 
-        // Load meetings for each committee
-        try {
-          final committeeDef = CommitteeDefinitions.findByName(committee.name);
-          if (committeeDef != null) {
-            final meetings = await _meetingRepository.getMeetingsByCommittee(
-              committeeDef.meetingsFilterName,
-              includeAttendance: false,
-            );
-            allMeetings.addAll(meetings);
+      // Load workspace enabled status for all committees
+      final workspaceEnabled = await _repository.getWorkspaceEnabledForCommittees(committeeNames);
+
+      for (final committee in session.userCommittees) {
+        // Only load data for enabled committees
+        if (workspaceEnabled[committee.name] == true) {
+          final count = await _repository.getMemberCountForCommittee(committee.name);
+          counts[committee.name] = count;
+
+          // Load meetings for each committee
+          try {
+            final committeeDef = CommitteeDefinitions.findByName(committee.name);
+            if (committeeDef != null) {
+              final meetings = await _meetingRepository.getMeetingsByCommittee(
+                committeeDef.meetingsFilterName,
+                includeAttendance: false,
+              );
+              allMeetings.addAll(meetings);
+            }
+          } catch (_) {
+            // Ignore meeting load errors
           }
-        } catch (_) {
-          // Ignore meeting load errors
         }
       }
+
+      // Check if all workspaces are disabled
+      final anyEnabled = workspaceEnabled.values.any((enabled) => enabled);
 
       // Get upcoming meetings (next 7 days)
       final now = DateTime.now();
@@ -88,6 +104,8 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
       if (!mounted) return;
       setState(() {
         _committeeMemberCounts = counts;
+        _workspaceEnabledMap = workspaceEnabled;
+        _allWorkspacesDisabled = !anyEnabled;
         _upcomingMeetings = upcoming.take(3).toList();
         _totalMeetingsThisMonth = thisMonthMeetings;
         _isLoading = false;
@@ -180,9 +198,19 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
       return _buildErrorView();
     }
 
-    final committees = session.userCommittees;
-    if (committees.isEmpty) {
+    // Filter to only show committees with workspace enabled
+    final committees = session.userCommittees
+        .where((c) => _workspaceEnabledMap[c.name] == true)
+        .toList();
+
+    // If no committees at all (not in any committee)
+    if (session.userCommittees.isEmpty) {
       return _buildNoCommitteesView();
+    }
+
+    // If all workspaces are disabled
+    if (_allWorkspacesDisabled || committees.isEmpty) {
+      return _buildWorkspaceDisabledView();
     }
 
     return LayoutBuilder(
@@ -847,6 +875,91 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
                   side: const BorderSide(color: _unityBlue),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWorkspaceDisabledView() {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: _unityBlue.withOpacity(0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.amber.withOpacity(0.1),
+                ),
+                padding: const EdgeInsets.all(24),
+                child: Icon(
+                  Icons.lock_clock_outlined,
+                  size: 56,
+                  color: Colors.amber.shade700,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Workspace Not Available',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: _unityBlue,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Your Committee Leaders have not enabled this workspace for you.\n\nPlease contact us if you believe this message is in error.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: _unityBlue.withOpacity(0.7),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _loadData,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Refresh'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _momentumBlue,
+                      side: const BorderSide(color: _momentumBlue),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: _handleLogout,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Sign Out'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _unityBlue,
+                      side: const BorderSide(color: _unityBlue),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

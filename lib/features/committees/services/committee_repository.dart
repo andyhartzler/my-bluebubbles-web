@@ -1270,6 +1270,100 @@ class CommitteeRepository {
     }
   }
 
+  /// Check if member workspace is enabled for a committee
+  Future<bool> isWorkspaceEnabled(String committeeName) async {
+    if (!isReady) return false;
+
+    try {
+      final data = await _readClient
+          .from('committees')
+          .select('workspace_enabled')
+          .or('name.ilike.%$committeeName%,slug.ilike.%$committeeName%')
+          .maybeSingle();
+
+      if (data == null) return false;
+      return data['workspace_enabled'] == true;
+    } catch (e) {
+      print('Error checking workspace enabled: $e');
+      return false;
+    }
+  }
+
+  /// Get workspace enabled status for multiple committees
+  /// Returns a map of committee name to enabled status
+  Future<Map<String, bool>> getWorkspaceEnabledForCommittees(List<String> committeeNames) async {
+    if (!isReady || committeeNames.isEmpty) return {};
+
+    try {
+      final results = <String, bool>{};
+
+      // Build the OR filter for all committee names
+      final filters = committeeNames.map((name) => 'name.ilike.%$name%').join(',');
+
+      final data = await _readClient
+          .from('committees')
+          .select('name, workspace_enabled')
+          .or(filters);
+
+      for (final item in data as List<dynamic>) {
+        if (item is Map<String, dynamic>) {
+          final name = item['name'] as String?;
+          final enabled = item['workspace_enabled'] as bool? ?? false;
+          if (name != null) {
+            // Match committee name case-insensitively
+            for (final requestedName in committeeNames) {
+              if (name.toLowerCase().contains(requestedName.toLowerCase()) ||
+                  requestedName.toLowerCase().contains(name.toLowerCase())) {
+                results[requestedName] = enabled;
+              }
+            }
+          }
+        }
+      }
+
+      // Default to false for any committees not found
+      for (final name in committeeNames) {
+        results.putIfAbsent(name, () => false);
+      }
+
+      return results;
+    } catch (e) {
+      print('Error fetching workspace enabled status: $e');
+      return {for (final name in committeeNames) name: false};
+    }
+  }
+
+  /// Update workspace enabled status for a committee (executive only)
+  Future<bool> updateWorkspaceEnabled(String committeeName, bool enabled) async {
+    if (!isReady) return false;
+
+    try {
+      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+
+      // First find the committee by name
+      final existing = await _readClient
+          .from('committees')
+          .select('id')
+          .or('name.ilike.%$committeeName%,slug.ilike.%$committeeName%')
+          .maybeSingle();
+
+      if (existing == null) {
+        print('Committee not found: $committeeName');
+        return false;
+      }
+
+      await writeClient
+          .from('committees')
+          .update({'workspace_enabled': enabled})
+          .eq('id', existing['id']);
+
+      return true;
+    } catch (e) {
+      print('Error updating workspace enabled: $e');
+      return false;
+    }
+  }
+
   /// Default tools available for committee members
   static const List<String> _defaultCommitteeTools = [
     'overview',
