@@ -114,6 +114,8 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
           democratCount: quickStats['democrat_legislators_count'] as int? ?? 0,
           houseCount: quickStats['house_legislators_count'] as int? ?? 0,
           senateCount: quickStats['senate_legislators_count'] as int? ?? 0,
+          withLeadershipCount: quickStats['legislators_with_leadership_count'] as int? ?? 0,
+          withPhotosCount: quickStats['legislators_with_photos_count'] as int? ?? 0,
         );
 
         // Sort legislators numerically by district
