@@ -403,7 +403,30 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     });
 
     try {
-      final stats = await _service.getCachedStatistics();
+      var stats = await _service.getCachedStatistics();
+
+      // Enrich leaderboard entries with photo URLs
+      final enrichedDemSponsors = await _service.enrichLeaderboardWithPhotos(
+        stats.top10DemocratPrimarySponsors,
+      );
+      final enrichedRepSponsors = await _service.enrichLeaderboardWithPhotos(
+        stats.top10RepublicanPrimarySponsors,
+      );
+      final enrichedDemCosponsors = await _service.enrichLeaderboardWithPhotos(
+        stats.top10DemocratCosponsors,
+      );
+      final enrichedRepCosponsors = await _service.enrichLeaderboardWithPhotos(
+        stats.top10RepublicanCosponsors,
+      );
+
+      // Create new stats with enriched leaderboards
+      stats = stats.copyWith(
+        top10DemocratPrimarySponsors: enrichedDemSponsors,
+        top10RepublicanPrimarySponsors: enrichedRepSponsors,
+        top10DemocratCosponsors: enrichedDemCosponsors,
+        top10RepublicanCosponsors: enrichedRepCosponsors,
+      );
+
       if (!mounted) return;
       setState(() {
         _stats = stats;
