@@ -319,9 +319,14 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
 
         children
           ..add(const SizedBox(height: 24))
-          ..add(_buildParticipantsPreview(_meeting, isCompact: isCompact))
-          ..add(const SizedBox(height: 16))
-          ..add(_buildNonMemberPreview(_meeting, isCompact: isCompact));
+          ..add(_buildParticipantsPreview(_meeting, isCompact: isCompact));
+
+        // Guest participants section - hidden for member view
+        if (!widget.isMemberView) {
+          children
+            ..add(const SizedBox(height: 16))
+            ..add(_buildNonMemberPreview(_meeting, isCompact: isCompact));
+        }
 
         return Card(
           margin: EdgeInsets.fromLTRB(

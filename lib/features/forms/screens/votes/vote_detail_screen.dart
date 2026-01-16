@@ -4,6 +4,7 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
@@ -51,6 +52,8 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
   @override
   void initState() {
     super.initState();
+    // Initialize timezone database for date formatting
+    tz_data.initializeTimeZones();
     // Member view has only 2 tabs (no Analytics)
     _tabController = TabController(length: widget.isMemberView ? 2 : 3, vsync: this);
     _loadVote();
@@ -437,9 +440,12 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
             ],
 
             // Results visualization
+            // Show results if: results are public, voting has ended (by date),
+            // vote is active (live results), or vote is closed (finished)
             if (vote.resultsPublic ||
                 vote.hasEnded ||
-                vote.status == 'active') ...[
+                vote.status == 'active' ||
+                vote.status == 'closed') ...[
               VoteResultsChart(
                 vote: vote,
                 calculatedQuestions: _questionsWithVoteCounts,
