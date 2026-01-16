@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/legislation_provider.dart';
 import '../models/tracked_bill.dart';
-import '../widgets/bill_list.dart';
 import 'bill_detail_screen.dart';
 import 'bill_search_screen.dart';
-import 'legislation_dashboard_screen.dart';
 import 'legislators_list_screen.dart';
+import 'legislation_stats_dashboard.dart';
 
 // Brand colors matching the main dashboard
 const _unityBlue = Color(0xFF273351);
@@ -16,13 +15,15 @@ const _actionRed = Color(0xFFE63946);
 const _sunriseGold = Color(0xFFFDB813);
 const _justicePurple = Color(0xFF6A1B9A);
 
-/// Modern Legislation Tracker screen matching the main dashboard style
+/// Modern Legislation Tracker screen with integrated dashboard
 class LegislationTrackerScreen extends StatefulWidget {
   final String committeeId;
+  final bool isMemberView;
 
   const LegislationTrackerScreen({
     super.key,
     required this.committeeId,
+    this.isMemberView = false,
   });
 
   @override
@@ -33,16 +34,16 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String? _selectedPosition;
-  String? _selectedPriority;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<LegislationProvider>();
       provider.initialize();
+      provider.loadStats();
     });
   }
 
@@ -57,15 +58,25 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     return Consumer<LegislationProvider>(
       builder: (context, provider, child) {
         if (provider.isLoading && provider.trackedBills.isEmpty) {
-          return const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
-            ),
+          return Stack(
+            children: [
+              _buildGradientBackground(),
+              const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
+                ),
+              ),
+            ],
           );
         }
 
         if (provider.error != null && provider.trackedBills.isEmpty) {
-          return _buildErrorState(provider);
+          return Stack(
+            children: [
+              _buildGradientBackground(),
+              _buildErrorState(provider),
+            ],
+          );
         }
 
         return _buildContent(provider);
@@ -73,31 +84,80 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     );
   }
 
+  Widget _buildGradientBackground() {
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          Image.asset(
+            'assets/images/Blue-Gradient-Background.png',
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          ),
+          Container(
+            color: Colors.white.withOpacity(0.18),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildContent(LegislationProvider provider) {
+    return Stack(
+      children: [
+        _buildGradientBackground(),
+        Column(
+          children: [
+            // Tab bar at top
+            Container(
+              color: _unityBlue,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                indicatorColor: _momentumBlue,
+                indicatorWeight: 3,
+                tabs: const [
+                  Tab(text: 'Overview', icon: Icon(Icons.dashboard_outlined, size: 20)),
+                  Tab(text: 'All Bills', icon: Icon(Icons.list_alt_outlined, size: 20)),
+                  Tab(text: 'Legislators', icon: Icon(Icons.people_outline, size: 20)),
+                ],
+              ),
+            ),
+            // Tab content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  LegislationStatsDashboard(
+                    committeeId: widget.committeeId,
+                    isExecutive: !widget.isMemberView,
+                  ),
+                  _buildAllBillsTab(provider),
+                  LegislatorsListScreen(committeeId: widget.committeeId),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAllBillsTab(LegislationProvider provider) {
     return RefreshIndicator(
       onRefresh: () => provider.loadTrackedBills(),
       color: _momentumBlue,
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         slivers: [
-          // Header section
-          SliverToBoxAdapter(
-            child: _buildHeader(provider),
-          ),
-
-          // Stats cards
-          SliverToBoxAdapter(
-            child: _buildStatsRow(provider),
-          ),
-
-          // Quick actions
-          SliverToBoxAdapter(
-            child: _buildQuickActions(provider),
-          ),
-
           // Position filter tabs
           SliverToBoxAdapter(
-            child: _buildPositionTabs(provider),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildPositionTabs(provider),
+            ),
           ),
 
           // Bill list
@@ -110,290 +170,14 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     );
   }
 
-  Widget _buildHeader(LegislationProvider provider) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [_unityBlue, _momentumBlue],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.gavel_rounded, color: Colors.white, size: 26),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Legislation Tracker',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: _unityBlue,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${provider.trackedBills.length} bills tracked',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: _unityBlue.withOpacity(0.6),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (provider.isSyncing)
-            Container(
-              padding: const EdgeInsets.all(8),
-              child: const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
-                ),
-              ),
-            )
-          else
-            IconButton(
-              onPressed: () => provider.syncBills(),
-              icon: const Icon(Icons.sync_rounded),
-              color: _unityBlue,
-              tooltip: 'Sync with Open States',
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsRow(LegislationProvider provider) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 500;
-
-          if (isNarrow) {
-            return Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: _buildStatCard(
-                      icon: Icons.check_circle_outline,
-                      label: 'Support',
-                      value: '${provider.supportedBills.length}',
-                      colors: [_grassrootsGreen, _momentumBlue],
-                    )),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildStatCard(
-                      icon: Icons.cancel_outlined,
-                      label: 'Oppose',
-                      value: '${provider.opposedBills.length}',
-                      colors: [_actionRed, _sunriseGold],
-                    )),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: _buildStatCard(
-                      icon: Icons.visibility_outlined,
-                      label: 'Watching',
-                      value: '${provider.watchingBills.length}',
-                      colors: [_momentumBlue, _justicePurple],
-                    )),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildStatCard(
-                      icon: Icons.warning_amber_rounded,
-                      label: 'Critical',
-                      value: '${provider.criticalBills.length}',
-                      colors: [_sunriseGold, _actionRed],
-                    )),
-                  ],
-                ),
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              Expanded(child: _buildStatCard(
-                icon: Icons.check_circle_outline,
-                label: 'Support',
-                value: '${provider.supportedBills.length}',
-                colors: [_grassrootsGreen, _momentumBlue],
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: _buildStatCard(
-                icon: Icons.cancel_outlined,
-                label: 'Oppose',
-                value: '${provider.opposedBills.length}',
-                colors: [_actionRed, _sunriseGold],
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: _buildStatCard(
-                icon: Icons.visibility_outlined,
-                label: 'Watching',
-                value: '${provider.watchingBills.length}',
-                colors: [_momentumBlue, _justicePurple],
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: _buildStatCard(
-                icon: Icons.warning_amber_rounded,
-                label: 'Critical',
-                value: '${provider.criticalBills.length}',
-                colors: [_sunriseGold, _actionRed],
-              )),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildStatCard({
-    required IconData icon,
-    required String label,
-    required String value,
-    required List<Color> colors,
-  }) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: Colors.white, size: 20),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickActions(LegislationProvider provider) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildActionButton(
-              icon: Icons.search_rounded,
-              label: 'Search Bills',
-              onTap: () => _navigateToSearch(),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildActionButton(
-              icon: Icons.dashboard_rounded,
-              label: 'Dashboard',
-              onTap: () => _navigateToDashboard(),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildActionButton(
-              icon: Icons.people_rounded,
-              label: 'Legislators',
-              onTap: () => _navigateToLegislators(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      elevation: 1,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _momentumBlue.withOpacity(0.2)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: _momentumBlue),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: _unityBlue,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPositionTabs(LegislationProvider provider) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _unityBlue,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: _unityBlue.withOpacity(0.08),
+            color: _unityBlue.withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -427,7 +211,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? _unityBlue : Colors.transparent,
+            color: isSelected ? _momentumBlue : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -436,7 +220,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : _unityBlue,
+                  color: Colors.white,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
                 ),
@@ -447,13 +231,13 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                 decoration: BoxDecoration(
                   color: isSelected
                       ? Colors.white.withOpacity(0.2)
-                      : _momentumBlue.withOpacity(0.1),
+                      : Colors.white.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '$count',
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : _momentumBlue,
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 11,
                   ),
@@ -638,13 +422,13 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: _momentumBlue.withOpacity(0.1),
+                color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.gavel_outlined,
                 size: 56,
-                color: _momentumBlue.withOpacity(0.5),
+                color: Colors.white.withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 20),
@@ -655,7 +439,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: _unityBlue,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 8),
@@ -663,7 +447,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               'Search and track bills from the Missouri Legislature',
               style: TextStyle(
                 fontSize: 14,
-                color: _unityBlue.withOpacity(0.6),
+                color: Colors.white.withOpacity(0.8),
               ),
               textAlign: TextAlign.center,
             ),
@@ -673,8 +457,8 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               icon: const Icon(Icons.search),
               label: const Text('Search Bills'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _momentumBlue,
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.white,
+                foregroundColor: _unityBlue,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -697,10 +481,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: _actionRed.withOpacity(0.1),
+                color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.error_outline, size: 48, color: _actionRed),
+              child: const Icon(Icons.error_outline, size: 48, color: Colors.white),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -708,7 +492,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: _unityBlue,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 8),
@@ -716,7 +500,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               provider.error ?? 'An unknown error occurred',
               style: TextStyle(
                 fontSize: 14,
-                color: _unityBlue.withOpacity(0.6),
+                color: Colors.white.withOpacity(0.8),
               ),
               textAlign: TextAlign.center,
             ),
@@ -726,8 +510,8 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _momentumBlue,
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.white,
+                foregroundColor: _unityBlue,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -765,28 +549,6 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
           value: provider,
           child: BillSearchScreen(committeeId: widget.committeeId),
         ),
-      ),
-    );
-  }
-
-  void _navigateToDashboard() {
-    final provider = context.read<LegislationProvider>();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ChangeNotifierProvider.value(
-          value: provider,
-          child: LegislationDashboardScreen(committeeId: widget.committeeId),
-        ),
-      ),
-    );
-  }
-
-  void _navigateToLegislators() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LegislatorsListScreen(committeeId: widget.committeeId),
       ),
     );
   }
