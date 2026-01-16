@@ -455,7 +455,7 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       dataSourceKey: source.key,
       title: source.label,
       icon: source.icon,
-      gradientColors: LegislationWidgetGradients.random,
+      gradientColors: LegislationWidgetGradients.all[0],
       gridX: 0,
       gridY: index,
     );
@@ -1734,69 +1734,464 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
               return a.gridX.compareTo(b.gridX);
             });
 
-          return ReorderableListView.builder(
+          return SingleChildScrollView(
             padding: EdgeInsets.all(horizontalPadding),
-            itemCount: sortedWidgets.length,
-            onReorder: (oldIndex, newIndex) {
-              if (oldIndex < newIndex) newIndex -= 1;
-              setState(() {
-                final widgetsList = List<LegislationWidgetConfig>.from(_config.widgets);
-                final item = widgetsList.removeAt(oldIndex);
-                widgetsList.insert(newIndex, item);
-                for (int i = 0; i < widgetsList.length; i++) {
-                  widgetsList[i] = widgetsList[i].copyWith(gridY: i);
-                }
-                _setConfig(_config.copyWith(widgets: widgetsList));
-              });
-            },
-            itemBuilder: (context, index) {
-              final widget = sortedWidgets[index];
-              final width = _getWidgetWidth(widget, widgetWidth, columns);
-              final height = _getWidgetHeight(widget, widgetHeight);
-
-              return Padding(
-                key: ValueKey(widget.id),
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _buildEditableWidget(widget, stats, width, height),
-              );
-            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Instructions bar
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: _momentumBlue,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Icon(Icons.drag_indicator, size: 14, color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isMobileLayout
+                            ? 'Tap widgets to edit or reorder'
+                            : 'Drag from palette to add, or tap widgets to edit',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+                // Widgets with drop zones
+                _buildWidgetsWithDropZones(sortedWidgets, stats, widgetWidth, widgetHeight, columns),
+              ],
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildEditableWidget(LegislationWidgetConfig config, LegislationStats stats, double width, double height) {
+  Widget _buildWidgetsWithDropZones(
+    List<LegislationWidgetConfig> widgets,
+    LegislationStats stats,
+    double widgetWidth,
+    double widgetHeight,
+    int columns,
+  ) {
+    final items = <Widget>[];
+
+    // Add drop zone at beginning
+    items.add(_buildReorderDropZone(0, widgetWidth));
+
+    for (int i = 0; i < widgets.length; i++) {
+      final widget = widgets[i];
+      final width = _getWidgetWidth(widget, widgetWidth, columns);
+      final height = _getWidgetHeight(widget, widgetHeight);
+      final source = LegislationDataSources.getByKey(widget.dataSourceKey);
+      final widgetLabel = source?.label ?? widget.dataSourceKey;
+      final widgetIcon = source?.icon ?? Icons.widgets;
+
+      items.add(
+        RepaintBoundary(
+          child: LongPressDraggable<_WidgetReorderData>(
+            key: ValueKey('draggable_${widget.id}'),
+            data: _WidgetReorderData(fromIndex: i, config: widget),
+            delay: const Duration(milliseconds: 150),
+            hapticFeedbackOnStart: true,
+            onDragStarted: () { if (mounted) setState(() => _isDragging = true); },
+            onDragEnd: (_) { if (mounted) setState(() => _isDragging = false); },
+            onDraggableCanceled: (_, __) { if (mounted) setState(() => _isDragging = false); },
+            onDragCompleted: () { if (mounted) setState(() => _isDragging = false); },
+            feedback: Material(
+              elevation: 12,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: width * 0.8,
+                height: 80,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _momentumBlue, width: 3),
+                  boxShadow: [
+                    BoxShadow(color: _momentumBlue.withOpacity(0.3), blurRadius: 20, spreadRadius: 4),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(widgetIcon, color: _momentumBlue, size: 32),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(widgetLabel,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _unityBlue),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            childWhenDragging: Opacity(
+              opacity: 0.3,
+              child: Container(
+                width: width,
+                height: height,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _momentumBlue.withOpacity(0.5), width: 2),
+                  color: Colors.grey.withOpacity(0.1),
+                ),
+              ),
+            ),
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: _buildEditableWidget(widget, stats, i),
+            ),
+          ),
+        ),
+      );
+
+      // Add drop zone after each widget
+      items.add(_buildReorderDropZone(i + 1, widgetWidth));
+    }
+
+    return Wrap(spacing: 16, runSpacing: 16, crossAxisAlignment: WrapCrossAlignment.start, children: items);
+  }
+
+  Widget _buildReorderDropZone(int insertIndex, double widgetWidth) {
+    return DragTarget<Object>(
+      key: ValueKey('drop_zone_$insertIndex'),
+      onWillAcceptWithDetails: (details) {
+        final data = details.data;
+        return data is _PaletteDragData || data is _WidgetReorderData;
+      },
+      onAcceptWithDetails: (details) {
+        if (!mounted) return;
+        final data = details.data;
+        if (data is _PaletteDragData) {
+          _addWidgetAtIndex(data.source, data.type, insertIndex);
+        } else if (data is _WidgetReorderData) {
+          _reorderWidgetToIndex(data.fromIndex, insertIndex);
+        }
+        setState(() => _isDragging = false);
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHovering = candidateData.isNotEmpty;
+        final isReorder = candidateData.any((d) => d is _WidgetReorderData);
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          width: isHovering ? widgetWidth * 0.4 : 8,
+          height: isHovering ? 80 : 60,
+          margin: EdgeInsets.symmetric(horizontal: isHovering ? 4 : 0),
+          decoration: BoxDecoration(
+            color: isHovering
+                ? (isReorder ? _grassrootsGreen.withOpacity(0.3) : _momentumBlue.withOpacity(0.3))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: isHovering
+                ? Border.all(color: isReorder ? _grassrootsGreen : _momentumBlue, width: 2)
+                : null,
+          ),
+          child: isHovering
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_circle_outline, color: isReorder ? _grassrootsGreen : _momentumBlue),
+                      const SizedBox(height: 4),
+                      Text('Drop here', style: TextStyle(fontSize: 10, color: isReorder ? _grassrootsGreen : _momentumBlue)),
+                    ],
+                  ),
+                )
+              : null,
+        );
+      },
+    );
+  }
+
+  void _reorderWidgetToIndex(int fromIndex, int toIndex) {
+    if (!mounted) return;
+    if (fromIndex == toIndex || fromIndex == toIndex - 1) return;
+    final currentWidgets = _config.widgets;
+    if (fromIndex < 0 || fromIndex >= currentWidgets.length) return;
+    setState(() {
+      final widgetsList = List<LegislationWidgetConfig>.from(currentWidgets);
+      final item = widgetsList.removeAt(fromIndex);
+      final adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
+      widgetsList.insert(adjustedTo.clamp(0, widgetsList.length), item);
+      for (int i = 0; i < widgetsList.length; i++) {
+        widgetsList[i] = widgetsList[i].copyWith(gridY: i);
+      }
+      _setConfig(_config.copyWith(widgets: widgetsList));
+    });
+    _saveConfig();
+  }
+
+  Widget _buildEditableWidget(LegislationWidgetConfig config, LegislationStats stats, int index) {
     return Stack(
       children: [
-        SizedBox(
-          width: width,
-          height: height,
-          child: _buildWidget(config, stats),
+        // The actual widget
+        _buildWidget(config, stats),
+        // Edit overlay - tap opens options
+        Positioned.fill(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _showWidgetOptions(config, index),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _momentumBlue.withOpacity(0.5), width: 2),
+                ),
+              ),
+            ),
+          ),
         ),
+        // Position indicator (#1, #2, etc.)
+        Positioned(
+          top: 8,
+          left: 8,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _unityBlue.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text('#${index + 1}',
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        // Drag handle indicator
+        Positioned(
+          bottom: 8,
+          left: 8,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.drag_indicator, color: Colors.white, size: 14),
+                SizedBox(width: 4),
+                Text('Hold to drag', style: TextStyle(color: Colors.white, fontSize: 10)),
+              ],
+            ),
+          ),
+        ),
+        // Settings button
+        Positioned(
+          top: 8,
+          right: 40,
+          child: GestureDetector(
+            onTap: () => _showWidgetOptions(config, index),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: _momentumBlue,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.settings, color: Colors.white, size: 16),
+            ),
+          ),
+        ),
+        // Delete button
         Positioned(
           top: 8,
           right: 8,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Material(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => _removeWidget(config.id),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.close, size: 16, color: _actionRed),
-                  ),
-                ),
+          child: GestureDetector(
+            onTap: () => _removeWidget(config.id),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: _actionRed,
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
+              child: const Icon(Icons.close, color: Colors.white, size: 16),
+            ),
           ),
         ),
       ],
     );
+  }
+
+  void _showWidgetOptions(LegislationWidgetConfig config, [int? index]) {
+    if (!mounted) return;
+    final source = LegislationDataSources.getByKey(config.dataSourceKey);
+    final currentGradientIndex = LegislationWidgetGradients.indexOfColors(config.gradientColors);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              child: ListView(
+                controller: scrollController,
+                children: [
+                  // Header with delete button
+                  Row(
+                    children: [
+                      Icon(config.icon ?? Icons.widgets, color: _momentumBlue),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(config.title,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: _actionRed),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _removeWidget(config.id);
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Widget type selection
+                  const Text('Display as:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: (source?.supportedWidgets ?? [LegislationWidgetType.statCard]).map((type) {
+                      final isSelected = config.type == type;
+                      return ChoiceChip(
+                        label: Text(_getWidgetTypeLabel(type)),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          if (selected) {
+                            _updateWidget(config.copyWith(type: type, size: _getSizeForType(type)));
+                            Navigator.pop(context);
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Size selection
+                  const Text('Size:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: LegislationWidgetSize.values.map((size) {
+                      final isSelected = config.size == size;
+                      return ChoiceChip(
+                        label: Text(_getSizeLabel(size)),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          if (selected) {
+                            _updateWidget(config.copyWith(size: size));
+                            Navigator.pop(context);
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Color selection
+                  const Text('Color:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 1.5,
+                    ),
+                    itemCount: LegislationWidgetGradients.all.length,
+                    itemBuilder: (context, gradientIndex) {
+                      final gradient = LegislationWidgetGradients.all[gradientIndex];
+                      final isSelected = currentGradientIndex == gradientIndex;
+                      return GestureDetector(
+                        onTap: () {
+                          _updateWidget(config.copyWith(gradientColors: gradient));
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: gradient,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                            boxShadow: [
+                              BoxShadow(color: gradient.last.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4)),
+                            ],
+                          ),
+                          child: isSelected
+                              ? const Center(child: Icon(Icons.check, color: Colors.white, size: 24))
+                              : null,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  if (currentGradientIndex != null)
+                    Center(
+                      child: Text(
+                        LegislationWidgetGradients.names[currentGradientIndex],
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _updateWidget(LegislationWidgetConfig updatedConfig) {
+    if (!mounted) return;
+    setState(() {
+      final widgetsList = _config.widgets.map((w) {
+        if (w.id == updatedConfig.id) {
+          return updatedConfig;
+        }
+        return w;
+      }).toList();
+      _setConfig(_config.copyWith(widgets: widgetsList));
+    });
+    _saveConfig();
+  }
+
+  String _getSizeLabel(LegislationWidgetSize size) {
+    switch (size) {
+      case LegislationWidgetSize.mini: return 'Mini';
+      case LegislationWidgetSize.small: return 'Small';
+      case LegislationWidgetSize.medium: return 'Medium';
+      case LegislationWidgetSize.large: return 'Large';
+      case LegislationWidgetSize.wide: return 'Wide';
+      case LegislationWidgetSize.tall: return 'Tall';
+      case LegislationWidgetSize.hero: return 'Hero';
+      case LegislationWidgetSize.mobileFull: return 'Full Width';
+    }
   }
 
   IconData _getWidgetTypeIcon(LegislationWidgetType type) {
