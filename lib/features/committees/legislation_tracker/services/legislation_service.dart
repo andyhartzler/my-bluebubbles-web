@@ -119,47 +119,41 @@ class LegislationService {
     final positionSetBy = response['position_set_by'] as String?;
     if (positionSetBy != null && positionSetBy.isNotEmpty) {
       try {
-        // Only select columns that exist on members table
-        final memberResponse = await _supabase
-            .from('members')
-            .select('id, name, profile_pictures')
-            .eq('id', positionSetBy)
-            .maybeSingle();
+        // Fetch member and slack mapping in parallel for speed
+        final results = await Future.wait([
+          _supabase
+              .from('members')
+              .select('id, name, profile_pictures')
+              .eq('id', positionSetBy)
+              .maybeSingle(),
+          _supabase
+              .from('slack_user_mapping')
+              .select('cached_avatar_path')
+              .eq('member_id', positionSetBy)
+              .maybeSingle(),
+        ]);
+
+        final memberResponse = results[0];
+        final slackMapping = results[1];
 
         if (memberResponse != null) {
           final Map<String, dynamic> setter = Map<String, dynamic>.from(memberResponse);
 
-          // Check if member has profile_pictures, if not try slack_user_mapping
+          // Check if member has profile_pictures
           final profilePics = setter['profile_pictures'];
-          bool hasProfilePic = false;
-          if (profilePics is List && profilePics.isNotEmpty) {
-            hasProfilePic = true;
-          }
+          bool hasProfilePic = profilePics is List && profilePics.isNotEmpty;
 
-          // If no profile picture, try to get from slack_user_mapping
-          if (!hasProfilePic) {
-            try {
-              final slackMapping = await _supabase
-                  .from('slack_user_mapping')
-                  .select('cached_avatar_path')
-                  .eq('member_id', positionSetBy)
-                  .maybeSingle();
-
-              if (slackMapping != null && slackMapping['cached_avatar_path'] != null) {
-                // Store the full Supabase storage URL
-                setter['slack_cached_avatar'] =
-                    'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/avatars/${slackMapping['cached_avatar_path']}';
-              }
-            } catch (_) {
-              // Ignore - slack avatar is optional fallback
-            }
+          // If no profile picture, use slack avatar
+          if (!hasProfilePic && slackMapping != null && slackMapping['cached_avatar_path'] != null) {
+            setter['slack_cached_avatar'] =
+                'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/avatars/${slackMapping['cached_avatar_path']}';
           }
 
           response['position_setter'] = setter;
         }
       } catch (e) {
         // Ignore - position setter info is optional
-        print('Could not fetch position setter: $e');
+        debugPrint('Could not fetch position setter: $e');
       }
     }
 
@@ -415,10 +409,28 @@ class LegislationService {
   }
 
   /// Get sponsors for a bill with linked legislator data
+  /// Only fetches essential legislator columns for faster loading
   Future<List<BillSponsor>> getBillSponsorsWithLegislators(String billId) async {
     final response = await _supabase
         .from('legislation_bill_sponsors')
-        .select('*, legislator:legislator_id(*)')
+        .select('''
+          *,
+          legislator:legislator_id(
+            id,
+            name,
+            first_name,
+            last_name,
+            party,
+            chamber,
+            district,
+            photo_storage_path,
+            photo_url,
+            leadership_role,
+            is_current,
+            created_at,
+            updated_at
+          )
+        ''')
         .eq('bill_id', billId)
         .order('is_primary', ascending: false);
 

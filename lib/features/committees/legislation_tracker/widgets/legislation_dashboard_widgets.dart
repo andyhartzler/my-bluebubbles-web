@@ -477,6 +477,7 @@ class LegislationProgressRingWidget extends StatelessWidget {
 }
 
 /// Party Comparison Widget - Side-by-side Democrat vs Republican
+/// Fully responsive at all widget sizes
 class PartyComparisonWidget extends StatelessWidget {
   final LegislationWidgetConfig config;
   final LegislationStats stats;
@@ -489,222 +490,276 @@ class PartyComparisonWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = config.gradientColors.isNotEmpty
+        ? config.gradientColors
+        : [_unityBlue, _momentumBlue];
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       clipBehavior: Clip.antiAlias,
       child: Container(
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: _unityBlue,
-          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(config.icon ?? Icons.compare_arrows, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  config.title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculate responsive sizes based on available space
+            final width = constraints.maxWidth;
+            final height = constraints.maxHeight;
+            final isCompact = height < 200 || width < 300;
+            final isVeryCompact = height < 150 || width < 250;
+            final padding = isVeryCompact ? 12.0 : (isCompact ? 14.0 : 20.0);
 
-            // Side-by-side party stats
-            Expanded(
-              child: Row(
+            // Font sizes based on available space
+            final titleSize = isVeryCompact ? 12.0 : (isCompact ? 14.0 : 18.0);
+            final partyNameSize = isVeryCompact ? 10.0 : (isCompact ? 12.0 : 14.0);
+            final countSize = isVeryCompact ? 20.0 : (isCompact ? 24.0 : 32.0);
+            final labelSize = isVeryCompact ? 9.0 : (isCompact ? 10.0 : 12.0);
+            final barHeight = isVeryCompact ? 10.0 : (isCompact ? 12.0 : 16.0);
+
+            return Padding(
+              padding: EdgeInsets.all(padding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Democrat side (BLUE)
+                  // Header
+                  Row(
+                    children: [
+                      Icon(
+                        config.icon ?? Icons.compare_arrows,
+                        color: Colors.white,
+                        size: isVeryCompact ? 16 : (isCompact ? 18 : 20),
+                      ),
+                      SizedBox(width: isVeryCompact ? 4 : 8),
+                      Expanded(
+                        child: Text(
+                          config.title,
+                          style: TextStyle(
+                            fontSize: titleSize,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: isVeryCompact ? 8 : (isCompact ? 12 : 16)),
+
+                  // Main content - side by side stats
                   Expanded(
-                    child: _buildPartyColumn(
-                      party: 'Democrats',
-                      color: _democratBlue,
-                      primaryCount: stats.democratPrimarySponsorCount,
-                      cosponsorCount: stats.democratCosponsorCount,
-                      avgPerLegislator: stats.avgBillsPerDemocratLegislator,
-                      alignment: CrossAxisAlignment.end,
+                    child: Row(
+                      children: [
+                        // Democrat side
+                        Expanded(
+                          child: _buildPartyStats(
+                            party: 'Democrats',
+                            color: _democratBlue,
+                            primaryCount: stats.democratPrimarySponsorCount,
+                            avgPerLegislator: stats.avgBillsPerDemocratLegislator,
+                            partyNameSize: partyNameSize,
+                            countSize: countSize,
+                            labelSize: labelSize,
+                            alignment: CrossAxisAlignment.center,
+                            isCompact: isCompact,
+                            isVeryCompact: isVeryCompact,
+                          ),
+                        ),
+
+                        // Divider
+                        Container(
+                          width: 1,
+                          margin: EdgeInsets.symmetric(
+                            horizontal: isVeryCompact ? 8 : 12,
+                            vertical: isVeryCompact ? 4 : 8,
+                          ),
+                          color: Colors.white24,
+                        ),
+
+                        // Republican side
+                        Expanded(
+                          child: _buildPartyStats(
+                            party: 'Republicans',
+                            color: _republicanRed,
+                            primaryCount: stats.republicanPrimarySponsorCount,
+                            avgPerLegislator: stats.avgBillsPerRepublicanLegislator,
+                            partyNameSize: partyNameSize,
+                            countSize: countSize,
+                            labelSize: labelSize,
+                            alignment: CrossAxisAlignment.center,
+                            isCompact: isCompact,
+                            isVeryCompact: isVeryCompact,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 
-                  // Divider
-                  Container(
-                    width: 2,
-                    height: 120,
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    color: Colors.white24,
-                  ),
-
-                  // Republican side (RED)
-                  Expanded(
-                    child: _buildPartyColumn(
-                      party: 'Republicans',
-                      color: _republicanRed,
-                      primaryCount: stats.republicanPrimarySponsorCount,
-                      cosponsorCount: stats.republicanCosponsorCount,
-                      avgPerLegislator: stats.avgBillsPerRepublicanLegislator,
-                      alignment: CrossAxisAlignment.start,
+                  // Comparison bars (only if enough space)
+                  if (!isVeryCompact) ...[
+                    SizedBox(height: isCompact ? 8 : 12),
+                    _buildComparisonBar(
+                      label: 'Primary',
+                      demValue: stats.democratPrimarySponsorCount,
+                      repValue: stats.republicanPrimarySponsorCount,
+                      labelSize: labelSize,
+                      barHeight: barHeight,
                     ),
-                  ),
+                    SizedBox(height: isCompact ? 6 : 10),
+                    _buildComparisonBar(
+                      label: 'Co-Sponsors',
+                      demValue: stats.democratCosponsorCount,
+                      repValue: stats.republicanCosponsorCount,
+                      labelSize: labelSize,
+                      barHeight: barHeight,
+                    ),
+                  ],
                 ],
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Visual comparison bars
-            _buildComparisonRow(
-              label: 'Primary Sponsors',
-              demValue: stats.democratPrimarySponsorCount,
-              repValue: stats.republicanPrimarySponsorCount,
-            ),
-            const SizedBox(height: 12),
-            _buildComparisonRow(
-              label: 'Co-Sponsors',
-              demValue: stats.democratCosponsorCount,
-              repValue: stats.republicanCosponsorCount,
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildPartyColumn({
+  Widget _buildPartyStats({
     required String party,
     required Color color,
     required int primaryCount,
-    required int cosponsorCount,
     required double avgPerLegislator,
+    required double partyNameSize,
+    required double countSize,
+    required double labelSize,
     required CrossAxisAlignment alignment,
+    required bool isCompact,
+    required bool isVeryCompact,
   }) {
     return Column(
       crossAxisAlignment: alignment,
       mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          party,
-          style: TextStyle(
-            color: color,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+        // Party name badge
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isVeryCompact ? 6 : 10,
+            vertical: isVeryCompact ? 2 : 4,
+          ),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.5)),
+          ),
+          child: Text(
+            party,
+            style: TextStyle(
+              color: color,
+              fontSize: partyNameSize,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: isVeryCompact ? 6 : 10),
+        // Primary count
         Text(
           '$primaryCount',
           style: TextStyle(
-            color: color,
-            fontSize: 32,
+            color: Colors.white,
+            fontSize: countSize,
             fontWeight: FontWeight.bold,
+            height: 1.1,
           ),
         ),
-        Text(
-          'Primary Sponsors',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 12,
+        if (!isVeryCompact) ...[
+          Text(
+            'Primary Sponsors',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: labelSize,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '${avgPerLegislator.toStringAsFixed(1)} avg/legislator',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 11,
+          SizedBox(height: isCompact ? 4 : 8),
+          Text(
+            '${avgPerLegislator.toStringAsFixed(1)}/legislator',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: labelSize - 1,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
 
-  Widget _buildComparisonRow({
+  Widget _buildComparisonBar({
     required String label,
     required int demValue,
     required int repValue,
+    required double labelSize,
+    required double barHeight,
   }) {
-    final max = demValue > repValue ? demValue : repValue;
+    final total = demValue + repValue;
+    final demRatio = total > 0 ? demValue / total : 0.5;
+    final repRatio = total > 0 ? repValue / total : 0.5;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 6),
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Democrat bar (right-aligned)
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    '$demValue',
-                    style: TextStyle(
-                      color: _democratBlue,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: FractionallySizedBox(
-                        widthFactor: max > 0 ? demValue / max : 0,
-                        child: Container(
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: _democratBlue,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+            Text(
+              '$demValue',
+              style: TextStyle(
+                color: _democratBlue,
+                fontWeight: FontWeight.bold,
+                fontSize: labelSize,
               ),
             ),
-            const SizedBox(width: 8),
-            // Republican bar (left-aligned)
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: labelSize - 1,
+              ),
+            ),
+            Text(
+              '$repValue',
+              style: TextStyle(
+                color: _republicanRed,
+                fontWeight: FontWeight.bold,
+                fontSize: labelSize,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
             Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: FractionallySizedBox(
-                      widthFactor: max > 0 ? repValue / max : 0,
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: _republicanRed,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$repValue',
-                    style: TextStyle(
-                      color: _republicanRed,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+              flex: (demRatio * 100).round().clamp(1, 99),
+              child: Container(
+                height: barHeight,
+                decoration: BoxDecoration(
+                  color: _democratBlue,
+                  borderRadius: BorderRadius.horizontal(left: Radius.circular(barHeight / 2)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 2),
+            Expanded(
+              flex: (repRatio * 100).round().clamp(1, 99),
+              child: Container(
+                height: barHeight,
+                decoration: BoxDecoration(
+                  color: _republicanRed,
+                  borderRadius: BorderRadius.horizontal(right: Radius.circular(barHeight / 2)),
+                ),
               ),
             ),
           ],
@@ -715,6 +770,7 @@ class PartyComparisonWidget extends StatelessWidget {
 }
 
 /// Legislator Leaderboard Widget with Photos
+/// Styled with gradient like other dashboard tiles, shows all entries (scrollable)
 class LegislatorLeaderboardWidget extends StatelessWidget {
   final LegislationWidgetConfig config;
   final List<SponsorLeaderboardEntry> entries;
@@ -729,90 +785,163 @@ class LegislatorLeaderboardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Use config gradients if available, otherwise create party-colored gradient
+    final colors = config.gradientColors.isNotEmpty
+        ? config.gradientColors
+        : [headerColor, headerColor.withOpacity(0.7)];
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          // Header with party color
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: headerColor),
-            child: Row(
-              children: [
-                const Icon(Icons.emoji_events, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    config.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxHeight < 200;
+            final isVeryCompact = constraints.maxHeight < 150;
+            final padding = isVeryCompact ? 10.0 : (isCompact ? 12.0 : 16.0);
 
-          // Entries with photos
-          Expanded(
-            child: Container(
-              color: _unityBlue,
-              child: entries.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No data available',
-                        style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            return Padding(
+              padding: EdgeInsets.all(padding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(isVeryCompact ? 6 : 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          config.icon ?? Icons.emoji_events,
+                          color: Colors.white,
+                          size: isVeryCompact ? 16 : 20,
+                        ),
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: entries.take(5).length,
-                      padding: EdgeInsets.zero,
-                      itemBuilder: (context, index) {
-                        final entry = entries[index];
-                        return _buildEntryTile(entry, index);
-                      },
-                    ),
-            ),
-          ),
-        ],
+                      SizedBox(width: isVeryCompact ? 8 : 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              config.title,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: isVeryCompact ? 12 : 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (!isVeryCompact)
+                              Text(
+                                '${entries.length} legislators',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: isVeryCompact ? 8 : 12),
+
+                  // Entries list - scrollable, shows all entries
+                  Expanded(
+                    child: entries.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.person_off_outlined,
+                                  color: Colors.white.withOpacity(0.4),
+                                  size: 32,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No data available',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            // Show ALL entries, not just top 5
+                            itemCount: entries.length,
+                            padding: EdgeInsets.zero,
+                            itemBuilder: (context, index) {
+                              final entry = entries[index];
+                              return _buildEntryTile(entry, index, isCompact, isVeryCompact);
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildEntryTile(SponsorLeaderboardEntry entry, int index) {
-    return ListTile(
-      dense: true,
-      leading: Row(
-        mainAxisSize: MainAxisSize.min,
+  Widget _buildEntryTile(SponsorLeaderboardEntry entry, int index, bool isCompact, bool isVeryCompact) {
+    final tileHeight = isVeryCompact ? 36.0 : (isCompact ? 44.0 : 52.0);
+    final avatarRadius = isVeryCompact ? 12.0 : (isCompact ? 14.0 : 16.0);
+    final rankSize = isVeryCompact ? 10.0 : 12.0;
+    final nameSize = isVeryCompact ? 11.0 : 13.0;
+    final subtitleSize = isVeryCompact ? 9.0 : 11.0;
+
+    return Container(
+      height: tileHeight,
+      margin: EdgeInsets.only(bottom: isVeryCompact ? 4 : 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: isVeryCompact ? 6 : 8,
+        vertical: isVeryCompact ? 4 : 6,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
         children: [
           // Rank badge
           Container(
-            width: 24,
-            height: 24,
+            width: isVeryCompact ? 18 : 22,
+            height: isVeryCompact ? 18 : 22,
             decoration: BoxDecoration(
-              color: headerColor.withOpacity(0.2),
+              color: Colors.white.withOpacity(index < 3 ? 0.3 : 0.15),
               shape: BoxShape.circle,
             ),
             child: Center(
               child: Text(
                 '${index + 1}',
                 style: TextStyle(
-                  color: headerColor,
+                  color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
+                  fontSize: rankSize,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          // Legislator photo
+          SizedBox(width: isVeryCompact ? 6 : 8),
+          // Photo
           CircleAvatar(
-            radius: 16,
-            backgroundColor: headerColor.withOpacity(0.3),
+            radius: avatarRadius,
+            backgroundColor: Colors.white.withOpacity(0.2),
             backgroundImage: entry.photoUrl != null && entry.photoUrl!.isNotEmpty
                 ? NetworkImage(entry.photoUrl!)
                 : null,
@@ -820,44 +949,62 @@ class LegislatorLeaderboardWidget extends StatelessWidget {
                 ? Text(
                     entry.name.isNotEmpty ? entry.name.substring(0, 1) : '?',
                     style: TextStyle(
-                      color: headerColor,
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
+                      fontSize: avatarRadius * 0.8,
                     ),
                   )
                 : null,
           ),
-        ],
-      ),
-      title: Text(
-        entry.name,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        '${entry.chamber} - District ${entry.district}',
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.6),
-          fontSize: 11,
-        ),
-      ),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: headerColor.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          '${entry.billsCount}',
-          style: TextStyle(
-            color: headerColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
+          SizedBox(width: isVeryCompact ? 6 : 10),
+          // Name and info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  entry.name,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: nameSize,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                if (!isVeryCompact)
+                  Text(
+                    '${entry.chamber} ${entry.district}',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: subtitleSize,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
           ),
-        ),
+          // Bill count badge
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isVeryCompact ? 6 : 8,
+              vertical: isVeryCompact ? 2 : 4,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${entry.billsCount}',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: rankSize,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

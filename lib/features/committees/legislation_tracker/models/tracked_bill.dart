@@ -211,7 +211,7 @@ class TrackedBill {
     this.primarySponsorDistrict,
     this.latestVoteResult,
     this.latestVoteDate,
-    this.position = 'watching',
+    this.position = 'neutral',
     this.positionSetBy,
     this.positionSetByName,
     this.positionSetByPhotoUrl,
@@ -302,7 +302,7 @@ class TrackedBill {
       primarySponsorDistrict: json['primary_sponsor_district'] as String?,
       latestVoteResult: json['latest_vote_result'] as String?,
       latestVoteDate: _parseDate(json['latest_vote_date']),
-      position: json['position'] as String? ?? 'watching',
+      position: json['position'] as String? ?? 'neutral',
       positionSetBy: json['position_set_by'] as String?,
       positionSetByName: _parsePositionSetByName(json),
       positionSetByPhotoUrl: _parsePositionSetByPhotoUrl(json),
@@ -703,19 +703,28 @@ class TrackedBill {
       // Try profile_pictures first
       final profilePictures = memberData['profile_pictures'];
       if (profilePictures is List && profilePictures.isNotEmpty) {
-        final firstPic = profilePictures.first;
-        if (firstPic is Map) {
-          // Try public_url first, then url
-          final url = firstPic['public_url'] ?? firstPic['url'];
+        // Find primary picture first, or use first one
+        Map<String, dynamic>? primaryPic;
+        for (final pic in profilePictures) {
+          if (pic is Map && pic['primary'] == true) {
+            primaryPic = Map<String, dynamic>.from(pic);
+            break;
+          }
+        }
+        final pic = primaryPic ?? (profilePictures.first is Map ? Map<String, dynamic>.from(profilePictures.first) : null);
+
+        if (pic != null) {
+          // Check for pre-computed URL first
+          final url = pic['public_url'] ?? pic['url'];
           if (url != null && url.toString().isNotEmpty) {
             return url.toString();
           }
-        }
-      } else if (profilePictures is Map && profilePictures.isNotEmpty) {
-        // Handle case where profile_pictures might be a single object
-        final url = profilePictures['public_url'] ?? profilePictures['url'];
-        if (url != null && url.toString().isNotEmpty) {
-          return url.toString();
+          // Construct URL from path and bucket
+          final path = pic['path'] as String?;
+          final bucket = pic['bucket'] as String? ?? 'member-photos';
+          if (path != null && path.isNotEmpty) {
+            return 'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/$bucket/$path';
+          }
         }
       }
       // Fallback to slack_cached_avatar (from slack_user_mapping)

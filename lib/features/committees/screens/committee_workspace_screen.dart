@@ -21,7 +21,7 @@ import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/screens/legislation_tracker_screen.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/legislation_provider.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/bill_search_provider.dart';
-import 'package:bluebubbles/features/committees/screens/committee_tools_config_screen.dart';
+import 'package:bluebubbles/features/committees/screens/committee_workspace_settings_screen.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
   final Committee committee;
@@ -415,20 +415,20 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                           padding: EdgeInsets.zero,
                           offset: const Offset(0, 40),
                           onSelected: (value) {
-                            if (value == 'member_tools') {
+                            if (value == 'workspace_settings') {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => CommitteeToolsConfigScreen(committee: committee),
+                                  builder: (_) => CommitteeWorkspaceSettingsScreen(committee: committee),
                                 ),
                               );
                             }
                           },
                           itemBuilder: (context) => [
                             const PopupMenuItem(
-                              value: 'member_tools',
+                              value: 'workspace_settings',
                               child: ListTile(
-                                leading: Icon(Icons.build_outlined),
-                                title: Text('Member Tools'),
+                                leading: Icon(Icons.settings_outlined),
+                                title: Text('Workspace Settings'),
                                 contentPadding: EdgeInsets.zero,
                               ),
                             ),
@@ -543,24 +543,24 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
   Widget _buildSettingsButton(BuildContext context) {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.settings_outlined, color: Colors.white),
-      tooltip: 'Committee Settings',
+      tooltip: 'Workspace Settings',
       offset: const Offset(0, 40),
       onSelected: (value) {
-        if (value == 'member_tools') {
+        if (value == 'workspace_settings') {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => CommitteeToolsConfigScreen(committee: committee),
+              builder: (_) => CommitteeWorkspaceSettingsScreen(committee: committee),
             ),
           );
         }
       },
       itemBuilder: (context) => [
         const PopupMenuItem(
-          value: 'member_tools',
+          value: 'workspace_settings',
           child: ListTile(
-            leading: Icon(Icons.build_outlined),
-            title: Text('Configure Member Tools'),
-            subtitle: Text('Control what committee members can access'),
+            leading: Icon(Icons.settings_outlined),
+            title: Text('Workspace Settings'),
+            subtitle: Text('Configure access and member tools'),
             contentPadding: EdgeInsets.zero,
           ),
         ),
