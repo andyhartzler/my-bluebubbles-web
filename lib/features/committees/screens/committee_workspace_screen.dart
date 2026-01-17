@@ -852,64 +852,6 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
     );
   }
 
-  Widget _buildLeaderChip(CommitteeLeader leader) {
-    return InkWell(
-      onTap: () {
-        if (leader.memberId != null) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MemberDetailScreen(memberId: leader.memberId!),
-            ),
-          );
-        }
-      },
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CorsAwareAvatar(
-              imageUrl: leader.photoUrl,
-              radius: 14,
-              backgroundColor: Colors.white.withOpacity(0.3),
-              fallbackText: leader.name,
-              fallbackIconColor: Colors.white,
-              fallbackTextColor: Colors.white,
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  leader.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (leader.title != null)
-                  Text(
-                    leader.title!,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 10,
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;

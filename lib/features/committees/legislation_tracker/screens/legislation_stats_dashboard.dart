@@ -527,7 +527,7 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
   LegislationProvider? _cachedProvider;
 
   LegislationProvider _getOrCreateProvider() {
-    _cachedProvider ??= LegislationProvider(_service);
+    _cachedProvider ??= LegislationProvider();
     return _cachedProvider!;
   }
 
