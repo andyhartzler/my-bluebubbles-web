@@ -37,8 +37,8 @@ class FormAnalyticsService {
   /// Get privileged client for bypassing RLS when reading submissions
   SupabaseClient get _readClient =>
       _crmService.isInitialized && _crmService.hasServiceRole
-          ? _crmService.privilegedClient
-          : _supabase;
+      ? _crmService.privilegedClient
+      : _supabase;
 
   /// Track when a form is viewed
   /// Returns a session token for tracking before subscriber is created
@@ -111,9 +111,7 @@ class FormAnalyticsService {
         'session_token': sessionToken,
         'event_type': FormEventTypes.phoneEntered,
         'timestamp': DateTime.now().toIso8601String(),
-        'metadata': {
-          if (phoneE164 != null) 'phone_e164': phoneE164,
-        },
+        'metadata': {if (phoneE164 != null) 'phone_e164': phoneE164},
       });
     } catch (e) {
       print('Analytics tracking error: $e');
@@ -140,9 +138,7 @@ class FormAnalyticsService {
         'session_token': sessionToken,
         'event_type': FormEventTypes.identityFound,
         'timestamp': DateTime.now().toIso8601String(),
-        'metadata': {
-          if (source != null) 'source': source,
-        },
+        'metadata': {if (source != null) 'source': source},
       });
     } catch (e) {
       print('Analytics tracking error: $e');
@@ -194,7 +190,9 @@ class FormAnalyticsService {
         'timestamp': DateTime.now().toIso8601String(),
         'metadata': {
           'field_count': submissionData.length,
-          'completed_fields': submissionData.values.where((v) => v != null).length,
+          'completed_fields': submissionData.values
+              .where((v) => v != null)
+              .length,
         },
       });
     } catch (e) {
@@ -256,9 +254,7 @@ class FormAnalyticsService {
         'session_token': sessionToken,
         'event_type': FormEventTypes.fieldUpdate,
         'timestamp': DateTime.now().toIso8601String(),
-        'metadata': {
-          'is_identity_field': isIdentityField,
-        },
+        'metadata': {'is_identity_field': isIdentityField},
       });
     } catch (e) {
       print('Analytics tracking error: $e');
@@ -323,6 +319,179 @@ class FormAnalyticsService {
     }
   }
 
+  // ============================================
+  // Vote-specific Analytics Methods
+  // These methods use vote_id instead of form_id
+  // ============================================
+
+  /// Track when a vote form is viewed
+  /// Returns a session token for tracking before subscriber is created
+  Future<String?> trackVoteView(
+    String voteId,
+    String? userId, {
+    String? memberId,
+    String? sessionToken,
+  }) async {
+    try {
+      final token = sessionToken ?? _generateSessionToken();
+      await _supabase.from('form_analytics').insert({
+        'form_id': voteId, // Also set form_id for compatibility
+        'vote_id': voteId,
+        'user_id': userId,
+        'member_id': memberId,
+        'session_token': token,
+        'event_type': FormEventTypes.view,
+        'timestamp': DateTime.now().toIso8601String(),
+        'metadata': {'source': 'vote'},
+      });
+      return token;
+    } catch (e) {
+      print('Vote analytics tracking error: $e');
+      return null;
+    }
+  }
+
+  /// Track when a member starts interacting with a vote
+  Future<void> trackVoteStart(
+    String voteId,
+    String? userId, {
+    String? memberId,
+    String? sessionToken,
+  }) async {
+    try {
+      await _supabase.from('form_analytics').insert({
+        'form_id': voteId,
+        'vote_id': voteId,
+        'user_id': userId,
+        'member_id': memberId,
+        'session_token': sessionToken,
+        'event_type': FormEventTypes.start,
+        'timestamp': DateTime.now().toIso8601String(),
+        'metadata': {'source': 'vote'},
+      });
+    } catch (e) {
+      print('Vote analytics tracking error: $e');
+    }
+  }
+
+  /// Track when a vote is submitted
+  Future<void> trackVoteSubmission(
+    String voteId,
+    String? userId,
+    Map<String, dynamic> voteData, {
+    String? memberId,
+    String? sessionToken,
+    String? voterSource, // 'member_view', 'exec_view', 'public_link'
+  }) async {
+    try {
+      await _supabase.from('form_analytics').insert({
+        'form_id': voteId,
+        'vote_id': voteId,
+        'user_id': userId,
+        'member_id': memberId,
+        'session_token': sessionToken,
+        'event_type': FormEventTypes.submit,
+        'timestamp': DateTime.now().toIso8601String(),
+        'metadata': {
+          'source': 'vote',
+          'voter_source': voterSource ?? 'unknown',
+          'question_count': voteData.length,
+          'answered_questions': voteData.values.where((v) => v != null).length,
+        },
+      });
+    } catch (e) {
+      print('Vote analytics tracking error: $e');
+    }
+  }
+
+  /// Track when a vote is abandoned (user leaves without submitting)
+  Future<void> trackVoteAbandonment(
+    String voteId,
+    String? userId,
+    Map<String, dynamic> partialData, {
+    String? memberId,
+    String? sessionToken,
+  }) async {
+    try {
+      await _supabase.from('form_analytics').insert({
+        'form_id': voteId,
+        'vote_id': voteId,
+        'user_id': userId,
+        'member_id': memberId,
+        'session_token': sessionToken,
+        'event_type': FormEventTypes.abandon,
+        'timestamp': DateTime.now().toIso8601String(),
+        'metadata': {
+          'source': 'vote',
+          'answered_questions': partialData.length,
+          'last_question': partialData.keys.lastOrNull,
+        },
+      });
+    } catch (e) {
+      print('Vote analytics tracking error: $e');
+    }
+  }
+
+  /// Track when a vote question is answered (field-level)
+  Future<void> trackVoteFieldInteraction(
+    String voteId,
+    String questionId,
+    String questionType,
+    String? userId, {
+    String? memberId,
+    String? sessionToken,
+  }) async {
+    try {
+      await _supabase.from('form_field_analytics').insert({
+        'form_id': voteId,
+        'vote_id': voteId,
+        'field_id': questionId,
+        'field_type': questionType,
+        'user_id': userId,
+        'member_id': memberId,
+        'session_token': sessionToken,
+        'event_type': 'interaction',
+        'timestamp': DateTime.now().toIso8601String(),
+        'metadata': {'source': 'vote'},
+      });
+    } catch (e) {
+      print('Vote field analytics tracking error: $e');
+    }
+  }
+
+  /// Track when a vote question answer is updated
+  Future<void> trackVoteFieldUpdate(
+    String voteId,
+    String questionId,
+    String questionType,
+    String? userId, {
+    String? memberId,
+    String? sessionToken,
+    dynamic answerValue,
+  }) async {
+    try {
+      await _supabase.from('form_field_analytics').insert({
+        'form_id': voteId,
+        'vote_id': voteId,
+        'field_id': questionId,
+        'field_type': questionType,
+        'user_id': userId,
+        'member_id': memberId,
+        'session_token': sessionToken,
+        'event_type': FormEventTypes.fieldUpdate,
+        'timestamp': DateTime.now().toIso8601String(),
+        'metadata': {
+          'source': 'vote',
+          // Don't store the actual answer for privacy, just metadata
+          'has_value': answerValue != null,
+          'is_list': answerValue is List,
+        },
+      });
+    } catch (e) {
+      print('Vote field analytics tracking error: $e');
+    }
+  }
+
   /// Generate a random session token for tracking
   String _generateSessionToken() {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -350,30 +519,58 @@ class FormAnalyticsService {
       final actualSubmissions = (submissionCountResponse as List).length;
 
       // Count various event types
-      final views = analyticsData.where((e) => e['event_type'] == FormEventTypes.view).length;
-      final starts = analyticsData.where((e) => e['event_type'] == FormEventTypes.start).length;
-      final phoneEntered = analyticsData.where((e) => e['event_type'] == FormEventTypes.phoneEntered).length;
-      final identityFound = analyticsData.where((e) => e['event_type'] == FormEventTypes.identityFound).length;
-      final identityCreated = analyticsData.where((e) => e['event_type'] == FormEventTypes.identityCreated).length;
-      final trackedSubmissions = analyticsData.where((e) => e['event_type'] == FormEventTypes.submit).length;
-      final abandonments = analyticsData.where((e) => e['event_type'] == FormEventTypes.abandon).length;
+      final views = analyticsData
+          .where((e) => e['event_type'] == FormEventTypes.view)
+          .length;
+      final starts = analyticsData
+          .where((e) => e['event_type'] == FormEventTypes.start)
+          .length;
+      final phoneEntered = analyticsData
+          .where((e) => e['event_type'] == FormEventTypes.phoneEntered)
+          .length;
+      final identityFound = analyticsData
+          .where((e) => e['event_type'] == FormEventTypes.identityFound)
+          .length;
+      final identityCreated = analyticsData
+          .where((e) => e['event_type'] == FormEventTypes.identityCreated)
+          .length;
+      final trackedSubmissions = analyticsData
+          .where((e) => e['event_type'] == FormEventTypes.submit)
+          .length;
+      final abandonments = analyticsData
+          .where((e) => e['event_type'] == FormEventTypes.abandon)
+          .length;
 
       // Use actual submissions as the authoritative count
-      final submissions = actualSubmissions > trackedSubmissions ? actualSubmissions : trackedSubmissions;
+      final submissions = actualSubmissions > trackedSubmissions
+          ? actualSubmissions
+          : trackedSubmissions;
 
       // Calculate rates based on phone entries (preferred) or starts
       // Phone entries represent the true "start" of form engagement with identity tracking
-      final effectiveStarts = phoneEntered > 0 ? phoneEntered : (starts > 0 ? starts : submissions);
-      final completionRate = effectiveStarts > 0 ? (submissions / effectiveStarts * 100) : (submissions > 0 ? 100.0 : 0.0);
-      final abandonmentRate = effectiveStarts > 0 ? (abandonments / effectiveStarts * 100) : 0.0;
+      final effectiveStarts = phoneEntered > 0
+          ? phoneEntered
+          : (starts > 0 ? starts : submissions);
+      final completionRate = effectiveStarts > 0
+          ? (submissions / effectiveStarts * 100)
+          : (submissions > 0 ? 100.0 : 0.0);
+      final abandonmentRate = effectiveStarts > 0
+          ? (abandonments / effectiveStarts * 100)
+          : 0.0;
 
       // Calculate identity-related metrics
-      final returningUserRate = phoneEntered > 0 ? (identityFound / phoneEntered * 100) : 0.0;
-      final newUserRate = phoneEntered > 0 ? (identityCreated / phoneEntered * 100) : 0.0;
+      final returningUserRate = phoneEntered > 0
+          ? (identityFound / phoneEntered * 100)
+          : 0.0;
+      final newUserRate = phoneEntered > 0
+          ? (identityCreated / phoneEntered * 100)
+          : 0.0;
 
       return FormAnalyticsSummary(
         formId: formId,
-        totalViews: views > 0 ? views : submissions, // Estimate views if not tracked
+        totalViews: views > 0
+            ? views
+            : submissions, // Estimate views if not tracked
         totalStarts: effectiveStarts,
         totalPhoneEntries: phoneEntered,
         totalIdentityFound: identityFound,
@@ -502,17 +699,14 @@ class FormAnalyticsService {
       final dateMap = <String, int>{};
       for (final item in data) {
         final timestamp = DateTime.parse(item['created_at'] as String);
-        final dateKey = '${timestamp.year}-${timestamp.month.toString().padLeft(2, '0')}-${timestamp.day.toString().padLeft(2, '0')}';
+        final dateKey =
+            '${timestamp.year}-${timestamp.month.toString().padLeft(2, '0')}-${timestamp.day.toString().padLeft(2, '0')}';
         dateMap[dateKey] = (dateMap[dateKey] ?? 0) + 1;
       }
 
       return dateMap.entries.map((e) {
-        return TimeSeriesData(
-          date: DateTime.parse(e.key),
-          count: e.value,
-        );
-      }).toList()
-        ..sort((a, b) => a.date.compareTo(b.date));
+        return TimeSeriesData(date: DateTime.parse(e.key), count: e.value);
+      }).toList()..sort((a, b) => a.date.compareTo(b.date));
     } catch (e) {
       print('Error fetching time series: $e');
       return [];
@@ -544,7 +738,10 @@ class FormAnalyticsService {
   }
 
   /// Get recent submission activity (last N submissions with timestamps)
-  Future<List<SubmissionActivity>> getRecentActivity(String formId, {int limit = 10}) async {
+  Future<List<SubmissionActivity>> getRecentActivity(
+    String formId, {
+    int limit = 10,
+  }) async {
     try {
       // Use privileged client to bypass RLS
       final response = await _readClient
@@ -555,13 +752,17 @@ class FormAnalyticsService {
           .limit(limit);
 
       final data = response as List;
-      return data.map((item) => SubmissionActivity(
-        id: item['id'] as String,
-        createdAt: DateTime.parse(item['created_at'] as String),
-        submitterName: item['submitter_name'] as String?,
-        submitterEmail: item['submitter_email'] as String?,
-        status: item['status'] as String? ?? 'submitted',
-      )).toList();
+      return data
+          .map(
+            (item) => SubmissionActivity(
+              id: item['id'] as String,
+              createdAt: DateTime.parse(item['created_at'] as String),
+              submitterName: item['submitter_name'] as String?,
+              submitterEmail: item['submitter_email'] as String?,
+              status: item['status'] as String? ?? 'submitted',
+            ),
+          )
+          .toList();
     } catch (e) {
       print('Error fetching recent activity: $e');
       return [];
@@ -669,10 +870,7 @@ class TimeSeriesData {
   final DateTime date;
   final int count;
 
-  TimeSeriesData({
-    required this.date,
-    required this.count,
-  });
+  TimeSeriesData({required this.date, required this.count});
 }
 
 /// Submission activity for recent activity list

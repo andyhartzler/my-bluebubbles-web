@@ -633,8 +633,8 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
   }
 
   Widget _buildBillCard(TrackedBill bill) {
-    final position = BillPosition.fromString(bill.position);
-    final priority = BillPriority.fromString(bill.priority);
+    final position = bill.position != null ? BillPosition.fromString(bill.position!) : null;
+    final priority = bill.priority != null ? BillPriority.fromString(bill.priority!) : null;
 
     return Card(
       elevation: 2,
@@ -645,7 +645,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
       child: Container(
         decoration: BoxDecoration(
           border: Border(
-            left: BorderSide(color: position.color, width: 4),
+            left: BorderSide(color: position?.color ?? _momentumBlue, width: 4),
           ),
         ),
         padding: const EdgeInsets.all(16),
@@ -688,7 +688,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                     ),
                   ),
                 const Spacer(),
-                _buildPositionBadge(position),
+                if (position != null) _buildPositionBadge(position),
               ],
             ),
             const SizedBox(height: 12),

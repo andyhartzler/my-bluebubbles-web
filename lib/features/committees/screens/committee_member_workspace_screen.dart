@@ -110,8 +110,8 @@ class _CommitteeMemberWorkspaceScreenState
           label: 'Slack',
           iconWidget: SvgPicture.asset(
             'assets/icon/slack-icon.svg',
-            width: 24,
-            height: 24,
+            width: 20,
+            height: 20,
             colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
           ),
           slug: 'slack',
@@ -300,12 +300,6 @@ class _CommitteeMemberWorkspaceScreenState
     return tabs[_currentTabIndex].slug == 'board';
   }
 
-  bool get _isOnLegislationTab {
-    final tabs = _tabs;
-    if (_currentTabIndex >= tabs.length) return false;
-    return tabs[_currentTabIndex].slug == 'legislation';
-  }
-
   void _setCanvasFullscreen(bool fullscreen) {
     setState(() {
       _isCanvasFullscreen = fullscreen;
@@ -371,11 +365,7 @@ class _CommitteeMemberWorkspaceScreenState
       );
     }
 
-    // Legislation tab: special layout with pinned sub-tabs and collapsible parent header
-    if (_isOnLegislationTab) {
-      return _buildLegislationLayout(context, tabs);
-    }
-
+    // Use unified layout for all tabs including Legislation
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isVerySmall = screenWidth < 400;
@@ -434,132 +424,6 @@ class _CommitteeMemberWorkspaceScreenState
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  /// Special layout for the Legislation tab:
-  /// - Committee header collapses on scroll and only shows when at the very top
-  /// - Legislation sub-tabs (Overview, All Bills, Legislators) stay pinned
-  Widget _buildLegislationLayout(
-    BuildContext context,
-    List<_TabDefinition> tabs,
-  ) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final isVerySmall = screenWidth < 400;
-
-    return Scaffold(
-      body: NestedScrollView(
-        floatHeaderSlivers: false, // Don't float - only show at very top
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            // Collapsible committee header - only visible when scrolled to top
-            SliverAppBar(
-              expandedHeight: isMobile ? 100 : 140,
-              floating: false, // Don't float back on scroll up
-              pinned: false, // Don't pin - allow full collapse
-              snap: false, // Don't snap - must scroll fully to top
-              automaticallyImplyLeading: false,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        committee.primaryColor,
-                        committee.secondaryColor,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: SafeArea(
-                    bottom: false,
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(4, 4, 12, isMobile ? 8 : 16),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.arrow_back,
-                              color: Colors.white,
-                            ),
-                            onPressed: () => Navigator.of(context).pop(),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          const SizedBox(width: 4),
-                          CircleAvatar(
-                            radius: isMobile ? 14 : 18,
-                            backgroundColor: Colors.white.withOpacity(0.2),
-                            child: Icon(
-                              committee.icon,
-                              color: Colors.white,
-                              size: isMobile ? 14 : 18,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              committee.displayName,
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(48),
-                child: Container(
-                  color: committee.primaryColor,
-                  child: TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    labelPadding: EdgeInsets.symmetric(
-                      horizontal: isVerySmall ? 6 : 10,
-                    ),
-                    indicatorWeight: 3,
-                    indicatorColor: Colors.white,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.white70,
-                    tabs: tabs
-                        .map(
-                          (tab) => Tab(
-                            icon: tab.iconWidget ?? Icon(tab.icon, size: 18),
-                            text: isVerySmall ? null : tab.label,
-                            iconMargin: EdgeInsets.only(
-                              bottom: isVerySmall ? 0 : 2,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              ),
-            ),
-          ];
-        },
-        // The legislation tab content handles its own tabs internally
-        body: TabBarView(
-          controller: _tabController,
-          physics: const NeverScrollableScrollPhysics(),
-          children: tabs.asMap().entries.map((entry) {
-            final index = entry.key;
-            final tab = entry.value;
-            return _LazyTabContent(
-              key: ValueKey('${tab.slug}_$index'),
-              builder: tab.builder,
-            );
-          }).toList(),
-        ),
       ),
     );
   }

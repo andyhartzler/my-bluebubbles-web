@@ -795,88 +795,31 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
   }
 
   Widget _buildHeader({required bool isMobile}) {
-    final theme = Theme.of(context);
-
-    if (isMobile) {
-      return Row(
-        children: [
-          Container(
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: _momentumBlue,
-            ),
-            padding: const EdgeInsets.all(8),
-            child: const Icon(Icons.analytics, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Legislation Stats',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: _unityBlue,
-              ),
-            ),
-          ),
-          if (widget.isExecutive)
-            IconButton(
-              tooltip: 'Customize',
-              icon: const Icon(
-                Icons.edit_outlined,
-                color: _unityBlue,
-                size: 22,
-              ),
-              onPressed: _toggleEditMode,
-            ),
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh, color: _unityBlue, size: 22),
-            onPressed: _loadStats,
-          ),
-        ],
-      );
+    // Member view: no header controls at all
+    if (!widget.isExecutive) {
+      return const SizedBox.shrink();
     }
 
+    // Executive view: just edit and refresh buttons aligned right
     return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Container(
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: _momentumBlue,
+        IconButton(
+          tooltip: 'Customize Dashboard',
+          icon: Icon(
+            Icons.edit_outlined,
+            color: _unityBlue,
+            size: isMobile ? 22 : 24,
           ),
-          padding: const EdgeInsets.all(12),
-          child: const Icon(Icons.analytics, color: Colors.white, size: 28),
+          onPressed: _toggleEditMode,
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Legislation Statistics',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: _unityBlue,
-                ),
-              ),
-              Text(
-                'Real-time insights into Missouri legislation',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: _unityBlue.withOpacity(0.7),
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (widget.isExecutive)
-          IconButton(
-            tooltip: 'Customize Dashboard',
-            icon: const Icon(Icons.edit_outlined, color: _unityBlue),
-            onPressed: _toggleEditMode,
-          ),
         IconButton(
           tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh, color: _unityBlue),
+          icon: Icon(
+            Icons.refresh,
+            color: _unityBlue,
+            size: isMobile ? 22 : 24,
+          ),
           onPressed: _loadStats,
         ),
       ],

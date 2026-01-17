@@ -88,18 +88,18 @@ class WidgetGradients {
 class WidgetBackgrounds {
   /// Solid background colors (null = white/default)
   static const List<Color?> solidColors = [
-    null,  // White (default)
-    Color(0xFFF8F9FA),  // Light gray
-    Color(0xFFE3F2FD),  // Light blue
-    Color(0xFFE8F5E9),  // Light green
-    Color(0xFFFFF3E0),  // Light orange
-    Color(0xFFFCE4EC),  // Light pink
-    Color(0xFFF3E5F5),  // Light purple
-    Color(0xFFE0F7FA),  // Light cyan
-    Color(0xFFFFFDE7),  // Light yellow
-    Color(0xFFEFEBE9),  // Light brown
-    Color(0xFFECEFF1),  // Blue gray
-    Color(0xFF263238),  // Dark slate (for dark mode look)
+    null, // White (default)
+    Color(0xFFF8F9FA), // Light gray
+    Color(0xFFE3F2FD), // Light blue
+    Color(0xFFE8F5E9), // Light green
+    Color(0xFFFFF3E0), // Light orange
+    Color(0xFFFCE4EC), // Light pink
+    Color(0xFFF3E5F5), // Light purple
+    Color(0xFFE0F7FA), // Light cyan
+    Color(0xFFFFFDE7), // Light yellow
+    Color(0xFFEFEBE9), // Light brown
+    Color(0xFFECEFF1), // Blue gray
+    Color(0xFF263238), // Dark slate (for dark mode look)
   ];
 
   static const List<String> colorNames = [
@@ -173,7 +173,9 @@ class StatCardWidget extends StatelessWidget {
 
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isSmall ? 12 : 16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(isSmall ? 12 : 16),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -188,45 +190,90 @@ class StatCardWidget extends StatelessWidget {
           padding: EdgeInsets.all(isSmall ? 12 : (isMini ? 16 : 20)),
           child: isSmall
               ? _buildSmallLayout(displayValue)
-              : (isMini ? _buildMiniLayout(displayValue) : _buildStandardLayout(displayValue)),
+              : (isMini
+                    ? _buildMiniLayout(displayValue)
+                    : _buildStandardLayout(displayValue)),
         ),
       ),
     );
   }
 
-  /// Compact square layout for mini size - number on top, name below
+  /// Compact square layout for mini size - number on top, name/icon below
+  /// Fully responsive - scales to any screen size
   Widget _buildMiniLayout(String displayValue) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Large number at the top
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            displayValue,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-              height: 1.1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate responsive sizes based on available space
+        final availableHeight = constraints.maxHeight;
+        final availableWidth = constraints.maxWidth;
+
+        // Number takes up ~60% of height, label takes ~40%
+        final numberHeight = availableHeight * 0.55;
+        final labelHeight = availableHeight * 0.35;
+        final spacing = availableHeight * 0.1;
+
+        // Calculate icon size proportional to available width
+        final iconSize = (availableWidth * 0.15).clamp(12.0, 20.0);
+
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Large number at the top - takes majority of space
+            SizedBox(
+              height: numberHeight,
+              width: availableWidth,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Text(
+                  displayValue,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 72, // Large base size, FittedBox will scale down
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        // Stat name below
-        Text(
-          config.title,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.95),
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+            SizedBox(height: spacing),
+            // Stat name and icon at the bottom - smaller, compact
+            SizedBox(
+              height: labelHeight,
+              width: availableWidth,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (config.icon != null) ...[
+                      Icon(
+                        config.icon,
+                        color: Colors.white.withOpacity(0.9),
+                        size: iconSize,
+                      ),
+                      SizedBox(width: iconSize * 0.3),
+                    ],
+                    Text(
+                      config.title,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.95),
+                        fontSize: 14, // Base size, FittedBox scales
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -349,7 +396,8 @@ class StatCardWidget extends StatelessWidget {
   String _formatValue(dynamic val) {
     if (val is num) {
       // For monetary values, show full amount with dollar sign and commas, no decimals
-      if (config.dataSourceKey.contains('Amount') || config.dataSourceKey.contains('Donation')) {
+      if (config.dataSourceKey.contains('Amount') ||
+          config.dataSourceKey.contains('Donation')) {
         return '\$${_formatWithCommas(val.toInt())}';
       }
       // For all other numbers, show full value with commas (no K/M abbreviation)
@@ -377,7 +425,6 @@ class StatCardWidget extends StatelessWidget {
     }
     return result.toString();
   }
-
 }
 
 /// Renders a bar chart widget with horizontal scrolling for mobile
@@ -398,7 +445,9 @@ class BarChartWidget extends StatelessWidget {
     final sortedData = List<NameCount>.from(data)
       ..sort((a, b) => b.count.compareTo(a.count));
     final displayData = sortedData.take(maxItems).toList();
-    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(
+      config.options,
+    );
 
     if (displayData.isEmpty) {
       return _buildEmptyState();
@@ -422,8 +471,10 @@ class BarChartWidget extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   // Safety check: ensure valid constraints before rendering chart
-                  if (constraints.maxWidth <= 0 || constraints.maxHeight <= 0 ||
-                      !constraints.maxWidth.isFinite || !constraints.maxHeight.isFinite) {
+                  if (constraints.maxWidth <= 0 ||
+                      constraints.maxHeight <= 0 ||
+                      !constraints.maxWidth.isFinite ||
+                      !constraints.maxHeight.isFinite) {
                     return const SizedBox.shrink();
                   }
                   // Use horizontal bar chart for small screens
@@ -441,9 +492,18 @@ class BarChartWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildVerticalChart(List<NameCount> displayData, BoxConstraints constraints) {
-    final maxValue = displayData.fold<int>(0, (prev, e) => e.count > prev ? e.count : prev);
-    final barWidth = ((constraints.maxWidth - 60) / displayData.length).clamp(12.0, 28.0);
+  Widget _buildVerticalChart(
+    List<NameCount> displayData,
+    BoxConstraints constraints,
+  ) {
+    final maxValue = displayData.fold<int>(
+      0,
+      (prev, e) => e.count > prev ? e.count : prev,
+    );
+    final barWidth = ((constraints.maxWidth - 60) / displayData.length).clamp(
+      12.0,
+      28.0,
+    );
 
     return BarChart(
       BarChartData(
@@ -500,11 +560,18 @@ class BarChartWidget extends StatelessWidget {
               final entry = displayData[groupIndex];
               return BarTooltipItem(
                 '${entry.name}\n',
-                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
                 children: [
                   TextSpan(
                     text: '${entry.count} members',
-                    style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.85),
+                      fontSize: 11,
+                    ),
                   ),
                 ],
               );
@@ -515,8 +582,14 @@ class BarChartWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildHorizontalBars(List<NameCount> displayData, BoxConstraints constraints) {
-    final maxValue = displayData.fold<int>(0, (prev, e) => e.count > prev ? e.count : prev);
+  Widget _buildHorizontalBars(
+    List<NameCount> displayData,
+    BoxConstraints constraints,
+  ) {
+    final maxValue = displayData.fold<int>(
+      0,
+      (prev, e) => e.count > prev ? e.count : prev,
+    );
 
     return ListView.builder(
       itemCount: displayData.length,
@@ -615,7 +688,11 @@ class BarChartWidget extends StatelessWidget {
             color: _momentumBlue.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(config.icon ?? Icons.bar_chart, color: _momentumBlue, size: 18),
+          child: Icon(
+            config.icon ?? Icons.bar_chart,
+            color: _momentumBlue,
+            size: 18,
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -669,15 +746,21 @@ class DynamicDistributionChartWidget extends StatefulWidget {
   });
 
   @override
-  State<DynamicDistributionChartWidget> createState() => _DynamicDistributionChartWidgetState();
+  State<DynamicDistributionChartWidget> createState() =>
+      _DynamicDistributionChartWidgetState();
 }
 
-class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChartWidget> {
+class _DynamicDistributionChartWidgetState
+    extends State<DynamicDistributionChartWidget> {
   late String _selectedKey;
 
   static const _distributionOptions = [
     ('membersByCounty', 'Top Counties', Icons.map),
-    ('membersByCongressionalDistrict', 'Congressional Districts', Icons.location_city),
+    (
+      'membersByCongressionalDistrict',
+      'Congressional Districts',
+      Icons.location_city,
+    ),
     ('membersByCommittee', 'Committees', Icons.groups),
     ('membersByHighSchool', 'High Schools', Icons.school),
     ('membersByCollege', 'Colleges', Icons.account_balance),
@@ -700,7 +783,9 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
   void initState() {
     super.initState();
     // Use stored selection from options, or default to first option
-    _selectedKey = widget.config.options['selectedDistribution'] as String? ?? _distributionOptions.first.$1;
+    _selectedKey =
+        widget.config.options['selectedDistribution'] as String? ??
+        _distributionOptions.first.$1;
   }
 
   List<NameCount> _getDataForKey(String key) {
@@ -765,7 +850,9 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
       orElse: () => _distributionOptions.first,
     );
     final data = _getDataForKey(_selectedKey);
-    final backgroundColor = WidgetBackgrounds.getBackgroundColor(widget.config.options);
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(
+      widget.config.options,
+    );
 
     return Card(
       elevation: 4,
@@ -788,8 +875,10 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
                       builder: (context, constraints) {
                         // Safety check: ensure valid constraints before rendering chart
                         // This prevents layout errors during animation transitions
-                        if (constraints.maxWidth <= 0 || constraints.maxHeight <= 0 ||
-                            !constraints.maxWidth.isFinite || !constraints.maxHeight.isFinite) {
+                        if (constraints.maxWidth <= 0 ||
+                            constraints.maxHeight <= 0 ||
+                            !constraints.maxWidth.isFinite ||
+                            !constraints.maxHeight.isFinite) {
                           return const SizedBox.shrink();
                         }
                         return _buildChart(data, constraints);
@@ -847,19 +936,33 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
                 value: opt.$1,
                 child: Row(
                   children: [
-                    Icon(opt.$3, size: 18, color: opt.$1 == _selectedKey ? _grassrootsGreen : Colors.white70),
+                    Icon(
+                      opt.$3,
+                      size: 18,
+                      color: opt.$1 == _selectedKey
+                          ? _grassrootsGreen
+                          : Colors.white70,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         opt.$2,
                         style: TextStyle(
-                          fontWeight: opt.$1 == _selectedKey ? FontWeight.bold : FontWeight.normal,
-                          color: opt.$1 == _selectedKey ? Colors.white : Colors.white.withOpacity(0.9),
+                          fontWeight: opt.$1 == _selectedKey
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: opt.$1 == _selectedKey
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.9),
                         ),
                       ),
                     ),
                     if (opt.$1 == _selectedKey)
-                      const Icon(Icons.check, size: 16, color: _grassrootsGreen),
+                      const Icon(
+                        Icons.check,
+                        size: 16,
+                        color: _grassrootsGreen,
+                      ),
                   ],
                 ),
               );
@@ -880,7 +983,10 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
       return _buildEmptyState();
     }
 
-    final maxValue = displayData.fold<int>(0, (prev, e) => e.count > prev ? e.count : prev);
+    final maxValue = displayData.fold<int>(
+      0,
+      (prev, e) => e.count > prev ? e.count : prev,
+    );
     final isSmall = constraints.maxWidth < 280;
     // Use horizontal bars for mobileFull size (like tall layout but full width)
     final isMobileFull = widget.config.size == DashboardWidgetSize.mobileFull;
@@ -893,12 +999,23 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
     return _buildVerticalBars(displayData, maxValue, constraints);
   }
 
-  Widget _buildVerticalBars(List<NameCount> displayData, int maxValue, BoxConstraints constraints) {
-    final barWidth = ((constraints.maxWidth - 60) / displayData.length).clamp(14.0, 32.0);
+  Widget _buildVerticalBars(
+    List<NameCount> displayData,
+    int maxValue,
+    BoxConstraints constraints,
+  ) {
+    final barWidth = ((constraints.maxWidth - 60) / displayData.length).clamp(
+      14.0,
+      32.0,
+    );
 
     // Calculate a nice interval for y-axis labels (aim for 4-5 labels)
     final yAxisInterval = _calculateNiceInterval(maxValue, 4);
-    final adjustedMaxY = ((maxValue / yAxisInterval).ceil() * yAxisInterval * 1.1).clamp(1.0, double.infinity);
+    final adjustedMaxY =
+        ((maxValue / yAxisInterval).ceil() * yAxisInterval * 1.1).clamp(
+          1.0,
+          double.infinity,
+        );
 
     return BarChart(
       BarChartData(
@@ -963,11 +1080,18 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
               final entry = displayData[groupIndex];
               return BarTooltipItem(
                 '${entry.name}\n',
-                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
                 children: [
                   TextSpan(
                     text: '${entry.count} members',
-                    style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.85),
+                      fontSize: 11,
+                    ),
                   ),
                 ],
               );
@@ -1075,7 +1199,9 @@ class _DynamicDistributionChartWidgetState extends State<DynamicDistributionChar
     final rawInterval = maxValue / targetLabels;
 
     // Find the order of magnitude
-    final magnitude = math.pow(10, (math.log(rawInterval) / math.ln10).floor()).toDouble();
+    final magnitude = math
+        .pow(10, (math.log(rawInterval) / math.ln10).floor())
+        .toDouble();
 
     // Calculate normalized value (1-10 range)
     final normalized = rawInterval / magnitude;
@@ -1151,7 +1277,9 @@ class _PieChartWidgetState extends State<PieChartWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = WidgetBackgrounds.getBackgroundColor(widget.config.options);
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(
+      widget.config.options,
+    );
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1166,8 +1294,10 @@ class _PieChartWidgetState extends State<PieChartWidget> {
 
   Widget _buildResponsiveChart(BoxConstraints constraints) {
     // Safety check: ensure valid constraints before rendering chart
-    if (constraints.maxWidth <= 0 || constraints.maxHeight <= 0 ||
-        !constraints.maxWidth.isFinite || !constraints.maxHeight.isFinite) {
+    if (constraints.maxWidth <= 0 ||
+        constraints.maxHeight <= 0 ||
+        !constraints.maxWidth.isFinite ||
+        !constraints.maxHeight.isFinite) {
       return const SizedBox.shrink();
     }
     final width = constraints.maxWidth;
@@ -1176,7 +1306,9 @@ class _PieChartWidgetState extends State<PieChartWidget> {
     final isLarge = width >= 400 && height >= 300;
     final isMedium = !isCompact && !isLarge;
     final textColor = WidgetBackgrounds.getTextColor(widget.config.options);
-    final secondaryTextColor = WidgetBackgrounds.getSecondaryTextColor(widget.config.options);
+    final secondaryTextColor = WidgetBackgrounds.getSecondaryTextColor(
+      widget.config.options,
+    );
 
     // Dynamic maxItems based on size
     final maxItems = isCompact ? 5 : (isLarge ? 12 : 8);
@@ -1187,9 +1319,16 @@ class _PieChartWidgetState extends State<PieChartWidget> {
 
     // Add "Other" category if there are more items
     if (sortedData.length > maxItems) {
-      final otherCount = sortedData.skip(maxItems).fold<int>(0, (sum, e) => sum + e.count);
+      final otherCount = sortedData
+          .skip(maxItems)
+          .fold<int>(0, (sum, e) => sum + e.count);
       if (otherCount > 0) {
-        displayData.add(NameCount(name: 'Other (${sortedData.length - maxItems} more)', count: otherCount));
+        displayData.add(
+          NameCount(
+            name: 'Other (${sortedData.length - maxItems} more)',
+            count: otherCount,
+          ),
+        );
       }
     }
 
@@ -1202,7 +1341,8 @@ class _PieChartWidgetState extends State<PieChartWidget> {
     // Calculate dynamic pie radius based on available space
     final availableChartHeight = height - 80; // Account for header
     final availableChartWidth = isCompact ? width - 40 : (width - 40) * 0.55;
-    final maxRadius = math.min(availableChartHeight / 2, availableChartWidth / 2) - 10;
+    final maxRadius =
+        math.min(availableChartHeight / 2, availableChartWidth / 2) - 10;
     final baseRadius = maxRadius.clamp(30.0, 120.0);
     final touchedRadius = baseRadius + 10;
 
@@ -1221,7 +1361,12 @@ class _PieChartWidgetState extends State<PieChartWidget> {
             const SizedBox(height: 8),
             Expanded(
               child: Center(
-                child: _buildPieWithTooltip(displayData, total, baseRadius, touchedRadius),
+                child: _buildPieWithTooltip(
+                  displayData,
+                  total,
+                  baseRadius,
+                  touchedRadius,
+                ),
               ),
             ),
           ],
@@ -1248,7 +1393,12 @@ class _PieChartWidgetState extends State<PieChartWidget> {
                 Expanded(
                   flex: isLarge ? 5 : 4,
                   child: Center(
-                    child: _buildPieWithTooltip(displayData, total, baseRadius, touchedRadius),
+                    child: _buildPieWithTooltip(
+                      displayData,
+                      total,
+                      baseRadius,
+                      touchedRadius,
+                    ),
                   ),
                 ),
                 SizedBox(width: isLarge ? 20 : 12),
@@ -1265,7 +1415,12 @@ class _PieChartWidgetState extends State<PieChartWidget> {
     );
   }
 
-  Widget _buildPieWithTooltip(List<NameCount> displayData, int total, double baseRadius, double touchedRadius) {
+  Widget _buildPieWithTooltip(
+    List<NameCount> displayData,
+    int total,
+    double baseRadius,
+    double touchedRadius,
+  ) {
     return PieChart(
       PieChartData(
         pieTouchData: PieTouchData(
@@ -1301,9 +1456,7 @@ class _PieChartWidgetState extends State<PieChartWidget> {
               fontSize: isTouched ? 11 : 10,
               fontWeight: FontWeight.bold,
               color: Colors.white,
-              shadows: const [
-                Shadow(color: Colors.black54, blurRadius: 4),
-              ],
+              shadows: const [Shadow(color: Colors.black54, blurRadius: 4)],
             ),
             titlePositionPercentageOffset: 0.55,
             badgePositionPercentageOffset: 1.1,
@@ -1313,7 +1466,11 @@ class _PieChartWidgetState extends State<PieChartWidget> {
     );
   }
 
-  Widget _buildLegend(List<NameCount> displayData, int total, {required bool isLarge}) {
+  Widget _buildLegend(
+    List<NameCount> displayData,
+    int total, {
+    required bool isLarge,
+  }) {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1324,7 +1481,8 @@ class _PieChartWidgetState extends State<PieChartWidget> {
           final isSelected = _touchedIndex == index;
 
           return Tooltip(
-            message: '${entry.name}: ${entry.count} (${percentage.toStringAsFixed(1)}%)',
+            message:
+                '${entry.name}: ${entry.count} (${percentage.toStringAsFixed(1)}%)',
             waitDuration: const Duration(milliseconds: 300),
             child: InkWell(
               onTap: () {
@@ -1340,7 +1498,9 @@ class _PieChartWidgetState extends State<PieChartWidget> {
                   horizontal: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: isSelected ? _pieColors[index % _pieColors.length].withOpacity(0.1) : Colors.transparent,
+                  color: isSelected
+                      ? _pieColors[index % _pieColors.length].withOpacity(0.1)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Row(
@@ -1352,7 +1512,13 @@ class _PieChartWidgetState extends State<PieChartWidget> {
                         color: _pieColors[index % _pieColors.length],
                         shape: BoxShape.circle,
                         boxShadow: isSelected
-                            ? [BoxShadow(color: _pieColors[index % _pieColors.length].withOpacity(0.5), blurRadius: 4)]
+                            ? [
+                                BoxShadow(
+                                  color: _pieColors[index % _pieColors.length]
+                                      .withOpacity(0.5),
+                                  blurRadius: 4,
+                                ),
+                              ]
                             : null,
                       ),
                     ),
@@ -1363,7 +1529,9 @@ class _PieChartWidgetState extends State<PieChartWidget> {
                         style: TextStyle(
                           fontSize: isLarge ? 13 : 11,
                           color: isSelected ? _unityBlue : Colors.grey[700],
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1449,15 +1617,13 @@ class LineChartWidget extends StatelessWidget {
   final DashboardWidgetConfig config;
   final List<MonthlyCount> data;
 
-  const LineChartWidget({
-    super.key,
-    required this.config,
-    required this.data,
-  });
+  const LineChartWidget({super.key, required this.config, required this.data});
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(
+      config.options,
+    );
 
     if (data.isEmpty) {
       return _buildEmptyState();
@@ -1466,7 +1632,10 @@ class LineChartWidget extends StatelessWidget {
     final sortedData = List<MonthlyCount>.from(data)
       ..sort((a, b) => a.month.compareTo(b.month));
 
-    final maxValue = sortedData.fold<int>(0, (prev, e) => e.count > prev ? e.count : prev);
+    final maxValue = sortedData.fold<int>(
+      0,
+      (prev, e) => e.count > prev ? e.count : prev,
+    );
 
     return Card(
       elevation: 4,
@@ -1486,111 +1655,143 @@ class LineChartWidget extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   // Safety check: ensure valid constraints before rendering chart
-                  if (constraints.maxWidth <= 0 || constraints.maxHeight <= 0 ||
-                      !constraints.maxWidth.isFinite || !constraints.maxHeight.isFinite) {
+                  if (constraints.maxWidth <= 0 ||
+                      constraints.maxHeight <= 0 ||
+                      !constraints.maxWidth.isFinite ||
+                      !constraints.maxHeight.isFinite) {
                     return const SizedBox.shrink();
                   }
                   return LineChart(
-                LineChartData(
-                  minY: 0,
-                  maxY: (maxValue * 1.2).clamp(1, double.infinity).toDouble(),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: maxValue > 0 ? maxValue / 4 : 1,
-                    getDrawingHorizontalLine: (value) => FlLine(
-                      color: Colors.grey[300]!,
-                      strokeWidth: 1,
-                    ),
-                  ),
-                  titlesData: FlTitlesData(
-                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 30,
-                        getTitlesWidget: (value, meta) {
-                          final index = value.toInt();
-                          if (index < 0 || index >= sortedData.length) {
-                            return const SizedBox.shrink();
-                          }
-                          final month = sortedData[index].month;
-                          // Format: 2025-10 -> Oct
-                          final parts = month.split('-');
-                          if (parts.length < 2) return const SizedBox.shrink();
-                          final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                          final monthNum = int.tryParse(parts[1]) ?? 1;
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              monthNames[monthNum - 1],
-                              style: const TextStyle(fontSize: 10, color: _unityBlue),
+                    LineChartData(
+                      minY: 0,
+                      maxY: (maxValue * 1.2)
+                          .clamp(1, double.infinity)
+                          .toDouble(),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: maxValue > 0 ? maxValue / 4 : 1,
+                        getDrawingHorizontalLine: (value) =>
+                            FlLine(color: Colors.grey[300]!, strokeWidth: 1),
+                      ),
+                      titlesData: FlTitlesData(
+                        topTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 30,
+                            getTitlesWidget: (value, meta) {
+                              final index = value.toInt();
+                              if (index < 0 || index >= sortedData.length) {
+                                return const SizedBox.shrink();
+                              }
+                              final month = sortedData[index].month;
+                              // Format: 2025-10 -> Oct
+                              final parts = month.split('-');
+                              if (parts.length < 2)
+                                return const SizedBox.shrink();
+                              final monthNames = [
+                                'Jan',
+                                'Feb',
+                                'Mar',
+                                'Apr',
+                                'May',
+                                'Jun',
+                                'Jul',
+                                'Aug',
+                                'Sep',
+                                'Oct',
+                                'Nov',
+                                'Dec',
+                              ];
+                              final monthNum = int.tryParse(parts[1]) ?? 1;
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  monthNames[monthNum - 1],
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: _unityBlue,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 35,
+                            getTitlesWidget: (value, meta) => Text(
+                              value.toInt().toString(),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: _unityBlue,
+                              ),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 35,
-                        getTitlesWidget: (value, meta) => Text(
-                          value.toInt().toString(),
-                          style: const TextStyle(fontSize: 10, color: _unityBlue),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: List.generate(sortedData.length, (index) {
+                            return FlSpot(
+                              index.toDouble(),
+                              sortedData[index].count.toDouble(),
+                            );
+                          }),
+                          isCurved: true,
+                          color: _momentumBlue,
+                          barWidth: 3,
+                          isStrokeCapRound: true,
+                          dotData: FlDotData(
+                            show: true,
+                            getDotPainter: (spot, percent, bar, index) {
+                              return FlDotCirclePainter(
+                                radius: 4,
+                                color: Colors.white,
+                                strokeWidth: 2,
+                                strokeColor: _momentumBlue,
+                              );
+                            },
+                          ),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                _momentumBlue.withOpacity(0.3),
+                                _momentumBlue.withOpacity(0.05),
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                        ),
+                      ],
+                      lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          tooltipBgColor: _unityBlue.withOpacity(0.9),
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              final entry = sortedData[spot.x.toInt()];
+                              return LineTooltipItem(
+                                '${entry.month}\n${entry.count} new members',
+                                const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
+                              );
+                            }).toList();
+                          },
                         ),
                       ),
                     ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: List.generate(sortedData.length, (index) {
-                        return FlSpot(index.toDouble(), sortedData[index].count.toDouble());
-                      }),
-                      isCurved: true,
-                      color: _momentumBlue,
-                      barWidth: 3,
-                      isStrokeCapRound: true,
-                      dotData: FlDotData(
-                        show: true,
-                        getDotPainter: (spot, percent, bar, index) {
-                          return FlDotCirclePainter(
-                            radius: 4,
-                            color: Colors.white,
-                            strokeWidth: 2,
-                            strokeColor: _momentumBlue,
-                          );
-                        },
-                      ),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        gradient: LinearGradient(
-                          colors: [
-                            _momentumBlue.withOpacity(0.3),
-                            _momentumBlue.withOpacity(0.05),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                    ),
-                  ],
-                  lineTouchData: LineTouchData(
-                    touchTooltipData: LineTouchTooltipData(
-                      tooltipBgColor: _unityBlue.withOpacity(0.9),
-                      getTooltipItems: (touchedSpots) {
-                        return touchedSpots.map((spot) {
-                          final entry = sortedData[spot.x.toInt()];
-                          return LineTooltipItem(
-                            '${entry.month}\n${entry.count} new members',
-                            const TextStyle(color: Colors.white, fontSize: 12),
-                          );
-                        }).toList();
-                      },
-                    ),
-                  ),
-                ),
                   );
                 },
               ),
@@ -1610,7 +1811,11 @@ class LineChartWidget extends StatelessWidget {
             color: _momentumBlue.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(config.icon ?? Icons.show_chart, color: _momentumBlue, size: 20),
+          child: Icon(
+            config.icon ?? Icons.show_chart,
+            color: _momentumBlue,
+            size: 20,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1671,7 +1876,9 @@ class LeaderboardWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayData = data.take(maxItems).toList();
-    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(
+      config.options,
+    );
 
     if (displayData.isEmpty) {
       return _buildEmptyState();
@@ -1735,7 +1942,11 @@ class LeaderboardWidget extends StatelessWidget {
             color: _sunriseGold.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(config.icon ?? Icons.emoji_events, color: _sunriseGold, size: 20),
+          child: Icon(
+            config.icon ?? Icons.emoji_events,
+            color: _sunriseGold,
+            size: 20,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1828,7 +2039,8 @@ class LeaderboardWidget extends StatelessWidget {
 
     // Generate initials for fallback
     final parts = name.trim().split(RegExp(r'\s+'));
-    final initials = parts.length >= 2
+    final initials =
+        parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty
         ? '${parts.first[0]}${parts.last[0]}'.toUpperCase()
         : (name.isNotEmpty ? name[0].toUpperCase() : '?');
 
@@ -1937,10 +2149,14 @@ class ProgressRingWidget extends StatelessWidget {
     final colors = config.gradientColors.isNotEmpty
         ? config.gradientColors
         : [_momentumBlue, _justicePurple];
-    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(
+      config.options,
+    );
     final isDark = WidgetBackgrounds.isDarkBackground(config.options);
     final textColor = WidgetBackgrounds.getTextColor(config.options);
-    final secondaryTextColor = WidgetBackgrounds.getSecondaryTextColor(config.options);
+    final secondaryTextColor = WidgetBackgrounds.getSecondaryTextColor(
+      config.options,
+    );
 
     return Card(
       elevation: 4,
@@ -1964,7 +2180,9 @@ class ProgressRingWidget extends StatelessWidget {
                       CircularProgressIndicator(
                         value: percentage,
                         strokeWidth: 10,
-                        backgroundColor: colors.first.withOpacity(isDark ? 0.3 : 0.1),
+                        backgroundColor: colors.first.withOpacity(
+                          isDark ? 0.3 : 0.1,
+                        ),
                         valueColor: AlwaysStoppedAnimation<Color>(colors.first),
                       ),
                       Center(
@@ -2007,10 +2225,7 @@ class ProgressRingWidget extends StatelessWidget {
             if (config.subtitle != null)
               Text(
                 config.subtitle!,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
           ],
@@ -2038,7 +2253,9 @@ class MemberListWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayMembers = members.take(maxItems).toList();
-    final backgroundColor = WidgetBackgrounds.getBackgroundColor(config.options);
+    final backgroundColor = WidgetBackgrounds.getBackgroundColor(
+      config.options,
+    );
 
     if (displayMembers.isEmpty) {
       return _buildEmptyState();
@@ -2083,7 +2300,11 @@ class MemberListWidget extends StatelessWidget {
             color: _grassrootsGreen.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(config.icon ?? Icons.person_add, color: _grassrootsGreen, size: 20),
+          child: Icon(
+            config.icon ?? Icons.person_add,
+            color: _grassrootsGreen,
+            size: 20,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -2147,10 +2368,7 @@ class MemberListWidget extends StatelessWidget {
                   if (member.chapterName != null || member.county != null)
                     Text(
                       member.chapterName ?? member.county ?? '',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       overflow: TextOverflow.ellipsis,
                     ),
                 ],
@@ -2238,7 +2456,7 @@ class MemberListWidget extends StatelessWidget {
                     strokeWidth: 2,
                     value: loadingProgress.expectedTotalBytes != null
                         ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
+                              loadingProgress.expectedTotalBytes!
                         : null,
                   ),
                 ),
@@ -2258,7 +2476,15 @@ class MemberListWidget extends StatelessWidget {
     if (parts.length == 1) {
       return parts[0].isNotEmpty ? parts[0][0].toUpperCase() : '?';
     }
-    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+    // Check both parts are non-empty before indexing
+    final first = parts[0];
+    final last = parts[parts.length - 1];
+    if (first.isEmpty || last.isEmpty) {
+      return first.isNotEmpty
+          ? first[0].toUpperCase()
+          : (last.isNotEmpty ? last[0].toUpperCase() : '?');
+    }
+    return '${first[0]}${last[0]}'.toUpperCase();
   }
 
   Widget _buildEmptyState() {
@@ -2309,7 +2535,9 @@ class QuickLinksButtonWidget extends StatelessWidget {
 
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isMini ? 12 : 16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(isMini ? 12 : 16),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -2338,11 +2566,7 @@ class QuickLinksButtonWidget extends StatelessWidget {
             color: Colors.white.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            config.icon ?? Icons.link,
-            color: Colors.white,
-            size: 18,
-          ),
+          child: Icon(config.icon ?? Icons.link, color: Colors.white, size: 18),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -2373,11 +2597,7 @@ class QuickLinksButtonWidget extends StatelessWidget {
             ),
           )
         else
-          const Icon(
-            Icons.arrow_forward,
-            color: Colors.white,
-            size: 20,
-          ),
+          const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
       ],
     );
   }

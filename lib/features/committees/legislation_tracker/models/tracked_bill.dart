@@ -91,14 +91,14 @@ class TrackedBill {
   final DateTime? latestVoteDate;
 
   // MOYD Committee Position & Tracking
-  final String position; // 'support', 'oppose', 'watching', 'neutral'
+  final String? position; // 'support', 'oppose', 'watching', or null (not set)
   final String? positionSetBy;
   final String? positionSetByName; // Member name who set the position
   final String? positionSetByPhotoUrl; // Member photo URL who set the position
   final DateTime? positionSetAt;
   final String? positionRationale;
 
-  final String priority; // 'critical', 'high', 'medium', 'low'
+  final String? priority; // 'critical', 'high', 'medium', 'low', or null (not set)
   final List<String> categories; // ['climate', 'healthcare']
   final List<String> tags; // Custom tags
 
@@ -211,13 +211,13 @@ class TrackedBill {
     this.primarySponsorDistrict,
     this.latestVoteResult,
     this.latestVoteDate,
-    this.position = 'neutral',
+    this.position,
     this.positionSetBy,
     this.positionSetByName,
     this.positionSetByPhotoUrl,
     this.positionSetAt,
     this.positionRationale,
-    this.priority = 'medium',
+    this.priority,
     this.categories = const [],
     this.tags = const [],
     this.addedBy,
@@ -303,13 +303,13 @@ class TrackedBill {
       primarySponsorDistrict: json['primary_sponsor_district'] as String?,
       latestVoteResult: json['latest_vote_result'] as String?,
       latestVoteDate: _parseDate(json['latest_vote_date']),
-      position: json['position'] as String? ?? 'neutral',
+      position: json['position'] as String?,
       positionSetBy: json['position_set_by'] as String?,
       positionSetByName: _parsePositionSetByName(json),
       positionSetByPhotoUrl: _parsePositionSetByPhotoUrl(json),
       positionSetAt: _parseDate(json['position_set_at']),
       positionRationale: json['position_rationale'] as String?,
-      priority: json['priority'] as String? ?? 'medium',
+      priority: json['priority'] as String?,
       categories: _parseStringList(json['categories']),
       tags: _parseStringList(json['tags']),
       addedBy: json['added_by'] as String?,

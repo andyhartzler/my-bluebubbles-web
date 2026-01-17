@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/features/forms/models/voting_form.dart';
 import 'package:bluebubbles/features/forms/models/vote_analytics.dart';
 import 'package:bluebubbles/features/forms/services/votes_service.dart';
+import 'package:bluebubbles/features/forms/services/form_analytics_service.dart';
 
 // Brand colors
 const _unityBlue = Color(0xFF273351);
@@ -30,11 +31,7 @@ class MemberVotesView extends StatefulWidget {
   final String committee;
   final String? memberId;
 
-  const MemberVotesView({
-    super.key,
-    required this.committee,
-    this.memberId,
-  });
+  const MemberVotesView({super.key, required this.committee, this.memberId});
 
   @override
   State<MemberVotesView> createState() => _MemberVotesViewState();
@@ -50,9 +47,7 @@ class _MemberVotesViewState extends State<MemberVotesView> {
 
   /// Get the member ID - from widget or current authenticated user
   String get _memberId =>
-      widget.memberId ??
-      Supabase.instance.client.auth.currentUser?.id ??
-      '';
+      widget.memberId ?? Supabase.instance.client.auth.currentUser?.id ?? '';
 
   // Track expanded state for closed vote dropdowns
   final Map<String, bool> _expandedVotes = {};
@@ -71,8 +66,14 @@ class _MemberVotesViewState extends State<MemberVotesView> {
 
     try {
       // Get all active and closed votes for this committee
-      final activeStream = _votesService.watchVotesForCommittee(widget.committee, 'active');
-      final closedStream = _votesService.watchVotesForCommittee(widget.committee, 'closed');
+      final activeStream = _votesService.watchVotesForCommittee(
+        widget.committee,
+        'active',
+      );
+      final closedStream = _votesService.watchVotesForCommittee(
+        widget.committee,
+        'closed',
+      );
 
       // Listen to streams and update state
       activeStream.listen((votes) async {
@@ -138,12 +139,12 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                 ),
               )
             : _error != null
-                ? _buildErrorState()
-                : RefreshIndicator(
-                    onRefresh: _loadVotes,
-                    color: _momentumBlue,
-                    child: _buildContent(),
-                  ),
+            ? _buildErrorState()
+            : RefreshIndicator(
+                onRefresh: _loadVotes,
+                color: _momentumBlue,
+                child: _buildContent(),
+              ),
       ],
     );
   }
@@ -161,7 +162,11 @@ class _MemberVotesViewState extends State<MemberVotesView> {
       children: [
         // Open Votes Section
         if (hasOpenVotes) ...[
-          _buildSectionHeader('Open Votes', Icons.how_to_vote, _grassrootsGreen),
+          _buildSectionHeader(
+            'Open Votes',
+            Icons.how_to_vote,
+            _grassrootsGreen,
+          ),
           const SizedBox(height: 12),
           ..._openVotes.map((vote) => _buildOpenVoteCard(vote)),
           const SizedBox(height: 24),
@@ -231,7 +236,10 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: hasVoted ? Colors.grey : _grassrootsGreen,
                       borderRadius: BorderRadius.circular(8),
@@ -263,7 +271,11 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.schedule, size: 16, color: Colors.white.withOpacity(0.7)),
+                    Icon(
+                      Icons.schedule,
+                      size: 16,
+                      color: Colors.white.withOpacity(0.7),
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Ends: ${dateFormat.format(vote.votingEndsAt!)}',
@@ -339,7 +351,8 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                             color: Colors.white,
                           ),
                         ),
-                        if (vote.description != null && vote.description!.isNotEmpty) ...[
+                        if (vote.description != null &&
+                            vote.description!.isNotEmpty) ...[
                           const SizedBox(height: 6),
                           Text(
                             _stripHtml(vote.description!),
@@ -366,7 +379,10 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                   ),
                   const SizedBox(width: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey,
                       borderRadius: BorderRadius.circular(8),
@@ -427,7 +443,11 @@ class _MemberVotesViewState extends State<MemberVotesView> {
 
         // Filter out short_answer and long_answer questions
         final displayableQuestions = summary.questionResults
-            .where((q) => q.questionType != 'short_answer' && q.questionType != 'long_answer')
+            .where(
+              (q) =>
+                  q.questionType != 'short_answer' &&
+                  q.questionType != 'long_answer',
+            )
             .toList();
 
         if (displayableQuestions.isEmpty) {
@@ -443,14 +463,17 @@ class _MemberVotesViewState extends State<MemberVotesView> {
         return Container(
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.05),
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(16),
+            ),
           ),
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Supporting documents
-              if (vote.supportingDocuments != null && vote.supportingDocuments!.isNotEmpty)
+              if (vote.supportingDocuments != null &&
+                  vote.supportingDocuments!.isNotEmpty)
                 _buildSupportingDocuments(vote.supportingDocuments!),
 
               // Question results
@@ -472,7 +495,10 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _buildStatItem('Total Votes', '${summary.totalVotes}'),
-                    _buildStatItem('Participation', '${summary.participationRate.toStringAsFixed(0)}%'),
+                    _buildStatItem(
+                      'Participation',
+                      '${summary.participationRate.toStringAsFixed(0)}%',
+                    ),
                   ],
                 ),
               ),
@@ -515,11 +541,15 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                     sections: question.options.asMap().entries.map((entry) {
                       final idx = entry.key;
                       final option = entry.value;
-                      final color = _chartGradientColors[idx % _chartGradientColors.length];
+                      final color =
+                          _chartGradientColors[idx %
+                              _chartGradientColors.length];
 
                       return PieChartSectionData(
                         value: option.count.toDouble(),
-                        title: option.percentage >= 5 ? '${option.percentage.toStringAsFixed(0)}%' : '',
+                        title: option.percentage >= 5
+                            ? '${option.percentage.toStringAsFixed(0)}%'
+                            : '',
                         color: color,
                         radius: 35,
                         titleStyle: const TextStyle(
@@ -541,7 +571,8 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                   children: question.options.asMap().entries.map((entry) {
                     final idx = entry.key;
                     final option = entry.value;
-                    final color = _chartGradientColors[idx % _chartGradientColors.length];
+                    final color =
+                        _chartGradientColors[idx % _chartGradientColors.length];
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -602,10 +633,7 @@ class _MemberVotesViewState extends State<MemberVotesView> {
         const SizedBox(height: 2),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.white.withOpacity(0.7),
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7)),
         ),
       ],
     );
@@ -619,7 +647,11 @@ class _MemberVotesViewState extends State<MemberVotesView> {
         children: [
           Row(
             children: [
-              Icon(Icons.attach_file, size: 16, color: Colors.white.withOpacity(0.7)),
+              Icon(
+                Icons.attach_file,
+                size: 16,
+                color: Colors.white.withOpacity(0.7),
+              ),
               const SizedBox(width: 6),
               Text(
                 'Supporting Documents',
@@ -643,7 +675,10 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                 onTap: url != null ? () => _openDocument(url) : null,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: _momentumBlue.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(8),
@@ -651,11 +686,7 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        _getDocIcon(name),
-                        size: 14,
-                        color: Colors.white,
-                      ),
+                      Icon(_getDocIcon(name), size: 14, color: Colors.white),
                       const SizedBox(width: 6),
                       Text(
                         name.length > 20 ? '${name.substring(0, 17)}...' : name,
@@ -772,7 +803,11 @@ class _MemberVotesViewState extends State<MemberVotesView> {
                 color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.error_outline, size: 48, color: Colors.white),
+              child: const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -800,7 +835,10 @@ class _MemberVotesViewState extends State<MemberVotesView> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: _unityBlue,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -845,9 +883,52 @@ class MemberVotingScreen extends StatefulWidget {
 
 class _MemberVotingScreenState extends State<MemberVotingScreen> {
   final _votesService = VotesService();
+  final _analyticsService = FormAnalyticsService();
   final Map<String, dynamic> _answers = {};
   bool _isSubmitting = false;
   bool _hasInteracted = false;
+  String? _sessionToken;
+  bool _hasTrackedStart = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _trackVoteView();
+  }
+
+  Future<void> _trackVoteView() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    _sessionToken = await _analyticsService.trackVoteView(
+      widget.vote.id,
+      userId,
+      memberId: widget.memberId,
+    );
+  }
+
+  void _trackFirstInteraction() {
+    if (!_hasTrackedStart) {
+      _hasTrackedStart = true;
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      _analyticsService.trackVoteStart(
+        widget.vote.id,
+        userId,
+        memberId: widget.memberId,
+        sessionToken: _sessionToken,
+      );
+    }
+  }
+
+  void _trackFieldInteraction(String questionId, String questionType) {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    _analyticsService.trackVoteFieldInteraction(
+      widget.vote.id,
+      questionId,
+      questionType,
+      userId,
+      memberId: widget.memberId,
+      sessionToken: _sessionToken,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -908,7 +989,9 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _grassrootsGreen,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -920,7 +1003,10 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     )
                                   : const Text(
@@ -949,9 +1035,7 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 16),
-      decoration: BoxDecoration(
-        color: _unityBlue,
-      ),
+      decoration: BoxDecoration(color: _unityBlue),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1017,7 +1101,11 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.attach_file, size: 18, color: Colors.white.withOpacity(0.9)),
+              Icon(
+                Icons.attach_file,
+                size: 18,
+                color: Colors.white.withOpacity(0.9),
+              ),
               const SizedBox(width: 8),
               const Text(
                 'Supporting Documents',
@@ -1047,11 +1135,7 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        _getDocIcon(name),
-                        size: 20,
-                        color: _momentumBlue,
-                      ),
+                      Icon(_getDocIcon(name), size: 20, color: _momentumBlue),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -1081,7 +1165,8 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
   Widget _buildQuestion(Map<String, dynamic> question, int index) {
     final questionId = question['id'] as String? ?? 'q$index';
     final questionText = question['text'] as String? ?? 'Question ${index + 1}';
-    final questionType = question['question_type'] as String? ?? 'multiple_choice';
+    final questionType =
+        question['question_type'] as String? ?? 'multiple_choice';
     final options = (question['options'] as List<dynamic>?) ?? [];
     final isRequired = question['required'] as bool? ?? true;
 
@@ -1194,15 +1279,21 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
                 _answers[questionId] = optionId;
                 _hasInteracted = true;
               });
+              _trackFirstInteraction();
+              _trackFieldInteraction(questionId, 'multiple_choice');
             },
             borderRadius: BorderRadius.circular(10),
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isSelected ? _momentumBlue : Colors.white.withOpacity(0.1),
+                color: isSelected
+                    ? _momentumBlue
+                    : Colors.white.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: isSelected ? _momentumBlue : Colors.white.withOpacity(0.3),
+                  color: isSelected
+                      ? _momentumBlue
+                      : Colors.white.withOpacity(0.3),
                   width: isSelected ? 2 : 1,
                 ),
               ),
@@ -1214,7 +1305,9 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
+                        color: isSelected
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.5),
                         width: 2,
                       ),
                       color: isSelected ? Colors.white : Colors.transparent,
@@ -1230,7 +1323,9 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 15,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -1267,15 +1362,21 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
                 _answers[questionId] = newAnswers;
                 _hasInteracted = true;
               });
+              _trackFirstInteraction();
+              _trackFieldInteraction(questionId, 'multiple_select');
             },
             borderRadius: BorderRadius.circular(10),
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isSelected ? _momentumBlue : Colors.white.withOpacity(0.1),
+                color: isSelected
+                    ? _momentumBlue
+                    : Colors.white.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: isSelected ? _momentumBlue : Colors.white.withOpacity(0.3),
+                  color: isSelected
+                      ? _momentumBlue
+                      : Colors.white.withOpacity(0.3),
                   width: isSelected ? 2 : 1,
                 ),
               ),
@@ -1287,7 +1388,9 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
+                        color: isSelected
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.5),
                         width: 2,
                       ),
                       color: isSelected ? Colors.white : Colors.transparent,
@@ -1303,7 +1406,9 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 15,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -1350,6 +1455,8 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
                 _answers[questionId] = value.toInt();
                 _hasInteracted = true;
               });
+              _trackFirstInteraction();
+              _trackFieldInteraction(questionId, 'rating_scale');
             },
           ),
         ),
@@ -1384,6 +1491,11 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
           _answers[questionId] = value;
           _hasInteracted = true;
         });
+        _trackFirstInteraction();
+        // Only track on first change to avoid excessive analytics
+        if (_answers[questionId]?.length == 1) {
+          _trackFieldInteraction(questionId, 'short_answer');
+        }
       },
       maxLines: 4,
       style: const TextStyle(color: Colors.white),
@@ -1409,14 +1521,18 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
   }
 
   Widget _buildRankedChoice(String questionId, List<dynamic> options) {
-    final currentRanking = (_answers[questionId] as List<String>?) ??
-        options.map((o) => (o as Map<String, dynamic>)['id'] as String? ?? '').toList();
+    final currentRanking =
+        (_answers[questionId] as List<String>?) ??
+        options
+            .map((o) => (o as Map<String, dynamic>)['id'] as String? ?? '')
+            .toList();
 
     // Create option lookup
     final optionLabels = <String, String>{};
     for (final opt in options) {
       final option = opt as Map<String, dynamic>;
-      optionLabels[option['id'] as String? ?? ''] = option['label'] as String? ?? '';
+      optionLabels[option['id'] as String? ?? ''] =
+          option['label'] as String? ?? '';
     }
 
     return ReorderableListView.builder(
@@ -1431,6 +1547,8 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
           _answers[questionId] = currentRanking;
           _hasInteracted = true;
         });
+        _trackFirstInteraction();
+        _trackFieldInteraction(questionId, 'ranked_choice');
       },
       itemBuilder: (context, index) {
         final optionId = currentRanking[index];
@@ -1468,16 +1586,10 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
                 ),
               ),
-              Icon(
-                Icons.drag_handle,
-                color: Colors.white.withOpacity(0.5),
-              ),
+              Icon(Icons.drag_handle, color: Colors.white.withOpacity(0.5)),
             ],
           ),
         );
@@ -1516,7 +1628,18 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              // Track abandonment when user chooses to leave
+              final userId = Supabase.instance.client.auth.currentUser?.id;
+              _analyticsService.trackVoteAbandonment(
+                widget.vote.id,
+                userId,
+                _answers,
+                memberId: widget.memberId,
+                sessionToken: _sessionToken,
+              );
+              Navigator.pop(context, true);
+            },
             child: const Text('Leave'),
           ),
           ElevatedButton(
@@ -1566,6 +1689,8 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
         widget.vote.id,
         widget.memberId,
         _answers,
+        sessionToken: _sessionToken,
+        voterSource: 'member_view',
       );
 
       widget.onVoteSubmitted?.call();

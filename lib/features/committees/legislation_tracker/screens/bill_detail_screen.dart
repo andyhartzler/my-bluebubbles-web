@@ -52,6 +52,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 8, vsync: this);
+    _tabController.addListener(_handleTabChange);
 
     // Load bill details
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -60,8 +61,15 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     });
   }
 
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging) {
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
     _provider?.clearSelectedBill();
     super.dispose();
@@ -178,82 +186,73 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     LegislationProvider provider,
     TrackedBill bill,
   ) {
-    return Column(
+    return Stack(
       children: [
-        // Header with bill info
-        _buildBillHeader(theme, provider, bill),
-        // Tab bar
-        Container(
-          color: _unityBlue,
-          child: TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            indicatorColor: _momentumBlue,
-            indicatorWeight: 3,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white60,
-            tabs: [
-              _buildTab('Overview', Icons.info_outline, 0),
-              _buildTab('AI Analysis', Icons.auto_awesome, 0),
-              _buildTab('Talking Points', Icons.campaign, 0),
-              _buildTab('Bill Text', Icons.article, 0),
-              _buildTab('Actions', Icons.timeline, provider.selectedBillActions.length),
-              _buildTab('Votes', Icons.how_to_vote, provider.selectedBillVotes.length),
-              _buildTab('Documents', Icons.description, provider.selectedBillDocuments.length),
-              _buildTab('Notes', Icons.note, provider.selectedBillNotes.length),
-            ],
+        // Gradient background
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/Blue-Gradient-Background.png',
+            fit: BoxFit.cover,
           ),
         ),
-        // Tab content with gradient background
-        Expanded(
-          child: Stack(
-            children: [
-              // Gradient background
-              Positioned.fill(
-                child: Image.asset(
-                  'assets/images/Blue-Gradient-Background.png',
-                  fit: BoxFit.cover,
-                ),
-              ),
-              Positioned.fill(
-                child: Container(
-                  color: Colors.white.withOpacity(0.18),
-                ),
-              ),
-              // Tab content - disable swiping
-              Positioned.fill(
-                child: TabBarView(
-                  controller: _tabController,
-                  physics: const NeverScrollableScrollPhysics(), // Disable swipe
-                  children: [
-                    _buildOverviewTab(context, theme, provider, bill),
-                    _buildAiAnalysisTab(context, theme, provider, bill),
-                    _buildTalkingPointsTab(context, theme, provider, bill),
-                    _buildBillTextTab(context, theme, bill),
-                    _buildActionsTab(context, theme, provider, bill),
-                    _buildVotesTab(context, theme, provider, bill),
-                    _buildDocumentsTab(context, theme, provider, bill),
-                    _buildNotesTab(context, theme, provider, bill),
-                  ],
-                ),
-              ),
-            ],
+        Positioned.fill(
+          child: Container(
+            color: Colors.white.withOpacity(0.18),
           ),
+        ),
+        // Content
+        Column(
+          children: [
+            // Header with bill info (in a navy tile)
+            _buildMobileBillHeader(theme, provider, bill),
+            // Custom tab bar matching All Bills style
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              child: _buildCustomTabBar(provider),
+            ),
+            // Tab content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildOverviewTab(context, theme, provider, bill),
+                  _buildAiAnalysisTab(context, theme, provider, bill),
+                  _buildTalkingPointsTab(context, theme, provider, bill),
+                  _buildBillTextTab(context, theme, bill),
+                  _buildActionsTab(context, theme, provider, bill),
+                  _buildVotesTab(context, theme, provider, bill),
+                  _buildDocumentsTab(context, theme, provider, bill),
+                  _buildNotesTab(context, theme, provider, bill),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildBillHeader(ThemeData theme, LegislationProvider provider, TrackedBill bill) {
-    final position = BillPosition.fromString(bill.position);
+  /// Mobile-optimized bill header tile
+  Widget _buildMobileBillHeader(ThemeData theme, LegislationProvider provider, TrackedBill bill) {
+    final position = bill.position != null ? BillPosition.fromString(bill.position!) : null;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _unityBlue,
+        borderRadius: BorderRadius.circular(14),
         border: Border(
-          left: BorderSide(color: position.color, width: 4),
+          left: BorderSide(color: position?.color ?? _momentumBlue, width: 4),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,33 +260,36 @@ class _BillDetailScreenState extends State<BillDetailScreen>
           Row(
             children: [
               BillStatusBadge(bill: bill, darkBackground: true),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: Text(
+                child: SelectableText(
                   bill.title,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                     height: 1.3,
                   ),
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             children: [
               PositionSelector(
-                currentPosition: BillPosition.fromString(bill.position),
+                currentPosition: bill.position != null
+                    ? BillPosition.fromString(bill.position!)
+                    : BillPosition.watching,
                 onChanged: (position) => _updatePosition(provider, bill, position.value),
                 compact: true,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               PrioritySelector(
-                currentPriority: BillPriority.fromString(bill.priority),
+                currentPriority: bill.priority != null
+                    ? BillPriority.fromString(bill.priority!)
+                    : BillPriority.medium,
                 onChanged: (priority) => _updatePriority(provider, bill, priority.value),
                 showLabel: false,
                 compact: true,
@@ -296,233 +298,332 @@ class _BillDetailScreenState extends State<BillDetailScreen>
           ),
           // Position setter info
           if (bill.positionSetByName != null || bill.positionSetAt != null) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _buildPositionSetterInfo(bill),
-          ],
-          if (provider.categories.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            CategoryChips(
-              availableCategories: provider.categories,
-              selectedCategories: bill.categories,
-              onChanged: (categories) => _updateCategories(provider, bill, categories),
-            ),
           ],
         ],
       ),
     );
   }
-
   Widget _buildWideLayout(
     BuildContext context,
     ThemeData theme,
     LegislationProvider provider,
     TrackedBill bill,
   ) {
-    final position = BillPosition.fromString(bill.position);
+    final position = bill.position != null ? BillPosition.fromString(bill.position!) : null;
 
-    return Row(
+    return Stack(
       children: [
-        // Left sidebar with bill info
-        SizedBox(
-          width: 380,
+        // Full-width gradient background
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/Blue-Gradient-Background.png',
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned.fill(
           child: Container(
-            color: _unityBlue,
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        BillStatusBadge(bill: bill, expanded: true, darkBackground: true),
-                        const SizedBox(height: 16),
-                        Text(
-                          bill.title,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            height: 1.3,
+            color: Colors.white.withOpacity(0.18),
+          ),
+        ),
+        // Content
+        Row(
+          children: [
+            // Left sidebar with bill info in navy tiles
+            SizedBox(
+              width: 380,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Bill header tile
+                          _buildNavyTile(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                BillStatusBadge(bill: bill, expanded: true, darkBackground: true),
+                                const SizedBox(height: 12),
+                                SelectableText(
+                                  bill.title,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    height: 1.3,
+                                  ),
+                                ),
+                                if (bill.description != null) ...[
+                                  const SizedBox(height: 10),
+                                  SelectableText(
+                                    bill.description!,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.white.withOpacity(0.85),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
-                        ),
-                        if (bill.description != null) ...[
                           const SizedBox(height: 12),
-                          Text(
-                            bill.description!,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white.withOpacity(0.8),
-                              height: 1.4,
+                          // Position & Priority tile
+                          _buildNavyTile(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildSectionPill('Position & Priority', Icons.flag_outlined),
+                                const SizedBox(height: 12),
+                                PositionSelector(
+                                  currentPosition: bill.position != null
+                                      ? BillPosition.fromString(bill.position!)
+                                      : BillPosition.watching,
+                                  onChanged: (position) => _updatePosition(provider, bill, position.value),
+                                ),
+                                const SizedBox(height: 12),
+                                PrioritySelector(
+                                  currentPriority: bill.priority != null
+                                      ? BillPriority.fromString(bill.priority!)
+                                      : BillPriority.medium,
+                                  onChanged: (priority) => _updatePriority(provider, bill, priority.value),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                        const SizedBox(height: 20),
-                        _buildSidebarSection('Position'),
-                        const SizedBox(height: 8),
-                        PositionSelector(
-                          currentPosition: BillPosition.fromString(bill.position),
-                          onChanged: (position) => _updatePosition(provider, bill, position.value),
-                        ),
-                        const SizedBox(height: 16),
-                        PrioritySelector(
-                          currentPriority: BillPriority.fromString(bill.priority),
-                          onChanged: (priority) => _updatePriority(provider, bill, priority.value),
-                        ),
-                        if (provider.categories.isNotEmpty) ...[
-                          const SizedBox(height: 20),
-                          _buildSidebarSection('Categories'),
-                          const SizedBox(height: 8),
-                          CategoryChips(
-                            availableCategories: provider.categories,
-                            selectedCategories: bill.categories,
-                            onChanged: (categories) => _updateCategories(provider, bill, categories),
-                          ),
-                        ],
-                        // Primary abstract
-                        if (bill.primaryAbstract != null && bill.primaryAbstract!.isNotEmpty) ...[
-                          const SizedBox(height: 20),
-                          _buildSidebarSection('Summary'),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              bill.primaryAbstract!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.white.withOpacity(0.9),
-                                height: 1.5,
+                          if (provider.categories.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            // Categories tile
+                            _buildNavyTile(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildSectionPill('Categories', Icons.category_outlined),
+                                  const SizedBox(height: 12),
+                                  CategoryChips(
+                                    availableCategories: provider.categories,
+                                    selectedCategories: bill.categories,
+                                    onChanged: (categories) => _updateCategories(provider, bill, categories),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
+                          ],
+                          // Primary abstract
+                          if (bill.primaryAbstract != null && bill.primaryAbstract!.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            _buildNavyTile(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildSectionPill('Summary', Icons.summarize_outlined),
+                                  const SizedBox(height: 12),
+                                  SelectableText(
+                                    bill.primaryAbstract!,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.white.withOpacity(0.9),
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          // Sponsors
+                          if (provider.selectedBillSponsors.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            _buildNavyTile(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildSectionPill('Sponsors', Icons.people_outline),
+                                  const SizedBox(height: 12),
+                                  SponsorList(
+                                    sponsors: provider.selectedBillSponsors,
+                                    onLegislatorTap: _navigateToLegislatorDetail,
+                                    darkBackground: true,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
-                        // Sponsors
-                        if (provider.selectedBillSponsors.isNotEmpty) ...[
-                          const SizedBox(height: 20),
-                          SponsorList(
-                            sponsors: provider.selectedBillSponsors,
-                            onLegislatorTap: _navigateToLegislatorDetail,
-                            darkBackground: true,
-                          ),
-                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Main content with tabs
+            Expanded(
+              child: Column(
+                children: [
+                  // Custom tab navigation like All Bills position tabs
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: _buildCustomTabBar(provider),
+                  ),
+                  // Tab content
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _buildOverviewTab(context, theme, provider, bill),
+                        _buildAiAnalysisTab(context, theme, provider, bill),
+                        _buildTalkingPointsTab(context, theme, provider, bill),
+                        _buildBillTextTab(context, theme, bill),
+                        _buildActionsTab(context, theme, provider, bill),
+                        _buildVotesTab(context, theme, provider, bill),
+                        _buildDocumentsTab(context, theme, provider, bill),
+                        _buildNotesTab(context, theme, provider, bill),
                       ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ),
-        // Main content with tabs
-        Expanded(
-          child: Column(
-            children: [
-              Container(
-                color: _unityBlue.withOpacity(0.9),
-                child: TabBar(
-                  controller: _tabController,
-                  isScrollable: true,
-                  indicatorColor: _momentumBlue,
-                  indicatorWeight: 3,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white60,
-                  tabs: [
-                    _buildTab('Overview', Icons.info_outline, 0),
-                    _buildTab('AI Analysis', Icons.auto_awesome, 0),
-                    _buildTab('Talking Points', Icons.campaign, 0),
-                    _buildTab('Bill Text', Icons.article, 0),
-                    _buildTab('Actions', Icons.timeline, provider.selectedBillActions.length),
-                    _buildTab('Votes', Icons.how_to_vote, provider.selectedBillVotes.length),
-                    _buildTab('Documents', Icons.description, provider.selectedBillDocuments.length),
-                    _buildTab('Notes', Icons.note, provider.selectedBillNotes.length),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Stack(
-                  children: [
-                    // Gradient background
-                    Positioned.fill(
-                      child: Image.asset(
-                        'assets/images/Blue-Gradient-Background.png',
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned.fill(
-                      child: Container(
-                        color: Colors.white.withOpacity(0.18),
-                      ),
-                    ),
-                    // Tab content - disable swiping
-                    Positioned.fill(
-                      child: TabBarView(
-                        controller: _tabController,
-                        physics: const NeverScrollableScrollPhysics(),
-                        children: [
-                          _buildOverviewTab(context, theme, provider, bill),
-                          _buildAiAnalysisTab(context, theme, provider, bill),
-                          _buildTalkingPointsTab(context, theme, provider, bill),
-                          _buildBillTextTab(context, theme, bill),
-                          _buildActionsTab(context, theme, provider, bill),
-                          _buildVotesTab(context, theme, provider, bill),
-                          _buildDocumentsTab(context, theme, provider, bill),
-                          _buildNotesTab(context, theme, provider, bill),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildSidebarSection(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: _momentumBlue,
-        letterSpacing: 0.5,
+  /// Builds a navy tile container for the left panel
+  Widget _buildNavyTile({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _unityBlue,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  /// Builds a section pill header for tiles
+  Widget _buildSectionPill(String title, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: _momentumBlue),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTab(String label, IconData icon, int count) {
-    return Tab(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18),
-          const SizedBox(width: 4),
-          Text(label),
-          if (count > 0) ...[
+  /// Builds custom tab bar matching the All Bills position tabs style
+  Widget _buildCustomTabBar(LegislationProvider provider) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _unityBlue,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.all(6),
+        child: Row(
+          children: [
+            _buildCustomTab('Overview', Icons.info_outline, 0, 0),
+            _buildCustomTab('Analysis', Icons.manage_search, 1, 0),
+            _buildCustomTab('Talking Points', Icons.campaign, 2, 0),
+            _buildCustomTab('Bill Text', Icons.article, 3, 0),
+            _buildCustomTab('Actions', Icons.timeline, 4, provider.selectedBillActions.length),
+            _buildCustomTab('Votes', Icons.how_to_vote, 5, provider.selectedBillVotes.length),
+            _buildCustomTab('Documents', Icons.description, 6, provider.selectedBillDocuments.length),
+            _buildCustomTab('Notes', Icons.note, 7, provider.selectedBillNotes.length),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Builds a custom tab button matching the position filter style
+  Widget _buildCustomTab(String label, IconData icon, int index, int count) {
+    final isSelected = _tabController.index == index;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _tabController.animateTo(index);
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: isSelected ? _momentumBlue : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
             const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: _momentumBlue,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
               ),
             ),
+            if (count > 0) ...[
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

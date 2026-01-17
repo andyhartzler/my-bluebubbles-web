@@ -12,35 +12,55 @@ class VotesService {
   /// Get privileged client for bypassing RLS when reading votes
   SupabaseClient get _readClient =>
       _crmService.isInitialized && _crmService.hasServiceRole
-          ? _crmService.privilegedClient
-          : _supabase;
+      ? _crmService.privilegedClient
+      : _supabase;
 
   // Voting forms are stored in form_schemas with form_type='vote'
-  Stream<List<VotingForm>> watchVotes(String statusFilter, {String? committee}) {
+  Stream<List<VotingForm>> watchVotes(
+    String statusFilter, {
+    String? committee,
+  }) {
     return _supabase
         .from('form_schemas')
         .stream(primaryKey: ['id'])
         .eq('form_type', 'vote')
         .order('created_at', ascending: false)
         .map((data) {
-      var votes = data.map((json) => VotingForm.fromJson(json)).toList();
+          var votes = data.map((json) => VotingForm.fromJson(json)).toList();
 
-      // Filter by committee if provided
-      if (committee != null) {
-        votes = votes.where((vote) => vote.committee == committee).toList();
-      }
+          // Filter by committee if provided (flexible matching with/without " Committee" suffix)
+          if (committee != null) {
+            votes = votes.where((vote) {
+              if (vote.committee == null) return false;
+              // Exact match first
+              if (vote.committee == committee) return true;
+              // Flexible match: normalize both by removing " Committee" suffix and comparing
+              final voteCommittee = vote.committee!
+                  .toLowerCase()
+                  .trim()
+                  .replaceAll(' committee', '');
+              final filterCommittee = committee.toLowerCase().trim().replaceAll(
+                ' committee',
+                '',
+              );
+              return voteCommittee == filterCommittee;
+            }).toList();
+          }
 
-      // Filter by status
-      if (statusFilter != 'all') {
-        votes = votes.where((vote) => vote.status == statusFilter).toList();
-      }
+          // Filter by status
+          if (statusFilter != 'all') {
+            votes = votes.where((vote) => vote.status == statusFilter).toList();
+          }
 
-      return votes;
-    });
+          return votes;
+        });
   }
 
   /// Watch votes for a specific committee
-  Stream<List<VotingForm>> watchVotesForCommittee(String committee, String statusFilter) {
+  Stream<List<VotingForm>> watchVotesForCommittee(
+    String committee,
+    String statusFilter,
+  ) {
     return watchVotes(statusFilter, committee: committee);
   }
 
@@ -73,8 +93,10 @@ class VotesService {
     DateTime? closesAt,
     // Access control
     bool requireLogin = false,
-    bool oneSubmissionPerUser = true, // Default true for votes (one vote per person)
-    bool executiveOnly = false, // Restrict voting to executive committee members
+    bool oneSubmissionPerUser =
+        true, // Default true for votes (one vote per person)
+    bool executiveOnly =
+        false, // Restrict voting to executive committee members
     // Submission limits
     int? maxSubmissions,
     // Custom URL
@@ -93,14 +115,10 @@ class VotesService {
     final Map<String, dynamic> schema;
     if (questions != null && questions.isNotEmpty) {
       // New format: multiple questions with different types
-      schema = {
-        'questions': questions,
-      };
+      schema = {'questions': questions};
     } else if (options != null && options.isNotEmpty) {
       // Legacy format: single question with options stored in 'fields'
-      schema = {
-        'fields': options.map((o) => o.toJson()).toList(),
-      };
+      schema = {'fields': options.map((o) => o.toJson()).toList()};
     } else {
       schema = {'questions': []};
     }
@@ -126,18 +144,25 @@ class VotesService {
           'status': status,
           'created_by': _supabase.auth.currentUser?.id,
           // Scheduling - use voting dates if opens_at/closes_at not provided
-          if (opensAt != null) 'opens_at': opensAt.toIso8601String()
-          else if (votingStartsAt != null) 'opens_at': votingStartsAt.toIso8601String(),
-          if (closesAt != null) 'closes_at': closesAt.toIso8601String()
-          else if (votingEndsAt != null) 'closes_at': votingEndsAt.toIso8601String(),
+          if (opensAt != null)
+            'opens_at': opensAt.toIso8601String()
+          else if (votingStartsAt != null)
+            'opens_at': votingStartsAt.toIso8601String(),
+          if (closesAt != null)
+            'closes_at': closesAt.toIso8601String()
+          else if (votingEndsAt != null)
+            'closes_at': votingEndsAt.toIso8601String(),
           'require_login': requireLogin,
           'one_submission_per_user': oneSubmissionPerUser,
           'executive_only': executiveOnly,
           if (maxSubmissions != null) 'max_submissions': maxSubmissions,
           if (slug != null) 'slug': slug,
-          if (confirmationEmailTemplate != null) 'confirmation_email_template': confirmationEmailTemplate,
-          if (notificationEmails != null) 'notification_emails': notificationEmails,
-          if (supportingDocuments != null) 'supporting_documents': supportingDocuments,
+          if (confirmationEmailTemplate != null)
+            'confirmation_email_template': confirmationEmailTemplate,
+          if (notificationEmails != null)
+            'notification_emails': notificationEmails,
+          if (supportingDocuments != null)
+            'supporting_documents': supportingDocuments,
           // Committee association
           if (committee != null) 'committee': committee,
         })
@@ -200,9 +225,7 @@ class VotesService {
     if (questions != null) {
       updates['schema'] = {'questions': questions};
     } else if (options != null) {
-      updates['schema'] = {
-        'fields': options.map((o) => o.toJson()).toList(),
-      };
+      updates['schema'] = {'fields': options.map((o) => o.toJson()).toList()};
     }
     if (status != null) updates['status'] = status;
 
@@ -238,7 +261,8 @@ class VotesService {
 
     // Access control
     if (requireLogin != null) updates['require_login'] = requireLogin;
-    if (oneSubmissionPerUser != null) updates['one_submission_per_user'] = oneSubmissionPerUser;
+    if (oneSubmissionPerUser != null)
+      updates['one_submission_per_user'] = oneSubmissionPerUser;
     if (executiveOnly != null) updates['executive_only'] = executiveOnly;
 
     // Submission limits
@@ -331,6 +355,8 @@ class VotesService {
     String? voterPhone,
     String? voterName,
     bool sendConfirmations = true,
+    String? sessionToken,
+    String? voterSource, // 'member_view', 'exec_view', 'public_link'
   }) async {
     // Record the vote in the votes table
     await _supabase.from('votes').insert({
@@ -340,6 +366,22 @@ class VotesService {
     });
 
     // The trigger update_vote_count() will automatically update results_data
+
+    // Track vote submission analytics
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      await _analyticsService.trackVoteSubmission(
+        voteId,
+        userId,
+        voteData,
+        memberId: memberId,
+        sessionToken: sessionToken,
+        voterSource: voterSource,
+      );
+    } catch (e) {
+      // Log but don't fail the vote if analytics fail
+      print('Warning: Failed to track vote analytics: $e');
+    }
 
     // Send confirmation messages and emails if enabled
     if (sendConfirmations && (voterEmail != null || voterPhone != null)) {
@@ -377,17 +419,18 @@ class VotesService {
           return false; // Member not found
         }
 
-        final isExecutiveCommittee = memberResponse['executive_committee'] as bool? ?? false;
+        final isExecutiveCommittee =
+            memberResponse['executive_committee'] as bool? ?? false;
         if (!isExecutiveCommittee) {
           return false; // Not an executive committee member
         }
       }
 
       // Then check other eligibility criteria via RPC
-      final response = await _readClient.rpc('can_member_vote', params: {
-        'p_member_id': memberId,
-        'p_voting_form_id': votingFormId,
-      });
+      final response = await _readClient.rpc(
+        'can_member_vote',
+        params: {'p_member_id': memberId, 'p_voting_form_id': votingFormId},
+      );
       return response as bool;
     } catch (e) {
       return false;
@@ -524,31 +567,41 @@ class VotesService {
       final formAnalytics = await _analyticsService.getFormAnalytics(voteId);
 
       // Get time series data for daily activity
-      final timeSeries = await _analyticsService.getSubmissionTimeSeries(voteId);
+      final timeSeries = await _analyticsService.getSubmissionTimeSeries(
+        voteId,
+      );
 
       // Build daily activity with cumulative counts
       final dailyActivity = <DailyActivityData>[];
       int cumulativeVotes = 0;
       for (final data in timeSeries) {
         cumulativeVotes += data.count;
-        dailyActivity.add(DailyActivityData(
-          date: data.date,
-          views: data.count, // Approximating views with submissions
-          submissions: data.count,
-          cumulativeVotes: cumulativeVotes,
-        ));
+        dailyActivity.add(
+          DailyActivityData(
+            date: data.date,
+            views: data.count, // Approximating views with submissions
+            submissions: data.count,
+            cumulativeVotes: cumulativeVotes,
+          ),
+        );
       }
 
       // Get field-level analytics
-      final fieldAnalyticsData = await _analyticsService.getFieldAnalytics(voteId);
-      final fieldAnalytics = fieldAnalyticsData.map((f) => VoteFieldAnalytics(
-        fieldId: f.fieldId,
-        fieldLabel: null, // Would need to join with schema
-        interactions: f.interactions,
-        completions: f.interactions, // Approximate
-        averageTimeSpent: 0,
-        dropOffRate: 0,
-      )).toList();
+      final fieldAnalyticsData = await _analyticsService.getFieldAnalytics(
+        voteId,
+      );
+      final fieldAnalytics = fieldAnalyticsData
+          .map(
+            (f) => VoteFieldAnalytics(
+              fieldId: f.fieldId,
+              fieldLabel: null, // Would need to join with schema
+              interactions: f.interactions,
+              completions: f.interactions, // Approximate
+              averageTimeSpent: 0,
+              dropOffRate: 0,
+            ),
+          )
+          .toList();
 
       return VoteAnalytics.fromFormAnalytics(
         formId: voteId,
@@ -581,7 +634,8 @@ class VotesService {
     for (final question in vote.questions) {
       final questionId = question['id'] as String? ?? 'default';
       final questionText = question['text'] as String? ?? 'Question';
-      final questionType = question['question_type'] as String? ?? 'multiple_choice';
+      final questionType =
+          question['question_type'] as String? ?? 'multiple_choice';
       final options = (question['options'] as List<dynamic>?) ?? [];
 
       // Count votes per option
@@ -630,21 +684,25 @@ class VotesService {
           winner = optId;
         }
 
-        optionResults.add(OptionResultData(
-          value: optId ?? '',
-          label: optLabel,
-          count: count,
-          percentage: percentage,
-        ));
+        optionResults.add(
+          OptionResultData(
+            value: optId ?? '',
+            label: optLabel,
+            count: count,
+            percentage: percentage,
+          ),
+        );
       }
 
-      questionResults.add(QuestionResultData(
-        fieldId: questionId,
-        question: questionText,
-        questionType: questionType,
-        options: optionResults,
-        winner: questionType == 'multiple_choice' ? winner : null,
-      ));
+      questionResults.add(
+        QuestionResultData(
+          fieldId: questionId,
+          question: questionText,
+          questionType: questionType,
+          options: optionResults,
+          winner: questionType == 'multiple_choice' ? winner : null,
+        ),
+      );
     }
 
     return VoteResultsSummary.fromVoteData(
@@ -675,7 +733,8 @@ class VotesService {
       }
 
       // Check for committee restriction - first in eligibleMembers, then fall back to vote.committee
-      final restrictToCommittee = eligibleMembers?['restrict_to_committee'] as String? ?? committee;
+      final restrictToCommittee =
+          eligibleMembers?['restrict_to_committee'] as String? ?? committee;
       if (restrictToCommittee != null && restrictToCommittee.isNotEmpty) {
         // Normalize the committee name - the database stores names without "Committee" suffix
         // e.g., "Policy & Advocacy Committee" -> "Policy & Advocacy"
@@ -685,10 +744,10 @@ class VotesService {
             : restrictToCommittee;
 
         // Try with normalized name first (without "Committee" suffix)
-        var response = await _readClient
-            .from('members')
-            .select('id')
-            .contains('committee', [normalizedName]);
+        var response = await _readClient.from('members').select('id').contains(
+          'committee',
+          [normalizedName],
+        );
 
         if ((response as List).isNotEmpty) {
           return response.length;
@@ -696,10 +755,10 @@ class VotesService {
 
         // If no results, try with the original name (in case some have "Committee" suffix)
         if (normalizedName != restrictToCommittee) {
-          response = await _readClient
-              .from('members')
-              .select('id')
-              .contains('committee', [restrictToCommittee]);
+          response = await _readClient.from('members').select('id').contains(
+            'committee',
+            [restrictToCommittee],
+          );
           return (response as List).length;
         }
 
@@ -733,7 +792,10 @@ class VotesService {
       // Custom eligibility filter
       if (isExecutiveOnly) {
         // For executive-only votes with custom filters
-        var query = _readClient.from('members').select('id').eq('executive_committee', true);
+        var query = _readClient
+            .from('members')
+            .select('id')
+            .eq('executive_committee', true);
 
         // Apply eligibility filters
         final chapterNames = eligibleMembers['chapter_names'] as List<dynamic>?;
@@ -741,7 +803,8 @@ class VotesService {
           query = query.inFilter('chapter_name', chapterNames.cast<String>());
         }
 
-        final membershipStatus = eligibleMembers['membership_status'] as String?;
+        final membershipStatus =
+            eligibleMembers['membership_status'] as String?;
         if (membershipStatus != null) {
           query = query.eq('current_chapter_member', membershipStatus);
         }
@@ -761,7 +824,8 @@ class VotesService {
           query = query.inFilter('chapter_name', chapterNames.cast<String>());
         }
 
-        final membershipStatus = eligibleMembers['membership_status'] as String?;
+        final membershipStatus =
+            eligibleMembers['membership_status'] as String?;
         if (membershipStatus != null) {
           query = query.eq('current_chapter_member', membershipStatus);
         }

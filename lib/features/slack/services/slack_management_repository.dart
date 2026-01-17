@@ -25,6 +25,19 @@ class SlackManagementRepository {
   SupabaseClient get _writeClient =>
       _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
 
+  /// Supabase storage URL for cached avatar images
+  static const _supabaseAvatarStorageUrl =
+      'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/avatars/';
+
+  /// Build avatar URL prioritizing cached Supabase path over direct Slack URL
+  /// to avoid CORS issues with slack-edge.com
+  String _buildAvatarUrl(String? cachedPath, String? slackUrl) {
+    if (cachedPath != null && cachedPath.isNotEmpty) {
+      return '$_supabaseAvatarStorageUrl$cachedPath';
+    }
+    return slackUrl ?? '';
+  }
+
   // ============================================
   // CHANNELS TAB - Channel & Message Operations
   // ============================================
@@ -144,7 +157,10 @@ class SlackManagementRepository {
             mappings[slackUserId] = {
               'real_name': item['slack_real_name']?.toString() ?? '',
               'display_name': item['slack_display_name']?.toString() ?? '',
-              'avatar_url': item['slack_avatar_url']?.toString() ?? '',
+              'avatar_url': _buildAvatarUrl(
+                item['cached_avatar_path']?.toString(),
+                item['slack_avatar_url']?.toString(),
+              ),
               'cached_avatar_path':
                   item['cached_avatar_path']?.toString() ?? '',
               'member_id': item['member_id']?.toString() ?? '',
@@ -168,7 +184,10 @@ class SlackManagementRepository {
             mappings[slackUserId] = {
               'real_name': item['slack_real_name']?.toString() ?? '',
               'display_name': item['slack_display_name']?.toString() ?? '',
-              'avatar_url': item['slack_avatar_url']?.toString() ?? '',
+              'avatar_url': _buildAvatarUrl(
+                item['cached_avatar_path']?.toString(),
+                item['slack_avatar_url']?.toString(),
+              ),
               'cached_avatar_path':
                   item['cached_avatar_path']?.toString() ?? '',
               'member_id': '', // Unmatched users have no member_id

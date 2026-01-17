@@ -72,7 +72,9 @@ class DashboardMetricsService {
 
       if (existingRow == null) {
         // No row exists - this shouldn't happen but handle it
-        print('[DashboardMetricsService] No metrics row found to update layout');
+        print(
+          '[DashboardMetricsService] No metrics row found to update layout',
+        );
         return false;
       }
 
@@ -93,12 +95,16 @@ class DashboardMetricsService {
   Future<Map<String, dynamic>?> fetchDashboardLayoutMobile() async {
     final client = _client;
     if (client == null) {
-      print('[DashboardMetricsService] fetchDashboardLayoutMobile: client is null');
+      print(
+        '[DashboardMetricsService] fetchDashboardLayoutMobile: client is null',
+      );
       return null;
     }
 
     try {
-      print('[DashboardMetricsService] fetchDashboardLayoutMobile: Fetching from database...');
+      print(
+        '[DashboardMetricsService] fetchDashboardLayoutMobile: Fetching from database...',
+      );
 
       final response = await client
           .from('crm_dashboard_metrics')
@@ -107,22 +113,32 @@ class DashboardMetricsService {
           .maybeSingle();
 
       if (response == null) {
-        print('[DashboardMetricsService] fetchDashboardLayoutMobile: No row found');
+        print(
+          '[DashboardMetricsService] fetchDashboardLayoutMobile: No row found',
+        );
         return null;
       }
 
       final layout = response['dashboard_layout_mobile'];
       if (layout == null) {
-        print('[DashboardMetricsService] fetchDashboardLayoutMobile: Layout is null (not set yet)');
+        print(
+          '[DashboardMetricsService] fetchDashboardLayoutMobile: Layout is null (not set yet)',
+        );
         return null;
       }
 
-      final widgetCount = (layout is Map) ? (layout['widgets'] as List?)?.length ?? 0 : 0;
-      print('[DashboardMetricsService] fetchDashboardLayoutMobile: Loaded layout with $widgetCount widgets');
+      final widgetCount = (layout is Map)
+          ? (layout['widgets'] as List?)?.length ?? 0
+          : 0;
+      print(
+        '[DashboardMetricsService] fetchDashboardLayoutMobile: Loaded layout with $widgetCount widgets',
+      );
 
       return layout is Map<String, dynamic> ? layout : null;
     } catch (e) {
-      print('[DashboardMetricsService] Error fetching mobile dashboard layout: $e');
+      print(
+        '[DashboardMetricsService] Error fetching mobile dashboard layout: $e',
+      );
       return null;
     }
   }
@@ -131,12 +147,16 @@ class DashboardMetricsService {
   Future<bool> saveDashboardLayoutMobile(Map<String, dynamic> layout) async {
     final client = _client;
     if (client == null) {
-      print('[DashboardMetricsService] saveDashboardLayoutMobile: client is null');
+      print(
+        '[DashboardMetricsService] saveDashboardLayoutMobile: client is null',
+      );
       return false;
     }
 
     try {
-      print('[DashboardMetricsService] saveDashboardLayoutMobile: Fetching existing row...');
+      print(
+        '[DashboardMetricsService] saveDashboardLayoutMobile: Fetching existing row...',
+      );
 
       // Get the ID of the first row
       final existingRow = await client
@@ -146,12 +166,16 @@ class DashboardMetricsService {
           .maybeSingle();
 
       if (existingRow == null) {
-        print('[DashboardMetricsService] No metrics row found to update mobile layout');
+        print(
+          '[DashboardMetricsService] No metrics row found to update mobile layout',
+        );
         return false;
       }
 
       final rowId = existingRow['id'];
-      print('[DashboardMetricsService] saveDashboardLayoutMobile: Updating row $rowId with ${layout['widgets']?.length ?? 0} widgets');
+      print(
+        '[DashboardMetricsService] saveDashboardLayoutMobile: Updating row $rowId with ${layout['widgets']?.length ?? 0} widgets',
+      );
 
       // Update the dashboard_layout_mobile column
       await client
@@ -159,10 +183,14 @@ class DashboardMetricsService {
           .update({'dashboard_layout_mobile': layout})
           .eq('id', rowId);
 
-      print('[DashboardMetricsService] saveDashboardLayoutMobile: Update completed successfully');
+      print(
+        '[DashboardMetricsService] saveDashboardLayoutMobile: Update completed successfully',
+      );
       return true;
     } catch (e, stackTrace) {
-      print('[DashboardMetricsService] Error saving mobile dashboard layout: $e');
+      print(
+        '[DashboardMetricsService] Error saving mobile dashboard layout: $e',
+      );
       print('[DashboardMetricsService] Stack trace: $stackTrace');
       return false;
     }
@@ -175,13 +203,12 @@ class DashboardMetricsService {
       return Stream.value(null);
     }
 
-    return client
-        .from('crm_dashboard_metrics')
-        .stream(primaryKey: ['id'])
-        .map((data) {
-          if (data.isEmpty) return null;
-          return DashboardMetrics.fromJson(data.first);
-        });
+    return client.from('crm_dashboard_metrics').stream(primaryKey: ['id']).map((
+      data,
+    ) {
+      if (data.isEmpty) return null;
+      return DashboardMetrics.fromJson(data.first);
+    });
   }
 
   /// Check if the metrics table exists and has data
@@ -304,13 +331,12 @@ class DashboardMetricsService {
           totalFollowers += followers;
           totalReach += reach;
           totalLikes += likes;
-          totalEngagements += likes + (row['comments_count'] as int? ?? 0) +
+          totalEngagements +=
+              likes +
+              (row['comments_count'] as int? ?? 0) +
               (row['shares_count'] as int? ?? 0);
 
-          platformFollowers.add({
-            'name': platform,
-            'count': followers,
-          });
+          platformFollowers.add({'name': platform, 'count': followers});
         }
       }
 
@@ -341,7 +367,7 @@ class DashboardMetricsService {
       final response = await client
           .from('legislation_statistics')
           .select()
-          .order('last_updated', ascending: false)
+          .order('updated_at', ascending: false)
           .limit(1)
           .maybeSingle();
 
@@ -352,7 +378,8 @@ class DashboardMetricsService {
         'total_bills_tracked': response['total_bills'] ?? 0,
         'bills_supported': response['support_count'] ?? 0,
         'bills_opposed': response['oppose_count'] ?? 0,
-        'priority_bills': response['priority_count'] ?? response['high_priority_count'] ?? 0,
+        'priority_bills':
+            response['priority_count'] ?? response['high_priority_count'] ?? 0,
         'bills_by_position': [
           {'name': 'Support', 'count': response['support_count'] ?? 0},
           {'name': 'Oppose', 'count': response['oppose_count'] ?? 0},
@@ -402,7 +429,9 @@ class DashboardMetricsService {
             : 0.0,
       };
     } catch (e) {
-      print('[DashboardMetricsService] Error fetching email campaign stats: $e');
+      print(
+        '[DashboardMetricsService] Error fetching email campaign stats: $e',
+      );
       return {};
     }
   }
@@ -440,7 +469,8 @@ class DashboardMetricsService {
       'total_unique_colleges': baseMetrics.totalUniqueColleges,
       'total_unique_high_schools': baseMetrics.totalUniqueHighSchools,
       'total_unique_counties': baseMetrics.totalUniqueCounties,
-      'total_unique_congressional_districts': baseMetrics.totalUniqueCongressionalDistricts,
+      'total_unique_congressional_districts':
+          baseMetrics.totalUniqueCongressionalDistricts,
       'total_unique_house_districts': baseMetrics.totalUniqueHouseDistricts,
       'total_unique_senate_districts': baseMetrics.totalUniqueSenateDistricts,
       'total_donations_amount': baseMetrics.totalDonationsAmount,

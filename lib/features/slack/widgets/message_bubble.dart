@@ -21,6 +21,7 @@ class SlackMessageBubble extends StatelessWidget {
     this.primaryColor = Colors.blue,
     this.onThreadTap,
     this.onMemberTap,
+    this.onUnmatchedUserTap,
   });
 
   final Map<String, dynamic> message;
@@ -29,6 +30,7 @@ class SlackMessageBubble extends StatelessWidget {
   final Color primaryColor;
   final VoidCallback? onThreadTap;
   final void Function(Member member)? onMemberTap;
+  final void Function(String slackUserId)? onUnmatchedUserTap;
 
   static final DateFormat _timestampFormat = DateFormat('MMM d, y • h:mm a');
 
@@ -73,6 +75,10 @@ class SlackMessageBubble extends StatelessWidget {
     }
 
     final canNavigate = linkedMember != null;
+    // Check if this is an unmatched user (has slack_user_id but no member_id)
+    final isUnmatchedUser = slackUserId != null &&
+        (memberId == null || memberId.isEmpty) &&
+        userMapping != null;
 
     // Use navy gradient background for message tiles
     return Container(
@@ -97,7 +103,9 @@ class SlackMessageBubble extends StatelessWidget {
         child: InkWell(
           onTap: canNavigate && onMemberTap != null
               ? () => onMemberTap!(linkedMember!)
-              : null,
+              : (isUnmatchedUser && onUnmatchedUserTap != null
+                  ? () => onUnmatchedUserTap!(slackUserId!)
+                  : null),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -133,7 +141,32 @@ class SlackMessageBubble extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              if (isUnmatchedUser) ...[
+                                const SizedBox(width: 6),
+                                Tooltip(
+                                  message: 'This Slack user has not been matched to a verified member',
+                                  child: Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFACC15), // Yellow/gold
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.priority_high,
+                                      size: 12,
+                                      color: Color(0xFF1F2937), // Dark gray
+                                    ),
+                                  ),
+                                ),
+                              ],
                               if (canNavigate) ...[
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.open_in_new,
+                                  size: 14,
+                                  color: Colors.white70,
+                                ),
+                              ] else if (isUnmatchedUser && onUnmatchedUserTap != null) ...[
                                 const SizedBox(width: 4),
                                 const Icon(
                                   Icons.open_in_new,

@@ -142,76 +142,48 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen> {
         // Content
         Column(
           children: [
-            // Header with back button (only show if not member view)
-            if (!widget.isMemberView)
-              Container(
-                padding: const EdgeInsets.fromLTRB(8, 12, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    const Expanded(
-                      child: Text(
-                        'Missouri Legislators',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    // Refresh button
-                    IconButton(
-                      icon: const Icon(Icons.refresh, color: Colors.white),
-                      onPressed: _loadLegislators,
-                      tooltip: 'Refresh',
+            // Search bar styled like All Bills tab
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _unityBlue,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _unityBlue.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-              ),
-
-            // Stats banner
-            if (_stats != null) _buildStatsBanner(theme),
-
-            // Search bar (searches all legislators by default)
-            Container(
-              padding: const EdgeInsets.all(12),
-              color: _unityBlue,
-              child: TextField(
-                controller: _searchController,
-                style: const TextStyle(color: Colors.black87),
-                decoration: InputDecoration(
-                  hintText: 'Search legislators...',
-                  hintStyle: TextStyle(color: Colors.black.withOpacity(0.5)),
-                  prefixIcon: Icon(Icons.search, color: _unityBlue.withOpacity(0.7)),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear, color: _unityBlue.withOpacity(0.7)),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                            _loadLegislators();
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
+                child: TextField(
+                  controller: _searchController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search legislators...',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                    prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.7)),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: Colors.white.withOpacity(0.7)),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                              _loadLegislators();
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   ),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  filled: true,
-                  fillColor: Colors.white,
                 ),
               ),
             ),
 
-            // Chamber selection buttons
+            // Chamber selection styled like All Bills position filter
             Container(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              color: _unityBlue,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: _buildChamberSelector(),
             ),
 
@@ -299,11 +271,18 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen> {
   Widget _buildChamberSelector() {
     return Container(
       decoration: BoxDecoration(
-        color: _unityBlue.withOpacity(0.5),
+        color: _unityBlue,
         borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(6),
         child: Row(
           children: [
             _buildChamberButton('Senate', 'senate', _senateLegislators.length),
@@ -331,27 +310,27 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen> {
             children: [
               Text(
                 label,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
-                  fontSize: 14,
+                  fontSize: 13,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? Colors.white.withOpacity(0.2)
                       : Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '$count',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    fontSize: 11,
                   ),
                 ),
               ),

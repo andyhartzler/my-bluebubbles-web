@@ -26,8 +26,9 @@ class BillCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final position = BillPosition.fromString(bill.position);
-    final priority = BillPriority.fromString(bill.priority);
+    // Only parse position/priority if they have values
+    final position = bill.position != null ? BillPosition.fromString(bill.position!) : null;
+    final priority = bill.priority != null ? BillPriority.fromString(bill.priority!) : null;
 
     return Card(
       elevation: 2,
@@ -43,7 +44,7 @@ class BillCard extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border(
               left: BorderSide(
-                color: position.color,
+                color: position?.color ?? _momentumBlue,
                 width: 4,
               ),
             ),
@@ -93,14 +94,15 @@ class BillCard extends StatelessWidget {
                       ),
                     const Spacer(),
 
-                    // Priority badge
-                    if (showPriority)
+                    // Priority badge - only show if priority is set
+                    if (showPriority && priority != null)
                       _buildBadge(
                         emoji: priority.emoji,
                         label: priority.label,
                         color: priority.color,
                       ),
-                    if (showPosition) ...[
+                    // Position badge - only show if position is set
+                    if (showPosition && position != null) ...[
                       const SizedBox(width: 8),
                       _buildBadge(
                         emoji: position.emoji,

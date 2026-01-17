@@ -1353,35 +1353,56 @@ class LegislationDataSources {
 }
 
 /// Pre-defined gradient color combinations for legislation dashboard widgets
+/// Matches the CRM dashboard gradients for consistency
 class LegislationWidgetGradients {
+  // Extended color palette for blue variants
+  static const _deepNavy = Color(0xFF0D1B2A);
+  static const _oceanBlue = Color(0xFF1B4965);
+  static const _darkSlate = Color(0xFF1A365D);
+  static const _skyBlue = Color(0xFF63B3ED);
+  static const _royalBlue = Color(0xFF4169E1);
+  static const _midnightBlue = Color(0xFF191970);
+  static const _indigoBlue = Color(0xFF4338CA);
+  static const _tealBlue = Color(0xFF0D9488);
+
   static const List<List<Color>> all = [
+    // Brand gradients
     [Color(0xFF273351), Color(0xFF32A6DE)],    // Unity Blue
-    [Color(0xFF32A6DE), Color(0xFF43A047)],    // Momentum
-    [Color(0xFF43A047), Color(0xFFFDB813)],    // Grassroots
-    [Color(0xFFFDB813), Color(0xFFE63946)],    // Sunrise
-    [Color(0xFFE63946), Color(0xFF6A1B9A)],    // Action
-    [Color(0xFF6A1B9A), Color(0xFF32A6DE)],    // Justice
-    [Color(0xFF3B82F6), Color(0xFF1D4ED8)],    // Democrat Blue
-    [Color(0xFFEF4444), Color(0xFFB91C1C)],    // Republican Red
-    [Color(0xFF10B981), Color(0xFF059669)],    // Success Green
-    [Color(0xFFF59E0B), Color(0xFFD97706)],    // Warning Amber
-    [Color(0xFF8B5CF6), Color(0xFF7C3AED)],    // Purple
-    [Color(0xFF06B6D4), Color(0xFF0891B2)],    // Cyan
+    [Color(0xFF32A6DE), Color(0xFF6A1B9A)],    // Momentum Purple
+    [Color(0xFF43A047), Color(0xFF32A6DE)],    // Grassroots Teal
+    [Color(0xFFFDB813), Color(0xFFE63946)],    // Sunrise Fire
+    [Color(0xFF6A1B9A), Color(0xFFE63946)],    // Purple Heat
+    [Color(0xFFE63946), Color(0xFFFDB813)],    // Warm Sunset
+    [Color(0xFF43A047), Color(0xFFFDB813)],    // Nature Glow
+    [Color(0xFF273351), Color(0xFF43A047)],    // Forest Blue
+    // Blue variants
+    [_deepNavy, _oceanBlue],                    // Deep Ocean
+    [_darkSlate, _oceanBlue],                   // Slate Ocean
+    [Color(0xFF273351), _skyBlue],              // Sky Gradient
+    [_royalBlue, Color(0xFF32A6DE)],            // Royal Momentum
+    [_midnightBlue, _indigoBlue],               // Midnight Indigo
+    [_tealBlue, Color(0xFF32A6DE)],             // Teal Momentum
+    [_deepNavy, Color(0xFF32A6DE)],             // Navy Momentum
+    [_indigoBlue, _skyBlue],                    // Indigo Sky
   ];
 
   static const List<String> names = [
     'Unity Blue',
-    'Momentum',
-    'Grassroots',
-    'Sunrise',
-    'Action',
-    'Justice',
-    'Democrat',
-    'Republican',
-    'Success',
-    'Warning',
-    'Purple',
-    'Cyan',
+    'Momentum Purple',
+    'Grassroots Teal',
+    'Sunrise Fire',
+    'Purple Heat',
+    'Warm Sunset',
+    'Nature Glow',
+    'Forest Blue',
+    'Deep Ocean',
+    'Slate Ocean',
+    'Sky Gradient',
+    'Royal Momentum',
+    'Midnight Indigo',
+    'Teal Momentum',
+    'Navy Momentum',
+    'Indigo Sky',
   ];
 
   /// Find the index of a gradient in the predefined list

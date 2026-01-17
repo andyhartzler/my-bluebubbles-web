@@ -69,39 +69,82 @@ class LegislationStatCardWidget extends StatelessWidget {
     );
   }
 
-  /// Compact square layout for mini size - number on top, name below
+  /// Compact square layout for mini size - number on top, name/icon below
+  /// Fully responsive - scales to any screen size
   Widget _buildMiniLayout(String displayValue) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Large number at the top
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            displayValue,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-              height: 1.1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate responsive sizes based on available space
+        final availableHeight = constraints.maxHeight;
+        final availableWidth = constraints.maxWidth;
+
+        // Number takes up ~60% of height, label takes ~40%
+        final numberHeight = availableHeight * 0.55;
+        final labelHeight = availableHeight * 0.35;
+        final spacing = availableHeight * 0.1;
+
+        // Calculate icon size proportional to available width
+        final iconSize = (availableWidth * 0.15).clamp(12.0, 20.0);
+
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Large number at the top - takes majority of space
+            SizedBox(
+              height: numberHeight,
+              width: availableWidth,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Text(
+                  displayValue,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 72, // Large base size, FittedBox will scale down
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        // Stat name below
-        Text(
-          config.title,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.95),
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+            SizedBox(height: spacing),
+            // Stat name and icon at the bottom - smaller, compact
+            SizedBox(
+              height: labelHeight,
+              width: availableWidth,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (config.icon != null) ...[
+                      Icon(
+                        config.icon,
+                        color: Colors.white.withOpacity(0.9),
+                        size: iconSize,
+                      ),
+                      SizedBox(width: iconSize * 0.3),
+                    ],
+                    Text(
+                      config.title,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.95),
+                        fontSize: 14, // Base size, FittedBox scales
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -282,46 +325,84 @@ class LegislationPieChartWidget extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 12),
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(flex: 3, child: _buildChart()),
-                    const SizedBox(width: 16),
-                    Expanded(flex: 2, child: _buildLegend()),
-                  ],
-                ),
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxHeight < 180 || constraints.maxWidth < 280;
+              final isVeryCompact = constraints.maxHeight < 140 || constraints.maxWidth < 220;
+              final spacing = isVeryCompact ? 8.0 : (isCompact ? 12.0 : 16.0);
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(isCompact: isCompact),
+                  SizedBox(height: isVeryCompact ? 8 : 12),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: _buildChart(
+                            isCompact: isCompact,
+                            isVeryCompact: isVeryCompact,
+                            constraints: constraints,
+                          ),
+                        ),
+                        SizedBox(width: spacing),
+                        Expanded(flex: 2, child: _buildLegend(isCompact: isCompact)),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader({bool isCompact = false}) {
     return Row(
       children: [
-        Icon(config.icon ?? Icons.pie_chart, color: Colors.white, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          config.title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+        Icon(
+          config.icon ?? Icons.pie_chart,
+          color: Colors.white,
+          size: isCompact ? 16 : 20,
+        ),
+        SizedBox(width: isCompact ? 6 : 8),
+        Expanded(
+          child: Text(
+            config.title,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isCompact ? 13 : 16,
+              fontWeight: FontWeight.bold,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildChart() {
+  Widget _buildChart({
+    bool isCompact = false,
+    bool isVeryCompact = false,
+    BoxConstraints? constraints,
+  }) {
     final total = data.fold<int>(0, (sum, item) => sum + item.count);
+
+    // Calculate responsive radius based on available space
+    final availableHeight = constraints?.maxHeight ?? 200;
+    final availableWidth = constraints?.maxWidth ?? 200;
+    final minDimension = (availableHeight < availableWidth ? availableHeight : availableWidth) * 0.4;
+
+    // Scale radius based on available space
+    final baseRadius = isDonut
+        ? minDimension.clamp(25.0, 50.0)
+        : minDimension.clamp(35.0, 70.0);
+    final centerRadius = isDonut ? (baseRadius * 0.7).clamp(20.0, 45.0) : 0.0;
+    final titleSize = isVeryCompact ? 9.0 : (isCompact ? 10.0 : 12.0);
 
     return PieChart(
       PieChartData(
@@ -331,43 +412,47 @@ class LegislationPieChartWidget extends StatelessWidget {
             value: item.count.toDouble(),
             title: percentage >= 5 ? '${percentage.toStringAsFixed(0)}%' : '',
             color: item.color,
-            radius: isDonut ? 40 : 60,
-            titleStyle: const TextStyle(
+            radius: baseRadius,
+            titleStyle: TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: titleSize,
               fontWeight: FontWeight.bold,
             ),
           );
         }).toList(),
-        centerSpaceRadius: isDonut ? 40 : 0,
+        centerSpaceRadius: centerRadius,
         sectionsSpace: 2,
       ),
     );
   }
 
-  Widget _buildLegend() {
+  Widget _buildLegend({bool isCompact = false}) {
+    final dotSize = isCompact ? 10.0 : 12.0;
+    final fontSize = isCompact ? 10.0 : 12.0;
+    final spacing = isCompact ? 3.0 : 4.0;
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: data.map((item) {
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: EdgeInsets.symmetric(vertical: spacing),
             child: Row(
               children: [
                 Container(
-                  width: 12,
-                  height: 12,
+                  width: dotSize,
+                  height: dotSize,
                   decoration: BoxDecoration(
                     color: item.color,
                     shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: isCompact ? 6 : 8),
                 Expanded(
                   child: Text(
                     item.label,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    style: TextStyle(color: Colors.white, fontSize: fontSize),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -375,7 +460,7 @@ class LegislationPieChartWidget extends StatelessWidget {
                   '${item.count}',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
-                    fontSize: 12,
+                    fontSize: fontSize,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -456,80 +541,113 @@ class LegislationProgressRingWidget extends StatelessWidget {
               end: Alignment.bottomRight,
             ),
           ),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      config.icon ?? Icons.donut_large,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  Text(
-                    '${percentage.toStringAsFixed(0)}%',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              SizedBox(
-                width: 100,
-                height: 100,
-                child: Stack(
-                  fit: StackFit.expand,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxHeight < 180 || constraints.maxWidth < 180;
+              final isVeryCompact = constraints.maxHeight < 140 || constraints.maxWidth < 140;
+
+              // Responsive sizing
+              final padding = isVeryCompact ? 12.0 : (isCompact ? 16.0 : 20.0);
+              final iconSize = isVeryCompact ? 18.0 : (isCompact ? 20.0 : 24.0);
+              final iconPadding = isVeryCompact ? 6.0 : (isCompact ? 8.0 : 10.0);
+              final percentageSize = isVeryCompact ? 16.0 : (isCompact ? 20.0 : 24.0);
+
+              // Calculate ring size based on available space
+              final availableForRing = constraints.maxHeight - padding * 2 - 80;
+              final ringSize = availableForRing.clamp(60.0, 120.0);
+              final strokeWidth = (ringSize * 0.1).clamp(6.0, 12.0);
+              final centerTextSize = (ringSize * 0.28).clamp(16.0, 32.0);
+
+              final titleSize = isVeryCompact ? 11.0 : (isCompact ? 12.0 : 14.0);
+              final subtitleSize = isVeryCompact ? 9.0 : (isCompact ? 10.0 : 12.0);
+
+              return Padding(
+                padding: EdgeInsets.all(padding),
+                child: Column(
                   children: [
-                    CircularProgressIndicator(
-                      value: percentage / 100,
-                      strokeWidth: 10,
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Colors.white,
-                      ),
-                    ),
-                    Center(
-                      child: Text(
-                        '$current',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(iconPadding),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            config.icon ?? Icons.donut_large,
+                            color: Colors.white,
+                            size: iconSize,
+                          ),
                         ),
+                        Text(
+                          '${percentage.toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: percentageSize,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    SizedBox(
+                      width: ringSize,
+                      height: ringSize,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CircularProgressIndicator(
+                            value: percentage / 100,
+                            strokeWidth: strokeWidth,
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                          Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '$current',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: centerTextSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    const Spacer(),
+                    Text(
+                      config.title,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: titleSize,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (config.subtitle != null)
+                      Text(
+                        config.subtitle!,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: subtitleSize,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                   ],
                 ),
-              ),
-              const Spacer(),
-              Text(
-                config.title,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              if (config.subtitle != null)
-                Text(
-                  config.subtitle!,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 12,
-                  ),
-                ),
-            ],
+              );
+            },
           ),
         ),
       ),

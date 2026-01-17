@@ -11,6 +11,7 @@ import 'package:bluebubbles/features/slack/services/slack_management_repository.
 import 'package:bluebubbles/features/slack/widgets/channel_sidebar.dart';
 import 'package:bluebubbles/features/slack/widgets/message_bubble.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/slack_activity.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 
@@ -358,6 +359,22 @@ class _ChannelsTabState extends State<ChannelsTab> {
       ThemeSwitcher.buildPageRoute(
         builder: (context) =>
             TitleBarWrapper(child: MemberDetailScreen(member: member)),
+      ),
+    );
+  }
+
+  /// Navigate to unmatched user profile dialog
+  Future<void> _navigateToUnmatchedUser(String slackUserId) async {
+    // Fetch the unmatched user info
+    final user = await _repository.getUnmatchedUserBySlackId(slackUserId);
+    if (user == null || !mounted) return;
+
+    // Show a dialog with unmatched user info and option to go to Unmatched Users tab
+    showDialog(
+      context: context,
+      builder: (context) => _UnmatchedUserInfoDialog(
+        user: user,
+        userMappings: _userMappings,
       ),
     );
   }
@@ -718,6 +735,7 @@ class _ChannelsTabState extends State<ChannelsTab> {
             memberCache: _memberCache,
             primaryColor: Theme.of(context).colorScheme.primary,
             onMemberTap: _navigateToMember,
+            onUnmatchedUserTap: _navigateToUnmatchedUser,
           );
         },
       ),
@@ -1010,6 +1028,221 @@ class _BrandedChannelDropdown extends StatelessWidget {
             }
           },
         ),
+      ),
+    );
+  }
+}
+
+/// Dialog showing unmatched user info with options
+class _UnmatchedUserInfoDialog extends StatelessWidget {
+  const _UnmatchedUserInfoDialog({
+    required this.user,
+    required this.userMappings,
+  });
+
+  final SlackUnmatchedUser user;
+  final Map<String, Map<String, String>> userMappings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: BrandColors.unityBlue.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    backgroundImage: user.avatarUrl != null
+                        ? NetworkImage(user.avatarUrl!)
+                        : null,
+                    child: user.avatarUrl == null
+                        ? const Icon(Icons.person, color: Colors.white, size: 30)
+                        : null,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                user.primaryLabel,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFACC15).withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.priority_high,
+                                    size: 12,
+                                    color: Color(0xFFFACC15),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Unmatched',
+                                    style: TextStyle(
+                                      color: Color(0xFFFACC15),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (user.usernameDisplay != null)
+                          Text(
+                            user.usernameDisplay!,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Info section
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+              ),
+              child: Column(
+                children: [
+                  if (user.email != null && user.email!.isNotEmpty)
+                    _buildInfoRow(Icons.email, 'Email', user.email!),
+                  _buildInfoRow(Icons.tag, 'Slack ID', user.slackUserId),
+                  if (user.notes != null && user.notes!.isNotEmpty)
+                    _buildInfoRow(Icons.notes, 'Notes', user.notes!),
+                ],
+              ),
+            ),
+            // Warning message
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFACC15).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFFFACC15).withOpacity(0.3),
+                  ),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFFACC15),
+                      size: 20,
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'This Slack user has not been matched to a verified member. Go to the Unmatched Users tab to match them.',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Actions
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: Colors.white70),
+          const SizedBox(width: 12),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

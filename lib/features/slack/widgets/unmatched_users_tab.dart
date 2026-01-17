@@ -503,7 +503,7 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
   }
 }
 
-/// Card widget for displaying an unmatched user
+/// Card widget for displaying an unmatched user with navy gradient design
 class _UnmatchedUserCard extends StatelessWidget {
   const _UnmatchedUserCard({
     super.key,
@@ -526,210 +526,216 @@ class _UnmatchedUserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final dateFormat = DateFormat('MMM d, y');
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: isHighlighted ? 8 : 4,
-      shadowColor: BrandColors.unityBlue.withOpacity(0.3),
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
-        side: isHighlighted
-            ? const BorderSide(color: BrandColors.sunriseGold, width: 3)
-            : BorderSide.none,
+        border: isHighlighted
+            ? Border.all(color: BrandColors.sunriseGold, width: 3)
+            : null,
+        boxShadow: [
+          BoxShadow(
+            color: BrandColors.unityBlue.withOpacity(0.3),
+            blurRadius: isHighlighted ? 12 : 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: onViewActivity,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CorsAwareAvatar(
-                    imageUrl: user.avatarUrl,
-                    radius: 28,
-                    backgroundColor: BrandColors.momentumBlue.withOpacity(0.2),
-                    fallbackText: user.primaryLabel,
-                    fallbackTextColor: BrandColors.unityBlue,
-                    fallbackIconColor: BrandColors.momentumBlue,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                user.primaryLabel,
-                                style: const TextStyle(
-                                  color: BrandColors.unityBlue,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onViewActivity,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CorsAwareAvatar(
+                      imageUrl: user.avatarUrl,
+                      radius: 28,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      fallbackText: user.primaryLabel,
+                      fallbackTextColor: Colors.white,
+                      fallbackIconColor: Colors.white,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  user.primaryLabel,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (user.manuallyRejected)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Rejected',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          if (user.usernameDisplay != null)
+                            Text(
+                              user.usernameDisplay!,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
                               ),
                             ),
-                            if (user.manuallyRejected)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: Colors.red.withOpacity(0.3),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Rejected',
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // Info row
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 8,
+                  children: [
+                    if (user.email != null && user.email!.isNotEmpty)
+                      _buildInfoChip(
+                        context,
+                        Icons.email,
+                        user.email!,
+                        const Color(0xFF4ADE80), // Green for success
+                      )
+                    else
+                      _buildInfoChip(
+                        context,
+                        Icons.email_outlined,
+                        'No email',
+                        const Color(0xFFF87171), // Red for warning
+                      ),
+                    if (user.createdAt != null)
+                      _buildInfoChip(
+                        context,
+                        Icons.calendar_today,
+                        'Added ${dateFormat.format(user.createdAt!)}',
+                        Colors.white70,
+                      ),
+                  ],
+                ),
+                if (user.notes != null && user.notes!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.notes,
+                          size: 16,
+                          color: BrandColors.momentumBlue,
                         ),
-                        if (user.usernameDisplay != null)
-                          Text(
-                            user.usernameDisplay!,
-                            style: TextStyle(
-                              color: BrandColors.unityBlue.withOpacity(0.7),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            user.notes!,
+                            style: const TextStyle(
+                              color: Colors.white70,
                               fontSize: 13,
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 14),
-              // Info row
-              Wrap(
-                spacing: 16,
-                runSpacing: 8,
-                children: [
-                  if (user.email != null && user.email!.isNotEmpty)
-                    _buildInfoChip(
-                      context,
-                      Icons.email,
-                      user.email!,
-                      BrandColors.success,
-                    )
-                  else
-                    _buildInfoChip(
-                      context,
-                      Icons.email_outlined,
-                      'No email',
-                      BrandColors.error,
-                    ),
-                  if (user.createdAt != null)
-                    _buildInfoChip(
-                      context,
-                      Icons.calendar_today,
-                      'Added ${dateFormat.format(user.createdAt!)}',
-                      BrandColors.unityBlue.withOpacity(0.7),
-                    ),
-                ],
-              ),
-              if (user.notes != null && user.notes!.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: BrandColors.momentumBlue.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: BrandColors.momentumBlue.withOpacity(0.2),
-                    ),
-                  ),
-                  child: Row(
+                const SizedBox(height: 14),
+                // Action buttons
+                if (!user.manuallyRejected)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Icon(
-                        Icons.notes,
-                        size: 16,
-                        color: BrandColors.momentumBlue,
+                      ElevatedButton.icon(
+                        onPressed: onMatch,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: BrandColors.momentumBlue,
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.link, size: 18),
+                        label: const Text('Match to Member'),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          user.notes!,
-                          style: TextStyle(
-                            color: BrandColors.unityBlue.withOpacity(0.8),
-                            fontSize: 13,
-                          ),
+                      OutlinedButton.icon(
+                        onPressed: onCreateMember,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white70),
+                        ),
+                        icon: const Icon(Icons.person_add, size: 18),
+                        label: const Text('Create Member'),
+                      ),
+                      TextButton.icon(
+                        onPressed: onReject,
+                        icon: Icon(
+                          Icons.block,
+                          size: 18,
+                          color: Colors.red.shade300,
+                        ),
+                        label: Text(
+                          'Reject',
+                          style: TextStyle(color: Colors.red.shade300),
                         ),
                       ),
+                      IconButton(
+                        onPressed: onEditNotes,
+                        icon: const Icon(
+                          Icons.edit_note,
+                          color: Colors.white70,
+                        ),
+                        tooltip: 'Add/Edit Notes',
+                      ),
                     ],
+                  )
+                else
+                  TextButton.icon(
+                    onPressed: onEditNotes,
+                    icon: const Icon(Icons.edit_note, color: Colors.white70),
+                    label: const Text(
+                      'Edit Notes',
+                      style: TextStyle(color: Colors.white70),
+                    ),
                   ),
-                ),
               ],
-              const SizedBox(height: 14),
-              // Action buttons
-              if (!user.manuallyRejected)
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: onMatch,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: BrandColors.unityBlue,
-                        foregroundColor: Colors.white,
-                      ),
-                      icon: const Icon(Icons.link, size: 18),
-                      label: const Text('Match to Member'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: onCreateMember,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: BrandColors.unityBlue,
-                        side: const BorderSide(color: BrandColors.unityBlue),
-                      ),
-                      icon: const Icon(Icons.person_add, size: 18),
-                      label: const Text('Create Member'),
-                    ),
-                    TextButton.icon(
-                      onPressed: onReject,
-                      icon: const Icon(
-                        Icons.block,
-                        size: 18,
-                        color: Colors.red,
-                      ),
-                      label: const Text(
-                        'Reject',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: onEditNotes,
-                      icon: Icon(
-                        Icons.edit_note,
-                        color: BrandColors.momentumBlue,
-                      ),
-                      tooltip: 'Add/Edit Notes',
-                    ),
-                  ],
-                )
-              else
-                TextButton.icon(
-                  onPressed: onEditNotes,
-                  icon: Icon(Icons.edit_note, color: BrandColors.momentumBlue),
-                  label: Text(
-                    'Edit Notes',
-                    style: TextStyle(color: BrandColors.momentumBlue),
-                  ),
-                ),
-            ],
+            ),
           ),
         ),
       ),
@@ -747,11 +753,14 @@ class _UnmatchedUserCard extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: color),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: BrandColors.unityBlue.withOpacity(0.7),
-            fontSize: 13,
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
