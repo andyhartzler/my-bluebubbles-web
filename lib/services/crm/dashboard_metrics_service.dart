@@ -21,10 +21,8 @@ class DashboardMetricsService {
     // had initialization issues (e.g., service role setup failed)
     try {
       final client = Supabase.instance.client;
-      // Verify the client is usable by checking if we have a valid URL
-      if (client.supabaseUrl.isNotEmpty) {
-        return client;
-      }
+      // If we can access the client without throwing, it's initialized
+      return client;
     } catch (e) {
       print('[DashboardMetricsService] Supabase.instance.client not available: $e');
     }
@@ -43,7 +41,7 @@ class DashboardMetricsService {
       return null;
     }
 
-    print('[DashboardMetricsService] fetchMetrics: Using client with URL: ${client.supabaseUrl.substring(0, client.supabaseUrl.length.clamp(0, 40))}...');
+    print('[DashboardMetricsService] fetchMetrics: Using Supabase client');
 
     try {
       print('[DashboardMetricsService] fetchMetrics: Querying crm_dashboard_metrics...');

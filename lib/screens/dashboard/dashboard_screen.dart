@@ -681,8 +681,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     bool hasSupabaseClient = _supabaseService.isInitialized;
     if (!hasSupabaseClient) {
       try {
-        final client = Supabase.instance.client;
-        hasSupabaseClient = client.supabaseUrl.isNotEmpty;
+        // Just check if client exists - accessing it throws if not initialized
+        Supabase.instance.client;
+        hasSupabaseClient = true;
       } catch (_) {
         // Supabase.instance not available
       }
