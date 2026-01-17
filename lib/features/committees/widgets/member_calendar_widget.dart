@@ -3,30 +3,21 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/calendar/models/calendar_event.dart';
 import 'package:bluebubbles/features/calendar/services/calendar_service.dart';
-import 'package:bluebubbles/features/calendar/widgets/calendar_subscribe_button.dart';
 
 // Brand colors
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
 
-/// Modern calendar widget with brand color styling
-class CommitteeCalendarWidget extends StatefulWidget {
-  final String? committeeName;
-  final Color? accentColor;
-  final VoidCallback? onAddEvent;
-
-  const CommitteeCalendarWidget({
-    super.key,
-    this.committeeName,
-    this.accentColor,
-    this.onAddEvent,
-  });
+/// A styled calendar widget for the member hub that displays all organization events
+/// Uses brand colors (unity blue, momentum blue) for consistent styling
+class MemberCalendarWidget extends StatefulWidget {
+  const MemberCalendarWidget({super.key});
 
   @override
-  State<CommitteeCalendarWidget> createState() => _CommitteeCalendarWidgetState();
+  State<MemberCalendarWidget> createState() => _MemberCalendarWidgetState();
 }
 
-class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
+class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
   final CalendarService _calendarService = CalendarService();
 
   List<CalendarEvent> _events = [];
@@ -49,7 +40,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
     });
 
     try {
-      // Fetch ALL events - no committee filter!
+      // Fetch ALL events - no committee filter
       final events = await _calendarService.getEventsForMonth(
         _focusedMonth.year,
         _focusedMonth.month,
@@ -75,21 +66,15 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
     final eventStart = event.startTime.toLocal();
     final eventEnd = event.endTime.toLocal();
 
-    // Normalize dates to start of day for comparison
     final dayStart = DateTime(day.year, day.month, day.day);
     final dayEnd = dayStart.add(const Duration(days: 1));
     final eventStartDay = DateTime(eventStart.year, eventStart.month, eventStart.day);
     final eventEndDay = DateTime(eventEnd.year, eventEnd.month, eventEnd.day);
 
-    // For all-day events, check if day falls within the range
     if (event.allDay) {
-      // All-day events: day is within [eventStartDay, eventEndDay)
-      // Note: end time for all-day events is typically midnight of the day AFTER
       return !dayStart.isBefore(eventStartDay) && dayStart.isBefore(eventEndDay);
     }
 
-    // For timed events spanning multiple days
-    // Check if the day overlaps with the event's time range
     return dayStart.isBefore(eventEnd) && dayEnd.isAfter(eventStart);
   }
 
@@ -124,29 +109,27 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? _unityBlue : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: _unityBlue.withOpacity(isDark ? 0.3 : 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: _unityBlue.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(isDark),
-          _buildMonthNavigation(isDark),
-          _buildDayHeaders(isDark),
+          _buildHeader(),
+          _buildMonthNavigation(),
+          _buildDayHeaders(),
           if (_loading)
-            Padding(
-              padding: const EdgeInsets.all(40),
+            const Padding(
+              padding: EdgeInsets.all(40),
               child: Center(
                 child: CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
@@ -154,103 +137,75 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
               ),
             )
           else if (_error != null)
-            _buildError(isDark)
+            _buildError()
           else ...[
-            _buildCalendarGrid(isDark),
-            Divider(
-              height: 1,
-              color: isDark ? Colors.white.withOpacity(0.1) : _unityBlue.withOpacity(0.1),
-            ),
-            _buildSelectedDayEvents(isDark),
+            _buildCalendarGrid(),
+            Divider(height: 1, color: _unityBlue.withOpacity(0.1)),
+            _buildSelectedDayEvents(),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildHeader(bool isDark) {
-    final accentColor = widget.accentColor ?? _momentumBlue;
+  Widget _buildHeader() {
+    final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            accentColor.withOpacity(0.15),
-            accentColor.withOpacity(0.05),
+            _momentumBlue.withOpacity(0.1),
+            _momentumBlue.withOpacity(0.05),
           ],
         ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.15),
+              color: _momentumBlue.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.calendar_today_rounded,
-              color: accentColor,
-              size: 24,
+              color: _momentumBlue,
+              size: 22,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              'Organization Events & Meetings',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : _unityBlue,
-              ),
+          const SizedBox(width: 12),
+          Text(
+            'Organization Calendar',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: _unityBlue,
             ),
           ),
-          CalendarSubscribeButton(
-            committeeName: widget.committeeName,
-            accentColor: widget.accentColor,
-          ),
-          const SizedBox(width: 8),
-          if (widget.onAddEvent != null)
-            FilledButton.icon(
-              onPressed: widget.onAddEvent,
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add Event', style: TextStyle(fontSize: 13)),
-              style: FilledButton.styleFrom(
-                backgroundColor: accentColor,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
         ],
       ),
     );
   }
 
-  Widget _buildMonthNavigation(bool isDark) {
+  Widget _buildMonthNavigation() {
+    final theme = Theme.of(context);
     final monthFormat = DateFormat('MMMM yyyy');
     final now = DateTime.now();
-    final isCurrentMonth = _focusedMonth.year == now.year &&
-        _focusedMonth.month == now.month;
+    final isCurrentMonth =
+        _focusedMonth.year == now.year && _focusedMonth.month == now.month;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
             onPressed: _previousMonth,
-            icon: Icon(
-              Icons.chevron_left_rounded,
-              color: isDark ? Colors.white : _unityBlue,
-            ),
+            icon: const Icon(Icons.chevron_left_rounded, color: _unityBlue),
             style: IconButton.styleFrom(
-              backgroundColor:
-                  isDark ? Colors.white.withOpacity(0.1) : _unityBlue.withOpacity(0.05),
+              backgroundColor: _unityBlue.withOpacity(0.05),
             ),
           ),
           GestureDetector(
@@ -260,17 +215,15 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
               children: [
                 Text(
                   monthFormat.format(_focusedMonth),
-                  style: TextStyle(
-                    fontSize: 17,
+                  style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : _unityBlue,
+                    color: _unityBlue,
                   ),
                 ),
                 if (!isCurrentMonth) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: _momentumBlue.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10),
@@ -290,13 +243,9 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
           ),
           IconButton(
             onPressed: _nextMonth,
-            icon: Icon(
-              Icons.chevron_right_rounded,
-              color: isDark ? Colors.white : _unityBlue,
-            ),
+            icon: const Icon(Icons.chevron_right_rounded, color: _unityBlue),
             style: IconButton.styleFrom(
-              backgroundColor:
-                  isDark ? Colors.white.withOpacity(0.1) : _unityBlue.withOpacity(0.05),
+              backgroundColor: _unityBlue.withOpacity(0.05),
             ),
           ),
         ],
@@ -304,7 +253,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
     );
   }
 
-  Widget _buildDayHeaders(bool isDark) {
+  Widget _buildDayHeaders() {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     return Padding(
@@ -318,9 +267,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? Colors.white.withOpacity(0.6)
-                            : _unityBlue.withOpacity(0.6),
+                        color: _unityBlue.withOpacity(0.6),
                       ),
                     ),
                   ),
@@ -330,7 +277,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
     );
   }
 
-  Widget _buildCalendarGrid(bool isDark) {
+  Widget _buildCalendarGrid() {
     final daysInMonth =
         DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0).day;
     final firstDayOfMonth =
@@ -339,7 +286,6 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
 
     final today = DateTime.now();
 
-    // Calculate number of rows needed (typically 5-6 weeks)
     final totalCells = startWeekday + daysInMonth;
     final rowCount = (totalCells / 7).ceil();
     final itemCount = rowCount * 7;
@@ -353,8 +299,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
           crossAxisCount: 7,
           mainAxisSpacing: 4,
           crossAxisSpacing: 4,
-          childAspectRatio: 1.0,
-          mainAxisExtent: 80,
+          mainAxisExtent: 72,
         ),
         itemCount: itemCount,
         itemBuilder: (context, index) {
@@ -363,8 +308,8 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
           if (dayOffset < 0 || dayOffset >= daysInMonth) {
             return Container(
               decoration: BoxDecoration(
-                color: isDark ? Colors.white.withOpacity(0.02) : _unityBlue.withOpacity(0.02),
-                borderRadius: BorderRadius.circular(8),
+                color: _unityBlue.withOpacity(0.02),
+                borderRadius: BorderRadius.circular(6),
               ),
             );
           }
@@ -384,8 +329,6 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
             isToday: isToday,
             isSelected: isSelected,
             events: dayEvents,
-            isDark: isDark,
-            showEventNames: true, // Show event names on desktop
             onTap: () {
               setState(() {
                 _selectedDate = date;
@@ -398,7 +341,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
     );
   }
 
-  Widget _buildError(bool isDark) {
+  Widget _buildError() {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Center(
@@ -407,7 +350,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
             Icon(
               Icons.error_outline,
               size: 40,
-              color: isDark ? Colors.red.shade300 : Colors.red.shade300,
+              color: Colors.red.shade300,
             ),
             const SizedBox(height: 12),
             Text(
@@ -415,7 +358,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: isDark ? Colors.red.shade300 : Colors.red.shade700,
+                color: Colors.red.shade700,
               ),
             ),
             const SizedBox(height: 12),
@@ -430,7 +373,8 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
     );
   }
 
-  Widget _buildSelectedDayEvents(bool isDark) {
+  Widget _buildSelectedDayEvents() {
+    final theme = Theme.of(context);
     final dayFormat = DateFormat('EEEE, MMMM d');
     final isToday = _selectedDate.year == DateTime.now().year &&
         _selectedDate.month == DateTime.now().month &&
@@ -448,17 +392,15 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
               children: [
                 Text(
                   dayFormat.format(_selectedDate),
-                  style: TextStyle(
-                    fontSize: 14,
+                  style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : _unityBlue,
+                    color: _unityBlue,
                   ),
                 ),
                 if (isToday) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: _momentumBlue,
                       borderRadius: BorderRadius.circular(8),
@@ -478,16 +420,14 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
                   '${_selectedDayEvents.length} event${_selectedDayEvents.length == 1 ? '' : 's'}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark
-                        ? Colors.white.withOpacity(0.5)
-                        : _unityBlue.withOpacity(0.5),
+                    color: _unityBlue.withOpacity(0.5),
                   ),
                 ),
               ],
             ),
           ),
           if (_selectedDayEvents.isEmpty)
-            _buildEmptyState(isDark)
+            _buildEmptyState()
           else
             Flexible(
               child: ListView.builder(
@@ -497,10 +437,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
                 itemBuilder: (context, index) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6),
-                    child: _EventCard(
-                      event: _selectedDayEvents[index],
-                      isDark: isDark,
-                    ),
+                    child: _EventCard(event: _selectedDayEvents[index]),
                   );
                 },
               ),
@@ -510,7 +447,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
     );
   }
 
-  Widget _buildEmptyState(bool isDark) {
+  Widget _buildEmptyState() {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Center(
@@ -519,8 +456,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
             Icon(
               Icons.event_available_rounded,
               size: 40,
-              color:
-                  isDark ? Colors.white.withOpacity(0.2) : _unityBlue.withOpacity(0.2),
+              color: _unityBlue.withOpacity(0.2),
             ),
             const SizedBox(height: 12),
             Text(
@@ -528,19 +464,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: isDark
-                    ? Colors.white.withOpacity(0.5)
-                    : _unityBlue.withOpacity(0.5),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Tap "Add Event" to create one',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? Colors.white.withOpacity(0.3)
-                    : _unityBlue.withOpacity(0.4),
+                color: _unityBlue.withOpacity(0.5),
               ),
             ),
           ],
@@ -550,14 +474,12 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
   }
 }
 
-/// Calendar day cell widget
+/// Calendar day cell widget with brand colors
 class _CalendarDayCell extends StatelessWidget {
   final DateTime date;
   final bool isToday;
   final bool isSelected;
   final List<CalendarEvent> events;
-  final bool isDark;
-  final bool showEventNames;
   final VoidCallback onTap;
 
   const _CalendarDayCell({
@@ -565,18 +487,14 @@ class _CalendarDayCell extends StatelessWidget {
     required this.isToday,
     required this.isSelected,
     required this.events,
-    required this.isDark,
-    this.showEventNames = false,
     required this.onTap,
   });
 
   Color _getEventColor(CalendarEvent event) {
-    // Check for Zoom meeting
     if (event.hasZoomMeeting) {
       return const Color(0xFF2D8CFF);
     }
 
-    // Color by event type string
     switch (event.eventType) {
       case 'committee':
         return _momentumBlue;
@@ -599,19 +517,14 @@ class _CalendarDayCell extends StatelessWidget {
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           color: isSelected
-              ? (isDark ? _momentumBlue.withOpacity(0.3) : _momentumBlue.withOpacity(0.15))
+              ? _momentumBlue.withOpacity(0.15)
               : isToday
                   ? _momentumBlue.withOpacity(0.08)
-                  : isDark
-                      ? Colors.white.withOpacity(0.03)
-                      : _unityBlue.withOpacity(0.02),
+                  : _unityBlue.withOpacity(0.02),
           borderRadius: BorderRadius.circular(8),
           border: isToday
               ? Border.all(color: _momentumBlue, width: 2)
-              : Border.all(
-                  color: isDark ? Colors.white.withOpacity(0.1) : _unityBlue.withOpacity(0.08),
-                  width: 0.5,
-                ),
+              : Border.all(color: _unityBlue.withOpacity(0.08), width: 0.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -638,9 +551,7 @@ class _CalendarDayCell extends StatelessWidget {
                           ? Colors.white
                           : isSelected
                               ? _momentumBlue
-                              : isDark
-                                  ? Colors.white
-                                  : _unityBlue,
+                              : _unityBlue,
                     ),
                   ),
                 ),
@@ -665,7 +576,7 @@ class _CalendarDayCell extends StatelessWidget {
               ],
             ),
             // Events area
-            if (events.isNotEmpty && showEventNames) ...[
+            if (events.isNotEmpty) ...[
               const SizedBox(height: 2),
               Expanded(
                 child: Column(
@@ -687,7 +598,7 @@ class _CalendarDayCell extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
-                          color: isDark ? Colors.white.withOpacity(0.9) : _unityBlue,
+                          color: _unityBlue,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -695,21 +606,6 @@ class _CalendarDayCell extends StatelessWidget {
                     );
                   }).toList(),
                 ),
-              ),
-            ] else if (events.isNotEmpty) ...[
-              // Fallback to dots when not showing names
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: events.take(3).map((event) => Container(
-                      width: 5,
-                      height: 5,
-                      margin: const EdgeInsets.symmetric(horizontal: 1),
-                      decoration: BoxDecoration(
-                        color: _getEventColor(event),
-                        shape: BoxShape.circle,
-                      ),
-                    )).toList(),
               ),
             ],
           ],
@@ -722,12 +618,8 @@ class _CalendarDayCell extends StatelessWidget {
 /// Event card widget with brand colors
 class _EventCard extends StatelessWidget {
   final CalendarEvent event;
-  final bool isDark;
 
-  const _EventCard({
-    required this.event,
-    required this.isDark,
-  });
+  const _EventCard({required this.event});
 
   bool get _isZoom => event.hasZoomMeeting;
 
@@ -735,12 +627,13 @@ class _EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final timeFormat = DateFormat('h:mm a');
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : _unityBlue.withOpacity(0.03),
+        color: _unityBlue.withOpacity(0.03),
         borderRadius: BorderRadius.circular(12),
         border: Border(
           left: BorderSide(
@@ -772,17 +665,13 @@ class _EventCard extends StatelessWidget {
                     timeFormat.format(event.endTime.toLocal()),
                     style: TextStyle(
                       fontSize: 11,
-                      color: isDark
-                          ? Colors.white.withOpacity(0.5)
-                          : _unityBlue.withOpacity(0.5),
+                      color: _unityBlue.withOpacity(0.5),
                     ),
                   ),
               ],
             ),
           ),
-
           const SizedBox(width: 12),
-
           // Event details
           Expanded(
             child: Column(
@@ -793,10 +682,9 @@ class _EventCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         event.title,
-                        style: TextStyle(
-                          fontSize: 14,
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w500,
-                          color: isDark ? Colors.white : _unityBlue,
+                          color: _unityBlue,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -805,8 +693,7 @@ class _EventCard extends StatelessWidget {
                     if (_isZoom) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: const Color(0xFF2D8CFF),
                           borderRadius: BorderRadius.circular(4),
@@ -814,8 +701,7 @@ class _EventCard extends StatelessWidget {
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.videocam,
-                                size: 10, color: Colors.white),
+                            Icon(Icons.videocam, size: 10, color: Colors.white),
                             SizedBox(width: 2),
                             Text(
                               'Zoom',
@@ -838,9 +724,7 @@ class _EventCard extends StatelessWidget {
                       Icon(
                         Icons.location_on_outlined,
                         size: 12,
-                        color: isDark
-                            ? Colors.white.withOpacity(0.5)
-                            : _unityBlue.withOpacity(0.5),
+                        color: _unityBlue.withOpacity(0.5),
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -848,9 +732,7 @@ class _EventCard extends StatelessWidget {
                           event.location!,
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark
-                                ? Colors.white.withOpacity(0.5)
-                                : _unityBlue.withOpacity(0.6),
+                            color: _unityBlue.withOpacity(0.6),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -862,8 +744,7 @@ class _EventCard extends StatelessWidget {
                 if (event.committeeName != null) ...[
                   const SizedBox(height: 4),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: _momentumBlue.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
@@ -880,12 +761,6 @@ class _EventCard extends StatelessWidget {
                 ],
               ],
             ),
-          ),
-
-          Icon(
-            Icons.chevron_right_rounded,
-            size: 20,
-            color: isDark ? Colors.white.withOpacity(0.2) : _unityBlue.withOpacity(0.2),
           ),
         ],
       ),

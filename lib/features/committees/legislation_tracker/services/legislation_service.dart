@@ -23,6 +23,7 @@ class LegislationService {
 
   /// Columns needed for bill list display (excludes large text fields)
   /// This reduces data transfer from ~47 MB to ~2-3 MB
+  /// Note: `description` column doesn't exist - use `primary_abstract` instead
   static const String _listSelectColumns = '''
     id,
     created_at,
@@ -32,10 +33,9 @@ class LegislationService {
     session,
     bill_identifier,
     title,
-    description,
+    primary_abstract,
     classification,
     subjects,
-    chamber,
     from_organization_classification,
     first_action_date,
     latest_action_date,
@@ -269,8 +269,8 @@ class LegislationService {
       'session': session,
       'bill_identifier': billIdentifier,
       'title': title,
-      'description': description,
-      'chamber': chamber,
+      'primary_abstract': description,
+      'from_organization_classification': chamber,
       'latest_action_date': latestActionDate,
       'latest_action_description': latestActionDescription,
       'primary_sponsor_name': primarySponsorName,

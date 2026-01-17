@@ -1427,8 +1427,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   double _getWidgetWidth(DashboardWidgetConfig widget, double unitWidth, int columns) {
-    final spanWidth = widget.gridWidth.clamp(1, columns);
-    return unitWidth * spanWidth + (spanWidth - 1) * 16;
+    // Use widthMultiplier for proper mini widget support (0.5 width)
+    final spanWidth = widget.widthMultiplier.clamp(0.5, columns.toDouble());
+    // For mini widgets (0.5), no gap adjustment needed
+    final gapAdjustment = spanWidth >= 1 ? (spanWidth.floor() - 1) * 16.0 : 0.0;
+    return unitWidth * spanWidth + gapAdjustment;
   }
 
   double _getWidgetHeight(DashboardWidgetConfig widget, double unitHeight) {
@@ -1741,54 +1744,42 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     // Layout mode is now updated in didChangeDependencies to prevent
     // callback accumulation that was causing RenderBox layout errors
 
-    // Wrap entire edit mode in error boundary for detailed error capture
-    return DashboardErrorBoundary(
-      contextName: 'Dashboard Edit Mode',
-      child: Builder(
-        builder: (context) {
-          try {
-            if (isMobile) {
-              // Mobile: Use a bottom sheet for the palette
-              return Container(
-                color: Colors.grey[100],
-                child: Column(
-                  children: [
-                    _buildEditHeader(isMobile: true),
-                    Expanded(child: _buildEditableGrid()),
-                  ],
-                ),
-              );
-            }
+    // Simple edit mode structure like the legislation dashboard
+    // No global error boundary - use local try-catch only where needed
+    if (isMobile) {
+      // Mobile: Use a bottom sheet for the palette
+      return Container(
+        color: Colors.grey[100],
+        child: Column(
+          children: [
+            _buildEditHeader(isMobile: true),
+            Expanded(child: _buildEditableGrid()),
+          ],
+        ),
+      );
+    }
 
-            // Desktop: Use sidebar layout
-            return Container(
-              color: Colors.grey[100],
-              child: Row(
-                children: [
-                  // Widget palette - only render when showing
-                  if (_showPalette)
-                    SizedBox(
-                      width: 300,
-                      child: _buildWidgetPaletteSafe(),
-                    ),
-                  // Main edit area
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildEditHeader(isMobile: false),
-                        Expanded(child: _buildEditableGrid()),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          } catch (e, stackTrace) {
-            debugPrint('[DashboardScreen] Error in _buildEditMode: $e');
-            debugPrint('[DashboardScreen] Stack trace: $stackTrace');
-            return _buildEditModeError(e.toString());
-          }
-        },
+    // Desktop: Use sidebar layout
+    return Container(
+      color: Colors.grey[100],
+      child: Row(
+        children: [
+          // Widget palette - only render when showing
+          if (_showPalette)
+            SizedBox(
+              width: 300,
+              child: _buildWidgetPaletteSafe(),
+            ),
+          // Main edit area
+          Expanded(
+            child: Column(
+              children: [
+                _buildEditHeader(isMobile: false),
+                Expanded(child: _buildEditableGrid()),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

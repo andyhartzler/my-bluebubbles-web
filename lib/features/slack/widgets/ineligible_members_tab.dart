@@ -54,7 +54,11 @@ class _IneligibleMembersTabState extends State<IneligibleMembersTab> {
   void _openMemberDetail(Member member) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => MemberDetailScreen(member: member),
+        // Navigate to Slack tab (index 2) directly
+        builder: (context) => MemberDetailScreen(
+          member: member,
+          initialTabIndex: 2, // Slack tab
+        ),
       ),
     );
   }

@@ -268,10 +268,10 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
           // Content
           CustomScrollView(
             slivers: [
-              // App bar with photo
+              // App bar with photo (not sticky)
               SliverAppBar(
                 expandedHeight: 300,
-                pinned: true,
+                pinned: false,
                 backgroundColor: _unityBlue,
                 leading: Padding(
                   padding: const EdgeInsets.all(8.0),

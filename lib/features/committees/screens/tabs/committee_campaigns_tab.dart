@@ -538,8 +538,8 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
                 ],
               ),
 
-              // Recent participants preview
-              if (recentParticipants.isNotEmpty) ...[
+              // Recent participants preview (only for exec view)
+              if (!widget.isMemberView && recentParticipants.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),

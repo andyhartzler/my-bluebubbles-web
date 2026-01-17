@@ -124,18 +124,20 @@ class SlackManagementRepository {
   }
 
   /// Get Slack user mappings for user display
+  /// Includes both matched users from slack_user_mapping and unmatched users from slack_users_unmatched
   Future<Map<String, Map<String, String>>> getSlackUserMappings() async {
     if (!isReady) return {};
 
     try {
-      final data = await _readClient
+      // Fetch matched users
+      final matchedData = await _readClient
           .from('slack_user_mapping')
           .select(
             'slack_user_id, slack_real_name, slack_display_name, slack_avatar_url, cached_avatar_path, member_id',
           );
 
       final mappings = <String, Map<String, String>>{};
-      for (final item in data as List<dynamic>) {
+      for (final item in matchedData as List<dynamic>) {
         if (item is Map) {
           final slackUserId = item['slack_user_id']?.toString();
           if (slackUserId != null) {
@@ -150,6 +152,31 @@ class SlackManagementRepository {
           }
         }
       }
+
+      // Also fetch unmatched users to fill in missing names/avatars
+      final unmatchedData = await _readClient
+          .from('slack_users_unmatched')
+          .select(
+            'slack_user_id, slack_real_name, slack_display_name, slack_avatar_url, cached_avatar_path',
+          );
+
+      for (final item in unmatchedData as List<dynamic>) {
+        if (item is Map) {
+          final slackUserId = item['slack_user_id']?.toString();
+          // Only add if not already in mappings (don't override matched users)
+          if (slackUserId != null && !mappings.containsKey(slackUserId)) {
+            mappings[slackUserId] = {
+              'real_name': item['slack_real_name']?.toString() ?? '',
+              'display_name': item['slack_display_name']?.toString() ?? '',
+              'avatar_url': item['slack_avatar_url']?.toString() ?? '',
+              'cached_avatar_path':
+                  item['cached_avatar_path']?.toString() ?? '',
+              'member_id': '', // Unmatched users have no member_id
+            };
+          }
+        }
+      }
+
       return mappings;
     } catch (e) {
       debugPrint('Error getting Slack user mappings: $e');

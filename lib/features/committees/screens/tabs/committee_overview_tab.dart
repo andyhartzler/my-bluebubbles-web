@@ -301,9 +301,9 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
           'color': Colors.purple,
         });
         data.add({
-          'icon': Icons.send,
-          'label': 'Emails Sent',
-          'value': '${specific['totalAdvocacyEmailsSent'] ?? 0}',
+          'icon': Icons.gavel,
+          'label': 'Bills Tracked',
+          'value': '${specific['totalBillsTracked'] ?? 0}',
           'color': Colors.green,
         });
         break;

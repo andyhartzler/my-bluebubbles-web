@@ -426,17 +426,17 @@ class CommitteeRepository {
           .count(CountOption.exact);
       stats['totalAdvocacyEmailsGenerated'] = generatedResponse.count ?? 0;
 
-      // Total advocacy emails sent
-      final PostgrestResponse sentResponse = await _readClient
-          .from('hanaway_campaign_tracking')
-          .select('id')
-          .not('sent_at', 'is', null)
-          .count(CountOption.exact);
-      stats['totalAdvocacyEmailsSent'] = sentResponse.count ?? 0;
+      // Get bills tracked count from legislation_statistics table
+      final legislationStatsResponse = await _readClient
+          .from('legislation_statistics')
+          .select('total_bills')
+          .limit(1)
+          .maybeSingle();
+      stats['totalBillsTracked'] = legislationStatsResponse?['total_bills'] ?? 0;
     } catch (e) {
       print('Error getting policy & advocacy stats: $e');
       stats['totalAdvocacyEmailsGenerated'] = 0;
-      stats['totalAdvocacyEmailsSent'] = 0;
+      stats['totalBillsTracked'] = 0;
     }
 
     return stats;

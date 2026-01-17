@@ -174,7 +174,7 @@ class SlackFileAttachments extends StatelessWidget {
   }
 }
 
-/// A single file attachment tile
+/// A single file attachment tile with thumbnail support for images
 class SlackFileAttachmentTile extends StatelessWidget {
   const SlackFileAttachmentTile({
     super.key,
@@ -205,7 +205,10 @@ class SlackFileAttachmentTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _buildFileIcon(theme),
+            // Show thumbnail for images, icon for other files
+            file.isImage && file.url != null
+                ? _buildImageThumbnail(theme)
+                : _buildFileIcon(theme),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -246,6 +249,36 @@ class SlackFileAttachmentTile extends StatelessWidget {
                   : theme.colorScheme.onSurfaceVariant,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageThumbnail(ThemeData theme) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: Image.network(
+          file.url!,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: Colors.grey.withOpacity(0.2),
+              child: const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return _buildFileIcon(theme);
+          },
         ),
       ),
     );

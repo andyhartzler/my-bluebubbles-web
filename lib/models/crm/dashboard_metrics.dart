@@ -537,13 +537,20 @@ class DashboardMetrics {
       try {
         final decoded = jsonDecode(value);
         if (decoded is List) {
-          return decoded.whereType<Map<String, dynamic>>().toList();
+          return decoded
+              .where((e) => e is Map)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
         }
       } catch (_) {}
       return [];
     }
     if (value is List) {
-      return value.whereType<Map<String, dynamic>>().toList();
+      // Cast each map explicitly to handle Map<Object?, Object?> from Supabase
+      return value
+          .where((e) => e is Map)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     }
     return [];
   }

@@ -6,6 +6,7 @@ import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/screens/committee_member_workspace_screen.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
+import 'package:bluebubbles/features/committees/widgets/member_calendar_widget.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
@@ -432,20 +433,28 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
   }
 
   Widget _buildDesktopLayout(List<UserCommitteeInfo> committees) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
       children: [
-        // Committees section
-        Expanded(
-          flex: 3,
-          child: _buildCommitteesSection(committees),
+        // Top row - Committees and Upcoming meetings
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Committees section
+            Expanded(
+              flex: 3,
+              child: _buildCommitteesSection(committees),
+            ),
+            const SizedBox(width: 24),
+            // Upcoming meetings section
+            Expanded(
+              flex: 2,
+              child: _buildUpcomingMeetingsSection(),
+            ),
+          ],
         ),
-        const SizedBox(width: 24),
-        // Upcoming meetings section
-        Expanded(
-          flex: 2,
-          child: _buildUpcomingMeetingsSection(),
-        ),
+        const SizedBox(height: 24),
+        // Calendar section - full width
+        const MemberCalendarWidget(),
       ],
     );
   }
@@ -456,6 +465,8 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
         _buildCommitteesSection(committees),
         const SizedBox(height: 24),
         _buildUpcomingMeetingsSection(),
+        const SizedBox(height: 24),
+        const MemberCalendarWidget(),
       ],
     );
   }

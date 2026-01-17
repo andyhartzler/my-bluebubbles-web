@@ -1,10 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/widgets/slack_file_attachment.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -74,89 +74,106 @@ class SlackMessageBubble extends StatelessWidget {
 
     final canNavigate = linkedMember != null;
 
-    return Card(
+    // Use navy gradient background for message tiles
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: canNavigate && onMemberTap != null
-            ? () => onMemberTap!(linkedMember!)
-            : null,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header row
-              Row(
-                children: [
-                  CorsAwareAvatar(
-                    imageUrl: avatarUrl,
-                    radius: 18,
-                    backgroundColor: primaryColor.withOpacity(0.2),
-                    fallbackText: userName,
-                    fallbackIconColor: primaryColor,
-                    fallbackTextColor: primaryColor,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                userName ?? 'Unknown User',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  decoration: canNavigate
-                                      ? TextDecoration.underline
-                                      : null,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (canNavigate) ...[
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.open_in_new,
-                                size: 14,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ],
-                          ],
-                        ),
-                        if (postedAt != null)
-                          Text(
-                            _timestampFormat.format(postedAt.toLocal()),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.textTheme.bodySmall?.color
-                                  ?.withOpacity(0.6),
-                            ),
-                          ),
-                      ],
+        boxShadow: [
+          BoxShadow(
+            color: BrandColors.unityBlue.withOpacity(0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: canNavigate && onMemberTap != null
+              ? () => onMemberTap!(linkedMember!)
+              : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header row
+                Row(
+                  children: [
+                    CorsAwareAvatar(
+                      imageUrl: avatarUrl,
+                      radius: 18,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      fallbackText: userName,
+                      fallbackIconColor: Colors.white,
+                      fallbackTextColor: Colors.white,
                     ),
-                  ),
-                  if (isThreadReply) _buildThreadBadge(context),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  userName ?? 'Unknown User',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (canNavigate) ...[
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.open_in_new,
+                                  size: 14,
+                                  color: Colors.white70,
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (postedAt != null)
+                            Text(
+                              _timestampFormat.format(postedAt.toLocal()),
+                              style: const TextStyle(
+                                color: Colors.white60,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (isThreadReply) _buildThreadBadge(context),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Message text with parsed formatting (only show if there's text or no files)
+                if (messageText.isNotEmpty || !hasFiles)
+                  _buildMessageText(context, messageText, theme, hasFiles),
+
+                // File indicator
+                if (hasFiles) ...[
+                  if (messageText.isNotEmpty) const SizedBox(height: 8),
+                  _buildFileIndicator(context),
                 ],
-              ),
-              const SizedBox(height: 12),
 
-              // Message text with parsed formatting
-              _buildMessageText(context, messageText, theme),
-
-              // File indicator
-              if (hasFiles) ...[
-                const SizedBox(height: 8),
-                _buildFileIndicator(context),
+                // Reactions
+                if (message['reactions'] != null)
+                  _buildReactions(context, message['reactions']),
               ],
-
-              // Reactions
-              if (message['reactions'] != null)
-                _buildReactions(context, message['reactions']),
-            ],
+            ),
           ),
         ),
       ),
@@ -169,19 +186,19 @@ class SlackMessageBubble extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: primaryColor.withOpacity(0.1),
+          color: Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(4),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.reply, size: 14, color: primaryColor),
+            const Icon(Icons.reply, size: 14, color: Colors.white70),
             const SizedBox(width: 4),
-            Text(
+            const Text(
               'Thread',
               style: TextStyle(
                 fontSize: 11,
-                color: primaryColor,
+                color: Colors.white70,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -195,23 +212,29 @@ class SlackMessageBubble extends StatelessWidget {
     BuildContext context,
     String messageText,
     ThemeData theme,
+    [bool hasFiles = false]
   ) {
+    // Don't show "[No text content]" if the message has files
     if (messageText.isEmpty) {
-      return Text(
+      if (hasFiles) {
+        return const SizedBox.shrink();
+      }
+      return const Text(
         '[No text content]',
-        style: theme.textTheme.bodyMedium?.copyWith(
+        style: TextStyle(
           fontStyle: FontStyle.italic,
-          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+          color: Colors.white54,
+          fontSize: 14,
         ),
       );
     }
 
-    // Use SlackMessageFormatter to parse the message
+    // Use SlackMessageFormatter to parse the message with white text
     final spans = SlackMessageFormatter.parse(
       messageText,
-      baseStyle: theme.textTheme.bodyMedium ?? const TextStyle(),
-      linkColor: theme.colorScheme.primary,
-      mentionColor: primaryColor,
+      baseStyle: const TextStyle(color: Colors.white, fontSize: 14),
+      linkColor: BrandColors.sunriseGold,
+      mentionColor: Colors.white,
       userMappings: userMappings,
       onMentionTap: (userId, memberId) {
         if (memberId != null && memberId.isNotEmpty) {
@@ -224,7 +247,10 @@ class SlackMessageBubble extends StatelessWidget {
     );
 
     if (spans.isEmpty) {
-      return Text(messageText, style: theme.textTheme.bodyMedium);
+      return Text(
+        messageText,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+      );
     }
 
     return RichText(text: TextSpan(children: spans));
@@ -236,33 +262,33 @@ class SlackMessageBubble extends StatelessWidget {
     final archivedFiles = parseArchivedFiles(filesArchived);
 
     if (archivedFiles.isNotEmpty) {
-      return SlackFileAttachments(files: archivedFiles);
+      return SlackFileAttachments(files: archivedFiles, darkBackground: true);
     }
 
     // Fallback to showing a simple indicator if only files is available
-    final theme = Theme.of(context);
     final files = message['files'] as List<dynamic>?;
     final fileCount = files?.length ?? 1;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(4),
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.attach_file,
-            size: 14,
-            color: theme.colorScheme.onSurfaceVariant,
+            size: 16,
+            color: Colors.white70,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           Text(
             '$fileCount file${fileCount > 1 ? 's' : ''} attached',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
             ),
           ),
         ],
@@ -282,8 +308,6 @@ class SlackMessageBubble extends StatelessWidget {
 
     if (reactionsList.isEmpty) return const SizedBox.shrink();
 
-    final theme = Theme.of(context);
-
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Wrap(
@@ -302,10 +326,10 @@ class SlackMessageBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
+                color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: theme.colorScheme.outline.withOpacity(0.3),
+                  color: Colors.white.withOpacity(0.2),
                 ),
               ),
               child: Row(
@@ -316,8 +340,10 @@ class SlackMessageBubble extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       '$count',
-                      style: theme.textTheme.bodySmall?.copyWith(
+                      style: const TextStyle(
+                        color: Colors.white,
                         fontWeight: FontWeight.w600,
+                        fontSize: 12,
                       ),
                     ),
                   ],

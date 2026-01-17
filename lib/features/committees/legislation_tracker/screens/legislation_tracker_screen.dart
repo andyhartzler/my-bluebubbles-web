@@ -174,9 +174,9 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               child: _buildSmartFilters(provider),
             ),
 
-          // Sticky position filter tabs
+          // Position filter tabs (not sticky)
           SliverPersistentHeader(
-            pinned: true,
+            pinned: false,
             delegate: _StickyPositionTabsDelegate(
               child: Container(
                 color: Colors.transparent,

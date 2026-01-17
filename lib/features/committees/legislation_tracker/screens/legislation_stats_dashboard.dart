@@ -1023,8 +1023,9 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     double unitWidth,
     int columns,
   ) {
-    final spanWidth = widget.gridWidth.clamp(1, columns);
-    return unitWidth * spanWidth + (spanWidth - 1) * 16;
+    final spanWidth = widget.widthMultiplier.clamp(0.5, columns.toDouble());
+    final gapAdjustment = spanWidth >= 1 ? (spanWidth.floor() - 1) * 16.0 : 0.0;
+    return unitWidth * spanWidth + gapAdjustment;
   }
 
   double _getWidgetHeight(LegislationWidgetConfig widget, double unitHeight) {

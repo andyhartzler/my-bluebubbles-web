@@ -9,6 +9,7 @@ import 'package:bluebubbles/features/slack/models/slack_analytics.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/features/slack/widgets/message_bubble.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/utils/slack_message_formatter.dart';
 import 'package:bluebubbles/models/crm/slack_activity.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -61,7 +62,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
         _repository.getUserActivity(),
         _repository.getDayOfWeekActivity(),
         _repository.getHourlyActivity(),
-        _repository.getRecentMembershipChanges(limit: 30),
+        _repository.getRecentMembershipChanges(limit: 100),
       ]);
 
       if (!mounted) return;
@@ -1153,7 +1154,8 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
             ],
           ),
           const SizedBox(height: 20),
-          ...(_membershipChanges.take(10).map((change) {
+          // Show all membership changes
+          ...(_membershipChanges.map((change) {
             final isJoin =
                 change.action == 'joined' || change.action == 'invited';
             return _buildMembershipChangeItem(change, isJoin, dateFormat);
@@ -1485,6 +1487,7 @@ class _BrandedSummaryCard extends StatelessWidget {
 }
 
 /// Dialog to show messages from a specific Slack user and allow linking
+/// Uses brand colors with light blue gradient background and navy gradient tiles
 class _SlackUserMessagesDialog extends StatefulWidget {
   const _SlackUserMessagesDialog({
     required this.slackUserId,
@@ -1606,35 +1609,49 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final screenSize = MediaQuery.of(context).size;
 
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
-      child: ConstrainedBox(
+      backgroundColor: Colors.transparent,
+      child: Container(
         constraints: BoxConstraints(
           maxWidth: 700,
           maxHeight: screenSize.height * 0.85,
         ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.backgroundGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
+            // Header with navy gradient
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                gradient: LinearGradient(
+                  colors: BrandColors.tileGradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(12),
+                  top: Radius.circular(16),
                 ),
               ),
               child: Row(
                 children: [
                   CorsAwareAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.orange.withOpacity(0.2),
+                    imageUrl: _unmatchedUser?.avatarUrl,
+                    radius: 22,
+                    backgroundColor: Colors.white.withOpacity(0.2),
                     fallbackText: widget.userName,
-                    fallbackTextColor: Colors.orange[700]!,
+                    fallbackTextColor: Colors.white,
+                    fallbackIconColor: Colors.white,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1643,14 +1660,29 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
                       children: [
                         Text(
                           widget.userName,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
-                        Text(
-                          'Unmatched Slack User',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.orange[700],
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: BrandColors.sunriseGold.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Unmatched User',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -1659,28 +1691,48 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
                   if (_unmatchedUser != null)
                     ElevatedButton.icon(
                       onPressed: _showMatchDialog,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: BrandColors.sunriseGold,
+                        foregroundColor: BrandColors.unityBlue,
+                      ),
                       icon: const Icon(Icons.link, size: 18),
                       label: const Text('Link to Member'),
                     ),
                   const SizedBox(width: 8),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close, color: Colors.white),
                   ),
                 ],
               ),
             ),
-            // Messages
+            // Messages with light blue background
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: BrandColors.momentumBlue,
+                      ),
+                    )
                   : _messages.isEmpty
                   ? Center(
-                      child: Text(
-                        'No messages found',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.message_outlined,
+                            size: 48,
+                            color: BrandColors.unityBlue.withOpacity(0.5),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No messages found',
+                            style: TextStyle(
+                              color: BrandColors.unityBlue.withOpacity(0.7),
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   : ListView.builder(
@@ -1692,9 +1744,15 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
                             padding: const EdgeInsets.all(16),
                             child: Center(
                               child: _loadingMore
-                                  ? const CircularProgressIndicator()
-                                  : OutlinedButton(
+                                  ? const CircularProgressIndicator(
+                                      color: BrandColors.momentumBlue,
+                                    )
+                                  : ElevatedButton(
                                       onPressed: _loadMore,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: BrandColors.unityBlue,
+                                        foregroundColor: Colors.white,
+                                      ),
                                       child: const Text('Load More'),
                                     ),
                             ),
@@ -1705,7 +1763,7 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
                           message: _messages[index],
                           userMappings: _userMappings,
                           memberCache: _memberCache,
-                          primaryColor: Colors.blue,
+                          primaryColor: BrandColors.momentumBlue,
                         );
                       },
                     ),
@@ -1862,6 +1920,7 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
 }
 
 /// Quick view dialog for unmatched user from membership changes
+/// Uses brand colors with light blue gradient background and navy gradient tiles
 class _UnmatchedUserQuickView extends StatefulWidget {
   const _UnmatchedUserQuickView({
     required this.user,
@@ -1880,6 +1939,7 @@ class _UnmatchedUserQuickView extends StatefulWidget {
 
 class _UnmatchedUserQuickViewState extends State<_UnmatchedUserQuickView> {
   List<Map<String, dynamic>> _messages = [];
+  Map<String, Map<String, String>> _userMappings = {};
   bool _loading = true;
   static const int _previewLimit = 5;
 
@@ -1891,15 +1951,19 @@ class _UnmatchedUserQuickViewState extends State<_UnmatchedUserQuickView> {
 
   Future<void> _loadPreview() async {
     try {
-      final messages = await widget.repository.getMessagesBySlackUserId(
-        widget.user.slackUserId,
-        limit: _previewLimit,
-      );
+      final results = await Future.wait([
+        widget.repository.getMessagesBySlackUserId(
+          widget.user.slackUserId,
+          limit: _previewLimit,
+        ),
+        widget.repository.getSlackUserMappings(),
+      ]);
 
       if (!mounted) return;
 
       setState(() {
-        _messages = messages;
+        _messages = results[0] as List<Map<String, dynamic>>;
+        _userMappings = results[1] as Map<String, Map<String, String>>;
         _loading = false;
       });
     } catch (e) {
@@ -1910,143 +1974,298 @@ class _UnmatchedUserQuickViewState extends State<_UnmatchedUserQuickView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return AlertDialog(
-      title: Row(
-        children: [
-          CorsAwareAvatar(
-            imageUrl: widget.user.avatarUrl,
-            radius: 20,
-            backgroundColor: Colors.orange.withOpacity(0.2),
-            fallbackText: widget.user.primaryLabel,
-            fallbackIconColor: Colors.orange[700]!,
-            fallbackTextColor: Colors.orange[700]!,
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(24),
+      child: Container(
+        width: 450,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.backgroundGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.user.primaryLabel,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'Unmatched User',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.orange[700],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: 400,
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // User info
-            if (widget.user.email != null && widget.user.email!.isNotEmpty)
-              _buildInfoRow(Icons.email, widget.user.email!, theme),
-            if (widget.user.usernameDisplay != null)
-              _buildInfoRow(
-                Icons.alternate_email,
-                widget.user.usernameDisplay!,
-                theme,
+            // Header with navy gradient
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: BrandColors.tileGradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
               ),
-            const Divider(height: 24),
-            // Recent messages preview
-            Text(
-              'Recent Messages',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
+              child: Row(
+                children: [
+                  CorsAwareAvatar(
+                    imageUrl: widget.user.avatarUrl,
+                    radius: 22,
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    fallbackText: widget.user.primaryLabel,
+                    fallbackIconColor: Colors.white,
+                    fallbackTextColor: Colors.white,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.user.primaryLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: BrandColors.sunriseGold.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Unmatched User',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            if (_loading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else if (_messages.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'No messages found',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              )
-            else
-              ...(_messages.take(3).map((msg) {
-                final text = msg['message_text']?.toString() ?? '';
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // User info in navy tiles
+                  if (widget.user.email != null && widget.user.email!.isNotEmpty)
+                    _buildInfoTile(Icons.email, 'Email', widget.user.email!),
+                  if (widget.user.usernameDisplay != null)
+                    _buildInfoTile(
+                      Icons.alternate_email,
+                      'Username',
+                      widget.user.usernameDisplay!,
                     ),
-                    child: Text(
-                      text.isNotEmpty ? text : '[No text]',
-                      style: theme.textTheme.bodySmall,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 16),
+                  // Recent messages header
+                  const Text(
+                    'Recent Messages',
+                    style: TextStyle(
+                      color: BrandColors.unityBlue,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
                   ),
-                );
-              })),
+                  const SizedBox(height: 8),
+                  // Messages in navy tiles with parsed formatting
+                  if (_loading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(
+                          color: BrandColors.momentumBlue,
+                        ),
+                      ),
+                    )
+                  else if (_messages.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: BrandColors.tileGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.message_outlined,
+                            color: Colors.white.withOpacity(0.7),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'No messages found',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ...(_messages.take(3).map((msg) => _buildMessageTile(msg))),
+                ],
+              ),
+            ),
+            // Actions
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      foregroundColor: BrandColors.unityBlue,
+                    ),
+                    child: const Text('Close'),
+                  ),
+                  if (widget.onSwitchToUnmatchedTab != null) ...[
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        widget.onSwitchToUnmatchedTab!();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: BrandColors.unityBlue,
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: const Icon(Icons.link, size: 18),
+                      label: const Text('Match User'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
-        ),
-        if (widget.onSwitchToUnmatchedTab != null)
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              widget.onSwitchToUnmatchedTab!();
-            },
-            icon: const Icon(Icons.link, size: 18),
-            label: const Text('Match User'),
-          ),
-      ],
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+  Widget _buildInfoTile(IconData icon, String label, String value) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Text(text, style: theme.textTheme.bodyMedium),
+          Icon(icon, size: 18, color: Colors.white70),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white60, fontSize: 11),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMessageTile(Map<String, dynamic> msg) {
+    final text = msg['message_text']?.toString() ?? '';
+    final postedAtStr = msg['posted_at']?.toString();
+    final postedAt = postedAtStr != null ? DateTime.tryParse(postedAtStr) : null;
+    final dateFormat = DateFormat('MMM d, h:mm a');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (postedAt != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                dateFormat.format(postedAt.toLocal()),
+                style: const TextStyle(color: Colors.white60, fontSize: 11),
+              ),
+            ),
+          // Parse Slack formatting for the message text
+          if (text.isNotEmpty)
+            _buildFormattedMessage(text)
+          else
+            const Text(
+              '[No text content]',
+              style: TextStyle(
+                color: Colors.white54,
+                fontStyle: FontStyle.italic,
+                fontSize: 13,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormattedMessage(String text) {
+    // Use SlackMessageFormatter to parse the message
+    final spans = SlackMessageFormatter.parse(
+      text,
+      baseStyle: const TextStyle(color: Colors.white, fontSize: 13),
+      linkColor: BrandColors.sunriseGold,
+      mentionColor: Colors.white,
+      userMappings: _userMappings,
+    );
+
+    if (spans.isEmpty) {
+      return Text(
+        text,
+        style: const TextStyle(color: Colors.white, fontSize: 13),
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    return RichText(
+      text: TextSpan(children: spans),
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

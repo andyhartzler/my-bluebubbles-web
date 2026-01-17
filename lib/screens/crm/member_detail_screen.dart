@@ -88,9 +88,13 @@ class _DonorProfile {
 class MemberDetailScreen extends StatefulWidget {
   final Member member;
 
+  /// Optional initial tab index (0=Overview, 1=Emails, 2=Slack)
+  final int initialTabIndex;
+
   const MemberDetailScreen({
     Key? key,
     required this.member,
+    this.initialTabIndex = 0,
   }) : super(key: key);
 
   @override
@@ -2029,6 +2033,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             )
           : DefaultTabController(
               length: 3,
+              initialIndex: widget.initialTabIndex.clamp(0, 2),
               child: Column(
                 children: [
                   Material(

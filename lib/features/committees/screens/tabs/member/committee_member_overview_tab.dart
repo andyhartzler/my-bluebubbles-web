@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:provider/provider.dart';
-import 'package:table_calendar/table_calendar.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
@@ -43,9 +42,6 @@ class _CommitteeMemberOverviewTabState
   bool _isLoading = true;
   bool _uploadingPhoto = false;
   List<Meeting> _meetings = [];
-  Map<DateTime, List<Meeting>> _meetingsByDate = {};
-  DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
   CommitteeStats? _stats;
 
   Committee get committee => widget.committee;
@@ -54,7 +50,6 @@ class _CommitteeMemberOverviewTabState
   @override
   void initState() {
     super.initState();
-    _selectedDay = _focusedDay;
     _loadData();
   }
 
@@ -75,20 +70,8 @@ class _CommitteeMemberOverviewTabState
       final meetings = results[0] as List<Meeting>;
       final stats = results[1] as CommitteeStats;
 
-      // Group meetings by date (normalized to midnight)
-      final byDate = <DateTime, List<Meeting>>{};
-      for (final meeting in meetings) {
-        final date = DateTime(
-          meeting.meetingDate.year,
-          meeting.meetingDate.month,
-          meeting.meetingDate.day,
-        );
-        byDate.putIfAbsent(date, () => []).add(meeting);
-      }
-
       setState(() {
         _meetings = meetings;
-        _meetingsByDate = byDate;
         _stats = stats;
         _isLoading = false;
       });
@@ -96,11 +79,6 @@ class _CommitteeMemberOverviewTabState
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
-  }
-
-  List<Meeting> _getMeetingsForDay(DateTime day) {
-    final normalized = DateTime(day.year, day.month, day.day);
-    return _meetingsByDate[normalized] ?? [];
   }
 
   Future<void> _selectProfilePhoto() async {
@@ -201,31 +179,27 @@ class _CommitteeMemberOverviewTabState
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Left column - Calendar
+        // Left column - Welcome and Stats
         Expanded(
           flex: 3,
-          child: Column(
-            children: [
-              _buildCalendarCard(theme),
-              const SizedBox(height: 16),
-              _buildSelectedDayMeetings(theme),
-            ],
-          ),
-        ),
-        const SizedBox(width: 24),
-        // Right column - Stats and Leadership
-        Expanded(
-          flex: 2,
           child: Column(
             children: [
               _buildWelcomeCard(theme),
               const SizedBox(height: 16),
               if (_stats != null) _buildStatsCard(theme),
+            ],
+          ),
+        ),
+        const SizedBox(width: 24),
+        // Right column - Leadership and Upcoming
+        Expanded(
+          flex: 2,
+          child: Column(
+            children: [
               if (leaders.isNotEmpty) ...[
-                const SizedBox(height: 16),
                 _buildLeadershipCard(theme),
+                const SizedBox(height: 16),
               ],
-              const SizedBox(height: 16),
               _buildUpcomingMeetingsCard(theme),
             ],
           ),
@@ -238,10 +212,6 @@ class _CommitteeMemberOverviewTabState
     return Column(
       children: [
         _buildWelcomeCard(theme),
-        const SizedBox(height: 16),
-        _buildCalendarCard(theme),
-        const SizedBox(height: 16),
-        _buildSelectedDayMeetings(theme),
         const SizedBox(height: 16),
         if (_stats != null) ...[
           _buildStatsCard(theme),
@@ -367,228 +337,6 @@ class _CommitteeMemberOverviewTabState
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildCalendarCard(ThemeData theme) {
-    return Card(
-      elevation: 2,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.calendar_month_outlined,
-                  color: BrandColors.momentumBlue,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Meeting Calendar',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: BrandColors.unityBlue,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TableCalendar<Meeting>(
-              firstDay: DateTime.now().subtract(const Duration(days: 365)),
-              lastDay: DateTime.now().add(const Duration(days: 365)),
-              focusedDay: _focusedDay,
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              calendarFormat: CalendarFormat.month,
-              eventLoader: _getMeetingsForDay,
-              startingDayOfWeek: StartingDayOfWeek.sunday,
-              headerStyle: HeaderStyle(
-                formatButtonVisible: false,
-                titleCentered: true,
-                titleTextStyle: theme.textTheme.titleMedium!.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: BrandColors.unityBlue,
-                ),
-                leftChevronIcon: const Icon(
-                  Icons.chevron_left,
-                  color: BrandColors.unityBlue,
-                ),
-                rightChevronIcon: const Icon(
-                  Icons.chevron_right,
-                  color: BrandColors.unityBlue,
-                ),
-              ),
-              daysOfWeekStyle: const DaysOfWeekStyle(
-                weekdayStyle: TextStyle(
-                  color: BrandColors.unityBlue,
-                  fontWeight: FontWeight.w600,
-                ),
-                weekendStyle: TextStyle(
-                  color: BrandColors.unityBlue,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              calendarStyle: CalendarStyle(
-                outsideDaysVisible: false,
-                defaultTextStyle: const TextStyle(color: BrandColors.unityBlue),
-                weekendTextStyle: TextStyle(
-                  color: BrandColors.unityBlue.withOpacity(0.6),
-                ),
-                todayDecoration: BoxDecoration(
-                  color: BrandColors.momentumBlue.withOpacity(0.3),
-                  shape: BoxShape.circle,
-                ),
-                todayTextStyle: const TextStyle(
-                  color: BrandColors.unityBlue,
-                  fontWeight: FontWeight.bold,
-                ),
-                selectedDecoration: const BoxDecoration(
-                  color: BrandColors.momentumBlue,
-                  shape: BoxShape.circle,
-                ),
-                selectedTextStyle: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-                markerDecoration: const BoxDecoration(
-                  color: BrandColors.unityBlue,
-                  shape: BoxShape.circle,
-                ),
-                markersMaxCount: 3,
-                markerSize: 6,
-                markerMargin: const EdgeInsets.symmetric(horizontal: 1),
-              ),
-              onDaySelected: (selectedDay, focusedDay) {
-                setState(() {
-                  _selectedDay = selectedDay;
-                  _focusedDay = focusedDay;
-                });
-              },
-              onPageChanged: (focusedDay) {
-                _focusedDay = focusedDay;
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSelectedDayMeetings(ThemeData theme) {
-    final meetings = _selectedDay != null
-        ? _getMeetingsForDay(_selectedDay!)
-        : [];
-
-    return Card(
-      elevation: 2,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.event_outlined, color: BrandColors.momentumBlue),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _selectedDay != null
-                        ? _formatSelectedDate(_selectedDay!)
-                        : 'Select a day',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: BrandColors.unityBlue,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (meetings.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Center(
-                  child: Text(
-                    'No meetings scheduled',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: BrandColors.unityBlue.withOpacity(0.6),
-                    ),
-                  ),
-                ),
-              )
-            else
-              ...meetings.map((meeting) => _buildMeetingItem(meeting, theme)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMeetingItem(Meeting meeting, ThemeData theme) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: BrandColors.unityBlue.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: BrandColors.momentumBlue.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 40,
-            decoration: BoxDecoration(
-              color: BrandColors.momentumBlue,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  meeting.meetingTitle,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: BrandColors.unityBlue,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${meeting.formattedTime} CST',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: BrandColors.unityBlue.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (meeting.durationMinutes != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: BrandColors.momentumBlue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${meeting.durationMinutes} min',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: BrandColors.momentumBlue,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -888,46 +636,6 @@ class _CommitteeMemberOverviewTabState
         ],
       ),
     );
-  }
-
-  String _formatSelectedDate(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final selected = DateTime(date.year, date.month, date.day);
-
-    if (selected == today) {
-      return 'Today';
-    } else if (selected == today.add(const Duration(days: 1))) {
-      return 'Tomorrow';
-    } else if (selected == today.subtract(const Duration(days: 1))) {
-      return 'Yesterday';
-    }
-
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final weekdays = [
-      'Sunday',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-    ];
-
-    return '${weekdays[date.weekday % 7]}, ${months[date.month - 1]} ${date.day}';
   }
 
   String _formatMonth(DateTime date) {

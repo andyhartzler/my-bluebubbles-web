@@ -210,10 +210,30 @@ class DashboardWidgetConfig {
   }
 
   /// Get the actual height multiplier for rendering
+  /// - mini is 0.5 (square - half height and half width)
   /// - small is 0.5 (half height compact row)
   /// - others use their gridHeight
   double get heightMultiplier {
-    return size == DashboardWidgetSize.small ? 0.5 : gridHeight.toDouble();
+    switch (size) {
+      case DashboardWidgetSize.mini:
+        return 0.5; // Mini is a square: half height
+      case DashboardWidgetSize.small:
+        return 0.5; // Small is half height
+      default:
+        return gridHeight.toDouble();
+    }
+  }
+
+  /// Get the actual width multiplier for rendering
+  /// - mini is 0.5 (square - half width)
+  /// - others use their gridWidth
+  double get widthMultiplier {
+    switch (size) {
+      case DashboardWidgetSize.mini:
+        return 0.5; // Mini is a square: half width
+      default:
+        return gridWidth.toDouble();
+    }
   }
 }
 

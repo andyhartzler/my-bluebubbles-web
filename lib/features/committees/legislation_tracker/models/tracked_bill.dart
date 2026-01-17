@@ -264,7 +264,8 @@ class TrackedBill {
       session: json['session'] as String,
       billIdentifier: json['bill_identifier'] as String,
       title: json['title'] as String,
-      description: json['description'] as String?,
+      // Use description if available, fall back to primary_abstract
+      description: json['description'] as String? ?? json['primary_abstract'] as String?,
       classification: _parseStringList(json['classification']),
       subjects: _parseStringList(json['subjects']),
       fromOrganizationId: json['from_organization_id'] as String?,

@@ -150,84 +150,99 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     final isMobile = screenWidth < 600;
 
     return Scaffold(
-      body: Column(
+      body: Stack(
         children: [
-          // Custom AppBar with Unity Blue
-          Container(
-            decoration: BoxDecoration(
-              color: _unityBlue,
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header row
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(isMobile ? 4 : 16, 8, 16, 8),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.campaign.name,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Tab bar
-                  TabBar(
-                    controller: _tabController,
-                    indicatorColor: _momentumBlue,
-                    indicatorWeight: 3,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.white60,
-                    labelPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
-                    tabs: [
-                      Tab(
-                        icon: const Icon(Icons.dashboard, size: 20),
-                        text: isMobile ? null : 'Overview',
-                        iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
-                      ),
-                      Tab(
-                        icon: const Icon(Icons.map, size: 20),
-                        text: isMobile ? null : 'Geography',
-                        iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
-                      ),
-                      if (!widget.isMemberView)
-                        Tab(
-                          icon: const Icon(Icons.people, size: 20),
-                          text: isMobile ? null : 'Participants',
-                          iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
+          // Gradient background
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/Blue-Gradient-Background.png',
+              fit: BoxFit.cover,
             ),
           ),
-          // Tab content - no swiping between tabs
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildOverviewTab(theme, colorScheme),
-                _buildGeographyTab(theme, colorScheme),
-                if (!widget.isMemberView) _buildParticipantsTab(theme, colorScheme),
-              ],
-            ),
+          Positioned.fill(
+            child: Container(color: Colors.white.withOpacity(0.18)),
+          ),
+          // Content
+          Column(
+            children: [
+              // Custom AppBar with Unity Blue
+              Container(
+                decoration: BoxDecoration(
+                  color: _unityBlue,
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header row
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(isMobile ? 4 : 16, 8, 16, 8),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back, color: Colors.white),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.campaign.name,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Tab bar
+                      TabBar(
+                        controller: _tabController,
+                        indicatorColor: _momentumBlue,
+                        indicatorWeight: 3,
+                        labelColor: Colors.white,
+                        unselectedLabelColor: Colors.white60,
+                        labelPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
+                        tabs: [
+                          Tab(
+                            icon: const Icon(Icons.dashboard, size: 20),
+                            text: isMobile ? null : 'Overview',
+                            iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
+                          ),
+                          Tab(
+                            icon: const Icon(Icons.map, size: 20),
+                            text: isMobile ? null : 'Geography',
+                            iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
+                          ),
+                          if (!widget.isMemberView)
+                            Tab(
+                              icon: const Icon(Icons.people, size: 20),
+                              text: isMobile ? null : 'Participants',
+                              iconMargin: EdgeInsets.only(bottom: isMobile ? 0 : 4),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Tab content - no swiping between tabs
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _buildOverviewTab(theme, colorScheme),
+                    _buildGeographyTab(theme, colorScheme),
+                    if (!widget.isMemberView) _buildParticipantsTab(theme, colorScheme),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -246,10 +261,17 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
         children: [
           // Campaign description
           if (widget.campaign.description.isNotEmpty) ...[
-            Text(
-              widget.campaign.description,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _unityBlue.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                widget.campaign.description,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: Colors.white,
+                ),
               ),
             ),
             SizedBox(height: isMobile ? 16 : 24),
@@ -341,9 +363,22 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
     return Container(
       padding: EdgeInsets.all(isVerySmall ? 10 : (isMobile ? 12 : 16)),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            _unityBlue,
+            _unityBlue.withOpacity(0.85),
+          ],
+        ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: _unityBlue.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,7 +399,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
             label,
             style: TextStyle(
               fontSize: isVerySmall ? 10 : 12,
-              color: color.withOpacity(0.8),
+              color: Colors.white.withOpacity(0.9),
             ),
             maxLines: 1,
             softWrap: false,

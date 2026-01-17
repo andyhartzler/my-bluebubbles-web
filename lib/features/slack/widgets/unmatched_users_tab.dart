@@ -11,6 +11,7 @@ import 'package:bluebubbles/features/slack/services/slack_management_repository.
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/slack_activity.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/utils/slack_message_formatter.dart';
 
 /// Tab displaying unmatched Slack users for manual matching
 class UnmatchedUsersTab extends StatefulWidget {
@@ -1107,6 +1108,7 @@ class _MemberAvatar extends StatelessWidget {
 }
 
 /// Comprehensive activity dialog showing all details and messages for an unmatched Slack user
+/// Uses brand colors with light blue gradient background and navy gradient tiles
 class _UnmatchedUserActivityDialog extends StatefulWidget {
   const _UnmatchedUserActivityDialog({
     required this.user,
@@ -1268,39 +1270,51 @@ class _UnmatchedUserActivityDialogState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final screenSize = MediaQuery.of(context).size;
     final dateFormat = DateFormat('MMM d, y • h:mm a');
 
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
-      child: ConstrainedBox(
+      backgroundColor: Colors.transparent,
+      child: Container(
         constraints: BoxConstraints(
           maxWidth: 900,
           maxHeight: screenSize.height * 0.9,
         ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.backgroundGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
-            _buildHeader(theme, dateFormat),
+            // Header with navy gradient
+            _buildHeader(dateFormat),
             // Content
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: BrandColors.momentumBlue,
+                      ),
+                    )
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // User Info Card
-                          _buildUserInfoCard(theme),
+                          _buildUserInfoCard(),
                           const SizedBox(height: 20),
                           // Channel Membership
-                          _buildChannelMembershipSection(theme, dateFormat),
+                          _buildChannelMembershipSection(dateFormat),
                           const SizedBox(height: 20),
                           // Messages
-                          _buildMessagesSection(theme, dateFormat),
+                          _buildMessagesSection(dateFormat),
                         ],
                       ),
                     ),
@@ -1311,21 +1325,26 @@ class _UnmatchedUserActivityDialogState
     );
   }
 
-  Widget _buildHeader(ThemeData theme, DateFormat dateFormat) {
+  Widget _buildHeader(DateFormat dateFormat) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Row(
         children: [
           CorsAwareAvatar(
             imageUrl: widget.user.avatarUrl,
             radius: 32,
-            backgroundColor: Colors.orange.withOpacity(0.2),
+            backgroundColor: Colors.white.withOpacity(0.2),
             fallbackText: widget.user.primaryLabel,
-            fallbackTextColor: Colors.orange[700]!,
+            fallbackTextColor: Colors.white,
+            fallbackIconColor: Colors.white,
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1334,32 +1353,33 @@ class _UnmatchedUserActivityDialogState
               children: [
                 Text(
                   widget.user.primaryLabel,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 if (widget.user.usernameDisplay != null)
                   Text(
                     widget.user.usernameDisplay!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
                   ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
+                    horizontal: 10,
+                    vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.15),
+                    color: BrandColors.sunriseGold.withOpacity(0.8),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text(
+                  child: const Text(
                     'Unmatched Slack User',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.orange[700],
-                      fontWeight: FontWeight.w500,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -1368,117 +1388,119 @@ class _UnmatchedUserActivityDialogState
           ),
           ElevatedButton.icon(
             onPressed: _showMatchDialog,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: BrandColors.sunriseGold,
+              foregroundColor: BrandColors.unityBlue,
+            ),
             icon: const Icon(Icons.link, size: 18),
             label: const Text('Link to Member'),
           ),
           const SizedBox(width: 8),
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close),
+            icon: const Icon(Icons.close, color: Colors.white),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildUserInfoCard(ThemeData theme) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'User Information',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 24,
-              runSpacing: 12,
-              children: [
-                _buildInfoItem(
-                  theme,
-                  Icons.badge,
-                  'Display Name',
-                  widget.user.displayName ?? 'Not set',
-                ),
-                _buildInfoItem(
-                  theme,
-                  Icons.person,
-                  'Real Name',
-                  widget.user.realName ?? 'Not set',
-                ),
-                _buildInfoItem(
-                  theme,
-                  Icons.email,
-                  'Email',
-                  widget.user.email ?? 'Not available',
-                ),
-                _buildInfoItem(
-                  theme,
-                  Icons.key,
-                  'Slack User ID',
-                  widget.user.slackUserId,
-                ),
-                if (widget.user.createdAt != null)
-                  _buildInfoItem(
-                    theme,
-                    Icons.calendar_today,
-                    'First Seen',
-                    DateFormat('MMM d, y').format(widget.user.createdAt!),
-                  ),
-              ],
-            ),
-            if (widget.user.notes != null && widget.user.notes!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.notes,
-                      size: 18,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        widget.user.notes!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
+  Widget _buildUserInfoCard() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.person, color: Colors.white70, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'User Information',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 24,
+            runSpacing: 12,
+            children: [
+              _buildInfoItem(
+                Icons.badge,
+                'Display Name',
+                widget.user.displayName ?? 'Not set',
+              ),
+              _buildInfoItem(
+                Icons.person,
+                'Real Name',
+                widget.user.realName ?? 'Not set',
+              ),
+              _buildInfoItem(
+                Icons.email,
+                'Email',
+                widget.user.email ?? 'Not available',
+              ),
+              _buildInfoItem(
+                Icons.key,
+                'Slack User ID',
+                widget.user.slackUserId,
+              ),
+              if (widget.user.createdAt != null)
+                _buildInfoItem(
+                  Icons.calendar_today,
+                  'First Seen',
+                  DateFormat('MMM d, y').format(widget.user.createdAt!),
+                ),
+            ],
+          ),
+          if (widget.user.notes != null && widget.user.notes!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.notes, size: 18, color: Colors.white70),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.user.notes!,
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildInfoItem(
-    ThemeData theme,
-    IconData icon,
-    String label,
-    String value,
-  ) {
+  Widget _buildInfoItem(IconData icon, String label, String value) {
     return SizedBox(
       width: 200,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          Icon(icon, size: 18, color: BrandColors.sunriseGold),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -1486,13 +1508,12 @@ class _UnmatchedUserActivityDialogState
               children: [
                 Text(
                   label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  style: const TextStyle(color: Colors.white60, fontSize: 12),
                 ),
                 Text(
                   value,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1504,10 +1525,7 @@ class _UnmatchedUserActivityDialogState
     );
   }
 
-  Widget _buildChannelMembershipSection(
-    ThemeData theme,
-    DateFormat dateFormat,
-  ) {
+  Widget _buildChannelMembershipSection(DateFormat dateFormat) {
     // Group by channel and get unique channels
     final channelSet = <String>{};
     for (final msg in _messages) {
@@ -1515,230 +1533,289 @@ class _UnmatchedUserActivityDialogState
       if (channelId != null) channelSet.add(channelId);
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.tag, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Channel Activity',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${channelSet.length} channels',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (channelSet.isEmpty)
-              Text(
-                'No channel activity recorded',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: channelSet.map((channelId) {
-                  final channelName = _channelNames[channelId] ?? channelId;
-                  return Chip(
-                    avatar: const Icon(Icons.tag, size: 16),
-                    label: Text(channelName),
-                    backgroundColor: theme.colorScheme.surfaceVariant,
-                  );
-                }).toList(),
-              ),
-            if (_channelMembership.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Membership History',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.tag, color: Colors.white70, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Channel Activity',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8),
-              ...(_channelMembership.take(10).map((change) {
-                final action = change['action']?.toString() ?? '';
-                final channelId = change['slack_channel_id']?.toString() ?? '';
-                final channelMapping =
-                    change['slack_channel_committee_mapping'];
-                String? channelName;
-                if (channelMapping is Map<String, dynamic>) {
-                  channelName = channelMapping['slack_channel_name']
-                      ?.toString();
-                }
-                channelName ??= _channelNames[channelId] ?? channelId;
-                final createdAt = change['created_at'] != null
-                    ? DateTime.tryParse(change['created_at'].toString())
-                    : null;
-                final isJoin = action == 'joined' || action == 'invited';
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+              const Spacer(),
+              Text(
+                '${channelSet.length} channels',
+                style: const TextStyle(color: Colors.white60, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (channelSet.isEmpty)
+            const Text(
+              'No channel activity recorded',
+              style: TextStyle(color: Colors.white70),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: channelSet.map((channelId) {
+                final channelName = _channelNames[channelId] ?? channelId;
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        isJoin ? Icons.add_circle : Icons.remove_circle,
-                        size: 16,
-                        color: isJoin ? Colors.green : Colors.red,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${action.toUpperCase()} #$channelName',
-                          style: theme.textTheme.bodySmall,
+                      const Icon(Icons.tag, size: 14, color: Colors.white70),
+                      const SizedBox(width: 4),
+                      Text(
+                        channelName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
                         ),
                       ),
-                      if (createdAt != null)
-                        Text(
-                          dateFormat.format(createdAt.toLocal()),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
                     ],
                   ),
                 );
-              })),
-            ],
+              }).toList(),
+            ),
+          if (_channelMembership.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Membership History',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...(_channelMembership.take(10).map((change) {
+              final action = change['action']?.toString() ?? '';
+              final channelId = change['slack_channel_id']?.toString() ?? '';
+              final channelMapping =
+                  change['slack_channel_committee_mapping'];
+              String? channelName;
+              if (channelMapping is Map<String, dynamic>) {
+                channelName = channelMapping['slack_channel_name']
+                    ?.toString();
+              }
+              channelName ??= _channelNames[channelId] ?? channelId;
+              final createdAt = change['created_at'] != null
+                  ? DateTime.tryParse(change['created_at'].toString())
+                  : null;
+              final isJoin = action == 'joined' || action == 'invited';
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      isJoin ? Icons.add_circle : Icons.remove_circle,
+                      size: 16,
+                      color: isJoin ? Colors.green[300] : Colors.red[300],
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${action.toUpperCase()} #$channelName',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    if (createdAt != null)
+                      Text(
+                        dateFormat.format(createdAt.toLocal()),
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            })),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildMessagesSection(ThemeData theme, DateFormat dateFormat) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.message, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Messages',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${_messages.length}${_hasMore ? '+' : ''} messages',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_messages.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: Text(
-                    'No messages found',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              )
-            else
-              ...(_messages.map((message) {
-                final text = message['message_text']?.toString() ?? '';
-                final channelId = message['slack_channel_id']?.toString() ?? '';
-                final channelName = _channelNames[channelId] ?? channelId;
-                final postedAt = message['posted_at'] != null
-                    ? DateTime.tryParse(message['posted_at'].toString())
-                    : null;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withOpacity(0.2),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.tag,
-                            size: 14,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            channelName,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const Spacer(),
-                          if (postedAt != null)
-                            Text(
-                              dateFormat.format(postedAt.toLocal()),
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        text.isNotEmpty ? text : '[No text content]',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontStyle: text.isEmpty ? FontStyle.italic : null,
-                          color: text.isEmpty
-                              ? theme.colorScheme.onSurfaceVariant
-                              : null,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              })),
-            if (_hasMore)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Center(
-                  child: OutlinedButton(
-                    onPressed: _loadingMore ? null : _loadMore,
-                    child: _loadingMore
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Load More Messages'),
-                  ),
+  Widget _buildMessagesSection(DateFormat dateFormat) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.message, color: Colors.white70, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Messages',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-          ],
-        ),
+              const Spacer(),
+              Text(
+                '${_messages.length}${_hasMore ? '+' : ''} messages',
+                style: const TextStyle(color: Colors.white60, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_messages.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'No messages found',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+            )
+          else
+            ...(_messages.map((message) {
+              final text = message['message_text']?.toString() ?? '';
+              final channelId = message['slack_channel_id']?.toString() ?? '';
+              final channelName = _channelNames[channelId] ?? channelId;
+              final postedAt = message['posted_at'] != null
+                  ? DateTime.tryParse(message['posted_at'].toString())
+                  : null;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.tag, size: 14, color: Colors.white70),
+                        const SizedBox(width: 4),
+                        Text(
+                          channelName,
+                          style: TextStyle(
+                            color: BrandColors.sunriseGold,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (postedAt != null)
+                          Text(
+                            dateFormat.format(postedAt.toLocal()),
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 11,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Parse Slack formatting for messages
+                    _buildFormattedMessage(text),
+                  ],
+                ),
+              );
+            })),
+          if (_hasMore)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Center(
+                child: ElevatedButton(
+                  onPressed: _loadingMore ? null : _loadMore,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: BrandColors.sunriseGold,
+                    foregroundColor: BrandColors.unityBlue,
+                  ),
+                  child: _loadingMore
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: BrandColors.unityBlue,
+                          ),
+                        )
+                      : const Text('Load More Messages'),
+                ),
+              ),
+            ),
+        ],
       ),
     );
+  }
+
+  Widget _buildFormattedMessage(String text) {
+    if (text.isEmpty) {
+      return const Text(
+        '[No text content]',
+        style: TextStyle(
+          color: Colors.white54,
+          fontStyle: FontStyle.italic,
+          fontSize: 13,
+        ),
+      );
+    }
+
+    // Use SlackMessageFormatter to parse the message
+    final spans = SlackMessageFormatter.parse(
+      text,
+      baseStyle: const TextStyle(color: Colors.white, fontSize: 14),
+      linkColor: BrandColors.sunriseGold,
+      mentionColor: Colors.white,
+      userMappings: _userMappings,
+    );
+
+    if (spans.isEmpty) {
+      return Text(
+        text,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+      );
+    }
+
+    return RichText(text: TextSpan(children: spans));
   }
 }

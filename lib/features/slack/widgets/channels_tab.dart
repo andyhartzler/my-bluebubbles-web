@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -28,6 +30,9 @@ class _ChannelsTabState extends State<ChannelsTab> {
   final MemberRepository _memberRepository = MemberRepository();
   final TextEditingController _searchController = TextEditingController();
 
+  // Debounce timer for live search
+  Timer? _debounceTimer;
+
   List<SlackChannel> _channels = [];
   SlackChannel? _selectedChannel;
   SlackArchiveStatus? _archiveStatus;
@@ -54,7 +59,16 @@ class _ChannelsTabState extends State<ChannelsTab> {
   @override
   void dispose() {
     _searchController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  /// Debounced search - waits 300ms after typing stops
+  void _onSearchChanged(String query) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      _search(query);
+    });
   }
 
   /// Custom channel sort order - these channels appear first in this order
@@ -645,6 +659,7 @@ class _ChannelsTabState extends State<ChannelsTab> {
       ),
       child: TextField(
         controller: _searchController,
+        style: const TextStyle(color: BrandColors.unityBlue), // Fix text color
         decoration: InputDecoration(
           hintText: 'Search messages...',
           hintStyle: TextStyle(color: BrandColors.unityBlue.withOpacity(0.5)),
@@ -681,7 +696,8 @@ class _ChannelsTabState extends State<ChannelsTab> {
           fillColor: BrandColors.momentumBlue.withOpacity(0.05),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         ),
-        onSubmitted: _search,
+        onChanged: _onSearchChanged, // Live search with debounce
+        onSubmitted: _search, // Also search on enter
       ),
     );
   }
