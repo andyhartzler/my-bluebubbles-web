@@ -25,6 +25,7 @@ import 'package:bluebubbles/services/crm/dashboard_metrics_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/quick_links_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/screens/dashboard/widgets/quick_links_dialog.dart';
 import 'package:bluebubbles/screens/dashboard/quick_links_screen.dart';
@@ -667,7 +668,28 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Future<void> _load() async {
-    if (!CRMConfig.crmEnabled || !_supabaseService.isInitialized) {
+    if (!CRMConfig.crmEnabled) {
+      setState(() {
+        _loading = false;
+        _metrics = DashboardMetrics.empty;
+      });
+      return;
+    }
+
+    // Check if we have any valid Supabase client available
+    // The CRMSupabaseService singleton or the global Supabase.instance
+    bool hasSupabaseClient = _supabaseService.isInitialized;
+    if (!hasSupabaseClient) {
+      try {
+        final client = Supabase.instance.client;
+        hasSupabaseClient = client.supabaseUrl.isNotEmpty;
+      } catch (_) {
+        // Supabase.instance not available
+      }
+    }
+
+    if (!hasSupabaseClient) {
+      debugPrint('[DashboardScreen] No Supabase client available');
       setState(() {
         _loading = false;
         _metrics = DashboardMetrics.empty;

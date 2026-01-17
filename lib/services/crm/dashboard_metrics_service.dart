@@ -7,22 +7,43 @@ import 'supabase_service.dart';
 class DashboardMetricsService {
   final CRMSupabaseService _crmService = CRMSupabaseService();
 
-  /// Get the Supabase client for read operations
+  /// Get the Supabase client for read operations.
+  /// Falls back to Supabase.instance.client if CRMSupabaseService isn't initialized
+  /// but the global Supabase instance is available.
   SupabaseClient? get _client {
-    if (!_crmService.isInitialized) return null;
-    return _crmService.hasServiceRole
-        ? _crmService.privilegedClient
-        : Supabase.instance.client;
+    // Prefer privileged client if CRM service is fully initialized with service role
+    if (_crmService.isInitialized && _crmService.hasServiceRole) {
+      return _crmService.privilegedClient;
+    }
+
+    // Fallback: try to use Supabase.instance.client directly
+    // This works if Supabase.initialize() was called, even if CRMSupabaseService
+    // had initialization issues (e.g., service role setup failed)
+    try {
+      final client = Supabase.instance.client;
+      // Verify the client is usable by checking if we have a valid URL
+      if (client.supabaseUrl.isNotEmpty) {
+        return client;
+      }
+    } catch (e) {
+      print('[DashboardMetricsService] Supabase.instance.client not available: $e');
+    }
+
+    return null;
   }
 
   /// Fetch the singleton dashboard metrics row
   Future<DashboardMetrics?> fetchMetrics() async {
     final client = _client;
     if (client == null) {
-      print('[DashboardMetricsService] fetchMetrics: client is null - CRM not initialized');
-      print('[DashboardMetricsService] isInitialized: ${_crmService.isInitialized}');
+      print('[DashboardMetricsService] fetchMetrics: client is null');
+      print('[DashboardMetricsService] CRMSupabaseService.isInitialized: ${_crmService.isInitialized}');
+      print('[DashboardMetricsService] CRMSupabaseService.hasServiceRole: ${_crmService.hasServiceRole}');
+      print('[DashboardMetricsService] Neither CRM service nor Supabase.instance is available');
       return null;
     }
+
+    print('[DashboardMetricsService] fetchMetrics: Using client with URL: ${client.supabaseUrl.substring(0, client.supabaseUrl.length.clamp(0, 40))}...');
 
     try {
       print('[DashboardMetricsService] fetchMetrics: Querying crm_dashboard_metrics...');
@@ -469,6 +490,7 @@ class DashboardMetricsService {
     final emailData = results[3];
 
     // Merge all data into a combined JSON and recreate the metrics
+    // IMPORTANT: Include ALL fields from baseMetrics, including JSONB array fields!
     final combinedJson = <String, dynamic>{
       'id': baseMetrics.id,
       'total_members': baseMetrics.totalMembers,
@@ -517,7 +539,138 @@ class DashboardMetricsService {
       'total_events': baseMetrics.totalEvents,
       'upcoming_events': baseMetrics.upcomingEvents,
       'total_event_attendees': baseMetrics.totalEventAttendees,
-      // Add Slack analytics
+      // JSONB array fields - TOP DONORS AND SLACK MEMBERS
+      'top_5_donors': baseMetrics.top5Donors
+          .map((d) => {'name': d.name, 'email': d.email, 'total_donated': d.totalDonated})
+          .toList(),
+      'top_50_slack_members': baseMetrics.top50SlackMembers
+          .map((m) => {
+                'id': m.id,
+                'name': m.name,
+                'email': m.email,
+                'message_count': m.messageCount,
+                'profile_photo_url': m.profilePhotoUrl,
+              })
+          .toList(),
+      // JSONB array fields - DISTRIBUTION DATA
+      'members_by_county': baseMetrics.membersByCounty
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_congressional_district': baseMetrics.membersByCongressionalDistrict
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_house_district': baseMetrics.membersByHouseDistrict
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_senate_district': baseMetrics.membersBySenateDistrict
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_community_type': baseMetrics.membersByCommunityType
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_age': baseMetrics.membersByAge
+          .map((ac) => {'age': ac.age, 'count': ac.count})
+          .toList(),
+      'members_by_college': baseMetrics.membersByCollege
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_high_school': baseMetrics.membersByHighSchool
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_graduation_year': baseMetrics.membersByGraduationYear
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_education_level': baseMetrics.membersByEducationLevel
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_in_school_status': baseMetrics.membersByInSchoolStatus
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_chapter': baseMetrics.membersByChapter
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_chapter_status': baseMetrics.membersByChapterStatus
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_chapter_position': baseMetrics.membersByChapterPosition
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_committee': baseMetrics.membersByCommittee
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_gender_identity': baseMetrics.membersByGenderIdentity
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_pronouns': baseMetrics.membersByPronouns
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_race': baseMetrics.membersByRace
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_sexual_orientation': baseMetrics.membersBySexualOrientation
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_hispanic_latino': baseMetrics.membersByHispanicLatino
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_religion': baseMetrics.membersByReligion
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_disability': baseMetrics.membersByDisability
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_languages': baseMetrics.membersByLanguages
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_industry': baseMetrics.membersByIndustry
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_employment_status': baseMetrics.membersByEmploymentStatus
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_voter_registration': baseMetrics.membersByVoterRegistration
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_desire_to_lead': baseMetrics.membersByDesireToLead
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_hours_per_week': baseMetrics.membersByHoursPerWeek
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_referral_source': baseMetrics.membersByReferralSource
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_by_areas_of_interest': baseMetrics.membersByAreasOfInterest
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'members_joined_by_month': baseMetrics.membersJoinedByMonth
+          .map((mc) => {'month': mc.month, 'count': mc.count})
+          .toList(),
+      // Slack JSONB array fields from base metrics (may be overridden by slackData)
+      'slack_channel_activity': baseMetrics.slackChannelActivity
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'slack_engagement_trend': baseMetrics.slackEngagementTrend
+          .map((mc) => {'month': mc.month, 'count': mc.count})
+          .toList(),
+      // Social media JSONB array fields from base metrics (may be overridden by socialData)
+      'followers_by_platform': baseMetrics.followersByPlatform
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'social_growth_trend': baseMetrics.socialGrowthTrend
+          .map((mc) => {'month': mc.month, 'count': mc.count})
+          .toList(),
+      // Legislation JSONB array fields from base metrics (may be overridden by legislationData)
+      'bills_by_position': baseMetrics.billsByPosition
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'bills_by_priority': baseMetrics.billsByPriority
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      'bills_by_category': baseMetrics.billsByCategory
+          .map((nc) => {'name': nc.name, 'count': nc.count})
+          .toList(),
+      // Add Slack analytics (overrides above if present)
       ...slackData,
       // Add social media stats
       ...socialData,

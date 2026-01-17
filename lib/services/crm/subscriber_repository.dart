@@ -304,15 +304,18 @@ class SubscriberRepository {
           i + batchSize > emails.length ? emails.length : i + batchSize,
         );
 
+        // Query event_attendees joined with members to get email
+        // event_attendees has member_id, not email directly
         final response = await client
             .from('event_attendees')
-            .select('email')
-            .inFilter('email', batch);
+            .select('member:members!member_id(email)')
+            .not('member_id', 'is', null);
 
         for (final row in (response as List<dynamic>?) ?? []) {
           final map = row as Map<String, dynamic>;
-          final email = map['email'] as String?;
-          if (email == null) continue;
+          final member = map['member'] as Map<String, dynamic>?;
+          final email = member?['email'] as String?;
+          if (email == null || !batch.contains(email)) continue;
           counts[email] = (counts[email] ?? 0) + 1;
         }
       }
