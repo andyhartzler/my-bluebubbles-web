@@ -11,6 +11,7 @@
 #include <dynamic_color/dynamic_color_plugin_c_api.h>
 #include <emoji_picker_flutter/emoji_picker_flutter_plugin_c_api.h>
 #include <file_selector_windows/file_selector_windows.h>
+#include <flutter_secure_storage_windows/flutter_secure_storage_windows_plugin.h>
 #include <geolocator_windows/geolocator_windows.h>
 #include <irondash_engine_context/irondash_engine_context_plugin_c_api.h>
 #include <maps_launcher/maps_launcher_plugin.h>
@@ -18,7 +19,6 @@
 #include <media_kit_video/media_kit_video_plugin_c_api.h>
 #include <objectbox_flutter_libs/objectbox_flutter_libs_plugin.h>
 #include <pasteboard/pasteboard_plugin.h>
-#include <permission_handler_windows/permission_handler_windows_plugin.h>
 #include <printing/printing_plugin.h>
 #include <record_windows/record_windows_plugin_c_api.h>
 #include <screen_brightness_windows/screen_brightness_windows_plugin.h>
@@ -38,6 +38,8 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("EmojiPickerFlutterPluginCApi"));
   FileSelectorWindowsRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FileSelectorWindows"));
+  FlutterSecureStorageWindowsPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("FlutterSecureStorageWindowsPlugin"));
   GeolocatorWindowsRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("GeolocatorWindows"));
   IrondashEngineContextPluginCApiRegisterWithRegistrar(
@@ -52,8 +54,6 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("ObjectboxFlutterLibsPlugin"));
   PasteboardPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("PasteboardPlugin"));
-  PermissionHandlerWindowsPluginRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("PermissionHandlerWindowsPlugin"));
   PrintingPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("PrintingPlugin"));
   RecordWindowsPluginCApiRegisterWithRegistrar(

@@ -742,6 +742,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       if (!mounted) return;
 
+      // Debug logging for dashboard data
+      debugPrint('[DashboardScreen] _load completed:');
+      debugPrint('[DashboardScreen]   metrics is null: ${metrics == null}');
+      if (metrics != null) {
+        debugPrint('[DashboardScreen]   totalMembers: ${metrics.totalMembers}');
+        debugPrint('[DashboardScreen]   top5Donors: ${metrics.top5Donors.length}');
+        debugPrint('[DashboardScreen]   top50SlackMembers: ${metrics.top50SlackMembers.length}');
+        debugPrint('[DashboardScreen]   membersByCounty: ${metrics.membersByCounty.length}');
+      }
+
       setState(() {
         _metrics = metrics ?? DashboardMetrics.empty;
         _chatCount = chatCount;
@@ -751,7 +761,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _quickLinksCount = quickLinksCount;
         _loading = false;
       });
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('[DashboardScreen] _load error: $e');
+      debugPrint('[DashboardScreen] Stack: ${stack.toString().split('\n').take(5).join('\n')}');
       if (!mounted) return;
       setState(() {
         _loading = false;

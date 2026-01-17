@@ -18,19 +18,33 @@ class DashboardMetricsService {
   /// Fetch the singleton dashboard metrics row
   Future<DashboardMetrics?> fetchMetrics() async {
     final client = _client;
-    if (client == null) return null;
+    if (client == null) {
+      print('[DashboardMetricsService] fetchMetrics: client is null - CRM not initialized');
+      print('[DashboardMetricsService] isInitialized: ${_crmService.isInitialized}');
+      return null;
+    }
 
     try {
+      print('[DashboardMetricsService] fetchMetrics: Querying crm_dashboard_metrics...');
       final response = await client
           .from('crm_dashboard_metrics')
           .select()
           .limit(1)
           .maybeSingle();
 
-      if (response == null) return null;
+      if (response == null) {
+        print('[DashboardMetricsService] fetchMetrics: Response is null - no data in table');
+        return null;
+      }
+
+      print('[DashboardMetricsService] fetchMetrics: Got response with ${response.keys.length} keys');
+      print('[DashboardMetricsService] fetchMetrics: total_members = ${response['total_members']}');
+      print('[DashboardMetricsService] fetchMetrics: top_5_donors count = ${(response['top_5_donors'] as List?)?.length ?? 0}');
+
       return DashboardMetrics.fromJson(response);
-    } catch (e) {
+    } catch (e, stack) {
       print('[DashboardMetricsService] Error fetching metrics: $e');
+      print('[DashboardMetricsService] Stack trace: ${stack.toString().split('\n').take(5).join('\n')}');
       return null;
     }
   }
