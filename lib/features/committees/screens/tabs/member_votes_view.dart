@@ -50,7 +50,7 @@ class _MemberVotesViewState extends State<MemberVotesView> {
 
   /// Get the member ID - from widget or current authenticated user
   String get _memberId =>
-      _memberId ??
+      widget.memberId ??
       Supabase.instance.client.auth.currentUser?.id ??
       '';
 
@@ -1564,7 +1564,7 @@ class _MemberVotingScreenState extends State<MemberVotingScreen> {
     try {
       await _votesService.castVote(
         widget.vote.id,
-        _memberId,
+        widget.memberId,
         _answers,
       );
 
