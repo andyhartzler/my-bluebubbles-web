@@ -15,13 +15,13 @@ enum LegislationWidgetType {
 
 /// Size options for widgets
 enum LegislationWidgetSize {
-  mini,       // 1x0.5 on grid (half height of small)
-  small,      // 1x1 on grid
-  medium,     // 2x1 on grid
-  large,      // 2x2 on grid
-  wide,       // 3x1 on grid
-  tall,       // 1x2 on grid
-  hero,       // 3x2 on grid
+  mini,       // 1x1 on grid - compact square with number on top, name below
+  small,      // 1x0.5 on grid - half height compact row
+  medium,     // 1x1 on grid - standard card size
+  large,      // 2x1 on grid - wide card
+  wide,       // 3x1 on grid - extra wide
+  tall,       // 1x2 on grid - vertical
+  hero,       // 3x2 on grid - full featured
   mobileFull, // Full width on mobile with tall proportions
 }
 
@@ -176,15 +176,15 @@ class LegislationWidgetConfig {
   /// Get the width in grid units
   int get gridWidth {
     switch (size) {
-      case LegislationWidgetSize.mini:
-      case LegislationWidgetSize.small:
-      case LegislationWidgetSize.tall:
+      case LegislationWidgetSize.mini:    // 1x1 square
+      case LegislationWidgetSize.small:   // 1x0.5 compact
+      case LegislationWidgetSize.medium:  // 1x1 standard
+      case LegislationWidgetSize.tall:    // 1x2 vertical
         return 1;
-      case LegislationWidgetSize.medium:
-      case LegislationWidgetSize.large:
+      case LegislationWidgetSize.large:   // 2x1 wide
         return 2;
-      case LegislationWidgetSize.wide:
-      case LegislationWidgetSize.hero:
+      case LegislationWidgetSize.wide:    // 3x1 extra wide
+      case LegislationWidgetSize.hero:    // 3x2 full featured
       case LegislationWidgetSize.mobileFull:
         return 3;
     }
@@ -193,22 +193,25 @@ class LegislationWidgetConfig {
   /// Get the height in grid units
   int get gridHeight {
     switch (size) {
-      case LegislationWidgetSize.mini:
-      case LegislationWidgetSize.small:
-      case LegislationWidgetSize.medium:
-      case LegislationWidgetSize.wide:
+      case LegislationWidgetSize.small:   // Half height
+        return 1; // Uses 0.5 multiplier
+      case LegislationWidgetSize.mini:    // Square
+      case LegislationWidgetSize.medium:  // Standard
+      case LegislationWidgetSize.large:   // Wide card
+      case LegislationWidgetSize.wide:    // Extra wide
         return 1;
-      case LegislationWidgetSize.tall:
-      case LegislationWidgetSize.large:
+      case LegislationWidgetSize.tall:    // Vertical
+      case LegislationWidgetSize.hero:    // Full featured
       case LegislationWidgetSize.mobileFull:
-      case LegislationWidgetSize.hero:
         return 2;
     }
   }
 
   /// Get the actual height multiplier for rendering
+  /// - small is 0.5 (half height compact row)
+  /// - others use their gridHeight
   double get heightMultiplier {
-    return size == LegislationWidgetSize.mini ? 0.5 : gridHeight.toDouble();
+    return size == LegislationWidgetSize.small ? 0.5 : gridHeight.toDouble();
   }
 }
 

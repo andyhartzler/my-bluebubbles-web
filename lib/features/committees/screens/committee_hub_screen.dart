@@ -927,7 +927,7 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Your Committee Leaders have not enabled this workspace for you.\n\nPlease contact us if you believe this message is in error.',
+                'Your committee(s) do not have workspace access enabled.\n\nIf you believe this is an error, please ask your committee leaders in Slack.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: _unityBlue.withOpacity(0.7),

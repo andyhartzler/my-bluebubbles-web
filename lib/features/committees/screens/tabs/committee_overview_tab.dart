@@ -5,6 +5,7 @@ import 'package:bluebubbles/features/calendar/widgets/event_create_dialog.dart';
 import 'package:bluebubbles/features/calendar/widgets/responsive_calendar_widget.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/meetings/widgets/upcoming_meetings_widget.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
@@ -36,7 +37,8 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
   Committee get committee => widget.committee;
 
   bool get _isSchoolCommittee =>
-      committee.id == 'College Democrats' || committee.id == 'High School Democrats';
+      committee.id == 'College Democrats' ||
+      committee.id == 'High School Democrats';
 
   @override
   void initState() {
@@ -56,9 +58,13 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
       // Load school distribution for College/HS Democrats (filtered by committee membership)
       Map<String, int> distribution = {};
       if (committee.id == 'College Democrats') {
-        distribution = await _repository.getCollegeDistribution(committeeName: committee.name);
+        distribution = await _repository.getCollegeDistribution(
+          committeeName: committee.name,
+        );
       } else if (committee.id == 'High School Democrats') {
-        distribution = await _repository.getHighSchoolDistribution(committeeName: committee.name);
+        distribution = await _repository.getHighSchoolDistribution(
+          committeeName: committee.name,
+        );
       }
 
       if (!mounted) return;
@@ -89,7 +95,11 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+              Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Theme.of(context).colorScheme.error,
+              ),
               const SizedBox(height: 16),
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
@@ -115,10 +125,12 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
             committee: committee,
             accentColor: committee.primaryColor,
             onNavigateToEmail: widget.onNavigateToTab != null
-                ? () => widget.onNavigateToTab!(3) // Email tab index
+                ? () =>
+                      widget.onNavigateToTab!(3) // Email tab index
                 : null,
             onNavigateToMessages: widget.onNavigateToTab != null
-                ? () => widget.onNavigateToTab!(4) // Messages tab index
+                ? () =>
+                      widget.onNavigateToTab!(4) // Messages tab index
                 : null,
           ),
           const SizedBox(height: 24),
@@ -141,26 +153,48 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
   }
 
   Widget _buildStatsSection(BuildContext context) {
-    final theme = Theme.of(context);
     final stats = _stats;
     final specific = stats?.specificStats ?? {};
     final currency = NumberFormat.compactSimpleCurrency();
 
     return Card(
-      elevation: 2,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.analytics_outlined, color: committee.primaryColor),
-                const SizedBox(width: 8),
-                Text(
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.analytics_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
                   'Committee Statistics',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -168,32 +202,42 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth > 500;
-                final isMobile = constraints.maxWidth < 400;
 
                 if (isWide) {
-                  final statCards = _buildStatCards(specific, currency, compact: false);
+                  final statCards = _buildStatCards(
+                    specific,
+                    currency,
+                    compact: false,
+                  );
                   return Wrap(
                     spacing: 16,
                     runSpacing: 16,
-                    children: statCards.map((card) => SizedBox(
-                      width: (constraints.maxWidth - 32) / 3,
-                      child: card,
-                    )).toList(),
+                    children: statCards
+                        .map(
+                          (card) => SizedBox(
+                            width: (constraints.maxWidth - 32) / 3,
+                            child: card,
+                          ),
+                        )
+                        .toList(),
                   );
                 }
 
                 // Mobile: horizontal thin tiles spanning full width
                 final statData = _getStatData(specific, currency);
                 return Column(
-                  children: statData.map((data) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _buildMobileStatTile(
-                      icon: data['icon'] as IconData,
-                      label: data['label'] as String,
-                      value: data['value'] as String,
-                      color: data['color'] as Color,
-                    ),
-                  )).toList(),
+                  children: statData
+                      .map(
+                        (data) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _buildMobileStatTile(
+                            icon: data['icon'] as IconData,
+                            label: data['label'] as String,
+                            value: data['value'] as String,
+                          ),
+                        ),
+                      )
+                      .toList(),
                 );
               },
             ),
@@ -203,7 +247,10 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     );
   }
 
-  List<Map<String, dynamic>> _getStatData(Map<String, dynamic> specific, NumberFormat currency) {
+  List<Map<String, dynamic>> _getStatData(
+    Map<String, dynamic> specific,
+    NumberFormat currency,
+  ) {
     final data = <Map<String, dynamic>>[];
 
     // Member count is common to all
@@ -335,47 +382,52 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     return n.toString();
   }
 
-  List<Widget> _buildStatCards(Map<String, dynamic> specific, NumberFormat currency, {bool compact = false}) {
+  List<Widget> _buildStatCards(
+    Map<String, dynamic> specific,
+    NumberFormat currency, {
+    bool compact = false,
+  }) {
     final data = _getStatData(specific, currency);
-    return data.map((d) => _buildStatCard(
-      icon: d['icon'] as IconData,
-      label: d['label'] as String,
-      value: d['value'] as String,
-      color: d['color'] as Color,
-    )).toList();
+    return data
+        .map(
+          (d) => _buildStatCard(
+            icon: d['icon'] as IconData,
+            label: d['label'] as String,
+            value: d['value'] as String,
+          ),
+        )
+        .toList();
   }
 
   Widget _buildMobileStatTile({
     required IconData icon,
     required String label,
     required String value,
-    required Color color,
   }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(icon, color: color, size: 18),
+            child: Icon(icon, color: Colors.white, size: 18),
           ),
           const SizedBox(width: 12),
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: color,
+              color: Colors.white,
             ),
           ),
           const SizedBox(width: 8),
@@ -384,7 +436,7 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
               label,
               style: TextStyle(
                 fontSize: 13,
-                color: color.withOpacity(0.8),
+                color: Colors.white.withOpacity(0.8),
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -398,26 +450,31 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     required IconData icon,
     required String label,
     required String value,
-    required Color color,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(height: 12),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 24,
+            style: const TextStyle(
+              fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: color,
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 4),
@@ -425,7 +482,7 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: color.withOpacity(0.8),
+              color: Colors.white.withOpacity(0.8),
             ),
           ),
         ],
@@ -434,7 +491,6 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
   }
 
   Widget _buildSchoolVisualizationSection(BuildContext context) {
-    final theme = Theme.of(context);
     final isCollege = committee.id == 'College Democrats';
     final schoolLabel = isCollege ? 'Colleges' : 'High Schools';
     final schoolIcon = isCollege ? Icons.account_balance : Icons.domain;
@@ -446,9 +502,17 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     final totalMembers = sortedSchools.fold<int>(0, (sum, e) => sum + e.value);
 
     return Card(
-      elevation: 2,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,24 +523,38 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
               borderRadius: BorderRadius.circular(8),
               child: Row(
                 children: [
-                  Icon(schoolIcon, color: committee.primaryColor),
-                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(schoolIcon, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       '$schoolLabel Represented',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: committee.primaryColor.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       '${sortedSchools.length} ${schoolLabel.toLowerCase()}',
-                      style: TextStyle(
-                        color: committee.primaryColor,
+                      style: const TextStyle(
+                        color: Colors.white,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),
@@ -485,7 +563,7 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
                   const SizedBox(width: 8),
                   Icon(
                     _schoolsExpanded ? Icons.expand_less : Icons.expand_more,
-                    color: committee.primaryColor,
+                    color: Colors.white,
                   ),
                 ],
               ),
@@ -493,8 +571,9 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
             const SizedBox(height: 8),
             Text(
               '$totalMembers members across ${sortedSchools.length} ${schoolLabel.toLowerCase()}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 13,
               ),
             ),
             // Expandable content
@@ -536,14 +615,9 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     required int percentage,
     required bool isCollege,
   }) {
-    // Color intensity based on member count relative to the max
+    // Opacity intensity based on member count relative to the max
     final maxCount = _schoolDistribution.values.reduce((a, b) => a > b ? a : b);
     final intensity = (count / maxCount).clamp(0.3, 1.0);
-
-    final baseColor = isCollege ? Colors.blue : Colors.green;
-    final chipColor = baseColor.withOpacity(intensity * 0.15 + 0.05);
-    final borderColor = baseColor.withOpacity(intensity * 0.4 + 0.1);
-    final textColor = baseColor.shade700;
 
     return InkWell(
       onTap: () {
@@ -554,9 +628,8 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: chipColor,
+          color: Colors.white.withOpacity(0.1 + (intensity * 0.1)),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -564,14 +637,14 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
             Icon(
               isCollege ? Icons.school : Icons.domain,
               size: 16,
-              color: textColor,
+              color: Colors.white,
             ),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
                 school,
-                style: TextStyle(
-                  color: textColor,
+                style: const TextStyle(
+                  color: Colors.white,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
                 ),
@@ -582,13 +655,13 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: baseColor.withOpacity(0.2),
+                color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 '$count',
-                style: TextStyle(
-                  color: textColor,
+                style: const TextStyle(
+                  color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),
@@ -601,23 +674,44 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
   }
 
   Widget _buildQuickActionsSection(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Card(
-      elevation: 2,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.flash_on, color: committee.primaryColor),
-                const SizedBox(width: 8),
-                Text(
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.flash_on,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
                   'Quick Actions',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -695,9 +789,11 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
       icon: Icon(icon, size: 18),
       label: Text(label),
       style: ElevatedButton.styleFrom(
-        backgroundColor: committee.primaryColor,
+        backgroundColor: Colors.white.withOpacity(0.2),
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
 
@@ -708,50 +804,80 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
   }
 
   Widget _buildCommitteeInfoSection(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Card(
-      elevation: 2,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.info_outline, color: committee.primaryColor),
-                const SizedBox(width: 8),
-                Text(
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.info_outline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
                   'About This Committee',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             Text(
               committee.description,
-              style: theme.textTheme.bodyMedium,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 16),
-            if (_stats != null && (_stats!.chairs.isNotEmpty || _stats!.coChairs.isNotEmpty)) ...[
-              const Divider(),
+            if (_stats != null &&
+                (_stats!.chairs.isNotEmpty || _stats!.coChairs.isNotEmpty)) ...[
+              Divider(color: Colors.white.withOpacity(0.2)),
               const SizedBox(height: 12),
               Text(
                 'Leadership',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 8),
               // Show all chairs
-              ..._stats!.chairs.map((chair) => _buildLeaderRow(
-                _stats!.chairs.length > 1 ? 'Co-Chair' : 'Chair',
-                chair,
-              )),
+              ..._stats!.chairs.map(
+                (chair) => _buildLeaderRow(
+                  _stats!.chairs.length > 1 ? 'Co-Chair' : 'Chair',
+                  chair,
+                ),
+              ),
               // Show all co-chairs
-              ..._stats!.coChairs.map((coChair) => _buildLeaderRow(
-                'Co-Chair',
-                coChair,
-              )),
+              ..._stats!.coChairs.map(
+                (coChair) => _buildLeaderRow('Co-Chair', coChair),
+              ),
             ],
           ],
         ),
@@ -765,26 +891,49 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
       child: InkWell(
         onTap: () => _navigateToMemberProfile(leader.memberId),
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          margin: const EdgeInsets.only(bottom: 4),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: Row(
             children: [
               CorsAwareAvatar(
                 imageUrl: leader.photoUrl,
                 radius: 20,
                 fallbackText: leader.name,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                fallbackTextColor: Colors.white,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(leader.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    Text(role, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    Text(
+                      leader.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      role,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.white.withOpacity(0.5),
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -796,9 +945,7 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     final member = await _repository.getMemberById(memberId);
     if (member != null && mounted) {
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MemberDetailScreen(member: member),
-        ),
+        MaterialPageRoute(builder: (_) => MemberDetailScreen(member: member)),
       );
     }
   }
@@ -812,9 +959,9 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
     if (event != null && mounted) {
       // Refresh the page to show new event
       setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Event "${event.title}" created')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Event "${event.title}" created')));
     }
   }
 }

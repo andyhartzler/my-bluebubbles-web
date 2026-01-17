@@ -81,7 +81,8 @@ class SlackManagementRepository {
       var query = _readClient
           .from('slack_messages')
           .select(
-              'id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, files_archived, reactions')
+            'id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, files_archived, reactions',
+          )
           .eq('slack_channel_id', channelId);
 
       // Apply full-text search if query provided
@@ -102,7 +103,9 @@ class SlackManagementRepository {
 
   /// Get thread messages for a specific parent message
   Future<List<Map<String, dynamic>>> getThreadMessages(
-      String channelId, String threadTs) async {
+    String channelId,
+    String threadTs,
+  ) async {
     if (!isReady) return [];
 
     try {
@@ -125,8 +128,11 @@ class SlackManagementRepository {
     if (!isReady) return {};
 
     try {
-      final data = await _readClient.from('slack_user_mapping').select(
-          'slack_user_id, slack_real_name, slack_display_name, slack_avatar_url, cached_avatar_path, member_id');
+      final data = await _readClient
+          .from('slack_user_mapping')
+          .select(
+            'slack_user_id, slack_real_name, slack_display_name, slack_avatar_url, cached_avatar_path, member_id',
+          );
 
       final mappings = <String, Map<String, String>>{};
       for (final item in data as List<dynamic>) {
@@ -137,7 +143,8 @@ class SlackManagementRepository {
               'real_name': item['slack_real_name']?.toString() ?? '',
               'display_name': item['slack_display_name']?.toString() ?? '',
               'avatar_url': item['slack_avatar_url']?.toString() ?? '',
-              'cached_avatar_path': item['cached_avatar_path']?.toString() ?? '',
+              'cached_avatar_path':
+                  item['cached_avatar_path']?.toString() ?? '',
               'member_id': item['member_id']?.toString() ?? '',
             };
           }
@@ -234,7 +241,9 @@ class SlackManagementRepository {
       final data = await _readClient
           .from('members')
           .select()
-          .or('name.ilike.%$searchQuery%,email.ilike.%$searchQuery%,school_email.ilike.%$searchQuery%')
+          .or(
+            'name.ilike.%$searchQuery%,email.ilike.%$searchQuery%,school_email.ilike.%$searchQuery%',
+          )
           .order('name', ascending: true)
           .limit(limit);
 
@@ -318,12 +327,14 @@ class SlackManagementRepository {
       // Update members table with slack_user_id
       await _writeClient
           .from('members')
-          .update({'slack_user_id': slackUserId}).eq('id', memberId);
+          .update({'slack_user_id': slackUserId})
+          .eq('id', memberId);
 
       // Update slack_messages to link with member_id
       await _writeClient
           .from('slack_messages')
-          .update({'member_id': memberId}).eq('slack_user_id', slackUserId);
+          .update({'member_id': memberId})
+          .eq('slack_user_id', slackUserId);
 
       // Delete from slack_users_unmatched
       await _writeClient
@@ -390,7 +401,8 @@ class SlackManagementRepository {
       // Update slack_messages to link with member_id
       await _writeClient
           .from('slack_messages')
-          .update({'member_id': memberId}).eq('slack_user_id', slackUserId);
+          .update({'member_id': memberId})
+          .eq('slack_user_id', slackUserId);
 
       // Delete from slack_users_unmatched
       await _writeClient
@@ -410,10 +422,13 @@ class SlackManagementRepository {
     if (!isReady) return false;
 
     try {
-      await _writeClient.from('slack_users_unmatched').update({
-        'manually_rejected': true,
-        if (notes != null) 'notes': notes,
-      }).eq('slack_user_id', slackUserId);
+      await _writeClient
+          .from('slack_users_unmatched')
+          .update({
+            'manually_rejected': true,
+            if (notes != null) 'notes': notes,
+          })
+          .eq('slack_user_id', slackUserId);
 
       return true;
     } catch (e) {
@@ -424,13 +439,16 @@ class SlackManagementRepository {
 
   /// Update notes for an unmatched user
   Future<bool> updateUnmatchedUserNotes(
-      String slackUserId, String notes) async {
+    String slackUserId,
+    String notes,
+  ) async {
     if (!isReady) return false;
 
     try {
       await _writeClient
           .from('slack_users_unmatched')
-          .update({'notes': notes}).eq('slack_user_id', slackUserId);
+          .update({'notes': notes})
+          .eq('slack_user_id', slackUserId);
 
       return true;
     } catch (e) {
@@ -585,8 +603,9 @@ class SlackManagementRepository {
   }
 
   /// Get recent membership changes with channel and user details
-  Future<List<MembershipChange>> getRecentMembershipChanges(
-      {int limit = 50}) async {
+  Future<List<MembershipChange>> getRecentMembershipChanges({
+    int limit = 50,
+  }) async {
     if (!isReady) return [];
 
     try {
@@ -596,15 +615,66 @@ class SlackManagementRepository {
           .select('''
             *,
             slack_channel_committee_mapping!slack_channel_id(slack_channel_name),
-            slack_user_mapping!slack_user_id(slack_display_name, slack_real_name, slack_avatar_url),
+            slack_user_mapping!slack_user_id(slack_display_name, slack_real_name, slack_avatar_url, cached_avatar_path),
             members!member_id(name, profile_pictures)
           ''')
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return (data as List<dynamic>)
+      final changes = (data as List<dynamic>)
           .map((e) => MembershipChange.fromJson(e as Map<String, dynamic>))
           .toList();
+
+      // Fetch unmatched user info for users without matched data
+      final unmatchedUserIds = changes
+          .where(
+            (c) =>
+                !c.isLinkedMember &&
+                c.slackAvatarUrl == null &&
+                c.slackUserId != null,
+          )
+          .map((c) => c.slackUserId!)
+          .toSet();
+
+      if (unmatchedUserIds.isNotEmpty) {
+        final unmatchedData = await _readClient
+            .from('slack_users_unmatched')
+            .select(
+              'slack_user_id, slack_real_name, slack_display_name, slack_avatar_url, cached_avatar_path',
+            )
+            .inFilter('slack_user_id', unmatchedUserIds.toList());
+
+        final unmatchedMap = <String, Map<String, dynamic>>{};
+        for (final item in (unmatchedData as List)) {
+          final slackUserId = item['slack_user_id']?.toString();
+          if (slackUserId != null) {
+            unmatchedMap[slackUserId] = item;
+          }
+        }
+
+        // Update changes with unmatched user info
+        for (int i = 0; i < changes.length; i++) {
+          final change = changes[i];
+          if (!change.isLinkedMember &&
+              change.slackAvatarUrl == null &&
+              change.slackUserId != null) {
+            final unmatchedInfo = unmatchedMap[change.slackUserId!];
+            if (unmatchedInfo != null) {
+              changes[i] = change.copyWithUnmatchedInfo(
+                unmatchedRealName: unmatchedInfo['slack_real_name']?.toString(),
+                unmatchedDisplayName: unmatchedInfo['slack_display_name']
+                    ?.toString(),
+                unmatchedAvatarUrl: unmatchedInfo['slack_avatar_url']
+                    ?.toString(),
+                unmatchedCachedAvatarPath: unmatchedInfo['cached_avatar_path']
+                    ?.toString(),
+              );
+            }
+          }
+        }
+      }
+
+      return changes;
     } catch (e) {
       debugPrint('Error fetching membership changes: $e');
       return [];
@@ -648,7 +718,8 @@ class SlackManagementRepository {
       final data = await _readClient
           .from('slack_messages')
           .select(
-              'id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, files_archived, reactions')
+            'id, slack_message_ts, slack_channel_id, slack_user_id, member_id, message_text, message_type, thread_ts, posted_at, has_files, files, files_archived, reactions',
+          )
           .eq('slack_user_id', slackUserId)
           .order('posted_at', ascending: false)
           .range(offset, offset + limit - 1);
@@ -661,7 +732,9 @@ class SlackManagementRepository {
   }
 
   /// Get unmatched user info by Slack user ID
-  Future<SlackUnmatchedUser?> getUnmatchedUserBySlackId(String slackUserId) async {
+  Future<SlackUnmatchedUser?> getUnmatchedUserBySlackId(
+    String slackUserId,
+  ) async {
     if (!isReady) return null;
 
     try {
@@ -680,7 +753,9 @@ class SlackManagementRepository {
   }
 
   /// Get user mapping info by Slack user ID
-  Future<Map<String, dynamic>?> getUserMappingBySlackId(String slackUserId) async {
+  Future<Map<String, dynamic>?> getUserMappingBySlackId(
+    String slackUserId,
+  ) async {
     if (!isReady) return null;
 
     try {
@@ -719,7 +794,9 @@ class SlackManagementRepository {
           .not('slack_user_id', 'is', null)
           .order('name', ascending: true);
 
-      debugPrint('Ineligible Slack members query returned ${(data as List).length} results');
+      debugPrint(
+        'Ineligible Slack members query returned ${(data as List).length} results',
+      );
 
       return (data as List<dynamic>)
           .map((e) => Member.fromJson(e as Map<String, dynamic>))
@@ -730,5 +807,4 @@ class SlackManagementRepository {
       return [];
     }
   }
-
 }

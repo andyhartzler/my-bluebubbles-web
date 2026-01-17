@@ -163,26 +163,47 @@ class LegislationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Load tracked bills
+  // Load tracked bills (optimized - single fetch with client-side filtering)
   Future<void> loadTrackedBills() async {
     try {
-      // Load filtered bills for display
-      _trackedBills = await _service.getTrackedBills(
-        session: _sessionFilter,
-        position: _positionFilter,
-        priority: _priorityFilter,
-        category: _categoryFilter,
-        sponsor: _sponsorFilter,
-        includeArchived: _showArchived,
-        searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
-        searchBillText: _searchBillText,
-      );
-
-      // Also load unfiltered list for position tabs (only filter by session)
+      // Fetch all bills once (session filter only) - this is now optimized to exclude large text fields
       _allTrackedBills = await _service.getTrackedBills(
         session: _sessionFilter,
         includeArchived: _showArchived,
+        // Note: text search requires server-side filtering
+        searchQuery: _searchBillText && _searchQuery.isNotEmpty ? _searchQuery : null,
+        searchBillText: _searchBillText,
       );
+
+      // Apply additional filters client-side for display list
+      _trackedBills = _allTrackedBills.where((bill) {
+        // Position filter
+        if (_positionFilter != null && bill.position != _positionFilter) {
+          return false;
+        }
+        // Priority filter
+        if (_priorityFilter != null && bill.priority != _priorityFilter) {
+          return false;
+        }
+        // Category filter
+        if (_categoryFilter != null && !bill.categories.contains(_categoryFilter)) {
+          return false;
+        }
+        // Sponsor filter
+        if (_sponsorFilter != null && bill.primarySponsorName != _sponsorFilter) {
+          return false;
+        }
+        // Text search (non-bill-text search can be done client-side)
+        if (!_searchBillText && _searchQuery.isNotEmpty) {
+          final query = _searchQuery.toLowerCase();
+          final matchesTitle = bill.title.toLowerCase().contains(query);
+          final matchesIdentifier = bill.billIdentifier.toLowerCase().contains(query);
+          if (!matchesTitle && !matchesIdentifier) {
+            return false;
+          }
+        }
+        return true;
+      }).toList();
     } catch (e) {
       _error = 'Failed to load bills: $e';
       _trackedBills = [];
@@ -389,7 +410,7 @@ class LegislationProvider extends ChangeNotifier {
     return trackedBill;
   }
 
-  // Update bill position
+  // Update bill position with optimistic UI update
   /// [memberId] is the ID of the member setting the position (from members table)
   Future<void> updatePosition({
     required String billId,
@@ -397,59 +418,177 @@ class LegislationProvider extends ChangeNotifier {
     String? memberId,
     String? rationale,
   }) async {
-    await _service.updatePosition(
-      billId: billId,
-      position: position,
-      memberId: memberId,
-      rationale: rationale,
-    );
+    // Store old values for potential rollback
+    final oldPosition = _selectedBill?.position;
+    final oldPositionSetBy = _selectedBill?.positionSetBy;
+    final oldPositionSetAt = _selectedBill?.positionSetAt;
 
-    if (_selectedBill?.id == billId) {
-      _selectedBill = await _service.getTrackedBill(billId);
+    // Optimistic update - update local state immediately
+    _updateBillPositionLocally(billId, position, memberId);
+    notifyListeners();
+
+    try {
+      // Then persist to database
+      await _service.updatePosition(
+        billId: billId,
+        position: position,
+        memberId: memberId,
+        rationale: rationale,
+      );
+      // Refresh stats in background (don't await)
+      loadStats();
+    } catch (e) {
+      // Rollback on error
+      _updateBillPositionLocally(billId, oldPosition ?? '', oldPositionSetBy);
+      notifyListeners();
+      rethrow;
     }
-
-    await loadTrackedBills();
-    await loadStats();
   }
 
-  // Update bill priority
+  // Helper to update position in local state
+  void _updateBillPositionLocally(String billId, String position, String? memberId) {
+    // Update selected bill
+    if (_selectedBill?.id == billId) {
+      _selectedBill = _selectedBill!.copyWith(
+        position: position,
+        positionSetBy: memberId,
+        positionSetAt: DateTime.now(),
+      );
+    }
+    // Update in tracked bills list
+    final index = _trackedBills.indexWhere((b) => b.id == billId);
+    if (index != -1) {
+      _trackedBills[index] = _trackedBills[index].copyWith(
+        position: position,
+        positionSetBy: memberId,
+        positionSetAt: DateTime.now(),
+      );
+    }
+    // Update in all tracked bills list
+    final allIndex = _allTrackedBills.indexWhere((b) => b.id == billId);
+    if (allIndex != -1) {
+      _allTrackedBills[allIndex] = _allTrackedBills[allIndex].copyWith(
+        position: position,
+        positionSetBy: memberId,
+        positionSetAt: DateTime.now(),
+      );
+    }
+  }
+
+  // Update bill priority with optimistic UI update
   Future<void> updatePriority({
     required String billId,
     required String priority,
   }) async {
-    await _service.updatePriority(billId: billId, priority: priority);
+    // Store old value for potential rollback
+    final oldPriority = _selectedBill?.priority;
 
-    if (_selectedBill?.id == billId) {
-      _selectedBill = await _service.getTrackedBill(billId);
+    // Optimistic update - update local state immediately
+    _updateBillPriorityLocally(billId, priority);
+    notifyListeners();
+
+    try {
+      // Then persist to database
+      await _service.updatePriority(billId: billId, priority: priority);
+      // Refresh stats in background (don't await)
+      loadStats();
+    } catch (e) {
+      // Rollback on error
+      _updateBillPriorityLocally(billId, oldPriority ?? '');
+      notifyListeners();
+      rethrow;
     }
-
-    await loadTrackedBills();
-    await loadStats();
   }
 
-  // Update bill categories
+  // Helper to update priority in local state
+  void _updateBillPriorityLocally(String billId, String priority) {
+    // Update selected bill
+    if (_selectedBill?.id == billId) {
+      _selectedBill = _selectedBill!.copyWith(priority: priority);
+    }
+    // Update in tracked bills list
+    final index = _trackedBills.indexWhere((b) => b.id == billId);
+    if (index != -1) {
+      _trackedBills[index] = _trackedBills[index].copyWith(priority: priority);
+    }
+    // Update in all tracked bills list
+    final allIndex = _allTrackedBills.indexWhere((b) => b.id == billId);
+    if (allIndex != -1) {
+      _allTrackedBills[allIndex] = _allTrackedBills[allIndex].copyWith(priority: priority);
+    }
+  }
+
+  // Update bill categories with optimistic UI update
   Future<void> updateCategories({
     required String billId,
     required List<String> categories,
   }) async {
-    await _service.updateCategories(billId: billId, categories: categories);
+    // Store old value for potential rollback
+    final oldCategories = _selectedBill?.categories;
 
-    if (_selectedBill?.id == billId) {
-      _selectedBill = await _service.getTrackedBill(billId);
+    // Optimistic update
+    _updateBillCategoriesLocally(billId, categories);
+    notifyListeners();
+
+    try {
+      await _service.updateCategories(billId: billId, categories: categories);
+    } catch (e) {
+      // Rollback on error
+      _updateBillCategoriesLocally(billId, oldCategories ?? []);
+      notifyListeners();
+      rethrow;
     }
-
-    await loadTrackedBills();
   }
 
-  // Update bill tags
+  // Helper to update categories in local state
+  void _updateBillCategoriesLocally(String billId, List<String> categories) {
+    if (_selectedBill?.id == billId) {
+      _selectedBill = _selectedBill!.copyWith(categories: categories);
+    }
+    final index = _trackedBills.indexWhere((b) => b.id == billId);
+    if (index != -1) {
+      _trackedBills[index] = _trackedBills[index].copyWith(categories: categories);
+    }
+    final allIndex = _allTrackedBills.indexWhere((b) => b.id == billId);
+    if (allIndex != -1) {
+      _allTrackedBills[allIndex] = _allTrackedBills[allIndex].copyWith(categories: categories);
+    }
+  }
+
+  // Update bill tags with optimistic UI update
   Future<void> updateTags({
     required String billId,
     required List<String> tags,
   }) async {
-    await _service.updateTags(billId: billId, tags: tags);
+    // Store old value for potential rollback
+    final oldTags = _selectedBill?.tags;
 
+    // Optimistic update
+    _updateBillTagsLocally(billId, tags);
+    notifyListeners();
+
+    try {
+      await _service.updateTags(billId: billId, tags: tags);
+    } catch (e) {
+      // Rollback on error
+      _updateBillTagsLocally(billId, oldTags ?? []);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Helper to update tags in local state
+  void _updateBillTagsLocally(String billId, List<String> tags) {
     if (_selectedBill?.id == billId) {
-      _selectedBill = await _service.getTrackedBill(billId);
+      _selectedBill = _selectedBill!.copyWith(tags: tags);
+    }
+    final index = _trackedBills.indexWhere((b) => b.id == billId);
+    if (index != -1) {
+      _trackedBills[index] = _trackedBills[index].copyWith(tags: tags);
+    }
+    final allIndex = _allTrackedBills.indexWhere((b) => b.id == billId);
+    if (allIndex != -1) {
+      _allTrackedBills[allIndex] = _allTrackedBills[allIndex].copyWith(tags: tags);
     }
   }
 

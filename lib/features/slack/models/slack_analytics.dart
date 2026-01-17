@@ -65,7 +65,9 @@ class SlackAnalyticsSummary {
     this.computedAt,
   });
 
-  factory SlackAnalyticsSummary.fromMetrics(List<SlackAnalyticsMetric> metrics) {
+  factory SlackAnalyticsSummary.fromMetrics(
+    List<SlackAnalyticsMetric> metrics,
+  ) {
     int totalAllTime = 0;
     int totalRecent = 0;
     int linked = 0;
@@ -116,10 +118,7 @@ class SlackAnalyticsSummary {
 
 /// Data point for time-series charts
 class DailyMessageCount {
-  const DailyMessageCount({
-    required this.date,
-    required this.count,
-  });
+  const DailyMessageCount({required this.date, required this.count});
 
   factory DailyMessageCount.fromJson(Map<String, dynamic> json) {
     return DailyMessageCount(
@@ -206,10 +205,7 @@ class DayOfWeekActivity {
 
 /// Hourly activity data
 class HourlyActivity {
-  const HourlyActivity({
-    required this.hour,
-    required this.messageCount,
-  });
+  const HourlyActivity({required this.hour, required this.messageCount});
 
   factory HourlyActivity.fromJson(Map<String, dynamic> json) {
     return HourlyActivity(
@@ -229,6 +225,10 @@ class HourlyActivity {
   }
 }
 
+/// Supabase storage base URL for cached Slack avatars
+const String _supabaseAvatarStorageUrl =
+    'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/avatars/';
+
 /// Membership change log entry
 class MembershipChange {
   const MembershipChange({
@@ -245,6 +245,7 @@ class MembershipChange {
     this.slackDisplayName,
     this.slackRealName,
     this.slackAvatarUrl,
+    this.cachedAvatarPath,
     // Member info (if linked)
     this.memberName,
     this.memberProfilePhotoUrl,
@@ -257,7 +258,9 @@ class MembershipChange {
     if (channelMapping is Map<String, dynamic>) {
       channelName = channelMapping['slack_channel_name']?.toString();
     } else if (channelMapping is List && channelMapping.isNotEmpty) {
-      channelName = (channelMapping.first as Map<String, dynamic>?)?['slack_channel_name']?.toString();
+      channelName =
+          (channelMapping.first as Map<String, dynamic>?)?['slack_channel_name']
+              ?.toString();
     }
 
     // Parse nested user mapping data
@@ -265,15 +268,18 @@ class MembershipChange {
     String? displayName;
     String? realName;
     String? avatarUrl;
+    String? cachedPath;
     if (userMapping is Map<String, dynamic>) {
       displayName = userMapping['slack_display_name']?.toString();
       realName = userMapping['slack_real_name']?.toString();
       avatarUrl = userMapping['slack_avatar_url']?.toString();
+      cachedPath = userMapping['cached_avatar_path']?.toString();
     } else if (userMapping is List && userMapping.isNotEmpty) {
       final first = userMapping.first as Map<String, dynamic>?;
       displayName = first?['slack_display_name']?.toString();
       realName = first?['slack_real_name']?.toString();
       avatarUrl = first?['slack_avatar_url']?.toString();
+      cachedPath = first?['cached_avatar_path']?.toString();
     }
 
     // Parse nested member data
@@ -328,6 +334,7 @@ class MembershipChange {
       slackDisplayName: displayName,
       slackRealName: realName,
       slackAvatarUrl: avatarUrl,
+      cachedAvatarPath: cachedPath,
       memberName: memberName,
       memberProfilePhotoUrl: memberPhotoUrl,
     );
@@ -342,10 +349,11 @@ class MembershipChange {
   final String source;
   final DateTime? createdAt;
   final Map<String, dynamic>? metadata;
-  // User info from slack_user_mapping
+  // User info from slack_user_mapping or slack_users_unmatched
   final String? slackDisplayName;
   final String? slackRealName;
   final String? slackAvatarUrl;
+  final String? cachedAvatarPath;
   // Member info (if linked)
   final String? memberName;
   final String? memberProfilePhotoUrl;
@@ -364,5 +372,40 @@ class MembershipChange {
   bool get isLinkedMember => memberId != null && memberId!.isNotEmpty;
 
   /// Get the best available avatar URL
-  String? get avatarUrl => memberProfilePhotoUrl ?? slackAvatarUrl;
+  /// Priority: member photo > cached Supabase avatar > direct Slack URL
+  String? get avatarUrl {
+    if (memberProfilePhotoUrl != null && memberProfilePhotoUrl!.isNotEmpty) {
+      return memberProfilePhotoUrl;
+    }
+    if (cachedAvatarPath != null && cachedAvatarPath!.isNotEmpty) {
+      return '$_supabaseAvatarStorageUrl$cachedAvatarPath';
+    }
+    return slackAvatarUrl;
+  }
+
+  /// Create a copy with unmatched user info (for updating after secondary lookup)
+  MembershipChange copyWithUnmatchedInfo({
+    String? unmatchedRealName,
+    String? unmatchedDisplayName,
+    String? unmatchedAvatarUrl,
+    String? unmatchedCachedAvatarPath,
+  }) {
+    return MembershipChange(
+      id: id,
+      memberId: memberId,
+      slackUserId: slackUserId,
+      slackChannelId: slackChannelId,
+      slackChannelName: slackChannelName,
+      action: action,
+      source: source,
+      createdAt: createdAt,
+      metadata: metadata,
+      slackDisplayName: slackDisplayName ?? unmatchedDisplayName,
+      slackRealName: slackRealName ?? unmatchedRealName,
+      slackAvatarUrl: slackAvatarUrl ?? unmatchedAvatarUrl,
+      cachedAvatarPath: cachedAvatarPath ?? unmatchedCachedAvatarPath,
+      memberName: memberName,
+      memberProfilePhotoUrl: memberProfilePhotoUrl,
+    );
+  }
 }

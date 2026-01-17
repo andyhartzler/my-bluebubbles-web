@@ -6,6 +6,7 @@ import 'package:table_calendar/table_calendar.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -13,10 +14,6 @@ import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
-
-// Brand colors
-const _unityBlue = Color(0xFF273351);
-const _momentumBlue = Color(0xFF32A6DE);
 
 /// Overview tab for committee members
 /// Includes calendar view of meetings, leadership, and quick links
@@ -33,10 +30,12 @@ class CommitteeMemberOverviewTab extends StatefulWidget {
   });
 
   @override
-  State<CommitteeMemberOverviewTab> createState() => _CommitteeMemberOverviewTabState();
+  State<CommitteeMemberOverviewTab> createState() =>
+      _CommitteeMemberOverviewTabState();
 }
 
-class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab> {
+class _CommitteeMemberOverviewTabState
+    extends State<CommitteeMemberOverviewTab> {
   final MeetingRepository _meetingRepository = MeetingRepository();
   final CommitteeRepository _committeeRepository = CommitteeRepository();
   final MemberRepository _memberRepository = MemberRepository();
@@ -128,7 +127,10 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
     }
 
     final picked = result.files.first;
-    final platformFile = await materializePickedPlatformFile(picked, source: result);
+    final platformFile = await materializePickedPlatformFile(
+      picked,
+      source: result,
+    );
     if (platformFile == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -148,9 +150,9 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
       if (updated != null) {
         // Update the user session with new member data
         userSession.refreshMember(updated);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile photo updated')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile photo updated')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Unable to update profile photo')),
@@ -158,9 +160,9 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
       }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading photo: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error uploading photo: $error')));
     } finally {
       if (mounted) {
         setState(() => _uploadingPhoto = false);
@@ -173,7 +175,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
+          valueColor: AlwaysStoppedAnimation<Color>(BrandColors.momentumBlue),
         ),
       );
     }
@@ -263,7 +265,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
 
     return Card(
       elevation: 4,
-      color: _unityBlue,
+      color: BrandColors.unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -288,7 +290,9 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                           height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -310,9 +314,12 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: _momentumBlue,
+                          color: BrandColors.momentumBlue,
                           shape: BoxShape.circle,
-                          border: Border.all(color: _unityBlue, width: 2),
+                          border: Border.all(
+                            color: BrandColors.unityBlue,
+                            width: 2,
+                          ),
                         ),
                         child: Icon(
                           hasPhoto ? Icons.photo_camera : Icons.add_a_photo,
@@ -376,13 +383,16 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
           children: [
             Row(
               children: [
-                Icon(Icons.calendar_month_outlined, color: _momentumBlue),
+                Icon(
+                  Icons.calendar_month_outlined,
+                  color: BrandColors.momentumBlue,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Meeting Calendar',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: _unityBlue,
+                    color: BrandColors.unityBlue,
                   ),
                 ),
               ],
@@ -401,24 +411,43 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                 titleCentered: true,
                 titleTextStyle: theme.textTheme.titleMedium!.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: _unityBlue,
+                  color: BrandColors.unityBlue,
                 ),
-                leftChevronIcon: const Icon(Icons.chevron_left, color: _unityBlue),
-                rightChevronIcon: const Icon(Icons.chevron_right, color: _unityBlue),
+                leftChevronIcon: const Icon(
+                  Icons.chevron_left,
+                  color: BrandColors.unityBlue,
+                ),
+                rightChevronIcon: const Icon(
+                  Icons.chevron_right,
+                  color: BrandColors.unityBlue,
+                ),
+              ),
+              daysOfWeekStyle: const DaysOfWeekStyle(
+                weekdayStyle: TextStyle(
+                  color: BrandColors.unityBlue,
+                  fontWeight: FontWeight.w600,
+                ),
+                weekendStyle: TextStyle(
+                  color: BrandColors.unityBlue,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               calendarStyle: CalendarStyle(
                 outsideDaysVisible: false,
-                weekendTextStyle: TextStyle(color: _unityBlue.withOpacity(0.6)),
+                defaultTextStyle: const TextStyle(color: BrandColors.unityBlue),
+                weekendTextStyle: TextStyle(
+                  color: BrandColors.unityBlue.withOpacity(0.6),
+                ),
                 todayDecoration: BoxDecoration(
-                  color: _momentumBlue.withOpacity(0.3),
+                  color: BrandColors.momentumBlue.withOpacity(0.3),
                   shape: BoxShape.circle,
                 ),
                 todayTextStyle: const TextStyle(
-                  color: _unityBlue,
+                  color: BrandColors.unityBlue,
                   fontWeight: FontWeight.bold,
                 ),
                 selectedDecoration: const BoxDecoration(
-                  color: _momentumBlue,
+                  color: BrandColors.momentumBlue,
                   shape: BoxShape.circle,
                 ),
                 selectedTextStyle: const TextStyle(
@@ -426,7 +455,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                   fontWeight: FontWeight.bold,
                 ),
                 markerDecoration: const BoxDecoration(
-                  color: _unityBlue,
+                  color: BrandColors.unityBlue,
                   shape: BoxShape.circle,
                 ),
                 markersMaxCount: 3,
@@ -450,7 +479,9 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
   }
 
   Widget _buildSelectedDayMeetings(ThemeData theme) {
-    final meetings = _selectedDay != null ? _getMeetingsForDay(_selectedDay!) : [];
+    final meetings = _selectedDay != null
+        ? _getMeetingsForDay(_selectedDay!)
+        : [];
 
     return Card(
       elevation: 2,
@@ -463,7 +494,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
           children: [
             Row(
               children: [
-                Icon(Icons.event_outlined, color: _momentumBlue),
+                Icon(Icons.event_outlined, color: BrandColors.momentumBlue),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -472,7 +503,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                         : 'Select a day',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: _unityBlue,
+                      color: BrandColors.unityBlue,
                     ),
                   ),
                 ),
@@ -486,7 +517,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                   child: Text(
                     'No meetings scheduled',
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: _unityBlue.withOpacity(0.6),
+                      color: BrandColors.unityBlue.withOpacity(0.6),
                     ),
                   ),
                 ),
@@ -504,9 +535,9 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _unityBlue.withOpacity(0.05),
+        color: BrandColors.unityBlue.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _momentumBlue.withOpacity(0.3)),
+        border: Border.all(color: BrandColors.momentumBlue.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -514,7 +545,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
             width: 4,
             height: 40,
             decoration: BoxDecoration(
-              color: _momentumBlue,
+              color: BrandColors.momentumBlue,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -527,7 +558,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                   meeting.meetingTitle,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: _unityBlue,
+                    color: BrandColors.unityBlue,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -536,7 +567,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                 Text(
                   '${meeting.formattedTime} CST',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: _unityBlue.withOpacity(0.7),
+                    color: BrandColors.unityBlue.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -546,13 +577,13 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: _momentumBlue.withOpacity(0.1),
+                color: BrandColors.momentumBlue.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 '${meeting.durationMinutes} min',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: _momentumBlue,
+                  color: BrandColors.momentumBlue,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -576,13 +607,13 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
           children: [
             Row(
               children: [
-                Icon(Icons.insights_outlined, color: _momentumBlue),
+                Icon(Icons.insights_outlined, color: BrandColors.momentumBlue),
                 const SizedBox(width: 8),
                 Text(
                   'Committee Stats',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: _unityBlue,
+                    color: BrandColors.unityBlue,
                   ),
                 ),
               ],
@@ -621,13 +652,13 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: _momentumBlue.withOpacity(0.1),
+        color: BrandColors.momentumBlue.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20, color: _momentumBlue),
+          Icon(icon, size: 20, color: BrandColors.momentumBlue),
           const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -636,13 +667,13 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                 value,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: _unityBlue,
+                  color: BrandColors.unityBlue,
                 ),
               ),
               Text(
                 label,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: _unityBlue.withOpacity(0.7),
+                  color: BrandColors.unityBlue.withOpacity(0.7),
                 ),
               ),
             ],
@@ -664,13 +695,16 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
           children: [
             Row(
               children: [
-                Icon(Icons.supervisor_account_outlined, color: _momentumBlue),
+                Icon(
+                  Icons.supervisor_account_outlined,
+                  color: BrandColors.momentumBlue,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Committee Leadership',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: _unityBlue,
+                    color: BrandColors.unityBlue,
                   ),
                 ),
               ],
@@ -691,10 +725,10 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
           CorsAwareAvatar(
             imageUrl: leader.photoUrl,
             radius: 20,
-            backgroundColor: _momentumBlue.withOpacity(0.2),
+            backgroundColor: BrandColors.momentumBlue.withOpacity(0.2),
             fallbackText: leader.name,
-            fallbackIconColor: _unityBlue,
-            fallbackTextColor: _unityBlue,
+            fallbackIconColor: BrandColors.unityBlue,
+            fallbackTextColor: BrandColors.unityBlue,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -705,14 +739,14 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                   leader.name,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: _unityBlue,
+                    color: BrandColors.unityBlue,
                   ),
                 ),
                 if (leader.title != null)
                   Text(
                     leader.title!,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: _momentumBlue,
+                      color: BrandColors.momentumBlue,
                     ),
                   ),
               ],
@@ -725,9 +759,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
 
   Widget _buildUpcomingMeetingsCard(ThemeData theme) {
     final now = DateTime.now();
-    final upcoming = _meetings
-        .where((m) => m.meetingDate.isAfter(now))
-        .toList()
+    final upcoming = _meetings.where((m) => m.meetingDate.isAfter(now)).toList()
       ..sort((a, b) => a.meetingDate.compareTo(b.meetingDate));
 
     final displayMeetings = upcoming.take(3).toList();
@@ -743,14 +775,14 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
           children: [
             Row(
               children: [
-                Icon(Icons.upcoming_outlined, color: _momentumBlue),
+                Icon(Icons.upcoming_outlined, color: BrandColors.momentumBlue),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Upcoming Meetings',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: _unityBlue,
+                      color: BrandColors.unityBlue,
                     ),
                   ),
                 ),
@@ -771,13 +803,13 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                       Icon(
                         Icons.event_busy_outlined,
                         size: 32,
-                        color: _unityBlue.withOpacity(0.4),
+                        color: BrandColors.unityBlue.withOpacity(0.4),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'No upcoming meetings',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: _unityBlue.withOpacity(0.6),
+                          color: BrandColors.unityBlue.withOpacity(0.6),
                         ),
                       ),
                     ],
@@ -785,7 +817,9 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
                 ),
               )
             else
-              ...displayMeetings.map((meeting) => _buildUpcomingMeetingItem(meeting, theme)),
+              ...displayMeetings.map(
+                (meeting) => _buildUpcomingMeetingItem(meeting, theme),
+              ),
           ],
         ),
       ),
@@ -797,7 +831,7 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _unityBlue,
+        color: BrandColors.unityBlue,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -869,14 +903,48 @@ class _CommitteeMemberOverviewTabState extends State<CommitteeMemberOverviewTab>
       return 'Yesterday';
     }
 
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final weekdays = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
 
     return '${weekdays[date.weekday % 7]}, ${months[date.month - 1]} ${date.day}';
   }
 
   String _formatMonth(DateTime date) {
-    final months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    final months = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC',
+    ];
     return months[date.month - 1];
   }
 }

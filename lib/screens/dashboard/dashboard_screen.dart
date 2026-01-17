@@ -684,7 +684,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final weeklySince = DateTime.now().subtract(const Duration(days: 7));
 
       final results = await Future.wait<dynamic>([
-        _metricsService.fetchMetrics(),
+        _metricsService.fetchMetricsWithAdditionalStats(),
         _fetchChatCount(),
         _fetchMessageCount(),
         _fetchMessageCount(after: weeklySince),
@@ -1035,9 +1035,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     // This prevents "RenderBox was not laid out" errors on subsequent edit mode entries
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Validate constraints to prevent RenderBox errors during layout
+        if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
+          return const SizedBox.shrink();
+        }
+
+        // Cache the constraints for child widgets to use
+        final screenWidth = constraints.maxWidth;
+        final screenHeight = constraints.maxHeight;
+
         return SizedBox(
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
+          width: screenWidth,
+          height: screenHeight,
           child: RepaintBoundary(
             child: AnimatedBuilder(
               animation: _flipAnimation,
@@ -1045,24 +1054,45 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 final angle = _flipAnimation.value * math.pi;
                 final isBack = angle > math.pi / 2;
 
+                // Build the content widget based on animation state
+                // Use a key to help Flutter reuse widgets without full rebuilds
+                final Widget content;
+                if (isBack) {
+                  content = Transform(
+                    key: const ValueKey('edit_transform'),
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()..rotateY(math.pi),
+                    child: _buildEditModeStable(screenWidth, screenHeight),
+                  );
+                } else {
+                  content = KeyedSubtree(
+                    key: const ValueKey('view_mode'),
+                    child: _buildViewMode(),
+                  );
+                }
+
                 return Transform(
                   alignment: Alignment.center,
                   transform: Matrix4.identity()
                     ..setEntry(3, 2, 0.001)
                     ..rotateY(angle),
-                  child: isBack
-                      ? Transform(
-                          alignment: Alignment.center,
-                          transform: Matrix4.identity()..rotateY(math.pi),
-                          child: _buildEditMode(),
-                        )
-                      : _buildViewMode(),
+                  child: content,
                 );
               },
             ),
           ),
         );
       },
+    );
+  }
+
+  /// Build edit mode with stable constraints to prevent RenderBox errors
+  /// This wrapper ensures the edit mode has fixed constraints regardless of animation state
+  Widget _buildEditModeStable(double width, double height) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: _buildEditMode(),
     );
   }
 
@@ -1112,6 +1142,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Guard against invalid constraints during animation transitions
+        if (!constraints.hasBoundedWidth || constraints.maxWidth <= 0) {
+          return const SizedBox.shrink();
+        }
+
         final isMobile = constraints.maxWidth < 600;
         final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
         final horizontalPadding = isMobile ? 12.0 : (isTablet ? 20.0 : 32.0);
@@ -1445,6 +1480,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       case DashboardWidgetType.lineChart:
         if (config.dataSourceKey == 'membersJoinedByMonth') {
           return LineChartWidget(config: config, data: metrics.membersJoinedByMonth);
+        } else if (config.dataSourceKey == 'slackEngagementTrend') {
+          return LineChartWidget(config: config, data: metrics.slackEngagementTrend);
+        } else if (config.dataSourceKey == 'socialGrowthTrend') {
+          return LineChartWidget(config: config, data: metrics.socialGrowthTrend);
+        } else if (config.dataSourceKey == 'emailCampaignPerformance') {
+          // Use existing monthly counts or create empty list
+          return LineChartWidget(config: config, data: const []);
+        }
+        // Fallback: show bar chart for distribution data
+        final data = _getDistributionData(config.dataSourceKey, metrics);
+        if (data.isNotEmpty) {
+          return BarChartWidget(config: config, data: data);
         }
         return const SizedBox.shrink();
 
@@ -1477,12 +1524,22 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       case DashboardWidgetType.progressRing:
         final current = _getValueForDataSource(config.dataSourceKey, metrics);
         int total = 114; // Default for counties
+        bool isPercentage = false;
         if (config.dataSourceKey == 'totalUniqueCongressionalDistricts') total = 8;
         if (config.dataSourceKey == 'totalUniqueHouseDistricts') total = 163;
         if (config.dataSourceKey == 'totalUniqueSenateDistricts') total = 34;
+        // Handle percentage-based metrics
+        if (config.dataSourceKey == 'socialEngagementRate' ||
+            config.dataSourceKey == 'emailOpenRate' ||
+            config.dataSourceKey == 'emailClickRate') {
+          total = 100;
+          isPercentage = true;
+        }
         return ProgressRingWidget(
           config: config,
-          current: (current is num) ? current.toInt() : 0,
+          current: isPercentage
+              ? ((current is num) ? (current * 100).toInt() : 0)
+              : ((current is num) ? current.toInt() : 0),
           total: total,
         );
 
@@ -1554,8 +1611,43 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return metrics.totalSlackMessages;
       case 'slackMessagesThisMonth':
         return metrics.slackMessagesThisMonth;
+      case 'slackMessagesThisWeek':
+        return metrics.slackMessagesThisWeek;
+      case 'slackActiveUsers':
+        return metrics.slackActiveUsers;
       case 'totalSocialImpressions':
         return metrics.totalSocialImpressions;
+      // Social Media stats
+      case 'totalFollowers':
+        return metrics.totalFollowers;
+      case 'socialMediaReach':
+        return metrics.socialMediaReach;
+      case 'socialEngagementRate':
+        return metrics.socialEngagementRate;
+      // Legislation stats
+      case 'totalBillsTracked':
+        return metrics.totalBillsTracked;
+      case 'billsSupported':
+        return metrics.billsSupported;
+      case 'billsOpposed':
+        return metrics.billsOpposed;
+      case 'priorityBills':
+        return metrics.priorityBills;
+      case 'legislativeActionsTaken':
+        return metrics.legislativeActionsTaken;
+      // Email Campaign stats
+      case 'totalEmailsSent':
+        return metrics.totalEmailsSent;
+      case 'emailOpenRate':
+        return metrics.averageOpenRate;
+      case 'emailClickRate':
+        return metrics.averageClickRate;
+      case 'emailUnsubscribeRate':
+        return 0; // Will be fetched from email_campaign_stats when available
+      case 'emailsThisMonth':
+        return metrics.totalEmailsSent; // Approximate - could be refined later
+      case 'activeCampaigns':
+        return metrics.totalCampaigns;
       case 'newMembersThisWeek':
         return metrics.newMembersThisWeek;
       case 'newMembersThisMonth':
@@ -1624,6 +1716,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           NameCount(name: '31-36', count: metrics.age31To36Count),
           NameCount(name: 'Unknown', count: metrics.ageUnknownCount),
         ];
+      // Slack Analytics distributions
+      case 'slackChannelActivity':
+        return metrics.slackChannelActivity;
+      // Social Media distributions
+      case 'followersByPlatform':
+        return metrics.followersByPlatform;
+      // Legislation distributions
+      case 'billsByPosition':
+        return metrics.billsByPosition;
+      case 'billsByPriority':
+        return metrics.billsByPriority;
+      case 'billsByCategory':
+        return metrics.billsByCategory;
       default:
         return [];
     }
@@ -2292,12 +2397,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: InkWell(
         onTap: () {
-          // If multiple widget types, show a simple dialog
-          if (supportedWidgets.length > 1) {
-            _showWidgetTypeDialog(source);
-          } else {
-            // Single type or no types - just add directly
-            _addWidget(source, defaultType);
+          try {
+            if (!mounted) return;
+            // If multiple widget types, show a simple dialog
+            if (supportedWidgets.length > 1) {
+              _showWidgetTypeDialog(source);
+            } else {
+              // Single type or no types - just add directly
+              _addWidget(source, defaultType);
+            }
+          } catch (e) {
+            debugPrint('[DashboardScreen] Error handling palette item tap: $e');
           }
         },
         borderRadius: BorderRadius.circular(4),
@@ -2342,16 +2452,32 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       key: ValueKey('draggable_palette_$sourceKey'),
       data: _PaletteDragData(source: source, type: defaultType),
       onDragStarted: () {
-        if (mounted) _isDragging = true;
+        try {
+          if (mounted) _isDragging = true;
+        } catch (e) {
+          debugPrint('[DashboardScreen] Error in palette onDragStarted: $e');
+        }
       },
       onDragEnd: (_) {
-        if (mounted) _isDragging = false;
+        try {
+          if (mounted) _isDragging = false;
+        } catch (e) {
+          debugPrint('[DashboardScreen] Error in palette onDragEnd: $e');
+        }
       },
       onDraggableCanceled: (_, __) {
-        if (mounted) _isDragging = false;
+        try {
+          if (mounted) _isDragging = false;
+        } catch (e) {
+          debugPrint('[DashboardScreen] Error in palette onDraggableCanceled: $e');
+        }
       },
       onDragCompleted: () {
-        if (mounted) _isDragging = false;
+        try {
+          if (mounted) _isDragging = false;
+        } catch (e) {
+          debugPrint('[DashboardScreen] Error in palette onDragCompleted: $e');
+        }
       },
       feedback: Material(
         elevation: 8,
@@ -2425,6 +2551,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Guard against invalid constraints during animation transitions
+        // This prevents "RenderBox was not laid out" errors
+        if (!constraints.hasBoundedWidth ||
+            !constraints.hasBoundedHeight ||
+            constraints.maxWidth <= 0 ||
+            constraints.maxHeight <= 0) {
+          return const SizedBox.shrink();
+        }
+
         final isMobile = constraints.maxWidth < 600;
         final columns = constraints.maxWidth > 800 ? 4 : 2;
         final widgetWidth = (constraints.maxWidth - 32 - (columns - 1) * 16) / columns;
@@ -2565,23 +2700,31 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             delay: const Duration(milliseconds: 150),
             hapticFeedbackOnStart: true,
             onDragStarted: () {
-              if (mounted) {
-                _isDragging = true;
+              try {
+                if (mounted) _isDragging = true;
+              } catch (e) {
+                debugPrint('[DashboardScreen] Error in onDragStarted: $e');
               }
             },
             onDragEnd: (_) {
-              if (mounted) {
-                _isDragging = false;
+              try {
+                if (mounted) _isDragging = false;
+              } catch (e) {
+                debugPrint('[DashboardScreen] Error in onDragEnd: $e');
               }
             },
             onDraggableCanceled: (_, __) {
-              if (mounted) {
-                _isDragging = false;
+              try {
+                if (mounted) _isDragging = false;
+              } catch (e) {
+                debugPrint('[DashboardScreen] Error in onDraggableCanceled: $e');
               }
             },
             onDragCompleted: () {
-              if (mounted) {
-                _isDragging = false;
+              try {
+                if (mounted) _isDragging = false;
+              } catch (e) {
+                debugPrint('[DashboardScreen] Error in onDragCompleted: $e');
               }
             },
             feedback: Material(
@@ -2671,15 +2814,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       },
       onAcceptWithDetails: (details) {
         // Ensure widget is still mounted before handling drop
-        if (!mounted) return;
-        final data = details.data;
-        if (data is _PaletteDragData) {
-          _addWidgetAtIndex(data.source, data.type, insertIndex);
-        } else if (data is _WidgetReorderData) {
-          _reorderWidgetToIndex(data.fromIndex, insertIndex);
+        // Wrap in try-catch to prevent gesture-related null errors
+        try {
+          if (!mounted) return;
+          final data = details.data;
+          if (data is _PaletteDragData) {
+            _addWidgetAtIndex(data.source, data.type, insertIndex);
+          } else if (data is _WidgetReorderData) {
+            _reorderWidgetToIndex(data.fromIndex, insertIndex);
+          }
+          // Reset drag state after drop
+          _isDragging = false;
+        } catch (e) {
+          debugPrint('[DashboardScreen] Error in onAcceptWithDetails: $e');
+          _isDragging = false;
         }
-        // Reset drag state after drop
-        _isDragging = false;
       },
       // Removed onMove/onLeave setState calls that were causing RenderBox layout errors
       // The DragTarget's candidateData already tracks hover state without needing _dragHoverIndex
@@ -2749,9 +2898,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: () {
-              // Ignore taps while dragging to prevent gesture conflicts
-              if (_isDragging || !mounted) return;
-              _showWidgetOptions(config, index);
+              // Guard against gesture callbacks during invalid states
+              // This prevents "Null check operator used on a null value" errors
+              try {
+                if (_isDragging || !mounted) return;
+                _showWidgetOptions(config, index);
+              } catch (e) {
+                debugPrint('[DashboardScreen] Error handling tap: $e');
+              }
             },
             child: Container(
               decoration: BoxDecoration(
@@ -2826,8 +2980,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () {
-                if (_isDragging || !mounted) return;
-                _showWidgetOptions(config);
+                try {
+                  if (_isDragging || !mounted) return;
+                  _showWidgetOptions(config);
+                } catch (e) {
+                  debugPrint('[DashboardScreen] Error handling settings tap: $e');
+                }
               },
               child: Container(
                 padding: const EdgeInsets.all(6),
@@ -2847,8 +3005,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () {
-                if (_isDragging || !mounted) return;
-                _removeWidget(config.id);
+                try {
+                  if (_isDragging || !mounted) return;
+                  _removeWidget(config.id);
+                } catch (e) {
+                  debugPrint('[DashboardScreen] Error handling delete tap: $e');
+                }
               },
               child: Container(
                 padding: const EdgeInsets.all(6),
@@ -3468,6 +3630,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return 'Engagement';
       case DashboardDataCategory.resources:
         return 'Resources';
+      case DashboardDataCategory.legislation:
+        return 'Legislation';
+      case DashboardDataCategory.socialMedia:
+        return 'Social Media';
+      case DashboardDataCategory.email:
+        return 'Email Campaigns';
     }
   }
 

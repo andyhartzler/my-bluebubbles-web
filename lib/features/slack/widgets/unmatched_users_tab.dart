@@ -1,10 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -13,7 +14,10 @@ import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 
 /// Tab displaying unmatched Slack users for manual matching
 class UnmatchedUsersTab extends StatefulWidget {
-  const UnmatchedUsersTab({super.key});
+  const UnmatchedUsersTab({super.key, this.highlightUserId});
+
+  /// Optional Slack user ID to highlight/scroll to
+  final String? highlightUserId;
 
   @override
   State<UnmatchedUsersTab> createState() => _UnmatchedUsersTabState();
@@ -21,6 +25,8 @@ class UnmatchedUsersTab extends StatefulWidget {
 
 class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
   final SlackManagementRepository _repository = SlackManagementRepository();
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _userKeys = {};
 
   List<SlackUnmatchedUser> _users = [];
   bool _loading = true;
@@ -31,6 +37,26 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
   void initState() {
     super.initState();
     _loadUsers();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Scroll to the highlighted user after loading
+  void _scrollToHighlightedUser() {
+    if (widget.highlightUserId == null) return;
+
+    final key = _userKeys[widget.highlightUserId];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   Future<void> _loadUsers() async {
@@ -47,10 +73,23 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
 
       if (!mounted) return;
 
+      // Create keys for each user
+      _userKeys.clear();
+      for (final user in users) {
+        _userKeys[user.slackUserId] = GlobalKey();
+      }
+
       setState(() {
         _users = users;
         _loading = false;
       });
+
+      // Scroll to highlighted user after the frame is rendered
+      if (widget.highlightUserId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToHighlightedUser();
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -83,13 +122,15 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
 
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Matched ${user.primaryLabel} to ${result.name}')),
+          SnackBar(
+            content: Text('Matched ${user.primaryLabel} to ${result.name}'),
+          ),
         );
         _loadUsers();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to match user')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to match user')));
       }
     }
   }
@@ -119,15 +160,13 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Are you sure you want to reject "${user.primaryLabel}"?',
-            ),
+            Text('Are you sure you want to reject "${user.primaryLabel}"?'),
             const SizedBox(height: 8),
             Text(
               'Rejected users are typically bots, external guests, or accounts that shouldn\'t be in the member database.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -226,10 +265,10 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
-                  ? _buildErrorState(theme)
-                  : _users.isEmpty
-                      ? _buildEmptyState(theme)
-                      : _buildUserList(),
+              ? _buildErrorState(theme)
+              : _users.isEmpty
+              ? _buildEmptyState(theme)
+              : _buildUserList(),
         ),
       ],
     );
@@ -239,11 +278,10 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.2),
-          ),
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
       ),
       child: Column(
@@ -251,22 +289,36 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
         children: [
           Row(
             children: [
-              Icon(Icons.person_search, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.person_search,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Unmatched Slack Users',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      '${_users.length} users need to be matched to members',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      '${_users.length} users need to be matched',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
                       ),
                     ),
                   ],
@@ -274,22 +326,44 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
               ),
               IconButton(
                 onPressed: _loadUsers,
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh, color: Colors.white),
                 tooltip: 'Refresh',
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             children: [
-              _buildFilterChip('All', 'all'),
-              _buildFilterChip('Has Email', 'has_email'),
-              _buildFilterChip('No Email', 'no_email'),
-              _buildFilterChip('Rejected', 'rejected'),
+              _buildBrandedFilterChip('All', 'all'),
+              _buildBrandedFilterChip('Has Email', 'has_email'),
+              _buildBrandedFilterChip('No Email', 'no_email'),
+              _buildBrandedFilterChip('Rejected', 'rejected'),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBrandedFilterChip(String label, String value) {
+    final isSelected = _filter == value;
+
+    return FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? BrandColors.unityBlue : Colors.white,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (_) => _setFilter(value),
+      backgroundColor: Colors.white.withOpacity(0.15),
+      selectedColor: Colors.white,
+      checkmarkColor: BrandColors.unityBlue,
+      side: BorderSide(
+        color: isSelected ? Colors.white : Colors.white.withOpacity(0.3),
       ),
     );
   }
@@ -311,17 +385,35 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
     return RefreshIndicator(
       onRefresh: _loadUsers,
       child: ListView.builder(
+        controller: _scrollController,
         padding: const EdgeInsets.all(16),
         itemCount: _users.length,
         itemBuilder: (context, index) {
+          final user = _users[index];
+          final isHighlighted = widget.highlightUserId == user.slackUserId;
           return _UnmatchedUserCard(
-            user: _users[index],
-            onMatch: () => _showMatchDialog(_users[index]),
-            onCreateMember: () => _showCreateMemberDialog(_users[index]),
-            onReject: () => _showRejectDialog(_users[index]),
-            onEditNotes: () => _showNotesDialog(_users[index]),
+            key: _userKeys[user.slackUserId],
+            user: user,
+            isHighlighted: isHighlighted,
+            onMatch: () => _showMatchDialog(user),
+            onCreateMember: () => _showCreateMemberDialog(user),
+            onReject: () => _showRejectDialog(user),
+            onEditNotes: () => _showNotesDialog(user),
+            onViewActivity: () => _showUserActivityDialog(user),
           );
         },
+      ),
+    );
+  }
+
+  /// Show the detailed activity dialog for an unmatched user
+  Future<void> _showUserActivityDialog(SlackUnmatchedUser user) async {
+    await showDialog(
+      context: context,
+      builder: (context) => _UnmatchedUserActivityDialog(
+        user: user,
+        repository: _repository,
+        onMatched: _loadUsers,
       ),
     );
   }
@@ -330,24 +422,35 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
     final message = _filter == 'rejected'
         ? 'No rejected users'
         : _filter == 'has_email'
-            ? 'No unmatched users with email'
-            : _filter == 'no_email'
-                ? 'No unmatched users without email'
-                : 'All Slack users are matched!';
+        ? 'No unmatched users with email'
+        : _filter == 'no_email'
+        ? 'No unmatched users without email'
+        : 'All Slack users are matched!';
 
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 64,
-            color: theme.colorScheme.primary,
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: BrandColors.success.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_circle_outline,
+              size: 64,
+              color: BrandColors.success,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
             message,
-            style: theme.textTheme.titleMedium,
+            style: const TextStyle(
+              color: BrandColors.unityBlue,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -361,16 +464,34 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: theme.colorScheme.error,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: BrandColors.error.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: BrandColors.error,
+              ),
             ),
             const SizedBox(height: 16),
-            Text(_error ?? 'An error occurred', textAlign: TextAlign.center),
+            Text(
+              _error ?? 'An error occurred',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: BrandColors.unityBlue,
+                fontSize: 15,
+              ),
+            ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: _loadUsers,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: BrandColors.unityBlue,
+                foregroundColor: Colors.white,
+              ),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),
@@ -384,11 +505,14 @@ class _UnmatchedUsersTabState extends State<UnmatchedUsersTab> {
 /// Card widget for displaying an unmatched user
 class _UnmatchedUserCard extends StatelessWidget {
   const _UnmatchedUserCard({
+    super.key,
     required this.user,
     required this.onMatch,
     required this.onCreateMember,
     required this.onReject,
     required this.onEditNotes,
+    required this.onViewActivity,
+    this.isHighlighted = false,
   });
 
   final SlackUnmatchedUser user;
@@ -396,6 +520,8 @@ class _UnmatchedUserCard extends StatelessWidget {
   final VoidCallback onCreateMember;
   final VoidCallback onReject;
   final VoidCallback onEditNotes;
+  final VoidCallback onViewActivity;
+  final bool isHighlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -404,158 +530,206 @@ class _UnmatchedUserCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  child: Text(
-                    user.primaryLabel.isNotEmpty
-                        ? user.primaryLabel[0].toUpperCase()
-                        : '?',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onPrimaryContainer,
+      elevation: isHighlighted ? 8 : 4,
+      shadowColor: BrandColors.unityBlue.withOpacity(0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: isHighlighted
+            ? const BorderSide(color: BrandColors.sunriseGold, width: 3)
+            : BorderSide.none,
+      ),
+      child: InkWell(
+        onTap: onViewActivity,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CorsAwareAvatar(
+                    imageUrl: user.avatarUrl,
+                    radius: 28,
+                    backgroundColor: BrandColors.momentumBlue.withOpacity(0.2),
+                    fallbackText: user.primaryLabel,
+                    fallbackTextColor: BrandColors.unityBlue,
+                    fallbackIconColor: BrandColors.momentumBlue,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                user.primaryLabel,
+                                style: const TextStyle(
+                                  color: BrandColors.unityBlue,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (user.manuallyRejected)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: Colors.red.withOpacity(0.3),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Rejected',
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (user.usernameDisplay != null)
+                          Text(
+                            user.usernameDisplay!,
+                            style: TextStyle(
+                              color: BrandColors.unityBlue.withOpacity(0.7),
+                              fontSize: 13,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ],
+              ),
+              const SizedBox(height: 14),
+              // Info row
+              Wrap(
+                spacing: 16,
+                runSpacing: 8,
+                children: [
+                  if (user.email != null && user.email!.isNotEmpty)
+                    _buildInfoChip(
+                      context,
+                      Icons.email,
+                      user.email!,
+                      BrandColors.success,
+                    )
+                  else
+                    _buildInfoChip(
+                      context,
+                      Icons.email_outlined,
+                      'No email',
+                      BrandColors.error,
+                    ),
+                  if (user.createdAt != null)
+                    _buildInfoChip(
+                      context,
+                      Icons.calendar_today,
+                      'Added ${dateFormat.format(user.createdAt!)}',
+                      BrandColors.unityBlue.withOpacity(0.7),
+                    ),
+                ],
+              ),
+              if (user.notes != null && user.notes!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: BrandColors.momentumBlue.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: BrandColors.momentumBlue.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              user.primaryLabel,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (user.manuallyRejected)
-                            Chip(
-                              label: const Text('Rejected'),
-                              backgroundColor: theme.colorScheme.errorContainer,
-                              labelStyle: TextStyle(
-                                color: theme.colorScheme.onErrorContainer,
-                                fontSize: 11,
-                              ),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                        ],
+                      Icon(
+                        Icons.notes,
+                        size: 16,
+                        color: BrandColors.momentumBlue,
                       ),
-                      if (user.usernameDisplay != null)
-                        Text(
-                          user.usernameDisplay!,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          user.notes!,
+                          style: TextStyle(
+                            color: BrandColors.unityBlue.withOpacity(0.8),
+                            fontSize: 13,
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 12),
-            // Info row
-            Wrap(
-              spacing: 16,
-              runSpacing: 8,
-              children: [
-                if (user.email != null && user.email!.isNotEmpty)
-                  _buildInfoChip(
-                    context,
-                    Icons.email,
-                    user.email!,
-                    Colors.green,
-                  )
-                else
-                  _buildInfoChip(
-                    context,
-                    Icons.email_outlined,
-                    'No email',
-                    theme.colorScheme.error,
-                  ),
-                if (user.createdAt != null)
-                  _buildInfoChip(
-                    context,
-                    Icons.calendar_today,
-                    'Added ${dateFormat.format(user.createdAt!)}',
-                    theme.colorScheme.onSurfaceVariant,
-                  ),
-              ],
-            ),
-            if (user.notes != null && user.notes!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
+              const SizedBox(height: 14),
+              // Action buttons
+              if (!user.manuallyRejected)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    Icon(
-                      Icons.notes,
-                      size: 16,
-                      color: theme.colorScheme.onSurfaceVariant,
+                    ElevatedButton.icon(
+                      onPressed: onMatch,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: BrandColors.unityBlue,
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: const Icon(Icons.link, size: 18),
+                      label: const Text('Match to Member'),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        user.notes!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                    OutlinedButton.icon(
+                      onPressed: onCreateMember,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: BrandColors.unityBlue,
+                        side: const BorderSide(color: BrandColors.unityBlue),
+                      ),
+                      icon: const Icon(Icons.person_add, size: 18),
+                      label: const Text('Create Member'),
+                    ),
+                    TextButton.icon(
+                      onPressed: onReject,
+                      icon: const Icon(
+                        Icons.block,
+                        size: 18,
+                        color: Colors.red,
+                      ),
+                      label: const Text(
+                        'Reject',
+                        style: TextStyle(color: Colors.red),
                       ),
                     ),
+                    IconButton(
+                      onPressed: onEditNotes,
+                      icon: Icon(
+                        Icons.edit_note,
+                        color: BrandColors.momentumBlue,
+                      ),
+                      tooltip: 'Add/Edit Notes',
+                    ),
                   ],
+                )
+              else
+                TextButton.icon(
+                  onPressed: onEditNotes,
+                  icon: Icon(Icons.edit_note, color: BrandColors.momentumBlue),
+                  label: Text(
+                    'Edit Notes',
+                    style: TextStyle(color: BrandColors.momentumBlue),
+                  ),
                 ),
-              ),
             ],
-            const SizedBox(height: 12),
-            // Action buttons
-            if (!user.manuallyRejected)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: onMatch,
-                    icon: const Icon(Icons.link, size: 18),
-                    label: const Text('Match to Member'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: onCreateMember,
-                    icon: const Icon(Icons.person_add, size: 18),
-                    label: const Text('Create Member'),
-                  ),
-                  TextButton.icon(
-                    onPressed: onReject,
-                    icon: Icon(Icons.block, size: 18, color: theme.colorScheme.error),
-                    label: Text('Reject', style: TextStyle(color: theme.colorScheme.error)),
-                  ),
-                  IconButton(
-                    onPressed: onEditNotes,
-                    icon: const Icon(Icons.edit_note),
-                    tooltip: 'Add/Edit Notes',
-                  ),
-                ],
-              )
-            else
-              TextButton.icon(
-                onPressed: onEditNotes,
-                icon: const Icon(Icons.edit_note),
-                label: const Text('Edit Notes'),
-              ),
-          ],
+          ),
         ),
       ),
     );
@@ -567,8 +741,6 @@ class _UnmatchedUserCard extends StatelessWidget {
     String label,
     Color color,
   ) {
-    final theme = Theme.of(context);
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -576,8 +748,9 @@ class _UnmatchedUserCard extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          style: TextStyle(
+            color: BrandColors.unityBlue.withOpacity(0.7),
+            fontSize: 13,
           ),
         ),
       ],
@@ -652,10 +825,7 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Match to Member',
-                style: theme.textTheme.headlineSmall,
-              ),
+              Text('Match to Member', style: theme.textTheme.headlineSmall),
               const SizedBox(height: 8),
               Text(
                 'Matching: ${widget.user.primaryLabel}',
@@ -680,35 +850,35 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
                     : _results.isEmpty
-                        ? Center(
-                            child: Text(
-                              _searchController.text.length < 2
-                                  ? 'Type to search members...'
-                                  : 'No members found',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _results.length,
-                            itemBuilder: (context, index) {
-                              final member = _results[index];
-                              return ListTile(
-                                leading: CorsAwareAvatar(
-                                  imageUrl: member.primaryProfilePhotoUrl,
-                                  radius: 20,
-                                  fallbackText: member.name,
-                                ),
-                                title: Text(member.name),
-                                subtitle: Text(
-                                  member.email ?? 'No email',
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                                onTap: () => Navigator.pop(context, member),
-                              );
-                            },
+                    ? Center(
+                        child: Text(
+                          _searchController.text.length < 2
+                              ? 'Type to search members...'
+                              : 'No members found',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _results.length,
+                        itemBuilder: (context, index) {
+                          final member = _results[index];
+                          return ListTile(
+                            leading: CorsAwareAvatar(
+                              imageUrl: member.primaryProfilePhotoUrl,
+                              radius: 20,
+                              fallbackText: member.name,
+                            ),
+                            title: Text(member.name),
+                            subtitle: Text(
+                              member.email ?? 'No email',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            onTap: () => Navigator.pop(context, member),
+                          );
+                        },
+                      ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -732,16 +902,13 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
     final initial = member.name.isNotEmpty ? member.name[0].toUpperCase() : '?';
 
     if (photoUrl == null) {
-      return CircleAvatar(
-        child: Text(initial),
-      );
+      return CircleAvatar(child: Text(initial));
     }
 
     return CachedNetworkImage(
       imageUrl: photoUrl,
-      imageBuilder: (context, imageProvider) => CircleAvatar(
-        backgroundImage: imageProvider,
-      ),
+      imageBuilder: (context, imageProvider) =>
+          CircleAvatar(backgroundImage: imageProvider),
       placeholder: (context, url) => CircleAvatar(
         child: const SizedBox(
           width: 16,
@@ -749,9 +916,7 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
       ),
-      errorWidget: (context, url, error) => CircleAvatar(
-        child: Text(initial),
-      ),
+      errorWidget: (context, url, error) => CircleAvatar(child: Text(initial)),
     );
   }
 }
@@ -815,9 +980,9 @@ class _CreateMemberDialogState extends State<_CreateMemberDialog> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
       setState(() => _saving = false);
     }
   }
@@ -935,6 +1100,643 @@ class _MemberAvatar extends StatelessWidget {
             initials,
             style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Comprehensive activity dialog showing all details and messages for an unmatched Slack user
+class _UnmatchedUserActivityDialog extends StatefulWidget {
+  const _UnmatchedUserActivityDialog({
+    required this.user,
+    required this.repository,
+    this.onMatched,
+  });
+
+  final SlackUnmatchedUser user;
+  final SlackManagementRepository repository;
+  final VoidCallback? onMatched;
+
+  @override
+  State<_UnmatchedUserActivityDialog> createState() =>
+      _UnmatchedUserActivityDialogState();
+}
+
+class _UnmatchedUserActivityDialogState
+    extends State<_UnmatchedUserActivityDialog> {
+  List<Map<String, dynamic>> _messages = [];
+  List<Map<String, dynamic>> _channelMembership = [];
+  Map<String, Map<String, String>> _userMappings = {};
+  Map<String, String> _channelNames = {};
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
+  static const int _pageSize = 20;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+
+    try {
+      final results = await Future.wait([
+        widget.repository.getMessagesBySlackUserId(
+          widget.user.slackUserId,
+          limit: _pageSize,
+        ),
+        widget.repository.getSlackUserMappings(),
+        _loadChannelMembership(),
+        _loadChannelNames(),
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages = results[0] as List<Map<String, dynamic>>;
+        _userMappings = results[1] as Map<String, Map<String, String>>;
+        _channelMembership = results[2] as List<Map<String, dynamic>>;
+        _channelNames = results[3] as Map<String, String>;
+        _offset = _messages.length;
+        _hasMore = _messages.length >= _pageSize;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadChannelMembership() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('slack_channel_membership_log')
+          .select(
+            '*, slack_channel_committee_mapping!slack_channel_id(slack_channel_name)',
+          )
+          .eq('slack_user_id', widget.user.slackUserId)
+          .order('created_at', ascending: false)
+          .limit(50);
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Error loading channel membership: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, String>> _loadChannelNames() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('slack_channel_committee_mapping')
+          .select('slack_channel_id, slack_channel_name');
+      final Map<String, String> names = {};
+      for (final item in (response as List)) {
+        final id = item['slack_channel_id']?.toString();
+        final name = item['slack_channel_name']?.toString();
+        if (id != null && name != null) {
+          names[id] = name;
+        }
+      }
+      return names;
+    } catch (e) {
+      debugPrint('Error loading channel names: $e');
+      return {};
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+
+    setState(() => _loadingMore = true);
+
+    try {
+      final newMessages = await widget.repository.getMessagesBySlackUserId(
+        widget.user.slackUserId,
+        limit: _pageSize,
+        offset: _offset,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages.addAll(newMessages);
+        _offset = _messages.length;
+        _hasMore = newMessages.length >= _pageSize;
+        _loadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
+    }
+  }
+
+  Future<void> _showMatchDialog() async {
+    final result = await showDialog<Member>(
+      context: context,
+      builder: (context) => _MemberSearchDialog(user: widget.user),
+    );
+
+    if (result != null && mounted) {
+      final success = await widget.repository.matchUserToMember(
+        slackUserId: widget.user.slackUserId,
+        memberId: result.id,
+        slackEmail: widget.user.email,
+        slackDisplayName: widget.user.displayName,
+        slackRealName: widget.user.realName,
+      );
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Matched ${widget.user.primaryLabel} to ${result.name}',
+            ),
+          ),
+        );
+        widget.onMatched?.call();
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+    final dateFormat = DateFormat('MMM d, y • h:mm a');
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 900,
+          maxHeight: screenSize.height * 0.9,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            _buildHeader(theme, dateFormat),
+            // Content
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // User Info Card
+                          _buildUserInfoCard(theme),
+                          const SizedBox(height: 20),
+                          // Channel Membership
+                          _buildChannelMembershipSection(theme, dateFormat),
+                          const SizedBox(height: 20),
+                          // Messages
+                          _buildMessagesSection(theme, dateFormat),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(ThemeData theme, DateFormat dateFormat) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      child: Row(
+        children: [
+          CorsAwareAvatar(
+            imageUrl: widget.user.avatarUrl,
+            radius: 32,
+            backgroundColor: Colors.orange.withOpacity(0.2),
+            fallbackText: widget.user.primaryLabel,
+            fallbackTextColor: Colors.orange[700]!,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.user.primaryLabel,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (widget.user.usernameDisplay != null)
+                  Text(
+                    widget.user.usernameDisplay!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Unmatched Slack User',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: _showMatchDialog,
+            icon: const Icon(Icons.link, size: 18),
+            label: const Text('Link to Member'),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserInfoCard(ThemeData theme) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'User Information',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 24,
+              runSpacing: 12,
+              children: [
+                _buildInfoItem(
+                  theme,
+                  Icons.badge,
+                  'Display Name',
+                  widget.user.displayName ?? 'Not set',
+                ),
+                _buildInfoItem(
+                  theme,
+                  Icons.person,
+                  'Real Name',
+                  widget.user.realName ?? 'Not set',
+                ),
+                _buildInfoItem(
+                  theme,
+                  Icons.email,
+                  'Email',
+                  widget.user.email ?? 'Not available',
+                ),
+                _buildInfoItem(
+                  theme,
+                  Icons.key,
+                  'Slack User ID',
+                  widget.user.slackUserId,
+                ),
+                if (widget.user.createdAt != null)
+                  _buildInfoItem(
+                    theme,
+                    Icons.calendar_today,
+                    'First Seen',
+                    DateFormat('MMM d, y').format(widget.user.createdAt!),
+                  ),
+              ],
+            ),
+            if (widget.user.notes != null && widget.user.notes!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.notes,
+                      size: 18,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.user.notes!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(
+    ThemeData theme,
+    IconData icon,
+    String label,
+    String value,
+  ) {
+    return SizedBox(
+      width: 200,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChannelMembershipSection(
+    ThemeData theme,
+    DateFormat dateFormat,
+  ) {
+    // Group by channel and get unique channels
+    final channelSet = <String>{};
+    for (final msg in _messages) {
+      final channelId = msg['slack_channel_id']?.toString();
+      if (channelId != null) channelSet.add(channelId);
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tag, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Channel Activity',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${channelSet.length} channels',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (channelSet.isEmpty)
+              Text(
+                'No channel activity recorded',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: channelSet.map((channelId) {
+                  final channelName = _channelNames[channelId] ?? channelId;
+                  return Chip(
+                    avatar: const Icon(Icons.tag, size: 16),
+                    label: Text(channelName),
+                    backgroundColor: theme.colorScheme.surfaceVariant,
+                  );
+                }).toList(),
+              ),
+            if (_channelMembership.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Membership History',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...(_channelMembership.take(10).map((change) {
+                final action = change['action']?.toString() ?? '';
+                final channelId = change['slack_channel_id']?.toString() ?? '';
+                final channelMapping =
+                    change['slack_channel_committee_mapping'];
+                String? channelName;
+                if (channelMapping is Map<String, dynamic>) {
+                  channelName = channelMapping['slack_channel_name']
+                      ?.toString();
+                }
+                channelName ??= _channelNames[channelId] ?? channelId;
+                final createdAt = change['created_at'] != null
+                    ? DateTime.tryParse(change['created_at'].toString())
+                    : null;
+                final isJoin = action == 'joined' || action == 'invited';
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isJoin ? Icons.add_circle : Icons.remove_circle,
+                        size: 16,
+                        color: isJoin ? Colors.green : Colors.red,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${action.toUpperCase()} #$channelName',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      if (createdAt != null)
+                        Text(
+                          dateFormat.format(createdAt.toLocal()),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              })),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessagesSection(ThemeData theme, DateFormat dateFormat) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.message, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Messages',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_messages.length}${_hasMore ? '+' : ''} messages',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_messages.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No messages found',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              )
+            else
+              ...(_messages.map((message) {
+                final text = message['message_text']?.toString() ?? '';
+                final channelId = message['slack_channel_id']?.toString() ?? '';
+                final channelName = _channelNames[channelId] ?? channelId;
+                final postedAt = message['posted_at'] != null
+                    ? DateTime.tryParse(message['posted_at'].toString())
+                    : null;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.tag,
+                            size: 14,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            channelName,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (postedAt != null)
+                            Text(
+                              dateFormat.format(postedAt.toLocal()),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        text.isNotEmpty ? text : '[No text content]',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontStyle: text.isEmpty ? FontStyle.italic : null,
+                          color: text.isEmpty
+                              ? theme.colorScheme.onSurfaceVariant
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              })),
+            if (_hasMore)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Center(
+                  child: OutlinedButton(
+                    onPressed: _loadingMore ? null : _loadMore,
+                    child: _loadingMore
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Load More Messages'),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

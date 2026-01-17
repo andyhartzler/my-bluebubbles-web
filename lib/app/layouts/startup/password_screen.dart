@@ -4,8 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:universal_html/html.dart' as html;
+import 'package:bluebubbles/providers/user_session_provider.dart';
+import 'package:bluebubbles/services/session_timeout_service.dart';
 
 class SupabaseAuthGate extends StatefulWidget {
   final Widget child;
@@ -16,15 +19,17 @@ class SupabaseAuthGate extends StatefulWidget {
   State<SupabaseAuthGate> createState() => _SupabaseAuthGateState();
 }
 
-class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
+class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBindingObserver {
   static const String _redirectUrl = 'https://moyd.app/auth/callback';
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
   final FocusNode _emailFocusNode = FocusNode();
   final FocusNode _codeFocusNode = FocusNode();
+  final SessionTimeoutService _sessionService = SessionTimeoutService();
 
   StreamSubscription<AuthState>? _authSubscription;
+  StreamSubscription? _visibilitySubscription;
   SupabaseClient? _client;
 
   bool _isCheckingSession = true;
@@ -32,6 +37,7 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
   bool _isSending = false;
   bool _isVerifyingCode = false;
   bool _showCodeInput = false;
+  bool _sessionExpired = false;
   String? _successMessage;
   String? _errorMessage;
   String? _emailForCode;
@@ -39,7 +45,41 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeClient();
+    _setupVisibilityListener();
+  }
+
+  /// Listen for visibility changes to check session expiration when user returns
+  void _setupVisibilityListener() {
+    if (!kIsWeb) return;
+
+    _visibilitySubscription = html.document.onVisibilityChange.listen((event) async {
+      if (html.document.visibilityState == 'visible' && _isAuthenticated) {
+        await _checkSessionExpiration();
+      }
+    });
+  }
+
+  /// Check if session has expired and sign out if needed
+  Future<void> _checkSessionExpiration() async {
+    final expired = await _sessionService.checkAndExpireSession();
+    if (expired && mounted) {
+      setState(() {
+        _isAuthenticated = false;
+        _sessionExpired = true;
+        _errorMessage = 'Your session has expired. Please sign in again.';
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Check session when app resumes
+    if (state == AppLifecycleState.resumed && _isAuthenticated) {
+      _checkSessionExpiration();
+    }
   }
 
   void _initializeClient() {
@@ -54,12 +94,16 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
     }
 
     _bootstrap();
-    _authSubscription = _client!.auth.onAuthStateChange.listen((authState) {
+    _authSubscription = _client!.auth.onAuthStateChange.listen((authState) async {
       switch (authState.event) {
         case AuthChangeEvent.signedIn:
           if (authState.session != null) {
+            // Record session start for timeout tracking
+            await _sessionService.recordSessionStart();
+            if (!mounted) return;
             setState(() {
               _isAuthenticated = true;
+              _sessionExpired = false;
               _successMessage = null;
               _errorMessage = null;
               _showCodeInput = false;
@@ -69,6 +113,15 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
           }
           break;
         case AuthChangeEvent.signedOut:
+          debugPrint('Auth state: signedOut - clearing session data');
+          // Clear session timestamps
+          await _sessionService.clearSession();
+          // Clear the user session provider state so the next user gets fresh data
+          if (mounted) {
+            context.read<UserSessionProvider>().clearSession();
+            debugPrint('UserSessionProvider cleared');
+          }
+          if (!mounted) return;
           setState(() {
             _isAuthenticated = false;
             _successMessage = null;
@@ -89,19 +142,40 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
     if (client == null) return;
 
     final currentSession = client.auth.currentSession;
-    final hasSession = currentSession != null;
+    var hasSession = currentSession != null;
 
     final errorParam = Get.parameters['error'] ?? Uri.base.queryParameters['error'];
 
     _codeController.clear();
 
+    // Check if session has expired (only for non-PWA users)
+    if (hasSession) {
+      final expired = await _sessionService.isSessionExpired();
+      if (expired) {
+        debugPrint('Session expired on bootstrap - signing out');
+        await client.auth.signOut();
+        await _sessionService.clearSession();
+        hasSession = false;
+        if (mounted) {
+          setState(() {
+            _sessionExpired = true;
+            _errorMessage = 'Your session has expired. Please sign in again.';
+          });
+        }
+      } else {
+        // Session is valid - record activity
+        await _sessionService.recordActivity();
+      }
+    }
+
+    if (!mounted) return;
     setState(() {
       _isAuthenticated = hasSession;
       _isCheckingSession = false;
       _showCodeInput = false;
       _isVerifyingCode = false;
       _emailForCode = null;
-      if (!hasSession && errorParam != null) {
+      if (!hasSession && errorParam != null && !_sessionExpired) {
         _errorMessage = _mapErrorMessage(errorParam);
       }
     });
@@ -117,7 +191,9 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSubscription?.cancel();
+    _visibilitySubscription?.cancel();
     _emailController.dispose();
     _codeController.dispose();
     _emailFocusNode.dispose();
@@ -175,16 +251,22 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
       String errorMessage;
 
       final message = error.message;
-      if (message.contains('Signups not allowed')) {
+      // Check if the error contains a structured message from our edge function
+      // Pass through specific messages from the edge function
+      if (message.contains('not currently a member of any committees') ||
+          message.contains('not currently a member of any active committees') ||
+          message.contains('does not have workspace access enabled') ||
+          message.contains('do not have workspace access enabled') ||
+          message.contains('not associated with a Missouri Young Democrats member')) {
+        // Use the error message directly from the edge function
+        errorMessage = message;
+      } else if (message.contains('Signups not allowed')) {
         errorMessage =
-            'This email is not registered in our system. If you believe this is an error, please contact info@moyoungdemocrats.org';
+            'This email is not associated with a Missouri Young Democrats member. If you believe this is an error, please contact info@moyoungdemocrats.org';
       } else if (message.contains('403') || message.contains('unexpected_failure')) {
+        // Generic 403 - use a general message
         errorMessage =
-            'This email is not associated with a member of the executive committee of the Missouri Young Democrats. If this is a mistake, please be sure to use the email you used when you filled out our Interest Form. For further help, contact info@moyoungdemocrats.org';
-      } else if (message.contains('not found in our system')) {
-        errorMessage = message;
-      } else if (message.contains('executive committee')) {
-        errorMessage = message;
+            'Unable to verify access for this email. If you believe this is an error, please contact info@moyoungdemocrats.org';
       } else {
         errorMessage = _mapErrorMessage(message);
       }
@@ -293,30 +375,30 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> {
     final decoded = Uri.decodeComponent(raw).trim();
     final normalized = decoded.toLowerCase();
 
+    // Pass through specific messages from our edge function
+    if (normalized.contains('not currently a member of any committees') ||
+        normalized.contains('not currently a member of any active committees') ||
+        normalized.contains('does not have workspace access enabled') ||
+        normalized.contains('do not have workspace access enabled') ||
+        normalized.contains('not associated with a missouri young democrats member')) {
+      return decoded;
+    }
+
     if (normalized.contains('unexpected_failure') || normalized.contains('403')) {
-      return 'This email is not associated with a member of the executive committee of the Missouri Young Democrats. If this is a mistake, please be sure to use the email you used when you filled out our Interest Form. For further help, contact info@moyoungdemocrats.org';
+      return 'Unable to verify access for this email. If you believe this is an error, please contact info@moyoungdemocrats.org';
     }
 
     if (normalized.contains('signups not allowed') ||
         (normalized.contains('signup') && normalized.contains('not allowed'))) {
-      return 'This email is not registered in our system. If you believe this is an error, please contact info@moyoungdemocrats.org';
+      return 'This email is not associated with a Missouri Young Democrats member. If you believe this is an error, please contact info@moyoungdemocrats.org';
     }
 
     if (normalized.contains('not found in our system') || normalized.contains('email not found')) {
-      return 'This email is not registered as an executive committee member. For assistance, contact info@moyoungdemocrats.org';
-    }
-
-    if (normalized.contains('executive committee') ||
-        (normalized.contains('executive') && normalized.contains('only'))) {
-      return decoded;
+      return 'This email is not associated with a Missouri Young Democrats member. If you believe this is an error, please contact info@moyoungdemocrats.org';
     }
 
     if (normalized.contains('unknown_member') || normalized.contains('member_not_found')) {
-      return 'We couldn\'t find your email in the Missouri Young Democrats roster.';
-    }
-
-    if (normalized.contains('non_executive') || normalized.contains('not_executive')) {
-      return 'This dashboard is reserved for executive leadership. Please contact your team lead for access.';
+      return 'This email is not associated with a Missouri Young Democrats member. If you believe this is an error, please contact info@moyoungdemocrats.org';
     }
 
     if (normalized.contains('auth_failed') || normalized.contains('expired')) {

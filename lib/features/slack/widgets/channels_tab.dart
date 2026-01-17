@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/slack/models/slack_channel.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/features/slack/widgets/channel_sidebar.dart';
@@ -88,7 +89,9 @@ class _ChannelsTabState extends State<ChannelsTab> {
 
       for (int i = 0; i < _priorityChannelOrder.length; i++) {
         final priority = _priorityChannelOrder[i];
-        if (aName == priority || aName.replaceAll('-', '').replaceAll('_', '') == priority.replaceAll('-', '').replaceAll('_', '')) {
+        if (aName == priority ||
+            aName.replaceAll('-', '').replaceAll('_', '') ==
+                priority.replaceAll('-', '').replaceAll('_', '')) {
           aPriority = i;
           break;
         }
@@ -96,7 +99,9 @@ class _ChannelsTabState extends State<ChannelsTab> {
 
       for (int i = 0; i < _priorityChannelOrder.length; i++) {
         final priority = _priorityChannelOrder[i];
-        if (bName == priority || bName.replaceAll('-', '').replaceAll('_', '') == priority.replaceAll('-', '').replaceAll('_', '')) {
+        if (bName == priority ||
+            bName.replaceAll('-', '').replaceAll('_', '') ==
+                priority.replaceAll('-', '').replaceAll('_', '')) {
           bPriority = i;
           break;
         }
@@ -167,7 +172,8 @@ class _ChannelsTabState extends State<ChannelsTab> {
   }
 
   Future<void> _loadMemberData(
-      Map<String, Map<String, String>> userMappings) async {
+    Map<String, Map<String, String>> userMappings,
+  ) async {
     final memberIds = <String>{};
     for (final mapping in userMappings.values) {
       final memberId = mapping['member_id'];
@@ -179,8 +185,9 @@ class _ChannelsTabState extends State<ChannelsTab> {
     if (memberIds.isEmpty) return;
 
     try {
-      final futures =
-          memberIds.map((id) => _memberRepository.getMemberById(id));
+      final futures = memberIds.map(
+        (id) => _memberRepository.getMemberById(id),
+      );
       final members = await Future.wait(futures);
 
       for (final member in members) {
@@ -207,8 +214,11 @@ class _ChannelsTabState extends State<ChannelsTab> {
 
     try {
       final results = await Future.wait([
-        _repository.getChannelMessages(channel.slackChannelId,
-            limit: _pageSize, offset: 0),
+        _repository.getChannelMessages(
+          channel.slackChannelId,
+          limit: _pageSize,
+          offset: 0,
+        ),
         _repository.getArchiveStatus(channel.slackChannelId),
       ]);
 
@@ -257,9 +267,9 @@ class _ChannelsTabState extends State<ChannelsTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingMore = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load more: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load more: $e')));
     }
   }
 
@@ -305,8 +315,9 @@ class _ChannelsTabState extends State<ChannelsTab> {
     setState(() => _syncing = true);
 
     try {
-      final success =
-          await _repository.triggerArchiveSync(_selectedChannel!.slackChannelId);
+      final success = await _repository.triggerArchiveSync(
+        _selectedChannel!.slackChannelId,
+      );
 
       if (!mounted) return;
 
@@ -331,9 +342,8 @@ class _ChannelsTabState extends State<ChannelsTab> {
   void _navigateToMember(Member member) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (context) => TitleBarWrapper(
-          child: MemberDetailScreen(member: member),
-        ),
+        builder: (context) =>
+            TitleBarWrapper(child: MemberDetailScreen(member: member)),
       ),
     );
   }
@@ -360,14 +370,21 @@ class _ChannelsTabState extends State<ChannelsTab> {
   Widget _buildDesktopLayout() {
     return Row(
       children: [
-        // Channel sidebar
-        SizedBox(
+        // Channel sidebar with brand styling
+        Container(
           width: 280,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: BrandColors.tileGradient,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
           child: Column(
             children: [
               _buildSidebarHeader(),
               Expanded(
-                child: ChannelSidebar(
+                child: _BrandedChannelSidebar(
                   channels: _channels,
                   selectedChannelId: _selectedChannel?.slackChannelId,
                   onChannelSelected: _selectChannel,
@@ -376,7 +393,6 @@ class _ChannelsTabState extends State<ChannelsTab> {
             ],
           ),
         ),
-        const VerticalDivider(width: 1),
         // Message content
         Expanded(
           child: _selectedChannel == null
@@ -390,10 +406,17 @@ class _ChannelsTabState extends State<ChannelsTab> {
   Widget _buildMobileLayout() {
     return Column(
       children: [
-        // Channel dropdown
-        Padding(
+        // Channel dropdown with brand styling
+        Container(
           padding: const EdgeInsets.all(12),
-          child: ChannelDropdown(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: BrandColors.tileGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: _BrandedChannelDropdown(
             channels: _channels,
             selectedChannel: _selectedChannel,
             onChannelSelected: _selectChannel,
@@ -410,32 +433,45 @@ class _ChannelsTabState extends State<ChannelsTab> {
   }
 
   Widget _buildSidebarHeader() {
-    final theme = Theme.of(context);
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.2),
-          ),
+          bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
         ),
       ),
       child: Row(
         children: [
-          Icon(Icons.tag, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
-          Text(
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.tag, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          const Text(
             'Channels',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const Spacer(),
-          Text(
-            '${_channels.length}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${_channels.length}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -450,16 +486,9 @@ class _ChannelsTabState extends State<ChannelsTab> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.chat_bubble_outline,
-            size: 64,
-            color: theme.disabledColor,
-          ),
+          Icon(Icons.chat_bubble_outline, size: 64, color: theme.disabledColor),
           const SizedBox(height: 16),
-          Text(
-            'Select a channel',
-            style: theme.textTheme.titleMedium,
-          ),
+          Text('Select a channel', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(
             'Choose a channel from the list to view messages',
@@ -486,59 +515,68 @@ class _ChannelsTabState extends State<ChannelsTab> {
           child: _loadingMessages
               ? const Center(child: CircularProgressIndicator())
               : _error != null
-                  ? _buildErrorState()
-                  : _messages.isEmpty
-                      ? _buildEmptyMessages()
-                      : _buildMessageList(),
+              ? _buildErrorState()
+              : _messages.isEmpty
+              ? _buildEmptyMessages()
+              : _buildMessageList(),
         ),
       ],
     );
   }
 
   Widget _buildChannelHeader() {
-    final theme = Theme.of(context);
     final archiveDateFormat = DateFormat('MMM d, y • h:mm a');
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.2),
-          ),
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
       ),
       child: Row(
         children: [
-          Icon(Icons.tag, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.tag, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _selectedChannel!.slackChannelName,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                  '#${_selectedChannel!.slackChannelName}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 Row(
                   children: [
                     Text(
                       _selectedChannel!.committeeName,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
                       ),
                     ),
                     if (_archiveStatus != null) ...[
                       const SizedBox(width: 8),
-                      Text('•', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                      const Text('•', style: TextStyle(color: Colors.white54)),
                       const SizedBox(width: 8),
                       Text(
-                        '${_archiveStatus!.totalMessagesArchived} messages archived',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        '${_archiveStatus!.totalMessagesArchived} messages',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
                         ),
                       ),
                     ],
@@ -548,26 +586,41 @@ class _ChannelsTabState extends State<ChannelsTab> {
             ),
           ),
           if (_archiveStatus?.lastArchiveDate != null)
-            Tooltip(
-              message:
-                  'Last archived: ${archiveDateFormat.format(_archiveStatus!.lastArchiveDate!.toLocal())}',
-              child: Chip(
-                avatar: const Icon(Icons.archive, size: 16),
-                label: Text(
-                  archiveDateFormat.format(_archiveStatus!.lastArchiveDate!.toLocal()),
-                  style: theme.textTheme.bodySmall,
-                ),
-                visualDensity: VisualDensity.compact,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.archive, size: 14, color: Colors.white70),
+                  const SizedBox(width: 6),
+                  Text(
+                    DateFormat(
+                      'MMM d',
+                    ).format(_archiveStatus!.lastArchiveDate!.toLocal()),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ],
               ),
             ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           ElevatedButton.icon(
             onPressed: _syncing ? null : _triggerSync,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: BrandColors.sunriseGold,
+              foregroundColor: BrandColors.unityBlue,
+            ),
             icon: _syncing
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: BrandColors.unityBlue,
+                    ),
                   )
                 : const Icon(Icons.sync, size: 18),
             label: Text(_syncing ? 'Syncing...' : 'Sync'),
@@ -578,26 +631,27 @@ class _ChannelsTabState extends State<ChannelsTab> {
   }
 
   Widget _buildSearchBar() {
-    final theme = Theme.of(context);
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.2),
+        color: Colors.white.withOpacity(0.95),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
-        ),
+        ],
       ),
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
           hintText: 'Search messages...',
-          prefixIcon: const Icon(Icons.search),
+          hintStyle: TextStyle(color: BrandColors.unityBlue.withOpacity(0.5)),
+          prefixIcon: Icon(Icons.search, color: BrandColors.momentumBlue),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear),
+                  icon: Icon(Icons.clear, color: BrandColors.unityBlue),
                   onPressed: () {
                     _searchController.clear();
                     _search('');
@@ -605,11 +659,26 @@ class _ChannelsTabState extends State<ChannelsTab> {
                 )
               : null,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(
+              color: BrandColors.momentumBlue.withOpacity(0.3),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(
+              color: BrandColors.momentumBlue.withOpacity(0.3),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(
+              color: BrandColors.momentumBlue,
+              width: 2,
+            ),
           ),
           filled: true,
-          fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+          fillColor: BrandColors.momentumBlue.withOpacity(0.05),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         ),
         onSubmitted: _search,
@@ -665,14 +734,12 @@ class _ChannelsTabState extends State<ChannelsTab> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 64,
-            color: theme.disabledColor,
-          ),
+          Icon(Icons.inbox_outlined, size: 64, color: theme.disabledColor),
           const SizedBox(height: 16),
           Text(
-            _searchQuery.isNotEmpty ? 'No matching messages' : 'No messages yet',
+            _searchQuery.isNotEmpty
+                ? 'No matching messages'
+                : 'No messages yet',
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
@@ -707,11 +774,7 @@ class _ChannelsTabState extends State<ChannelsTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: theme.colorScheme.error,
-            ),
+            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
             const SizedBox(height: 16),
             Text(
               _error ?? 'An error occurred',
@@ -727,6 +790,209 @@ class _ChannelsTabState extends State<ChannelsTab> {
               label: const Text('Retry'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Branded channel sidebar with white text on gradient background
+class _BrandedChannelSidebar extends StatelessWidget {
+  const _BrandedChannelSidebar({
+    required this.channels,
+    required this.selectedChannelId,
+    required this.onChannelSelected,
+  });
+
+  final List<SlackChannel> channels;
+  final String? selectedChannelId;
+  final void Function(SlackChannel channel) onChannelSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (channels.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.tag, size: 48, color: Colors.white.withOpacity(0.5)),
+              const SizedBox(height: 12),
+              Text(
+                'No channels found',
+                style: TextStyle(color: Colors.white.withOpacity(0.7)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: channels.length,
+      itemBuilder: (context, index) {
+        final channel = channels[index];
+        final isSelected = channel.slackChannelId == selectedChannelId;
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? Colors.white.withOpacity(0.2)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: ListTile(
+            dense: true,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            leading: Icon(
+              Icons.tag,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.white70,
+            ),
+            title: Text(
+              channel.slackChannelName,
+              style: TextStyle(
+                color: isSelected
+                    ? Colors.white
+                    : Colors.white.withOpacity(0.9),
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 14,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              channel.committeeName,
+              style: TextStyle(
+                color: isSelected
+                    ? Colors.white.withOpacity(0.7)
+                    : Colors.white.withOpacity(0.5),
+                fontSize: 11,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            onTap: () => onChannelSelected(channel),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Branded channel dropdown for mobile
+class _BrandedChannelDropdown extends StatelessWidget {
+  const _BrandedChannelDropdown({
+    required this.channels,
+    required this.selectedChannel,
+    required this.onChannelSelected,
+  });
+
+  final List<SlackChannel> channels;
+  final SlackChannel? selectedChannel;
+  final void Function(SlackChannel channel) onChannelSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (channels.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.warning_amber, color: BrandColors.sunriseGold, size: 20),
+            const SizedBox(width: 12),
+            const Text(
+              'No channels available',
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: selectedChannel?.slackChannelId,
+          isExpanded: true,
+          dropdownColor: BrandColors.unityBlue,
+          icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+          items: channels.map((channel) {
+            return DropdownMenuItem<String>(
+              value: channel.slackChannelId,
+              child: Row(
+                children: [
+                  const Icon(Icons.tag, size: 18, color: Colors.white70),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          channel.slackChannelName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          channel.committeeName,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 11,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+          selectedItemBuilder: (context) {
+            return channels.map((channel) {
+              return Row(
+                children: [
+                  const Icon(Icons.tag, size: 18, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '#${channel.slackChannelName}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              );
+            }).toList();
+          },
+          onChanged: (channelId) {
+            if (channelId != null) {
+              final channel = channels.firstWhere(
+                (c) => c.slackChannelId == channelId,
+              );
+              onChannelSelected(channel);
+            }
+          },
         ),
       ),
     );

@@ -22,6 +22,7 @@ import 'package:bluebubbles/features/committees/legislation_tracker/screens/legi
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/legislation_provider.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/bill_search_provider.dart';
 import 'package:bluebubbles/features/committees/screens/committee_workspace_settings_screen.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
   final Committee committee;
@@ -29,7 +30,8 @@ class CommitteeWorkspaceScreen extends StatefulWidget {
   const CommitteeWorkspaceScreen({super.key, required this.committee});
 
   @override
-  State<CommitteeWorkspaceScreen> createState() => _CommitteeWorkspaceScreenState();
+  State<CommitteeWorkspaceScreen> createState() =>
+      _CommitteeWorkspaceScreenState();
 }
 
 class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
@@ -44,8 +46,15 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
 
   Committee get committee => widget.committee;
 
-  // Board tab is at index 6 (after Overview, Members, Slack, Email, Messages, Meetings)
-  bool get _isOnBoardTab => _currentTabIndex == 6;
+  // Board tab detection (dynamic based on tab list)
+  bool get _isOnBoardTab =>
+      _tabs.length > _currentTabIndex &&
+      _tabs[_currentTabIndex].label == 'Board';
+
+  // Legislation tab detection (dynamic based on tab list)
+  bool get _isOnLegislationTab =>
+      _tabs.length > _currentTabIndex &&
+      _tabs[_currentTabIndex].label == 'Legislation';
 
   void _setCanvasFullscreen(bool fullscreen) {
     setState(() {
@@ -128,60 +137,71 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         icon: Icons.how_to_vote_outlined,
         builder: () => CommitteeVotesTab(
           committee: committee,
-          onNavigateToEmail: () => _navigateToTab(3),  // Email tab is at index 3
-          onNavigateToMessages: () => _navigateToTab(4),  // Messages tab is at index 4
+          onNavigateToEmail: () => _navigateToTab(3), // Email tab is at index 3
+          onNavigateToMessages: () =>
+              _navigateToTab(4), // Messages tab is at index 4
         ),
       ),
     ];
 
     // Add committee-specific tabs
     if (committee.hasDonorsTab) {
-      tabs.add(_TabDefinition(
-        label: 'Donors',
-        icon: Icons.volunteer_activism_outlined,
-        builder: () => const CommitteeDonorsTab(),
-      ));
+      tabs.add(
+        _TabDefinition(
+          label: 'Donors',
+          icon: Icons.volunteer_activism_outlined,
+          builder: () => const CommitteeDonorsTab(),
+        ),
+      );
     }
 
     if (committee.hasChaptersTab) {
-      tabs.add(_TabDefinition(
-        label: 'Chapters',
-        icon: Icons.account_tree_outlined,
-        builder: () => CommitteeChaptersTab(
-          chapterTypeFilter: committee.chapterTypeFilter,
+      tabs.add(
+        _TabDefinition(
+          label: 'Chapters',
+          icon: Icons.account_tree_outlined,
+          builder: () => CommitteeChaptersTab(
+            chapterTypeFilter: committee.chapterTypeFilter,
+          ),
         ),
-      ));
+      );
     }
 
     if (committee.hasCampaignsTab) {
-      tabs.add(_TabDefinition(
-        label: 'Campaigns',
-        icon: Icons.campaign_outlined,
-        builder: () => const CommitteeCampaignsTab(),
-      ));
+      tabs.add(
+        _TabDefinition(
+          label: 'Campaigns',
+          icon: Icons.campaign_outlined,
+          builder: () => const CommitteeCampaignsTab(),
+        ),
+      );
     }
 
     if (committee.hasLegislationTab) {
-      tabs.add(_TabDefinition(
-        label: 'Legislation',
-        icon: Icons.gavel_outlined,
-        builder: () => MultiProvider(
-          providers: [
-            ChangeNotifierProvider(create: (_) => LegislationProvider()),
-            ChangeNotifierProvider(create: (_) => BillSearchProvider()),
-          ],
-          child: LegislationTrackerScreen(committeeId: committee.id),
+      tabs.add(
+        _TabDefinition(
+          label: 'Legislation',
+          icon: Icons.gavel_outlined,
+          builder: () => MultiProvider(
+            providers: [
+              ChangeNotifierProvider(create: (_) => LegislationProvider()),
+              ChangeNotifierProvider(create: (_) => BillSearchProvider()),
+            ],
+            child: LegislationTrackerScreen(committeeId: committee.id),
+          ),
         ),
-      ));
+      );
     }
 
     // Add Social Media Analytics tab for Communications committee
     if (committee.id == 'Communications') {
-      tabs.add(_TabDefinition(
-        label: 'Social Media',
-        icon: Icons.analytics_outlined,
-        builder: () => SocialMediaAnalyticsTab(committee: committee),
-      ));
+      tabs.add(
+        _TabDefinition(
+          label: 'Social Media',
+          icon: Icons.analytics_outlined,
+          builder: () => SocialMediaAnalyticsTab(committee: committee),
+        ),
+      );
     }
 
     return tabs;
@@ -263,22 +283,30 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                       child: Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
                             onPressed: () => Navigator.of(context).pop(),
                           ),
                           CircleAvatar(
                             radius: 18,
                             backgroundColor: Colors.white.withOpacity(0.2),
-                            child: Icon(committee.icon, color: Colors.white, size: 18),
+                            child: Icon(
+                              committee.icon,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               committee.displayName,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -290,10 +318,14 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                     TabBar(
                       controller: _tabController,
                       isScrollable: true,
-                      tabs: _tabs.map((tab) => Tab(
-                        icon: tab.iconWidget ?? Icon(tab.icon),
-                        text: tab.label,
-                      )).toList(),
+                      tabs: _tabs
+                          .map(
+                            (tab) => Tab(
+                              icon: tab.iconWidget ?? Icon(tab.icon),
+                              text: tab.label,
+                            ),
+                          )
+                          .toList(),
                     ),
                   ],
                 ),
@@ -312,45 +344,174 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
       );
     }
 
+    // Legislation tab: special layout with pinned sub-tabs and collapsible parent header
+    if (_isOnLegislationTab) {
+      return _buildLegislationLayout(context);
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isVerySmall = screenWidth < 400;
 
-    // Mobile: use scroll-aware collapsing header
-    if (isMobile) {
-      return _buildMobileLayout(context, isVerySmall);
-    }
+    // Use unified layout matching member workspace style
+    return Scaffold(
+      body: Stack(
+        children: [
+          // Gradient background (not shown on Board tab)
+          if (!_isOnBoardTab)
+            Positioned.fill(
+              child: Image.asset(
+                BrandColors.backgroundAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        committee.primaryColor,
+                        committee.secondaryColor,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (!_isOnBoardTab)
+            Positioned.fill(
+              child: Container(
+                color: Colors.white.withOpacity(
+                  BrandColors.backgroundOverlayOpacity,
+                ),
+              ),
+            ),
+          // Content
+          Column(
+            children: [
+              // Fixed header with tabs
+              _buildFixedHeader(context, isMobile, isVerySmall),
+              // Tab content
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: _tabs.map((tab) => tab.builder()).toList(),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-    // Desktop: use standard NestedScrollView
+  /// Special layout for the Legislation tab:
+  /// - Committee header collapses on scroll and only shows when at the very top
+  /// - Legislation sub-tabs (Overview, All Bills, Legislators) stay pinned
+  Widget _buildLegislationLayout(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isVerySmall = screenWidth < 400;
+
     return Scaffold(
       body: NestedScrollView(
+        floatHeaderSlivers: false, // Don't float - only show at very top
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
+            // Collapsible committee header - only visible when scrolled to top
             SliverAppBar(
-              expandedHeight: 200,
-              floating: false,
-              pinned: true,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
-                tooltip: 'Back to committees',
-              ),
+              expandedHeight: isMobile ? 100 : 140,
+              floating: false, // Don't float back on scroll up
+              pinned: false, // Don't pin - allow full collapse
+              snap: false, // Don't snap - must scroll fully to top
+              automaticallyImplyLeading: false,
               flexibleSpace: FlexibleSpaceBar(
-                background: _buildHeader(context),
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        committee.primaryColor,
+                        committee.secondaryColor,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(4, 4, 12, isMobile ? 8 : 16),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          const SizedBox(width: 4),
+                          CircleAvatar(
+                            radius: isMobile ? 14 : 18,
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            child: Icon(
+                              committee.icon,
+                              color: Colors.white,
+                              size: isMobile ? 14 : 18,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              committee.displayName,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              bottom: TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-                tabs: _tabs.map((tab) => Tab(
-                  icon: tab.iconWidget ?? Icon(tab.icon, size: 24),
-                  text: tab.label,
-                  iconMargin: const EdgeInsets.only(bottom: 4),
-                )).toList(),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: Container(
+                  color: committee.primaryColor,
+                  child: TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    labelPadding: EdgeInsets.symmetric(
+                      horizontal: isVerySmall ? 6 : 10,
+                    ),
+                    indicatorWeight: 3,
+                    indicatorColor: Colors.white,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white70,
+                    tabs: _tabs
+                        .map(
+                          (tab) => Tab(
+                            icon: tab.iconWidget ?? Icon(tab.icon, size: 18),
+                            text: isVerySmall ? null : tab.label,
+                            iconMargin: EdgeInsets.only(
+                              bottom: isVerySmall ? 0 : 2,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
               ),
             ),
           ];
         },
+        // The legislation tab content handles its own tabs internally
         body: TabBarView(
           controller: _tabController,
           physics: const NeverScrollableScrollPhysics(),
@@ -387,7 +548,10 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                     child: Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
                           onPressed: () => Navigator.of(context).pop(),
                           visualDensity: VisualDensity.compact,
                         ),
@@ -395,7 +559,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                         CircleAvatar(
                           radius: 14,
                           backgroundColor: Colors.white.withOpacity(0.2),
-                          child: Icon(committee.icon, color: Colors.white, size: 14),
+                          child: Icon(
+                            committee.icon,
+                            color: Colors.white,
+                            size: 14,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -411,14 +579,21 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                         ),
                         // Settings button for mobile
                         PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+                          icon: const Icon(
+                            Icons.more_vert,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                           padding: EdgeInsets.zero,
                           offset: const Offset(0, 40),
                           onSelected: (value) {
                             if (value == 'workspace_settings') {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => CommitteeWorkspaceSettingsScreen(committee: committee),
+                                  builder: (_) =>
+                                      CommitteeWorkspaceSettingsScreen(
+                                        committee: committee,
+                                      ),
                                 ),
                               );
                             }
@@ -441,16 +616,24 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                   TabBar(
                     controller: _tabController,
                     isScrollable: true,
-                    labelPadding: EdgeInsets.symmetric(horizontal: isVerySmall ? 6 : 10),
+                    labelPadding: EdgeInsets.symmetric(
+                      horizontal: isVerySmall ? 6 : 10,
+                    ),
                     indicatorWeight: 3,
                     indicatorColor: Colors.white,
                     labelColor: Colors.white,
                     unselectedLabelColor: Colors.white70,
-                    tabs: _tabs.map((tab) => Tab(
-                      icon: tab.iconWidget ?? Icon(tab.icon, size: 18),
-                      text: isVerySmall ? null : tab.label,
-                      iconMargin: EdgeInsets.only(bottom: isVerySmall ? 0 : 2),
-                    )).toList(),
+                    tabs: _tabs
+                        .map(
+                          (tab) => Tab(
+                            icon: tab.iconWidget ?? Icon(tab.icon, size: 18),
+                            text: isVerySmall ? null : tab.label,
+                            iconMargin: EdgeInsets.only(
+                              bottom: isVerySmall ? 0 : 2,
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
               ),
@@ -465,6 +648,264 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Fixed header matching the member workspace styling
+  Widget _buildFixedHeader(
+    BuildContext context,
+    bool isMobile,
+    bool isVerySmall,
+  ) {
+    final theme = Theme.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [committee.primaryColor, committee.secondaryColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header row with back button, icon, and title
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 4 : 16,
+                isMobile ? 8 : 16,
+                16,
+                isMobile ? 4 : 8,
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  const SizedBox(width: 8),
+                  CircleAvatar(
+                    radius: isMobile ? 16 : 20,
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    child: Icon(
+                      committee.icon,
+                      color: Colors.white,
+                      size: isMobile ? 16 : 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          committee.displayName,
+                          style:
+                              (isMobile
+                                      ? theme.textTheme.titleSmall
+                                      : theme.textTheme.titleMedium)
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (!isMobile && _leaders.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Led by ${_leaders.map((l) => l.name.split(' ').first).join(' & ')}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white.withOpacity(0.8),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (!isMobile) ...[
+                    const SizedBox(width: 16),
+                    _buildLeadershipChips(),
+                    const SizedBox(width: 12),
+                    _buildSettingsButton(context),
+                  ] else ...[
+                    // Settings button for mobile
+                    PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.more_vert,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      padding: EdgeInsets.zero,
+                      offset: const Offset(0, 40),
+                      onSelected: (value) {
+                        if (value == 'workspace_settings') {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CommitteeWorkspaceSettingsScreen(
+                                committee: committee,
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'workspace_settings',
+                          child: ListTile(
+                            leading: Icon(Icons.settings_outlined),
+                            title: Text('Workspace Settings'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Tab bar
+            TabBar(
+              controller: _tabController,
+              isScrollable: true,
+              labelPadding: EdgeInsets.symmetric(
+                horizontal: isVerySmall ? 8 : 12,
+              ),
+              indicatorWeight: 3,
+              indicatorColor: Colors.white,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              tabs: _tabs
+                  .map(
+                    (tab) => Tab(
+                      icon:
+                          tab.iconWidget ??
+                          Icon(tab.icon, size: isMobile ? 18 : 24),
+                      text: isVerySmall ? null : tab.label,
+                      iconMargin: EdgeInsets.only(bottom: isVerySmall ? 0 : 4),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Leadership chips for desktop view
+  Widget _buildLeadershipChips() {
+    if (_loadingLeaders) {
+      return SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(
+            Colors.white.withOpacity(0.7),
+          ),
+        ),
+      );
+    }
+
+    if (_leaders.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Sort leaders: Chairs first, then Co-Chairs
+    final sortedLeaders = List<CommitteeLeader>.from(_leaders)
+      ..sort((a, b) {
+        final aTitle = a.title?.toLowerCase() ?? '';
+        final bTitle = b.title?.toLowerCase() ?? '';
+        final aIsCoChair =
+            aTitle.contains('co-chair') || aTitle.contains('vice');
+        final bIsCoChair =
+            bTitle.contains('co-chair') || bTitle.contains('vice');
+        if (aIsCoChair != bIsCoChair) {
+          return aIsCoChair ? 1 : -1;
+        }
+        return a.name.compareTo(b.name);
+      });
+
+    // Show up to 2 leaders as chips
+    final displayLeaders = sortedLeaders.take(2).toList();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: displayLeaders
+          .map(
+            (leader) => Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: _buildLeaderChip(leader),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildLeaderChip(CommitteeLeader leader) {
+    return InkWell(
+      onTap: () {
+        if (leader.memberId != null) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MemberDetailScreen(memberId: leader.memberId!),
+            ),
+          );
+        }
+      },
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CorsAwareAvatar(
+              imageUrl: leader.photoUrl,
+              radius: 14,
+              backgroundColor: Colors.white.withOpacity(0.3),
+              fallbackText: leader.name,
+              fallbackIconColor: Colors.white,
+              fallbackTextColor: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  leader.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (leader.title != null)
+                  Text(
+                    leader.title!,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 10,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -512,10 +953,14 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                     Expanded(
                       child: Text(
                         committee.displayName,
-                        style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.headlineSmall)?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style:
+                            (isMobile
+                                    ? theme.textTheme.titleMedium
+                                    : theme.textTheme.headlineSmall)
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -549,7 +994,8 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         if (value == 'workspace_settings') {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => CommitteeWorkspaceSettingsScreen(committee: committee),
+              builder: (_) =>
+                  CommitteeWorkspaceSettingsScreen(committee: committee),
             ),
           );
         }
@@ -583,7 +1029,9 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         height: 16,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.7)),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            Colors.white.withOpacity(0.7),
+          ),
         ),
       );
     }
@@ -599,8 +1047,10 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         final bTitle = b.title?.toLowerCase() ?? '';
 
         // Determine if each is a chair or co-chair
-        final aIsCoChair = aTitle.contains('co-chair') || aTitle.contains('vice');
-        final bIsCoChair = bTitle.contains('co-chair') || bTitle.contains('vice');
+        final aIsCoChair =
+            aTitle.contains('co-chair') || aTitle.contains('vice');
+        final bIsCoChair =
+            bTitle.contains('co-chair') || bTitle.contains('vice');
 
         // Chairs come before Co-Chairs
         if (aIsCoChair != bIsCoChair) {
@@ -615,10 +1065,14 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.end,
-      children: sortedLeaders.map((leader) => Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: _buildLeaderChip(leader),
-      )).toList(),
+      children: sortedLeaders
+          .map(
+            (leader) => Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: _buildLeaderChip(leader),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -679,9 +1133,7 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
     final member = await _repository.getMemberById(memberId);
     if (member != null && mounted) {
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MemberDetailScreen(member: member),
-        ),
+        MaterialPageRoute(builder: (_) => MemberDetailScreen(member: member)),
       );
     }
   }

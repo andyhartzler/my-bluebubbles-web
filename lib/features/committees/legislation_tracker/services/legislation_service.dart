@@ -21,7 +21,72 @@ class LegislationService {
 
   // ==================== TRACKED BILLS ====================
 
-  /// Get all tracked bills with optional filters
+  /// Columns needed for bill list display (excludes large text fields)
+  /// This reduces data transfer from ~47 MB to ~2-3 MB
+  static const String _listSelectColumns = '''
+    id,
+    created_at,
+    updated_at,
+    openstates_bill_id,
+    jurisdiction,
+    session,
+    bill_identifier,
+    title,
+    description,
+    classification,
+    subjects,
+    chamber,
+    from_organization_classification,
+    first_action_date,
+    latest_action_date,
+    latest_action_description,
+    latest_passage_date,
+    passed_lower,
+    passed_lower_date,
+    passed_upper,
+    passed_upper_date,
+    signed_by_governor,
+    signed_date,
+    vetoed,
+    veto_date,
+    openstates_url,
+    sponsor_count,
+    action_count,
+    vote_count,
+    version_count,
+    document_count,
+    primary_sponsor_name,
+    primary_sponsor_party,
+    primary_sponsor_district,
+    latest_vote_result,
+    latest_vote_date,
+    position,
+    position_set_by,
+    position_set_at,
+    priority,
+    categories,
+    tags,
+    added_by,
+    is_archived,
+    archived_at,
+    archived_reason,
+    last_synced_at,
+    sync_error,
+    current_bill_text_version,
+    current_bill_text_url,
+    current_bill_text_word_count,
+    current_bill_pdf_path,
+    ai_summary_short,
+    ai_position_recommendation,
+    ai_priority_recommendation,
+    ai_categories_recommendation,
+    ai_analyzed_at,
+    ai_analysis_pending,
+    ai_analysis_error
+  ''';
+
+  /// Get all tracked bills with optional filters (optimized for list display)
+  /// Only fetches columns needed for bill cards, excluding large text fields
   /// Uses pagination to bypass Supabase's 1000 row limit
   Future<List<TrackedBill>> getTrackedBills({
     String? session,
@@ -40,9 +105,10 @@ class LegislationService {
 
     while (allBills.length < limit) {
       try {
+        // Use optimized column selection for list view (excludes current_bill_text, ai_summary, etc.)
         var query = _supabase
             .from('legislation_tracked_bills')
-            .select();
+            .select(_listSelectColumns);
 
         if (!includeArchived) {
           query = query.eq('is_archived', false);
@@ -581,7 +647,7 @@ class LegislationService {
     return (response as List).map((json) => Legislator.fromJson(json as Map<String, dynamic>)).toList();
   }
 
-  /// Get bills sponsored by a legislator
+  /// Get bills sponsored by a legislator (optimized for list display)
   Future<List<TrackedBill>> getBillsBySponsor(String legislatorId) async {
     // Get bill IDs where this legislator is a sponsor
     final sponsorships = await _supabase
@@ -595,9 +661,10 @@ class LegislationService {
 
     final billIds = sponsorships.map((s) => s['bill_id'] as String).toList();
 
+    // Use optimized column selection (excludes large text fields)
     final response = await _supabase
         .from('legislation_tracked_bills')
-        .select()
+        .select(_listSelectColumns)
         .inFilter('id', billIds)
         .order('latest_action_date', ascending: false);
 
@@ -889,10 +956,10 @@ class LegislationService {
       final response = await _supabase
           .from('legislation_statistics')
           .select('''
-            top_10_democrat_primary_sponsors,
-            top_10_republican_primary_sponsors,
-            top_10_democrat_cosponsors,
-            top_10_republican_cosponsors,
+            top_30_democrat_primary_sponsors,
+            top_30_republican_primary_sponsors,
+            top_30_democrat_cosponsors,
+            top_30_republican_cosponsors,
             top_10_most_sponsored_bills,
             top_10_most_active_bills,
             avg_bills_per_democrat_legislator,
@@ -1434,11 +1501,11 @@ class LegislationStats {
       billsNeedingSponsorLinkCount: json['bills_needing_sponsor_link_count'] as int? ?? 0,
       billsWithSyncErrorsCount: json['bills_with_sync_errors_count'] as int? ?? 0,
 
-      // Leaderboards
-      top10DemocratPrimarySponsors: _parseLeaderboard(json['top_10_democrat_primary_sponsors']),
-      top10RepublicanPrimarySponsors: _parseLeaderboard(json['top_10_republican_primary_sponsors']),
-      top10DemocratCosponsors: _parseLeaderboard(json['top_10_democrat_cosponsors']),
-      top10RepublicanCosponsors: _parseLeaderboard(json['top_10_republican_cosponsors']),
+      // Leaderboards (using top_30_* columns from database)
+      top10DemocratPrimarySponsors: _parseLeaderboard(json['top_30_democrat_primary_sponsors']),
+      top10RepublicanPrimarySponsors: _parseLeaderboard(json['top_30_republican_primary_sponsors']),
+      top10DemocratCosponsors: _parseLeaderboard(json['top_30_democrat_cosponsors']),
+      top10RepublicanCosponsors: _parseLeaderboard(json['top_30_republican_cosponsors']),
       top10MostSponsoredBills: _parseBillLeaderboard(json['top_10_most_sponsored_bills']),
       top10MostActiveBills: _parseBillLeaderboard(json['top_10_most_active_bills']),
 

@@ -7,6 +7,7 @@ import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
+import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
 import 'package:bluebubbles/features/slack/widgets/slack_file_attachment.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
@@ -121,11 +122,13 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
 
       // Add MOHSDA messages fetch if applicable
       if (_hasMohsdaTab) {
-        futures.add(_repository.getSlackMessagesByChannelId(
-          _mohsdaChannelId,
-          limit: _pageSize,
-          offset: 0,
-        ));
+        futures.add(
+          _repository.getSlackMessagesByChannelId(
+            _mohsdaChannelId,
+            limit: _pageSize,
+            offset: 0,
+          ),
+        );
       }
 
       final results = await Future.wait(futures);
@@ -177,7 +180,8 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
 
   /// Load member data for users who have linked member IDs
   Future<void> _loadMemberData(
-      Map<String, Map<String, String>> userMappings) async {
+    Map<String, Map<String, String>> userMappings,
+  ) async {
     final memberIds = <String>{};
     for (final mapping in userMappings.values) {
       final memberId = mapping['member_id'];
@@ -190,8 +194,9 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
 
     try {
       // Fetch all members in parallel
-      final futures =
-          memberIds.map((id) => _memberRepository.getMemberById(id));
+      final futures = memberIds.map(
+        (id) => _memberRepository.getMemberById(id),
+      );
       final members = await Future.wait(futures);
 
       for (final member in members) {
@@ -211,7 +216,9 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
       final supabase = Supabase.instance.client;
       final response = await supabase
           .from('slack_users_unmatched')
-          .select('slack_user_id, slack_real_name, slack_display_name, cached_avatar_path')
+          .select(
+            'slack_user_id, slack_real_name, slack_display_name, cached_avatar_path',
+          )
           .eq('manually_rejected', false);
 
       final unmatchedMap = <String, Map<String, String>>{};
@@ -324,10 +331,7 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
         Expanded(
           child: TabBarView(
             controller: _tabController,
-            children: [
-              _buildMainChannelView(),
-              _buildMohsdaChannelView(),
-            ],
+            children: [_buildMainChannelView(), _buildMohsdaChannelView()],
           ),
         ),
       ],
@@ -383,7 +387,9 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
               itemBuilder: (context, index) {
                 if (index == _mohsdaMessages.length) {
                   return _buildLoadMoreButton(
-                      _loadMoreMohsda, _mohsdaLoadingMore);
+                    _loadMoreMohsda,
+                    _mohsdaLoadingMore,
+                  );
                 }
                 return _buildMessageCard(_mohsdaMessages[index]);
               },
@@ -398,8 +404,11 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline,
-                size: 48, color: Theme.of(context).colorScheme.error),
+            Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Theme.of(context).colorScheme.error,
+            ),
             const SizedBox(height: 16),
             Text(error, textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -436,12 +445,10 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
               'This committee does not have a Slack channel configured.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.color
-                        ?.withOpacity(0.7),
-                  ),
+                color: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.color?.withOpacity(0.7),
+              ),
             ),
           ],
         ),
@@ -475,12 +482,10 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
                     : 'Messages from the Slack channel will appear here once archived.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.color
-                          ?.withOpacity(0.7),
-                    ),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                ),
               ),
             ],
           ),
@@ -511,22 +516,24 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
   Widget _buildMessageCard(Map<String, dynamic> message) {
     final messageText = message['message_text']?.toString() ?? '';
     final postedAtStr = message['posted_at']?.toString();
-    final postedAt =
-        postedAtStr != null ? DateTime.tryParse(postedAtStr) : null;
+    final postedAt = postedAtStr != null
+        ? DateTime.tryParse(postedAtStr)
+        : null;
     final isThreadReply = message['thread_ts'] != null;
     final slackUserId = message['slack_user_id']?.toString();
 
     // Get user info from our mappings using slack_user_id
-    final userMapping =
-        slackUserId != null ? _slackUserMappings[slackUserId] : null;
+    final userMapping = slackUserId != null
+        ? _slackUserMappings[slackUserId]
+        : null;
     String? userName;
     String? avatarUrl;
     String? memberId = userMapping?['member_id'];
     Member? linkedMember;
 
     // Determine if this is an unmatched user (no member_id in the mapping)
-    final isUnmatchedUser = userMapping == null ||
-        (memberId == null || memberId.isEmpty);
+    final isUnmatchedUser =
+        userMapping == null || (memberId == null || memberId.isEmpty);
 
     if (userMapping != null) {
       userName = userMapping['real_name']?.isNotEmpty == true
@@ -558,7 +565,8 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
           avatarUrl = userMapping['avatar_url'];
         }
       }
-    } else if (slackUserId != null && _unmatchedUsers.containsKey(slackUserId)) {
+    } else if (slackUserId != null &&
+        _unmatchedUsers.containsKey(slackUserId)) {
       // No user mapping, but we have data from slack_users_unmatched
       final unmatchedData = _unmatchedUsers[slackUserId]!;
       userName = unmatchedData['real_name']?.isNotEmpty == true
@@ -581,7 +589,9 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
       color: _unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        onTap: canNavigate ? () => _navigateToMemberProfile(linkedMember!) : null,
+        onTap: canNavigate
+            ? () => _navigateToMemberProfile(linkedMember!)
+            : null,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -603,21 +613,25 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
                   if (isUnmatchedUser && !widget.isMemberView) ...[
                     const SizedBox(width: 4),
                     Tooltip(
-                      message: 'Unmatched Slack user',
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade700,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '!',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                      message: 'Unmatched Slack user - Click to match',
+                      child: InkWell(
+                        onTap: () => _navigateToUnmatchedUsers(slackUserId),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade700,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -667,7 +681,9 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
                   if (isThreadReply)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _momentumBlue,
                         borderRadius: BorderRadius.circular(6),
@@ -675,8 +691,7 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.reply,
-                              size: 14, color: Colors.white),
+                          Icon(Icons.reply, size: 14, color: Colors.white),
                           SizedBox(width: 4),
                           Text(
                             'Thread',
@@ -735,8 +750,11 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.attach_file,
-                size: 14, color: Colors.white.withOpacity(0.8)),
+            Icon(
+              Icons.attach_file,
+              size: 14,
+              color: Colors.white.withOpacity(0.8),
+            ),
             const SizedBox(width: 6),
             Text(
               '$fileCount file${fileCount > 1 ? 's' : ''} attached',
@@ -777,32 +795,28 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
       linkColor: _momentumBlue,
       mentionColor: _momentumBlue,
       userMappings: _slackUserMappings,
-      onMentionTap: widget.isMemberView ? null : (userId, memberId) {
-        if (memberId != null && memberId.isNotEmpty) {
-          _navigateToMemberProfileById(memberId);
-        }
-      },
+      onMentionTap: widget.isMemberView
+          ? null
+          : (userId, memberId) {
+              if (memberId != null && memberId.isNotEmpty) {
+                _navigateToMemberProfileById(memberId);
+              }
+            },
     );
 
     if (spans.isEmpty) {
-      return Text(
-        messageText,
-        style: baseStyle,
-      );
+      return Text(messageText, style: baseStyle);
     }
 
-    return RichText(
-      text: TextSpan(children: spans),
-    );
+    return RichText(text: TextSpan(children: spans));
   }
 
   /// Navigate to member profile screen from a Member object
   void _navigateToMemberProfile(Member member) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (context) => TitleBarWrapper(
-          child: MemberDetailScreen(member: member),
-        ),
+        builder: (context) =>
+            TitleBarWrapper(child: MemberDetailScreen(member: member)),
       ),
     );
   }
@@ -820,9 +834,9 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error loading member: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error loading member: $e')));
         }
         return;
       }
@@ -831,15 +845,25 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
     if (member != null && mounted) {
       Navigator.of(context).push(
         ThemeSwitcher.buildPageRoute(
-          builder: (context) => TitleBarWrapper(
-            child: MemberDetailScreen(member: member!),
-          ),
+          builder: (context) =>
+              TitleBarWrapper(child: MemberDetailScreen(member: member!)),
         ),
       );
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Member not found')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Member not found')));
     }
+  }
+
+  /// Navigate to Slack management page with Unmatched Users tab selected
+  void _navigateToUnmatchedUsers(String? slackUserId) {
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (context) => TitleBarWrapper(
+          child: SlackManagementScreen(initialUnmatchedUserId: slackUserId),
+        ),
+      ),
+    );
   }
 }

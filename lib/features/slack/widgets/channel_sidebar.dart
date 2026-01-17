@@ -32,11 +32,7 @@ class ChannelSidebar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.tag,
-                size: 48,
-                color: theme.disabledColor,
-              ),
+              Icon(Icons.tag, size: 48, color: theme.disabledColor),
               const SizedBox(height: 12),
               Text(
                 'No channels found',

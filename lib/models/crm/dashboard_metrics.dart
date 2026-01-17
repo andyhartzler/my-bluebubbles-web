@@ -39,8 +39,29 @@ class DashboardMetrics {
   // Slack/Communication stats
   final int totalSlackMessages;
   final int slackMessagesThisMonth;
+  final int slackMessagesThisWeek;
+  final int slackActiveUsers;
   final int totalSocialImpressions;
   final List<TopSlackMember> top50SlackMembers;
+  final List<NameCount> slackChannelActivity;
+  final List<MonthlyCount> slackEngagementTrend;
+
+  // Social Media stats (from social_media_stats table)
+  final int totalFollowers;
+  final int socialMediaReach;
+  final double socialEngagementRate;
+  final List<NameCount> followersByPlatform;
+  final List<MonthlyCount> socialGrowthTrend;
+
+  // Legislation stats (from legislation_statistics table)
+  final int totalBillsTracked;
+  final int billsSupported;
+  final int billsOpposed;
+  final int priorityBills;
+  final int legislativeActionsTaken;
+  final List<NameCount> billsByPosition;
+  final List<NameCount> billsByPriority;
+  final List<NameCount> billsByCategory;
 
   // Age demographics
   final int age14To17Count;
@@ -132,8 +153,25 @@ class DashboardMetrics {
     required this.top5Donors,
     required this.totalSlackMessages,
     required this.slackMessagesThisMonth,
+    required this.slackMessagesThisWeek,
+    required this.slackActiveUsers,
     required this.totalSocialImpressions,
     required this.top50SlackMembers,
+    required this.slackChannelActivity,
+    required this.slackEngagementTrend,
+    required this.totalFollowers,
+    required this.socialMediaReach,
+    required this.socialEngagementRate,
+    required this.followersByPlatform,
+    required this.socialGrowthTrend,
+    required this.totalBillsTracked,
+    required this.billsSupported,
+    required this.billsOpposed,
+    required this.priorityBills,
+    required this.legislativeActionsTaken,
+    required this.billsByPosition,
+    required this.billsByPriority,
+    required this.billsByCategory,
     required this.age14To17Count,
     required this.age18To21Count,
     required this.age22To25Count,
@@ -220,8 +258,25 @@ class DashboardMetrics {
       top5Donors: top5Donors,
       totalSlackMessages: totalSlackMessages,
       slackMessagesThisMonth: slackMessagesThisMonth,
+      slackMessagesThisWeek: slackMessagesThisWeek,
+      slackActiveUsers: slackActiveUsers,
       totalSocialImpressions: totalSocialImpressions,
       top50SlackMembers: top50SlackMembers ?? this.top50SlackMembers,
+      slackChannelActivity: slackChannelActivity,
+      slackEngagementTrend: slackEngagementTrend,
+      totalFollowers: totalFollowers,
+      socialMediaReach: socialMediaReach,
+      socialEngagementRate: socialEngagementRate,
+      followersByPlatform: followersByPlatform,
+      socialGrowthTrend: socialGrowthTrend,
+      totalBillsTracked: totalBillsTracked,
+      billsSupported: billsSupported,
+      billsOpposed: billsOpposed,
+      priorityBills: priorityBills,
+      legislativeActionsTaken: legislativeActionsTaken,
+      billsByPosition: billsByPosition,
+      billsByPriority: billsByPriority,
+      billsByCategory: billsByCategory,
       age14To17Count: age14To17Count,
       age18To21Count: age18To21Count,
       age22To25Count: age22To25Count,
@@ -307,8 +362,27 @@ class DashboardMetrics {
       top5Donors: _parseTopDonors(json['top_5_donors']),
       totalSlackMessages: _parseInt(json['total_slack_messages']) ?? 0,
       slackMessagesThisMonth: _parseInt(json['slack_messages_this_month']) ?? 0,
+      slackMessagesThisWeek: _parseInt(json['slack_messages_this_week']) ?? 0,
+      slackActiveUsers: _parseInt(json['slack_active_users']) ?? 0,
       totalSocialImpressions: _parseInt(json['total_social_impressions']) ?? 0,
       top50SlackMembers: _parseTopSlackMembers(json['top_50_slack_members']),
+      slackChannelActivity: _parseNameCountsOrMap(json['slack_channel_activity']),
+      slackEngagementTrend: _parseMonthlyCounts(json['slack_engagement_trend']),
+      // Social media stats
+      totalFollowers: _parseInt(json['total_followers']) ?? 0,
+      socialMediaReach: _parseInt(json['social_media_reach']) ?? 0,
+      socialEngagementRate: _parseDouble(json['social_engagement_rate']) ?? 0.0,
+      followersByPlatform: _parseNameCountsOrMap(json['followers_by_platform']),
+      socialGrowthTrend: _parseMonthlyCounts(json['social_growth_trend']),
+      // Legislation stats
+      totalBillsTracked: _parseInt(json['total_bills_tracked'] ?? json['total_bills']) ?? 0,
+      billsSupported: _parseInt(json['bills_supported'] ?? json['support_count']) ?? 0,
+      billsOpposed: _parseInt(json['bills_opposed'] ?? json['oppose_count']) ?? 0,
+      priorityBills: _parseInt(json['priority_bills'] ?? json['priority_count']) ?? 0,
+      legislativeActionsTaken: _parseInt(json['legislative_actions_taken']) ?? 0,
+      billsByPosition: _parseNameCountsOrMap(json['bills_by_position']),
+      billsByPriority: _parseNameCountsOrMap(json['bills_by_priority']),
+      billsByCategory: _parseNameCountsOrMap(json['bills_by_category']),
       age14To17Count: _parseInt(json['age_14_17_count']) ?? 0,
       age18To21Count: _parseInt(json['age_18_21_count']) ?? 0,
       age22To25Count: _parseInt(json['age_22_25_count']) ?? 0,
@@ -512,8 +586,25 @@ class DashboardMetrics {
     top5Donors: const [],
     totalSlackMessages: 0,
     slackMessagesThisMonth: 0,
+    slackMessagesThisWeek: 0,
+    slackActiveUsers: 0,
     totalSocialImpressions: 0,
     top50SlackMembers: const [],
+    slackChannelActivity: const [],
+    slackEngagementTrend: const [],
+    totalFollowers: 0,
+    socialMediaReach: 0,
+    socialEngagementRate: 0,
+    followersByPlatform: const [],
+    socialGrowthTrend: const [],
+    totalBillsTracked: 0,
+    billsSupported: 0,
+    billsOpposed: 0,
+    priorityBills: 0,
+    legislativeActionsTaken: 0,
+    billsByPosition: const [],
+    billsByPriority: const [],
+    billsByCategory: const [],
     age14To17Count: 0,
     age18To21Count: 0,
     age22To25Count: 0,

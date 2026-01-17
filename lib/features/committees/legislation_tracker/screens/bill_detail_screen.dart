@@ -94,11 +94,38 @@ class _BillDetailScreenState extends State<BillDetailScreen>
             backgroundColor: _unityBlue,
             foregroundColor: Colors.white,
             actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () => provider.syncBills(billId: widget.billId),
-                tooltip: 'Sync with Open States',
-              ),
+              provider.isSyncing
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () async {
+                        final result = await provider.syncBills(billId: widget.billId);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                result.success
+                                    ? 'Bill refreshed from Open States'
+                                    : 'Failed to refresh bill',
+                              ),
+                              backgroundColor: result.success ? _grassrootsGreen : _actionRed,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      tooltip: 'Refresh bill from Open States',
+                    ),
               PopupMenuButton<String>(
                 itemBuilder: (context) => [
                   const PopupMenuItem(
@@ -521,11 +548,53 @@ class _BillDetailScreenState extends State<BillDetailScreen>
               if (bill.chamber != null)
                 _buildInfoRow('Chamber', bill.chamber == 'lower' ? 'House' : 'Senate'),
               if (bill.primarySponsorName != null)
-                _buildInfoRow('Primary Sponsor', bill.primarySponsorName!),
+                _buildInfoRow(
+                  'Primary Sponsor',
+                  '${bill.primarySponsorName!}${bill.primarySponsorParty != null ? ' (${BillHelpers.getPartyAbbreviation(bill.primarySponsorParty)})' : ''}',
+                ),
               if (bill.latestActionDescription != null)
                 _buildInfoRow('Latest Action', bill.latestActionDescription!),
               if (bill.latestActionDate != null)
                 _buildInfoRow('Action Date', BillHelpers.formatDate(bill.latestActionDate)),
+              if (bill.categories.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 130,
+                      child: Text(
+                        'Categories',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: bill.categories.map((cat) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _momentumBlue.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            _formatCategoryName(cat),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 16),
@@ -1073,5 +1142,13 @@ class _BillDetailScreenState extends State<BillDetailScreen>
         Navigator.pop(context);
         break;
     }
+  }
+
+  String _formatCategoryName(String category) {
+    return category
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1)}' : '')
+        .join(' ');
   }
 }

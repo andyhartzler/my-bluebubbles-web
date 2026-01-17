@@ -1,8 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/models/slack_analytics.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
@@ -90,14 +91,18 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
     setState(() => _refreshing = true);
 
     try {
-      final success = await _repository.refreshAnalytics(daysBack: _selectedDays);
+      final success = await _repository.refreshAnalytics(
+        daysBack: _selectedDays,
+      );
 
       if (!mounted) return;
 
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Analytics refresh started. Reloading in a moment...'),
+            content: Text(
+              'Analytics refresh started. Reloading in a moment...',
+            ),
           ),
         );
         // Wait a bit for the edge function to complete
@@ -118,7 +123,9 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: BrandColors.momentumBlue),
+      );
     }
 
     if (_error != null) {
@@ -127,6 +134,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
 
     return RefreshIndicator(
       onRefresh: _loadAnalytics,
+      color: BrandColors.momentumBlue,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -138,22 +146,48 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
             const SizedBox(height: 24),
             _buildMessagesOverTimeChart(),
             const SizedBox(height: 24),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _buildTopChannelsCard()),
-                const SizedBox(width: 16),
-                Expanded(child: _buildTopUsersCard()),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth < 800) {
+                  return Column(
+                    children: [
+                      _buildTopChannelsCard(),
+                      const SizedBox(height: 16),
+                      _buildTopUsersCard(),
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _buildTopChannelsCard()),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildTopUsersCard()),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 24),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _buildDayOfWeekCard()),
-                const SizedBox(width: 16),
-                Expanded(child: _buildHourlyActivityCard()),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth < 800) {
+                  return Column(
+                    children: [
+                      _buildDayOfWeekCard(),
+                      const SizedBox(height: 16),
+                      _buildHourlyActivityCard(),
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _buildDayOfWeekCard()),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildHourlyActivityCard()),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 24),
             _buildMembershipChangesCard(),
@@ -164,69 +198,107 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   }
 
   Widget _buildHeader() {
-    final theme = Theme.of(context);
     final dateFormat = DateFormat('MMM d, y • h:mm a');
 
-    return Row(
-      children: [
-        Icon(Icons.analytics, color: theme.colorScheme.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Slack Analytics',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (_summary?.computedAt != null)
-                Text(
-                  'Last updated: ${dateFormat.format(_summary!.computedAt!.toLocal())}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+    return BrandedCard(
+      gradientColors: BrandColors.tileGradient,
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.analytics, color: Colors.white, size: 28),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Slack Analytics',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-            ],
+                if (_summary?.computedAt != null)
+                  Text(
+                    'Last updated: ${dateFormat.format(_summary!.computedAt!.toLocal())}',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+              ],
+            ),
           ),
-        ),
-        // Time period selector
-        DropdownButton<int>(
-          value: _selectedDays,
-          items: const [
-            DropdownMenuItem(value: 30, child: Text('Last 30 days')),
-            DropdownMenuItem(value: 60, child: Text('Last 60 days')),
-            DropdownMenuItem(value: 90, child: Text('Last 90 days')),
-          ],
-          onChanged: (value) {
-            if (value != null) {
-              setState(() => _selectedDays = value);
-            }
-          },
-        ),
-        const SizedBox(width: 8),
-        ElevatedButton.icon(
-          onPressed: _refreshing ? null : _refreshAnalytics,
-          icon: _refreshing
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.refresh, size: 18),
-          label: Text(_refreshing ? 'Refreshing...' : 'Refresh'),
-        ),
-      ],
+          // Time period selector
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int>(
+                value: _selectedDays,
+                dropdownColor: BrandColors.unityBlue,
+                style: const TextStyle(color: Colors.white),
+                icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                items: const [
+                  DropdownMenuItem(value: 30, child: Text('Last 30 days')),
+                  DropdownMenuItem(value: 60, child: Text('Last 60 days')),
+                  DropdownMenuItem(value: 90, child: Text('Last 90 days')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedDays = value);
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: _refreshing ? null : _refreshAnalytics,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: BrandColors.sunriseGold,
+              foregroundColor: BrandColors.unityBlue,
+            ),
+            icon: _refreshing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: BrandColors.unityBlue,
+                    ),
+                  )
+                : const Icon(Icons.refresh, size: 18),
+            label: Text(_refreshing ? 'Refreshing...' : 'Refresh'),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildSummaryCards() {
+    // Gradient colors for each card
+    const List<List<Color>> cardGradients = [
+      [BrandColors.unityBlue, BrandColors.momentumBlue], // Messages
+      [Color(0xFF10B981), Color(0xFF059669)], // Channels - Green
+      [Color(0xFF8B5CF6), Color(0xFF7C3AED)], // Users - Purple
+      [Color(0xFFF59E0B), Color(0xFFD97706)], // Unmatched - Amber
+    ];
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth > 600;
         final cardCount = isWide ? 4 : 2;
-        final cardWidth = (constraints.maxWidth - (cardCount - 1) * 16) / cardCount;
+        final cardWidth =
+            (constraints.maxWidth - (cardCount - 1) * 16) / cardCount;
 
         return Wrap(
           spacing: 16,
@@ -234,44 +306,49 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
           children: [
             SizedBox(
               width: cardWidth,
-              child: _SummaryCard(
+              child: _BrandedSummaryCard(
                 title: 'Total Messages',
                 value: _formatNumber(_summary?.totalMessagesAllTime ?? 0),
-                subtitle: '+${_formatNumber(_summary?.totalMessagesRecent ?? 0)} this period',
+                subtitle:
+                    '+${_formatNumber(_summary?.totalMessagesRecent ?? 0)} this period',
                 icon: Icons.message,
-                color: Colors.blue,
+                gradientColors: cardGradients[0],
               ),
             ),
             SizedBox(
               width: cardWidth,
-              child: _SummaryCard(
+              child: _BrandedSummaryCard(
                 title: 'Active Channels',
                 value: '${_summary?.activeChannels ?? 0}',
                 icon: Icons.tag,
-                color: Colors.green,
+                gradientColors: cardGradients[1],
               ),
             ),
             SizedBox(
               width: cardWidth,
-              child: _SummaryCard(
+              child: _BrandedSummaryCard(
                 title: 'Linked Users',
                 value: '${_summary?.linkedUsers ?? 0}',
                 icon: Icons.people,
-                color: Colors.purple,
+                gradientColors: cardGradients[2],
               ),
             ),
             SizedBox(
               width: cardWidth,
-              child: _SummaryCard(
+              child: _BrandedSummaryCard(
                 title: 'Unmatched Users',
                 value: '${_summary?.unmatchedUsers ?? 0}',
-                subtitle: _summary?.unmatchedUsers != null && _summary!.unmatchedUsers > 0
+                subtitle:
+                    _summary?.unmatchedUsers != null &&
+                        _summary!.unmatchedUsers > 0
                     ? 'Needs attention'
                     : null,
                 icon: Icons.person_search,
-                color: _summary?.unmatchedUsers != null && _summary!.unmatchedUsers > 0
-                    ? Colors.orange
-                    : Colors.grey,
+                gradientColors:
+                    _summary?.unmatchedUsers != null &&
+                        _summary!.unmatchedUsers > 0
+                    ? cardGradients[3]
+                    : [Colors.grey.shade600, Colors.grey.shade500],
               ),
             ),
           ],
@@ -281,8 +358,6 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   }
 
   Widget _buildMessagesOverTimeChart() {
-    final theme = Theme.of(context);
-
     if (_messagesByDay.isEmpty) {
       return _buildEmptyCard(
         title: 'Messages Over Time',
@@ -292,72 +367,166 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
     }
 
     // Find max for scaling
-    final maxCount = _messagesByDay.map((e) => e.count).reduce((a, b) => a > b ? a : b);
+    final maxCount = _messagesByDay
+        .map((e) => e.count)
+        .reduce((a, b) => a > b ? a : b)
+        .toDouble();
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Messages Over Time',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+    // Build spots for line chart
+    final spots = _messagesByDay.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value.count.toDouble());
+    }).toList();
+
+    return BrandedCard(
+      gradientColors: BrandColors.tileGradient,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.trending_up,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: _messagesByDay.map((day) {
-                  final height = maxCount > 0 ? (day.count / maxCount) * 180 : 0.0;
-                  return Expanded(
-                    child: Tooltip(
-                      message: '${day.date}: ${day.count} messages',
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 1),
-                        height: height,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.7),
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(2),
-                          ),
+              const SizedBox(width: 12),
+              const Text(
+                'Messages Over Time',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 200,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: maxCount > 0 ? maxCount / 4 : 1,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: Colors.white.withOpacity(0.1),
+                    strokeWidth: 1,
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 40,
+                      getTitlesWidget: (value, meta) => Text(
+                        _formatNumber(value.toInt()),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
                         ),
                       ),
                     ),
-                  );
-                }).toList(),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      interval: (_messagesByDay.length / 6).ceilToDouble(),
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index >= 0 && index < _messagesByDay.length) {
+                          final date = _messagesByDay[index].date;
+                          // Show only month/day
+                          final parts = date.split('-');
+                          if (parts.length >= 2) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                '${parts[1]}/${parts.length > 2 ? parts[2] : ''}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (_messagesByDay.length - 1).toDouble(),
+                minY: 0,
+                maxY: maxCount * 1.1,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    curveSmoothness: 0.3,
+                    color: BrandColors.sunriseGold,
+                    barWidth: 3,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        colors: [
+                          BrandColors.sunriseGold.withOpacity(0.3),
+                          BrandColors.sunriseGold.withOpacity(0.05),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ],
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (_) => BrandColors.unityBlue,
+                    getTooltipItems: (spots) {
+                      return spots.map((spot) {
+                        final index = spot.x.toInt();
+                        final date = index < _messagesByDay.length
+                            ? _messagesByDay[index].date
+                            : '';
+                        return LineTooltipItem(
+                          '$date\n${spot.y.toInt()} messages',
+                          const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _messagesByDay.isNotEmpty ? _messagesByDay.first.date : '',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                Text(
-                  _messagesByDay.isNotEmpty ? _messagesByDay.last.date : '',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildTopChannelsCard() {
-    final theme = Theme.of(context);
-
     if (_channelActivity.isEmpty) {
       return _buildEmptyCard(
         title: 'Most Active Channels',
@@ -371,63 +540,106 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
         ? topChannels.first.messageCount
         : 1;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Most Active Channels',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...topChannels.map((channel) {
-              final barWidth = maxCount > 0 ? (channel.messageCount / maxCount) : 0.0;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.tag, size: 14, color: theme.colorScheme.primary),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            channel.channelName,
-                            style: theme.textTheme.bodyMedium,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Text(
-                          _formatNumber(channel.messageCount),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    LinearProgressIndicator(
-                      value: barWidth,
-                      backgroundColor: theme.colorScheme.surfaceVariant,
-                    ),
-                  ],
+    return BrandedCard(
+      gradientColors: [const Color(0xFF10B981), const Color(0xFF059669)],
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              );
-            }),
-          ],
-        ),
+                child: const Icon(Icons.tag, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Most Active Channels',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ...topChannels.asMap().entries.map((entry) {
+            final index = entry.key;
+            final channel = entry.value;
+            final barWidth = maxCount > 0
+                ? (channel.messageCount / maxCount)
+                : 0.0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '#${channel.channelName}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        _formatNumber(channel.messageCount),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: barWidth,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.white,
+                      ),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
 
   Widget _buildTopUsersCard() {
-    final theme = Theme.of(context);
-
     if (_userActivity.isEmpty) {
       return _buildEmptyCard(
         title: 'Most Active Users',
@@ -439,77 +651,142 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
     final topUsers = _userActivity.take(5).toList();
     final maxCount = topUsers.isNotEmpty ? topUsers.first.messageCount : 1;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Most Active Users',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...topUsers.map((user) {
-              final barWidth = maxCount > 0 ? (user.messageCount / maxCount) : 0.0;
-              return InkWell(
-                onTap: () => _handleUserTap(user),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            user.isLinked ? Icons.person : Icons.person_outline,
-                            size: 14,
-                            color: user.isLinked
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              user.name,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                decoration: TextDecoration.underline,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Text(
-                            _formatNumber(user.messageCount),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.chevron_right,
-                            size: 16,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      LinearProgressIndicator(
-                        value: barWidth,
-                        backgroundColor: theme.colorScheme.surfaceVariant,
-                        color: user.isLinked
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.secondary,
-                      ),
-                    ],
-                  ),
+    return BrandedCard(
+      gradientColors: [const Color(0xFF8B5CF6), const Color(0xFF7C3AED)],
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              );
-            }),
-          ],
-        ),
+                child: const Icon(Icons.people, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Most Active Users',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ...topUsers.asMap().entries.map((entry) {
+            final index = entry.key;
+            final user = entry.value;
+            final barWidth = maxCount > 0
+                ? (user.messageCount / maxCount)
+                : 0.0;
+            return InkWell(
+              onTap: () => _handleUserTap(user),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: user.isLinked
+                                ? Colors.white.withOpacity(0.3)
+                                : Colors.orange.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${index + 1}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  user.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: Colors.white70,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (!user.isLinked) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    '!',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        Text(
+                          _formatNumber(user.messageCount),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.chevron_right,
+                          size: 18,
+                          color: Colors.white70,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: barWidth,
+                        backgroundColor: Colors.white.withOpacity(0.2),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          user.isLinked ? Colors.white : Colors.orange[300]!,
+                        ),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
@@ -521,9 +798,8 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       if (member != null && mounted) {
         Navigator.of(context).push(
           ThemeSwitcher.buildPageRoute(
-            builder: (context) => TitleBarWrapper(
-              child: MemberDetailScreen(member: member),
-            ),
+            builder: (context) =>
+                TitleBarWrapper(child: MemberDetailScreen(member: member)),
           ),
         );
       }
@@ -543,8 +819,6 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   }
 
   Widget _buildDayOfWeekCard() {
-    final theme = Theme.of(context);
-
     if (_dayOfWeekActivity.isEmpty) {
       return _buildEmptyCard(
         title: 'Activity by Day',
@@ -553,66 +827,130 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       );
     }
 
-    final maxCount = _dayOfWeekActivity.map((e) => e.messageCount).reduce((a, b) => a > b ? a : b);
+    final maxCount = _dayOfWeekActivity
+        .map((e) => e.messageCount)
+        .reduce((a, b) => a > b ? a : b)
+        .toDouble();
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Activity by Day',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+    return BrandedCard(
+      gradientColors: [const Color(0xFF06B6D4), const Color(0xFF0891B2)],
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.calendar_today,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 120,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: _dayOfWeekActivity.map((day) {
-                  final height = maxCount > 0 ? (day.messageCount / maxCount) * 100 : 0.0;
-                  return Expanded(
-                    child: Tooltip(
-                      message: '${day.dayName}: ${day.messageCount} messages',
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            height: height,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.secondary.withOpacity(0.7),
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4),
+              const SizedBox(width: 12),
+              const Text(
+                'Activity by Day',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 150,
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxCount * 1.2,
+                minY: 0,
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => BrandColors.unityBlue,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final day = _dayOfWeekActivity[group.x.toInt()];
+                      return BarTooltipItem(
+                        '${day.dayName}\n${day.messageCount} messages',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index >= 0 && index < _dayOfWeekActivity.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              _dayOfWeekActivity[index].dayName.substring(0, 3),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            day.dayName.substring(0, 3),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
                     ),
+                  ),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: _dayOfWeekActivity.asMap().entries.map((entry) {
+                  return BarChartGroupData(
+                    x: entry.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: entry.value.messageCount.toDouble(),
+                        color: Colors.white,
+                        width: 24,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(6),
+                        ),
+                        backDrawRodData: BackgroundBarChartRodData(
+                          show: true,
+                          toY: maxCount * 1.2,
+                          color: Colors.white.withOpacity(0.1),
+                        ),
+                      ),
+                    ],
                   );
                 }).toList(),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildHourlyActivityCard() {
-    final theme = Theme.of(context);
-
     if (_hourlyActivity.isEmpty) {
       return _buildEmptyCard(
         title: 'Activity by Hour',
@@ -621,74 +959,158 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       );
     }
 
-    final maxCount = _hourlyActivity.map((e) => e.messageCount).reduce((a, b) => a > b ? a : b);
+    final maxCount = _hourlyActivity
+        .map((e) => e.messageCount)
+        .reduce((a, b) => a > b ? a : b)
+        .toDouble();
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Activity by Hour',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+    return BrandedCard(
+      gradientColors: [const Color(0xFFEC4899), const Color(0xFFDB2777)],
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.access_time,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 120,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: _hourlyActivity.map((hour) {
-                  final height = maxCount > 0 ? (hour.messageCount / maxCount) * 100 : 0.0;
-                  final isWorkHour = hour.hour >= 9 && hour.hour <= 17;
-                  return Expanded(
-                    child: Tooltip(
-                      message: '${hour.hourLabel}: ${hour.messageCount} messages',
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                        height: height,
-                        decoration: BoxDecoration(
-                          color: isWorkHour
-                              ? theme.colorScheme.primary.withOpacity(0.7)
-                              : theme.colorScheme.secondary.withOpacity(0.5),
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(2),
-                          ),
-                        ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Activity by Hour',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: BrandColors.sunriseGold,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Work hours',
+                      style: TextStyle(color: Colors.white70, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 150,
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxCount * 1.2,
+                minY: 0,
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => BrandColors.unityBlue,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final hour = _hourlyActivity[group.x.toInt()];
+                      return BarTooltipItem(
+                        '${hour.hourLabel}\n${hour.messageCount} messages',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      interval: 4,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index >= 0 &&
+                            index < _hourlyActivity.length &&
+                            index % 4 == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              _hourlyActivity[index].hourLabel,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 9,
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: _hourlyActivity.asMap().entries.map((entry) {
+                  final isWorkHour =
+                      entry.value.hour >= 9 && entry.value.hour <= 17;
+                  return BarChartGroupData(
+                    x: entry.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: entry.value.messageCount.toDouble(),
+                        color: isWorkHour
+                            ? BrandColors.sunriseGold
+                            : Colors.white.withOpacity(0.7),
+                        width: 8,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(3),
+                        ),
+                      ),
+                    ],
                   );
                 }).toList(),
               ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '12 AM',
-                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
-                ),
-                Text(
-                  '12 PM',
-                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
-                ),
-                Text(
-                  '11 PM',
-                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildMembershipChangesCard() {
-    final theme = Theme.of(context);
     final dateFormat = DateFormat('MMM d • h:mm a');
 
     if (_membershipChanges.isEmpty) {
@@ -699,25 +1121,44 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       );
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Recent Membership Changes',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+    return BrandedCard(
+      gradientColors: BrandColors.tileGradient,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.people_alt,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            ...(_membershipChanges.take(10).map((change) {
-              final isJoin = change.action == 'joined' || change.action == 'invited';
-              return _buildMembershipChangeItem(change, isJoin, dateFormat);
-            })),
-          ],
-        ),
+              const SizedBox(width: 12),
+              const Text(
+                'Recent Membership Changes',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ...(_membershipChanges.take(10).map((change) {
+            final isJoin =
+                change.action == 'joined' || change.action == 'invited';
+            return _buildMembershipChangeItem(change, isJoin, dateFormat);
+          })),
+        ],
       ),
     );
   }
@@ -727,13 +1168,16 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
     bool isJoin,
     DateFormat dateFormat,
   ) {
-    final theme = Theme.of(context);
-
     return InkWell(
       onTap: () => _handleMembershipChangeTap(change),
       borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
         child: Row(
           children: [
             // Avatar with action indicator
@@ -748,10 +1192,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                     decoration: BoxDecoration(
                       color: isJoin ? Colors.green : Colors.red,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: theme.colorScheme.surface,
-                        width: 2,
-                      ),
+                      border: Border.all(color: Colors.white, width: 2),
                     ),
                     child: Icon(
                       isJoin ? Icons.add : Icons.remove,
@@ -773,7 +1214,8 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                       Expanded(
                         child: Text(
                           change.displayName,
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: const TextStyle(
+                            color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -786,36 +1228,31 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
+                            color: Colors.orange,
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: Colors.orange.withOpacity(0.3),
-                            ),
                           ),
-                          child: Text(
-                            'Unmatched',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: Colors.orange[700],
+                          child: const Text(
+                            '!',
+                            style: TextStyle(
+                              color: Colors.white,
                               fontSize: 10,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(
-                        Icons.tag,
-                        size: 12,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      const Icon(Icons.tag, size: 12, color: Colors.white70),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           change.channelDisplayName,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -830,17 +1267,21 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: isJoin
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.red.withOpacity(0.1),
+                        ? Colors.green.withOpacity(0.8)
+                        : Colors.red.withOpacity(0.8),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     change.action.toUpperCase(),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: isJoin ? Colors.green[700] : Colors.red[700],
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -849,21 +1290,14 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                   const SizedBox(height: 4),
                   Text(
                     dateFormat.format(change.createdAt!.toLocal()),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontSize: 11,
-                    ),
+                    style: const TextStyle(color: Colors.white60, fontSize: 11),
                   ),
                 ],
               ],
             ),
             // Navigation indicator
             const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            const Icon(Icons.chevron_right, size: 20, color: Colors.white70),
           ],
         ),
       ),
@@ -871,18 +1305,15 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   }
 
   Widget _buildUserAvatar(MembershipChange change) {
-    final theme = Theme.of(context);
-    final accentColor = change.isLinkedMember
-        ? theme.colorScheme.primary
-        : Colors.orange[700]!;
-
     return CorsAwareAvatar(
       imageUrl: change.avatarUrl,
       radius: 20,
-      backgroundColor: accentColor.withOpacity(0.2),
+      backgroundColor: change.isLinkedMember
+          ? Colors.white.withOpacity(0.3)
+          : Colors.orange.withOpacity(0.5),
       fallbackText: change.displayName,
-      fallbackIconColor: accentColor,
-      fallbackTextColor: accentColor,
+      fallbackIconColor: Colors.white,
+      fallbackTextColor: Colors.white,
     );
   }
 
@@ -893,11 +1324,28 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       if (member != null && mounted) {
         Navigator.of(context).push(
           ThemeSwitcher.buildPageRoute(
-            builder: (context) => TitleBarWrapper(
-              child: MemberDetailScreen(member: member),
-            ),
+            builder: (context) =>
+                TitleBarWrapper(child: MemberDetailScreen(member: member)),
           ),
         );
+      }
+    } else if (change.slackUserId != null) {
+      // Show activity dialog for unmatched user
+      final unmatchedUser = await _repository.getUnmatchedUserBySlackId(
+        change.slackUserId!,
+      );
+      if (unmatchedUser != null && mounted) {
+        await showDialog(
+          context: context,
+          builder: (context) => _UnmatchedUserQuickView(
+            user: unmatchedUser,
+            repository: _repository,
+            onSwitchToUnmatchedTab: widget.onSwitchToUnmatchedTab,
+          ),
+        );
+      } else if (widget.onSwitchToUnmatchedTab != null) {
+        // Fallback to switching tabs if user not found
+        widget.onSwitchToUnmatchedTab!();
       }
     } else if (widget.onSwitchToUnmatchedTab != null) {
       // Switch to unmatched users tab
@@ -910,30 +1358,24 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
     required String message,
     required IconData icon,
   }) {
-    final theme = Theme.of(context);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+    return BrandedCard(
+      gradientColors: [Colors.grey.shade600, Colors.grey.shade500],
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 16),
-            Icon(icon, size: 48, color: theme.disabledColor),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          Icon(icon, size: 48, color: Colors.white54),
+          const SizedBox(height: 8),
+          Text(message, style: const TextStyle(color: Colors.white70)),
+        ],
       ),
     );
   }
@@ -947,11 +1389,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: theme.colorScheme.error,
-            ),
+            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
             const SizedBox(height: 16),
             Text(_error ?? 'An error occurred', textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -976,73 +1414,71 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   }
 }
 
-/// Summary card widget for displaying a key metric
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+/// Branded summary card widget for displaying a key metric with gradient
+class _BrandedSummaryCard extends StatelessWidget {
+  const _BrandedSummaryCard({
     required this.title,
     required this.value,
     this.subtitle,
     required this.icon,
-    required this.color,
+    required this.gradientColors,
   });
 
   final String title;
   final String value;
   final String? subtitle;
   final IconData icon;
-  final Color color;
+  final List<Color> gradientColors;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: color, size: 20),
+    return BrandedCard(
+      gradientColors: gradientColors,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
+                child: Icon(icon, color: Colors.white, size: 22),
               ),
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                subtitle!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle!,
+              style: const TextStyle(color: Colors.white60, fontSize: 12),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -1063,7 +1499,8 @@ class _SlackUserMessagesDialog extends StatefulWidget {
   final VoidCallback? onLinked;
 
   @override
-  State<_SlackUserMessagesDialog> createState() => _SlackUserMessagesDialogState();
+  State<_SlackUserMessagesDialog> createState() =>
+      _SlackUserMessagesDialogState();
 }
 
 class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
@@ -1088,7 +1525,10 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
 
     try {
       final results = await Future.wait([
-        widget.repository.getMessagesBySlackUserId(widget.slackUserId, limit: _pageSize),
+        widget.repository.getMessagesBySlackUserId(
+          widget.slackUserId,
+          limit: _pageSize,
+        ),
         widget.repository.getSlackUserMappings(),
         widget.repository.getUnmatchedUserBySlackId(widget.slackUserId),
       ]);
@@ -1154,7 +1594,9 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Matched ${widget.userName} to ${result.name}')),
+          SnackBar(
+            content: Text('Matched ${widget.userName} to ${result.name}'),
+          ),
         );
         widget.onLinked?.call();
         Navigator.of(context).pop();
@@ -1182,7 +1624,9 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
               ),
               child: Row(
                 children: [
@@ -1231,40 +1675,40 @@ class _SlackUserMessagesDialogState extends State<_SlackUserMessagesDialog> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _messages.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No messages found',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _messages.length + (_hasMore ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == _messages.length) {
-                              return Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Center(
-                                  child: _loadingMore
-                                      ? const CircularProgressIndicator()
-                                      : OutlinedButton(
-                                          onPressed: _loadMore,
-                                          child: const Text('Load More'),
-                                        ),
-                                ),
-                              );
-                            }
-
-                            return SlackMessageBubble(
-                              message: _messages[index],
-                              userMappings: _userMappings,
-                              memberCache: _memberCache,
-                              primaryColor: Colors.blue,
-                            );
-                          },
+                  ? Center(
+                      child: Text(
+                        'No messages found',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _messages.length + (_hasMore ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == _messages.length) {
+                          return Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Center(
+                              child: _loadingMore
+                                  ? const CircularProgressIndicator()
+                                  : OutlinedButton(
+                                      onPressed: _loadMore,
+                                      child: const Text('Load More'),
+                                    ),
+                            ),
+                          );
+                        }
+
+                        return SlackMessageBubble(
+                          message: _messages[index],
+                          userMappings: _userMappings,
+                          memberCache: _memberCache,
+                          primaryColor: Colors.blue,
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -1328,10 +1772,7 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Link to Member',
-                style: theme.textTheme.headlineSmall,
-              ),
+              Text('Link to Member', style: theme.textTheme.headlineSmall),
               const SizedBox(height: 16),
               TextField(
                 controller: _searchController,
@@ -1349,35 +1790,35 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
                     : _results.isEmpty
-                        ? Center(
-                            child: Text(
-                              _searchController.text.length < 2
-                                  ? 'Type to search members...'
-                                  : 'No members found',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _results.length,
-                            itemBuilder: (context, index) {
-                              final member = _results[index];
-                              return ListTile(
-                                leading: CorsAwareAvatar(
-                                  imageUrl: member.primaryProfilePhotoUrl,
-                                  radius: 20,
-                                  fallbackText: member.name,
-                                ),
-                                title: Text(member.name),
-                                subtitle: Text(
-                                  member.email ?? 'No email',
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                                onTap: () => Navigator.pop(context, member),
-                              );
-                            },
+                    ? Center(
+                        child: Text(
+                          _searchController.text.length < 2
+                              ? 'Type to search members...'
+                              : 'No members found',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _results.length,
+                        itemBuilder: (context, index) {
+                          final member = _results[index];
+                          return ListTile(
+                            leading: CorsAwareAvatar(
+                              imageUrl: member.primaryProfilePhotoUrl,
+                              radius: 20,
+                              fallbackText: member.name,
+                            ),
+                            title: Text(member.name),
+                            subtitle: Text(
+                              member.email ?? 'No email',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            onTap: () => Navigator.pop(context, member),
+                          );
+                        },
+                      ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -1401,16 +1842,13 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
     final initial = member.name.isNotEmpty ? member.name[0].toUpperCase() : '?';
 
     if (photoUrl == null) {
-      return CircleAvatar(
-        child: Text(initial),
-      );
+      return CircleAvatar(child: Text(initial));
     }
 
     return CachedNetworkImage(
       imageUrl: photoUrl,
-      imageBuilder: (context, imageProvider) => CircleAvatar(
-        backgroundImage: imageProvider,
-      ),
+      imageBuilder: (context, imageProvider) =>
+          CircleAvatar(backgroundImage: imageProvider),
       placeholder: (context, url) => CircleAvatar(
         child: const SizedBox(
           width: 16,
@@ -1418,8 +1856,196 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
       ),
-      errorWidget: (context, url, error) => CircleAvatar(
-        child: Text(initial),
+      errorWidget: (context, url, error) => CircleAvatar(child: Text(initial)),
+    );
+  }
+}
+
+/// Quick view dialog for unmatched user from membership changes
+class _UnmatchedUserQuickView extends StatefulWidget {
+  const _UnmatchedUserQuickView({
+    required this.user,
+    required this.repository,
+    this.onSwitchToUnmatchedTab,
+  });
+
+  final SlackUnmatchedUser user;
+  final SlackManagementRepository repository;
+  final VoidCallback? onSwitchToUnmatchedTab;
+
+  @override
+  State<_UnmatchedUserQuickView> createState() =>
+      _UnmatchedUserQuickViewState();
+}
+
+class _UnmatchedUserQuickViewState extends State<_UnmatchedUserQuickView> {
+  List<Map<String, dynamic>> _messages = [];
+  bool _loading = true;
+  static const int _previewLimit = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreview();
+  }
+
+  Future<void> _loadPreview() async {
+    try {
+      final messages = await widget.repository.getMessagesBySlackUserId(
+        widget.user.slackUserId,
+        limit: _previewLimit,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages = messages;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          CorsAwareAvatar(
+            imageUrl: widget.user.avatarUrl,
+            radius: 20,
+            backgroundColor: Colors.orange.withOpacity(0.2),
+            fallbackText: widget.user.primaryLabel,
+            fallbackIconColor: Colors.orange[700]!,
+            fallbackTextColor: Colors.orange[700]!,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.user.primaryLabel,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Unmatched User',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.orange[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // User info
+            if (widget.user.email != null && widget.user.email!.isNotEmpty)
+              _buildInfoRow(Icons.email, widget.user.email!, theme),
+            if (widget.user.usernameDisplay != null)
+              _buildInfoRow(
+                Icons.alternate_email,
+                widget.user.usernameDisplay!,
+                theme,
+              ),
+            const Divider(height: 24),
+            // Recent messages preview
+            Text(
+              'Recent Messages',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_loading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_messages.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'No messages found',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            else
+              ...(_messages.take(3).map((msg) {
+                final text = msg['message_text']?.toString() ?? '';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      text.isNotEmpty ? text : '[No text]',
+                      style: theme.textTheme.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                );
+              })),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+        if (widget.onSwitchToUnmatchedTab != null)
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onSwitchToUnmatchedTab!();
+            },
+            icon: const Icon(Icons.link, size: 18),
+            label: const Text('Match User'),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Text(text, style: theme.textTheme.bodyMedium),
+        ],
       ),
     );
   }

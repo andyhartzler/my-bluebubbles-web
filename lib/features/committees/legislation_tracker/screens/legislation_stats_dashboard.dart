@@ -2,10 +2,15 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../services/committee_repository.dart';
 import '../models/legislation_widget_config.dart';
+import '../providers/legislation_provider.dart';
+import '../screens/bill_detail_screen.dart';
+import '../screens/legislator_detail_screen.dart';
+import '../screens/legislation_tracker_screen.dart';
 import '../services/legislation_service.dart';
 import '../widgets/legislation_dashboard_widgets.dart';
 
@@ -20,8 +25,6 @@ const _grassrootsGreen = Color(0xFF43A047);
 // Party colors
 const _democratBlue = Color(0xFF3B82F6);
 const _republicanRed = Color(0xFFEF4444);
-
-const _prefsKey = 'legislation_dashboard_config_v1';
 
 /// Data class for dragging widgets from the palette
 class _PaletteDragData {
@@ -50,12 +53,14 @@ class LegislationStatsDashboard extends StatefulWidget {
   });
 
   @override
-  State<LegislationStatsDashboard> createState() => _LegislationStatsDashboardState();
+  State<LegislationStatsDashboard> createState() =>
+      _LegislationStatsDashboardState();
 }
 
 class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     with SingleTickerProviderStateMixin {
   final LegislationService _service = LegislationService();
+  final CommitteeRepository _committeeRepository = CommitteeRepository();
   final Uuid _uuid = const Uuid();
 
   LegislationStats? _stats;
@@ -70,12 +75,13 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
   int? _dragHoverIndex;
   bool _isDragging = false;
 
-  // Dashboard configuration
+  // Dashboard configuration (separate for desktop and mobile)
   LegislationDashboardConfig _desktopConfig = _getDefaultConfig();
   LegislationDashboardConfig _mobileConfig = _getDefaultMobileConfig();
   bool _isMobileLayout = false;
 
-  LegislationDashboardConfig get _config => _isMobileLayout ? _mobileConfig : _desktopConfig;
+  LegislationDashboardConfig get _config =>
+      _isMobileLayout ? _mobileConfig : _desktopConfig;
 
   @override
   void initState() {
@@ -362,26 +368,44 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
 
   Future<void> _loadConfig() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final desktopJson = prefs.getString('${_prefsKey}_desktop');
-      final mobileJson = prefs.getString('${_prefsKey}_mobile');
+      // Load layouts from Supabase (shared across all users for this committee)
+      final layouts = await _committeeRepository.getLegislationDashboardLayouts(
+        widget.committeeId,
+      );
 
-      if (desktopJson != null) {
-        _desktopConfig = LegislationDashboardConfig.fromJsonString(desktopJson);
+      final desktopConfig = layouts['desktop'];
+      final mobileConfig = layouts['mobile'];
+
+      if (desktopConfig != null) {
+        _desktopConfig = LegislationDashboardConfig.fromJson(desktopConfig);
       }
-      if (mobileJson != null) {
-        _mobileConfig = LegislationDashboardConfig.fromJsonString(mobileJson);
+      if (mobileConfig != null) {
+        _mobileConfig = LegislationDashboardConfig.fromJson(mobileConfig);
       }
+
+      if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error loading legislation dashboard config: $e');
     }
   }
 
   Future<void> _saveConfig() async {
+    // Only executives can save layout changes
+    if (!widget.isExecutive) return;
+
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('${_prefsKey}_desktop', _desktopConfig.toJsonString());
-      await prefs.setString('${_prefsKey}_mobile', _mobileConfig.toJsonString());
+      // Save desktop and mobile configs separately to Supabase
+      if (_isMobileLayout) {
+        await _committeeRepository.updateLegislationDashboardMobileLayout(
+          widget.committeeId,
+          _mobileConfig.toJson(),
+        );
+      } else {
+        await _committeeRepository.updateLegislationDashboardDesktopLayout(
+          widget.committeeId,
+          _desktopConfig.toJson(),
+        );
+      }
     } catch (e) {
       debugPrint('Error saving legislation dashboard config: $e');
     }
@@ -441,6 +465,114 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     }
   }
 
+  // ======== NAVIGATION ========
+
+  void _navigateToBillDetail(String billId) {
+    if (!mounted) return;
+    final provider = _getOrCreateProvider();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChangeNotifierProvider.value(
+          value: provider,
+          child: BillDetailScreen(
+            billId: billId,
+            committeeId: widget.committeeId,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToLegislatorDetail(String legislatorId) {
+    if (!mounted) return;
+    final provider = _getOrCreateProvider();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChangeNotifierProvider.value(
+          value: provider,
+          child: LegislatorDetailScreen(
+            legislatorId: legislatorId,
+            committeeId: widget.committeeId,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToFilteredBillList({String? position, String? priority}) {
+    if (!mounted) return;
+    final provider = _getOrCreateProvider();
+
+    // Pre-apply filters before navigation if specified
+    if (position != null) {
+      provider.setPositionFilter(position);
+    }
+    if (priority != null) {
+      provider.setPriorityFilter(priority);
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChangeNotifierProvider.value(
+          value: provider,
+          child: LegislationTrackerScreen(committeeId: widget.committeeId),
+        ),
+      ),
+    );
+  }
+
+  LegislationProvider? _cachedProvider;
+
+  LegislationProvider _getOrCreateProvider() {
+    _cachedProvider ??= LegislationProvider(_service);
+    return _cachedProvider!;
+  }
+
+  void _handleStatCardTap(String dataSourceKey) {
+    // Navigate based on the stat card type
+    switch (dataSourceKey) {
+      case 'supportCount':
+        _navigateToFilteredBillList(position: 'support');
+        break;
+      case 'opposeCount':
+        _navigateToFilteredBillList(position: 'oppose');
+        break;
+      case 'watchingCount':
+        _navigateToFilteredBillList(position: 'watching');
+        break;
+      case 'neutralCount':
+        _navigateToFilteredBillList(position: 'neutral');
+        break;
+      case 'noPositionCount':
+        _navigateToFilteredBillList(position: 'none');
+        break;
+      case 'criticalCount':
+        _navigateToFilteredBillList(priority: 'critical');
+        break;
+      case 'highCount':
+        _navigateToFilteredBillList(priority: 'high');
+        break;
+      case 'mediumCount':
+        _navigateToFilteredBillList(priority: 'medium');
+        break;
+      case 'lowCount':
+        _navigateToFilteredBillList(priority: 'low');
+        break;
+      default:
+        // Navigate to the main bill list for other stats
+        _navigateToFilteredBillList();
+    }
+  }
+
+  void _handleChartTap(String dataSourceKey) {
+    // Navigate to the main bill list for chart taps
+    // Could be enhanced to show specific filtered views based on chart type
+    _navigateToFilteredBillList();
+  }
+
   void _toggleEditMode() {
     if (!mounted) return;
     final wasEditMode = _isEditMode;
@@ -469,7 +601,11 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     _addWidgetAtIndex(source, type, _config.widgets.length);
   }
 
-  void _addWidgetAtIndex(LegislationDataSource source, LegislationWidgetType type, int index) {
+  void _addWidgetAtIndex(
+    LegislationDataSource source,
+    LegislationWidgetType type,
+    int index,
+  ) {
     if (!mounted) return;
     final newWidget = LegislationWidgetConfig(
       id: _uuid.v4(),
@@ -489,20 +625,24 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       for (int i = 0; i < widgetsList.length; i++) {
         widgetsList[i] = widgetsList[i].copyWith(gridY: i);
       }
-      _setConfig(LegislationDashboardConfig(
-        id: _config.id,
-        name: _config.name,
-        widgets: widgetsList,
-      ));
+      _setConfig(
+        LegislationDashboardConfig(
+          id: _config.id,
+          name: _config.name,
+          widgets: widgetsList,
+        ),
+      );
     });
   }
 
   void _removeWidget(String widgetId) {
     if (!mounted) return;
     setState(() {
-      _setConfig(_config.copyWith(
-        widgets: _config.widgets.where((w) => w.id != widgetId).toList(),
-      ));
+      _setConfig(
+        _config.copyWith(
+          widgets: _config.widgets.where((w) => w.id != widgetId).toList(),
+        ),
+      );
     });
   }
 
@@ -577,7 +717,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
             errorBuilder: (_, __, ___) => Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [_unityBlue.withOpacity(0.1), _momentumBlue.withOpacity(0.1)],
+                  colors: [
+                    _unityBlue.withOpacity(0.1),
+                    _momentumBlue.withOpacity(0.1),
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -605,25 +748,42 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     return LayoutBuilder(
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 600;
-        final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
+        final isTablet =
+            constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
         final horizontalPadding = isMobile ? 12.0 : (isTablet ? 20.0 : 32.0);
         final columns = isMobile ? 2 : (isTablet ? 3 : 4);
 
         return CustomScrollView(
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
           slivers: [
             // Header
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, isMobile ? 12 : 24, horizontalPadding, 0),
-              sliver: SliverToBoxAdapter(child: _buildHeader(isMobile: isMobile)),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                isMobile ? 12 : 24,
+                horizontalPadding,
+                0,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: _buildHeader(isMobile: isMobile),
+              ),
             ),
             // Widgets Grid
             SliverPadding(
               padding: EdgeInsets.all(horizontalPadding),
               sliver: SliverToBoxAdapter(
                 child: isMobile
-                    ? _buildMobileWidgetsGrid(stats, constraints.maxWidth - horizontalPadding * 2)
-                    : _buildWidgetsGrid(stats, columns, constraints.maxWidth - horizontalPadding * 2),
+                    ? _buildMobileWidgetsGrid(
+                        stats,
+                        constraints.maxWidth - horizontalPadding * 2,
+                      )
+                    : _buildWidgetsGrid(
+                        stats,
+                        columns,
+                        constraints.maxWidth - horizontalPadding * 2,
+                      ),
               ),
             ),
             if (isMobile)
@@ -641,7 +801,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       return Row(
         children: [
           Container(
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: _momentumBlue),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: _momentumBlue,
+            ),
             padding: const EdgeInsets.all(8),
             child: const Icon(Icons.analytics, color: Colors.white, size: 20),
           ),
@@ -658,7 +821,11 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
           if (widget.isExecutive)
             IconButton(
               tooltip: 'Customize',
-              icon: const Icon(Icons.edit_outlined, color: _unityBlue, size: 22),
+              icon: const Icon(
+                Icons.edit_outlined,
+                color: _unityBlue,
+                size: 22,
+              ),
               onPressed: _toggleEditMode,
             ),
           IconButton(
@@ -673,7 +840,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     return Row(
       children: [
         Container(
-          decoration: const BoxDecoration(shape: BoxShape.circle, color: _momentumBlue),
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: _momentumBlue,
+          ),
           padding: const EdgeInsets.all(12),
           child: const Icon(Icons.analytics, color: Colors.white, size: 28),
         ),
@@ -713,7 +883,11 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     );
   }
 
-  Widget _buildWidgetsGrid(LegislationStats stats, int columns, double maxWidth) {
+  Widget _buildWidgetsGrid(
+    LegislationStats stats,
+    int columns,
+    double maxWidth,
+  ) {
     final widgetWidth = (maxWidth - (columns - 1) * 16) / columns;
     final widgetHeight = widgetWidth * 0.8;
 
@@ -766,33 +940,44 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         if (!processedSwipeRows.contains(widget.swipeRowId)) {
           processedSwipeRows.add(widget.swipeRowId!);
           final rowWidgets = swipeRows[widget.swipeRowId]!;
-          rows.add(_buildSwipeableRow(rowWidgets, stats, widgetWidth, widgetHeight));
+          rows.add(
+            _buildSwipeableRow(rowWidgets, stats, widgetWidth, widgetHeight),
+          );
         }
       } else {
-        final isMobileFull = widget.size == LegislationWidgetSize.mobileFull ||
+        final isMobileFull =
+            widget.size == LegislationWidgetSize.mobileFull ||
             widget.size == LegislationWidgetSize.hero ||
             widget.size == LegislationWidgetSize.large;
         final height = isMobileFull ? fullWidgetHeight : widgetHeight;
 
-        rows.add(SizedBox(
-          width: maxWidth,
-          height: height,
-          child: _buildWidget(widget, stats),
-        ));
+        rows.add(
+          SizedBox(
+            width: maxWidth,
+            height: height,
+            child: _buildWidget(widget, stats),
+          ),
+        );
       }
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: rows.map((row) => Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: row,
-      )).toList(),
+      children: rows
+          .map(
+            (row) =>
+                Padding(padding: const EdgeInsets.only(bottom: 16), child: row),
+          )
+          .toList(),
     );
   }
 
-  Widget _buildSwipeableRow(List<LegislationWidgetConfig> widgets, LegislationStats stats,
-      double baseWidgetWidth, double baseWidgetHeight) {
+  Widget _buildSwipeableRow(
+    List<LegislationWidgetConfig> widgets,
+    LegislationStats stats,
+    double baseWidgetWidth,
+    double baseWidgetHeight,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -833,14 +1018,20 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     );
   }
 
-  double _getWidgetWidth(LegislationWidgetConfig widget, double unitWidth, int columns) {
+  double _getWidgetWidth(
+    LegislationWidgetConfig widget,
+    double unitWidth,
+    int columns,
+  ) {
     final spanWidth = widget.gridWidth.clamp(1, columns);
     return unitWidth * spanWidth + (spanWidth - 1) * 16;
   }
 
   double _getWidgetHeight(LegislationWidgetConfig widget, double unitHeight) {
     final spanHeight = widget.heightMultiplier;
-    final gapAdjustment = spanHeight >= 1 ? (spanHeight.floor() - 1) * 16.0 : 0.0;
+    final gapAdjustment = spanHeight >= 1
+        ? (spanHeight.floor() - 1) * 16.0
+        : 0.0;
     return unitHeight * spanHeight + gapAdjustment;
   }
 
@@ -866,7 +1057,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     }
   }
 
-  Widget _buildWidgetInternal(LegislationWidgetConfig config, LegislationStats stats) {
+  Widget _buildWidgetInternal(
+    LegislationWidgetConfig config,
+    LegislationStats stats,
+  ) {
     final value = _getValueForDataSource(config.dataSourceKey, stats);
 
     switch (config.type) {
@@ -874,19 +1068,33 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         return LegislationStatCardWidget(
           config: config,
           value: value,
+          onTap: () => _handleStatCardTap(config.dataSourceKey),
         );
 
       case LegislationWidgetType.pieChart:
         final data = _getDistributionData(config.dataSourceKey, stats);
-        return LegislationPieChartWidget(config: config, data: data);
+        return LegislationPieChartWidget(
+          config: config,
+          data: data,
+          onTap: () => _handleChartTap(config.dataSourceKey),
+        );
 
       case LegislationWidgetType.donutChart:
         final data = _getDistributionData(config.dataSourceKey, stats);
-        return LegislationPieChartWidget(config: config, data: data, isDonut: true);
+        return LegislationPieChartWidget(
+          config: config,
+          data: data,
+          isDonut: true,
+          onTap: () => _handleChartTap(config.dataSourceKey),
+        );
 
       case LegislationWidgetType.barChart:
         final data = _getDistributionData(config.dataSourceKey, stats);
-        return LegislationBarChartWidget(config: config, data: data);
+        return LegislationBarChartWidget(
+          config: config,
+          data: data,
+          onTap: () => _handleChartTap(config.dataSourceKey),
+        );
 
       case LegislationWidgetType.progressRing:
         final current = stats.billsAiAnalyzedCount;
@@ -895,10 +1103,15 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
           config: config,
           current: current,
           total: total,
+          onTap: () => _handleStatCardTap('billsAnalyzed'),
         );
 
       case LegislationWidgetType.partyComparison:
-        return PartyComparisonWidget(config: config, stats: stats);
+        return PartyComparisonWidget(
+          config: config,
+          stats: stats,
+          onTap: () => _navigateToFilteredBillList(),
+        );
 
       case LegislationWidgetType.leaderboard:
         if (config.dataSourceKey.contains('Democrat')) {
@@ -908,6 +1121,11 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                 ? stats.top10DemocratCosponsors
                 : stats.top10DemocratPrimarySponsors,
             headerColor: _democratBlue,
+            onEntryTap: (entry) {
+              if (entry.legislatorId != null) {
+                _navigateToLegislatorDetail(entry.legislatorId!);
+              }
+            },
           );
         } else if (config.dataSourceKey.contains('Republican')) {
           return LegislatorLeaderboardWidget(
@@ -916,16 +1134,23 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                 ? stats.top10RepublicanCosponsors
                 : stats.top10RepublicanPrimarySponsors,
             headerColor: _republicanRed,
+            onEntryTap: (entry) {
+              if (entry.legislatorId != null) {
+                _navigateToLegislatorDetail(entry.legislatorId!);
+              }
+            },
           );
         } else if (config.dataSourceKey.contains('MostSponsored')) {
           return BillLeaderboardWidget(
             config: config,
             entries: stats.top10MostSponsoredBills,
+            onEntryTap: (entry) => _navigateToBillDetail(entry.id),
           );
         } else if (config.dataSourceKey.contains('MostActive')) {
           return BillLeaderboardWidget(
             config: config,
             entries: stats.top10MostActiveBills,
+            onEntryTap: (entry) => _navigateToBillDetail(entry.id),
           );
         }
         return const SizedBox.shrink();
@@ -1170,97 +1395,269 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     switch (key) {
       case 'positionBreakdown':
         return [
-          PieChartItem(label: 'Support', count: stats.supportCount, color: _grassrootsGreen),
-          PieChartItem(label: 'Oppose', count: stats.opposeCount, color: _republicanRed),
-          PieChartItem(label: 'Watching', count: stats.watchingCount, color: _sunriseGold),
-          PieChartItem(label: 'Neutral', count: stats.neutralCount, color: Colors.grey),
-          PieChartItem(label: 'No Position', count: stats.noPositionCount, color: Colors.grey.shade400),
+          PieChartItem(
+            label: 'Support',
+            count: stats.supportCount,
+            color: _grassrootsGreen,
+          ),
+          PieChartItem(
+            label: 'Oppose',
+            count: stats.opposeCount,
+            color: _republicanRed,
+          ),
+          PieChartItem(
+            label: 'Watching',
+            count: stats.watchingCount,
+            color: _sunriseGold,
+          ),
+          PieChartItem(
+            label: 'Neutral',
+            count: stats.neutralCount,
+            color: Colors.grey,
+          ),
+          PieChartItem(
+            label: 'No Position',
+            count: stats.noPositionCount,
+            color: Colors.grey.shade400,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'priorityBreakdown':
         return [
-          PieChartItem(label: 'Critical', count: stats.criticalCount, color: _actionRed),
-          PieChartItem(label: 'High', count: stats.highCount, color: _sunriseGold),
-          PieChartItem(label: 'Medium', count: stats.mediumCount, color: _momentumBlue),
-          PieChartItem(label: 'Low', count: stats.lowCount, color: _grassrootsGreen),
-          PieChartItem(label: 'None', count: stats.noPriorityCount, color: Colors.grey.shade400),
+          PieChartItem(
+            label: 'Critical',
+            count: stats.criticalCount,
+            color: _actionRed,
+          ),
+          PieChartItem(
+            label: 'High',
+            count: stats.highCount,
+            color: _sunriseGold,
+          ),
+          PieChartItem(
+            label: 'Medium',
+            count: stats.mediumCount,
+            color: _momentumBlue,
+          ),
+          PieChartItem(
+            label: 'Low',
+            count: stats.lowCount,
+            color: _grassrootsGreen,
+          ),
+          PieChartItem(
+            label: 'None',
+            count: stats.noPriorityCount,
+            color: Colors.grey.shade400,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'statusBreakdown':
         return [
-          PieChartItem(label: 'Passed House', count: stats.passedLowerCount, color: _momentumBlue),
-          PieChartItem(label: 'Passed Senate', count: stats.passedUpperCount, color: _justicePurple),
-          PieChartItem(label: 'Passed Both', count: stats.passedBothChambersCount, color: _grassrootsGreen),
-          PieChartItem(label: 'Signed', count: stats.signedCount, color: _sunriseGold),
-          PieChartItem(label: 'Vetoed', count: stats.vetoedCount, color: _actionRed),
+          PieChartItem(
+            label: 'Passed House',
+            count: stats.passedLowerCount,
+            color: _momentumBlue,
+          ),
+          PieChartItem(
+            label: 'Passed Senate',
+            count: stats.passedUpperCount,
+            color: _justicePurple,
+          ),
+          PieChartItem(
+            label: 'Passed Both',
+            count: stats.passedBothChambersCount,
+            color: _grassrootsGreen,
+          ),
+          PieChartItem(
+            label: 'Signed',
+            count: stats.signedCount,
+            color: _sunriseGold,
+          ),
+          PieChartItem(
+            label: 'Vetoed',
+            count: stats.vetoedCount,
+            color: _actionRed,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'chamberOriginBreakdown':
         return [
-          PieChartItem(label: 'House Bills', count: stats.houseBillsCount, color: _momentumBlue),
-          PieChartItem(label: 'Senate Bills', count: stats.senateBillsCount, color: _justicePurple),
+          PieChartItem(
+            label: 'House Bills',
+            count: stats.houseBillsCount,
+            color: _momentumBlue,
+          ),
+          PieChartItem(
+            label: 'Senate Bills',
+            count: stats.senateBillsCount,
+            color: _justicePurple,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'partySponsorship':
         return [
-          PieChartItem(label: 'Democrat', count: stats.totalDemocratSponsorships, color: _democratBlue),
-          PieChartItem(label: 'Republican', count: stats.totalRepublicanSponsorships, color: _republicanRed),
+          PieChartItem(
+            label: 'Democrat',
+            count: stats.totalDemocratSponsorships,
+            color: _democratBlue,
+          ),
+          PieChartItem(
+            label: 'Republican',
+            count: stats.totalRepublicanSponsorships,
+            color: _republicanRed,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'bipartisanBreakdown':
         return [
-          PieChartItem(label: 'Bipartisan', count: stats.bipartisanBillsCount, color: _justicePurple),
-          PieChartItem(label: 'Democrat Only', count: stats.democratOnlyBillsCount, color: _democratBlue),
-          PieChartItem(label: 'Republican Only', count: stats.republicanOnlyBillsCount, color: _republicanRed),
+          PieChartItem(
+            label: 'Bipartisan',
+            count: stats.bipartisanBillsCount,
+            color: _justicePurple,
+          ),
+          PieChartItem(
+            label: 'Democrat Only',
+            count: stats.democratOnlyBillsCount,
+            color: _democratBlue,
+          ),
+          PieChartItem(
+            label: 'Republican Only',
+            count: stats.republicanOnlyBillsCount,
+            color: _republicanRed,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'chamberDistribution':
         return [
-          PieChartItem(label: 'House', count: stats.houseLegislatorsCount, color: _momentumBlue),
-          PieChartItem(label: 'Senate', count: stats.senateLegislatorsCount, color: _justicePurple),
+          PieChartItem(
+            label: 'House',
+            count: stats.houseLegislatorsCount,
+            color: _momentumBlue,
+          ),
+          PieChartItem(
+            label: 'Senate',
+            count: stats.senateLegislatorsCount,
+            color: _justicePurple,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'partyDistribution':
         return [
-          PieChartItem(label: 'Democrats', count: stats.democratLegislatorsCount, color: _democratBlue),
-          PieChartItem(label: 'Republicans', count: stats.republicanLegislatorsCount, color: _republicanRed),
+          PieChartItem(
+            label: 'Democrats',
+            count: stats.democratLegislatorsCount,
+            color: _democratBlue,
+          ),
+          PieChartItem(
+            label: 'Republicans',
+            count: stats.republicanLegislatorsCount,
+            color: _republicanRed,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'textCoverageBreakdown':
         return [
-          PieChartItem(label: 'With Text', count: stats.billsWithTextCount, color: _grassrootsGreen),
-          PieChartItem(label: 'Without Text', count: stats.billsWithoutTextCount, color: _actionRed),
-          PieChartItem(label: 'Deferred', count: stats.billsTextDeferredCount, color: _sunriseGold),
+          PieChartItem(
+            label: 'With Text',
+            count: stats.billsWithTextCount,
+            color: _grassrootsGreen,
+          ),
+          PieChartItem(
+            label: 'Without Text',
+            count: stats.billsWithoutTextCount,
+            color: _actionRed,
+          ),
+          PieChartItem(
+            label: 'Deferred',
+            count: stats.billsTextDeferredCount,
+            color: _sunriseGold,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'aiAnalysisBreakdown':
         return [
-          PieChartItem(label: 'Analyzed', count: stats.billsAiAnalyzedCount, color: _grassrootsGreen),
-          PieChartItem(label: 'Pending', count: stats.billsAiPendingCount, color: _sunriseGold),
-          PieChartItem(label: 'Errors', count: stats.billsAiErrorCount, color: _actionRed),
-          PieChartItem(label: 'Awaiting', count: stats.billsAwaitingAiAnalysisCount, color: Colors.grey),
+          PieChartItem(
+            label: 'Analyzed',
+            count: stats.billsAiAnalyzedCount,
+            color: _grassrootsGreen,
+          ),
+          PieChartItem(
+            label: 'Pending',
+            count: stats.billsAiPendingCount,
+            color: _sunriseGold,
+          ),
+          PieChartItem(
+            label: 'Errors',
+            count: stats.billsAiErrorCount,
+            color: _actionRed,
+          ),
+          PieChartItem(
+            label: 'Awaiting',
+            count: stats.billsAwaitingAiAnalysisCount,
+            color: Colors.grey,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'aiPositionRecommendations':
         return [
-          PieChartItem(label: 'Support', count: stats.aiRecommendsSupportCount, color: _grassrootsGreen),
-          PieChartItem(label: 'Oppose', count: stats.aiRecommendsOpposeCount, color: _republicanRed),
-          PieChartItem(label: 'Watching', count: stats.aiRecommendsWatchingCount, color: _sunriseGold),
-          PieChartItem(label: 'Neutral', count: stats.aiRecommendsNeutralCount, color: Colors.grey),
+          PieChartItem(
+            label: 'Support',
+            count: stats.aiRecommendsSupportCount,
+            color: _grassrootsGreen,
+          ),
+          PieChartItem(
+            label: 'Oppose',
+            count: stats.aiRecommendsOpposeCount,
+            color: _republicanRed,
+          ),
+          PieChartItem(
+            label: 'Watching',
+            count: stats.aiRecommendsWatchingCount,
+            color: _sunriseGold,
+          ),
+          PieChartItem(
+            label: 'Neutral',
+            count: stats.aiRecommendsNeutralCount,
+            color: Colors.grey,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'aiPriorityRecommendations':
         return [
-          PieChartItem(label: 'Critical', count: stats.aiRecommendsCriticalCount, color: _actionRed),
-          PieChartItem(label: 'High', count: stats.aiRecommendsHighCount, color: _sunriseGold),
-          PieChartItem(label: 'Medium', count: stats.aiRecommendsMediumCount, color: _momentumBlue),
-          PieChartItem(label: 'Low', count: stats.aiRecommendsLowCount, color: _grassrootsGreen),
+          PieChartItem(
+            label: 'Critical',
+            count: stats.aiRecommendsCriticalCount,
+            color: _actionRed,
+          ),
+          PieChartItem(
+            label: 'High',
+            count: stats.aiRecommendsHighCount,
+            color: _sunriseGold,
+          ),
+          PieChartItem(
+            label: 'Medium',
+            count: stats.aiRecommendsMediumCount,
+            color: _momentumBlue,
+          ),
+          PieChartItem(
+            label: 'Low',
+            count: stats.aiRecommendsLowCount,
+            color: _grassrootsGreen,
+          ),
         ].where((item) => item.count > 0).toList();
 
       case 'voteBreakdown':
         return [
-          PieChartItem(label: 'Passed', count: stats.votesPassedCount, color: _grassrootsGreen),
-          PieChartItem(label: 'Failed', count: stats.votesFailedCount, color: _actionRed),
+          PieChartItem(
+            label: 'Passed',
+            count: stats.votesPassedCount,
+            color: _grassrootsGreen,
+          ),
+          PieChartItem(
+            label: 'Failed',
+            count: stats.votesFailedCount,
+            color: _actionRed,
+          ),
         ].where((item) => item.count > 0).toList();
 
       default:
@@ -1307,13 +1704,8 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
             child: Row(
               children: [
                 if (_showPalette && !_isMobileLayout)
-                  SizedBox(
-                    width: 280,
-                    child: _buildWidgetPalette(),
-                  ),
-                Expanded(
-                  child: _buildEditableGrid(),
-                ),
+                  SizedBox(width: 280, child: _buildWidgetPalette()),
+                Expanded(child: _buildEditableGrid()),
               ],
             ),
           ),
@@ -1348,9 +1740,18 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
               Row(
                 children: [
                   TextButton.icon(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white70, size: 20),
-                    label: const Text('Cancel', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
+                    label: const Text(
+                      'Cancel',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
                     onPressed: () {
                       _loadConfig();
                       _toggleEditMode();
@@ -1362,19 +1763,34 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                     children: [
                       Icon(Icons.edit, color: Colors.white70, size: 18),
                       SizedBox(width: 6),
-                      Text('Editing', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                      Text(
+                        'Editing',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
                     ],
                   ),
                   const Spacer(),
                   ElevatedButton.icon(
                     icon: const Icon(Icons.check, size: 18),
-                    label: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'Save',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _grassrootsGreen,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       elevation: 4,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                     ),
                     onPressed: _toggleEditMode,
                   ),
@@ -1390,8 +1806,13 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white54),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                     onPressed: _showMobilePalette,
                   ),
@@ -1402,12 +1823,21 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white70,
                       side: const BorderSide(color: Colors.white38),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                     onPressed: () {
                       setState(() {
-                        _setConfig(_isMobileLayout ? _getDefaultMobileConfig() : _getDefaultConfig());
+                        _setConfig(
+                          _isMobileLayout
+                              ? _getDefaultMobileConfig()
+                              : _getDefaultConfig(),
+                        );
                       });
                     },
                   ),
@@ -1438,7 +1868,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       child: Row(
         children: [
           IconButton(
-            icon: Icon(_showPalette ? Icons.chevron_left : Icons.menu, color: Colors.white),
+            icon: Icon(
+              _showPalette ? Icons.chevron_left : Icons.menu,
+              color: Colors.white,
+            ),
             onPressed: () => setState(() => _showPalette = !_showPalette),
             tooltip: _showPalette ? 'Hide palette' : 'Show palette',
           ),
@@ -1454,19 +1887,33 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
               children: [
                 Icon(Icons.edit, color: Colors.white70, size: 18),
                 SizedBox(width: 8),
-                Text('Edit Mode', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                Text(
+                  'Edit Mode',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
               ],
             ),
           ),
           const SizedBox(width: 16),
-          const Text('Customize your dashboard', style: TextStyle(fontSize: 14, color: Colors.white70)),
+          const Text(
+            'Customize your dashboard',
+            style: TextStyle(fontSize: 14, color: Colors.white70),
+          ),
           const Spacer(),
           TextButton.icon(
             icon: const Icon(Icons.restore, color: Colors.white70, size: 18),
             label: const Text('Reset', style: TextStyle(color: Colors.white70)),
             onPressed: () {
               setState(() {
-                _setConfig(_isMobileLayout ? _getDefaultMobileConfig() : _getDefaultConfig());
+                _setConfig(
+                  _isMobileLayout
+                      ? _getDefaultMobileConfig()
+                      : _getDefaultConfig(),
+                );
               });
             },
           ),
@@ -1476,7 +1923,9 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
               foregroundColor: Colors.white,
               side: const BorderSide(color: Colors.white54),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               _loadConfig();
@@ -1487,13 +1936,18 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
           const SizedBox(width: 12),
           ElevatedButton.icon(
             icon: const Icon(Icons.check),
-            label: const Text('Save & Exit', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text(
+              'Save & Exit',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: _grassrootsGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: _toggleEditMode,
           ),
@@ -1533,14 +1987,27 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     const Icon(Icons.widgets, color: _unityBlue),
                     const SizedBox(width: 12),
-                    const Text('Add Widgets', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _unityBlue)),
+                    const Text(
+                      'Add Widgets',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _unityBlue,
+                      ),
+                    ),
                     const Spacer(),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   ],
                 ),
               ),
@@ -1550,7 +2017,9 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                   controller: scrollController,
                   padding: const EdgeInsets.all(12),
                   children: LegislationDataCategory.values.map((category) {
-                    final sources = LegislationDataSources.getByCategory(category);
+                    final sources = LegislationDataSources.getByCategory(
+                      category,
+                    );
                     if (sources.isEmpty) return const SizedBox.shrink();
                     return _buildMobilePaletteCategory(category, sources);
                   }).toList(),
@@ -1563,7 +2032,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     );
   }
 
-  Widget _buildMobilePaletteCategory(LegislationDataCategory category, List<LegislationDataSource> sources) {
+  Widget _buildMobilePaletteCategory(
+    LegislationDataCategory category,
+    List<LegislationDataSource> sources,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1571,7 +2043,11 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           child: Text(
             LegislationDataSources.getCategoryLabel(category),
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _unityBlue),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: _unityBlue,
+            ),
           ),
         ),
         ...sources.map((source) => _buildMobilePaletteItem(source)),
@@ -1609,14 +2085,19 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
   void _showWidgetTypeSelector(LegislationDataSource source) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (context) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Display "${source.label}" as:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(
+              'Display "${source.label}" as:',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
@@ -1659,7 +2140,14 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
               children: [
                 Icon(Icons.widgets, color: Colors.white),
                 SizedBox(width: 12),
-                Text('Add Widgets', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  'Add Widgets',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1672,14 +2160,21 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                 final sources = LegislationDataSources.getByCategory(category);
 
                 return Theme(
-                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  data: Theme.of(
+                    context,
+                  ).copyWith(dividerColor: Colors.transparent),
                   child: ExpansionTile(
                     title: Text(
                       LegislationDataSources.getCategoryLabel(category),
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
                     initiallyExpanded: index == 0,
-                    children: sources.map((source) => _buildPaletteItem(source)).toList(),
+                    children: sources
+                        .map((source) => _buildPaletteItem(source))
+                        .toList(),
                   ),
                 );
               },
@@ -1717,7 +2212,13 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(source.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    Text(
+                      source.label,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     Text(
                       source.description,
                       style: TextStyle(fontSize: 11, color: Colors.grey[600]),
@@ -1728,7 +2229,9 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                 ),
               ),
               Icon(
-                source.supportedWidgets.length > 1 ? Icons.add_circle_outline : Icons.add_circle,
+                source.supportedWidgets.length > 1
+                    ? Icons.add_circle_outline
+                    : Icons.add_circle,
                 color: _grassrootsGreen,
                 size: 24,
               ),
@@ -1748,14 +2251,18 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         builder: (context, constraints) {
           final columns = _isMobileLayout ? 2 : 4;
           final horizontalPadding = _isMobileLayout ? 12.0 : 24.0;
-          final widgetWidth = (constraints.maxWidth - horizontalPadding * 2 - (columns - 1) * 16) / columns;
+          final widgetWidth =
+              (constraints.maxWidth -
+                  horizontalPadding * 2 -
+                  (columns - 1) * 16) /
+              columns;
           final widgetHeight = widgetWidth * 0.8;
 
-          final sortedWidgets = List<LegislationWidgetConfig>.from(_config.widgets)
-            ..sort((a, b) {
-              if (a.gridY != b.gridY) return a.gridY.compareTo(b.gridY);
-              return a.gridX.compareTo(b.gridX);
-            });
+          final sortedWidgets =
+              List<LegislationWidgetConfig>.from(_config.widgets)..sort((a, b) {
+                if (a.gridY != b.gridY) return a.gridY.compareTo(b.gridY);
+                return a.gridX.compareTo(b.gridX);
+              });
 
           return SingleChildScrollView(
             padding: EdgeInsets.all(horizontalPadding),
@@ -1773,7 +2280,11 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                           color: _momentumBlue,
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Icon(Icons.drag_indicator, size: 14, color: Colors.white),
+                        child: const Icon(
+                          Icons.drag_indicator,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -1786,7 +2297,13 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                   ),
                 ),
                 // Widgets with drop zones
-                _buildWidgetsWithDropZones(sortedWidgets, stats, widgetWidth, widgetHeight, columns),
+                _buildWidgetsWithDropZones(
+                  sortedWidgets,
+                  stats,
+                  widgetWidth,
+                  widgetHeight,
+                  columns,
+                ),
               ],
             ),
           );
@@ -1822,10 +2339,18 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
             data: _WidgetReorderData(fromIndex: i, config: widget),
             delay: const Duration(milliseconds: 150),
             hapticFeedbackOnStart: true,
-            onDragStarted: () { if (mounted) setState(() => _isDragging = true); },
-            onDragEnd: (_) { if (mounted) setState(() => _isDragging = false); },
-            onDraggableCanceled: (_, __) { if (mounted) setState(() => _isDragging = false); },
-            onDragCompleted: () { if (mounted) setState(() => _isDragging = false); },
+            onDragStarted: () {
+              if (mounted) setState(() => _isDragging = true);
+            },
+            onDragEnd: (_) {
+              if (mounted) setState(() => _isDragging = false);
+            },
+            onDraggableCanceled: (_, __) {
+              if (mounted) setState(() => _isDragging = false);
+            },
+            onDragCompleted: () {
+              if (mounted) setState(() => _isDragging = false);
+            },
             feedback: Material(
               elevation: 12,
               borderRadius: BorderRadius.circular(16),
@@ -1838,7 +2363,11 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: _momentumBlue, width: 3),
                   boxShadow: [
-                    BoxShadow(color: _momentumBlue.withOpacity(0.3), blurRadius: 20, spreadRadius: 4),
+                    BoxShadow(
+                      color: _momentumBlue.withOpacity(0.3),
+                      blurRadius: 20,
+                      spreadRadius: 4,
+                    ),
                   ],
                 ),
                 child: Row(
@@ -1846,8 +2375,13 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                     Icon(widgetIcon, color: _momentumBlue, size: 32),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(widgetLabel,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _unityBlue),
+                      child: Text(
+                        widgetLabel,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _unityBlue,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -1862,7 +2396,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                 height: height,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _momentumBlue.withOpacity(0.5), width: 2),
+                  border: Border.all(
+                    color: _momentumBlue.withOpacity(0.5),
+                    width: 2,
+                  ),
                   color: Colors.grey.withOpacity(0.1),
                 ),
               ),
@@ -1880,7 +2417,12 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       items.add(_buildReorderDropZone(i + 1, widgetWidth));
     }
 
-    return Wrap(spacing: 16, runSpacing: 16, crossAxisAlignment: WrapCrossAlignment.start, children: items);
+    return Wrap(
+      spacing: 16,
+      runSpacing: 16,
+      crossAxisAlignment: WrapCrossAlignment.start,
+      children: items,
+    );
   }
 
   Widget _buildReorderDropZone(int insertIndex, double widgetWidth) {
@@ -1912,11 +2454,16 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
           margin: EdgeInsets.symmetric(horizontal: isHovering ? 4 : 0),
           decoration: BoxDecoration(
             color: isHovering
-                ? (isReorder ? _grassrootsGreen.withOpacity(0.3) : _momentumBlue.withOpacity(0.3))
+                ? (isReorder
+                      ? _grassrootsGreen.withOpacity(0.3)
+                      : _momentumBlue.withOpacity(0.3))
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: isHovering
-                ? Border.all(color: isReorder ? _grassrootsGreen : _momentumBlue, width: 2)
+                ? Border.all(
+                    color: isReorder ? _grassrootsGreen : _momentumBlue,
+                    width: 2,
+                  )
                 : null,
           ),
           child: isHovering
@@ -1924,9 +2471,18 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.add_circle_outline, color: isReorder ? _grassrootsGreen : _momentumBlue),
+                      Icon(
+                        Icons.add_circle_outline,
+                        color: isReorder ? _grassrootsGreen : _momentumBlue,
+                      ),
                       const SizedBox(height: 4),
-                      Text('Drop here', style: TextStyle(fontSize: 10, color: isReorder ? _grassrootsGreen : _momentumBlue)),
+                      Text(
+                        'Drop here',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isReorder ? _grassrootsGreen : _momentumBlue,
+                        ),
+                      ),
                     ],
                   ),
                 )
@@ -1954,7 +2510,11 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     _saveConfig();
   }
 
-  Widget _buildEditableWidget(LegislationWidgetConfig config, LegislationStats stats, int index) {
+  Widget _buildEditableWidget(
+    LegislationWidgetConfig config,
+    LegislationStats stats,
+    int index,
+  ) {
     return Stack(
       children: [
         // The actual widget
@@ -1969,7 +2529,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _momentumBlue.withOpacity(0.5), width: 2),
+                  border: Border.all(
+                    color: _momentumBlue.withOpacity(0.5),
+                    width: 2,
+                  ),
                 ),
               ),
             ),
@@ -1985,8 +2548,13 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
               color: _unityBlue.withOpacity(0.9),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text('#${index + 1}',
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            child: Text(
+              '#${index + 1}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -2005,7 +2573,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
               children: [
                 Icon(Icons.drag_indicator, color: Colors.white, size: 14),
                 SizedBox(width: 4),
-                Text('Hold to drag', style: TextStyle(color: Colors.white, fontSize: 10)),
+                Text(
+                  'Hold to drag',
+                  style: TextStyle(color: Colors.white, fontSize: 10),
+                ),
               ],
             ),
           ),
@@ -2049,7 +2620,9 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
   void _showWidgetOptions(LegislationWidgetConfig config, [int? index]) {
     if (!mounted) return;
     final source = LegislationDataSources.getByKey(config.dataSourceKey);
-    final currentGradientIndex = LegislationWidgetGradients.indexOfColors(config.gradientColors);
+    final currentGradientIndex = LegislationWidgetGradients.indexOfColors(
+      config.gradientColors,
+    );
 
     showModalBottomSheet(
       context: context,
@@ -2075,12 +2648,19 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                       Icon(config.icon ?? Icons.widgets, color: _momentumBlue),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(config.title,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        child: Text(
+                          config.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, color: _actionRed),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: _actionRed,
+                        ),
                         onPressed: () {
                           Navigator.pop(context);
                           _removeWidget(config.id);
@@ -2091,28 +2671,43 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                   const SizedBox(height: 20),
 
                   // Widget type selection
-                  const Text('Display as:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Display as:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: (source?.supportedWidgets ?? [LegislationWidgetType.statCard]).map((type) {
-                      final isSelected = config.type == type;
-                      return ChoiceChip(
-                        label: Text(_getWidgetTypeLabel(type)),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          if (selected) {
-                            _updateWidget(config.copyWith(type: type, size: _getSizeForType(type)));
-                            Navigator.pop(context);
-                          }
-                        },
-                      );
-                    }).toList(),
+                    children:
+                        (source?.supportedWidgets ??
+                                [LegislationWidgetType.statCard])
+                            .map((type) {
+                              final isSelected = config.type == type;
+                              return ChoiceChip(
+                                label: Text(_getWidgetTypeLabel(type)),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    _updateWidget(
+                                      config.copyWith(
+                                        type: type,
+                                        size: _getSizeForType(type),
+                                      ),
+                                    );
+                                    Navigator.pop(context);
+                                  }
+                                },
+                              );
+                            })
+                            .toList(),
                   ),
                   const SizedBox(height: 20),
 
                   // Size selection
-                  const Text('Size:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Size:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -2133,24 +2728,31 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                   const SizedBox(height: 20),
 
                   // Color selection
-                  const Text('Color:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Color:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 12),
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 1.5,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 4,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 1.5,
+                        ),
                     itemCount: LegislationWidgetGradients.all.length,
                     itemBuilder: (context, gradientIndex) {
-                      final gradient = LegislationWidgetGradients.all[gradientIndex];
+                      final gradient =
+                          LegislationWidgetGradients.all[gradientIndex];
                       final isSelected = currentGradientIndex == gradientIndex;
                       return GestureDetector(
                         onTap: () {
-                          _updateWidget(config.copyWith(gradientColors: gradient));
+                          _updateWidget(
+                            config.copyWith(gradientColors: gradient),
+                          );
                           Navigator.pop(context);
                         },
                         child: Container(
@@ -2161,13 +2763,25 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                               end: Alignment.bottomRight,
                             ),
                             borderRadius: BorderRadius.circular(12),
-                            border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                            border: isSelected
+                                ? Border.all(color: Colors.white, width: 3)
+                                : null,
                             boxShadow: [
-                              BoxShadow(color: gradient.last.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4)),
+                              BoxShadow(
+                                color: gradient.last.withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
                             ],
                           ),
                           child: isSelected
-                              ? const Center(child: Icon(Icons.check, color: Colors.white, size: 24))
+                              ? const Center(
+                                  child: Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                )
                               : null,
                         ),
                       );
@@ -2178,7 +2792,11 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                     Center(
                       child: Text(
                         LegislationWidgetGradients.names[currentGradientIndex],
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                     ),
                 ],
@@ -2206,14 +2824,22 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
 
   String _getSizeLabel(LegislationWidgetSize size) {
     switch (size) {
-      case LegislationWidgetSize.mini: return 'Mini';
-      case LegislationWidgetSize.small: return 'Small';
-      case LegislationWidgetSize.medium: return 'Medium';
-      case LegislationWidgetSize.large: return 'Large';
-      case LegislationWidgetSize.wide: return 'Wide';
-      case LegislationWidgetSize.tall: return 'Tall';
-      case LegislationWidgetSize.hero: return 'Hero';
-      case LegislationWidgetSize.mobileFull: return 'Full Width';
+      case LegislationWidgetSize.mini:
+        return 'Mini';
+      case LegislationWidgetSize.small:
+        return 'Small';
+      case LegislationWidgetSize.medium:
+        return 'Medium';
+      case LegislationWidgetSize.large:
+        return 'Large';
+      case LegislationWidgetSize.wide:
+        return 'Wide';
+      case LegislationWidgetSize.tall:
+        return 'Tall';
+      case LegislationWidgetSize.hero:
+        return 'Hero';
+      case LegislationWidgetSize.mobileFull:
+        return 'Full Width';
     }
   }
 

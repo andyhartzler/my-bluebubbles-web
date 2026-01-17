@@ -113,10 +113,15 @@ class SlackFileAttachments extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...visibleFiles.map((file) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: SlackFileAttachmentTile(file: file, darkBackground: darkBackground),
-            )),
+        ...visibleFiles.map(
+          (file) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: SlackFileAttachmentTile(
+              file: file,
+              darkBackground: darkBackground,
+            ),
+          ),
+        ),
         if (remainingCount > 0)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -129,7 +134,9 @@ class SlackFileAttachments extends StatelessWidget {
                   '+$remainingCount more file${remainingCount > 1 ? 's' : ''}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: darkBackground ? const Color(0xFF32A6DE) : Theme.of(context).colorScheme.primary,
+                    color: darkBackground
+                        ? const Color(0xFF32A6DE)
+                        : Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -328,10 +335,7 @@ class SlackFileAttachmentTile extends StatelessWidget {
 
 /// Dialog for previewing files
 class SlackFilePreviewDialog extends StatelessWidget {
-  const SlackFilePreviewDialog({
-    super.key,
-    required this.file,
-  });
+  const SlackFilePreviewDialog({super.key, required this.file});
 
   final SlackArchivedFile file;
 
@@ -453,7 +457,7 @@ class SlackFilePreviewDialog extends StatelessWidget {
                 child: CircularProgressIndicator(
                   value: loadingProgress.expectedTotalBytes != null
                       ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
+                            loadingProgress.expectedTotalBytes!
                       : null,
                 ),
               );
@@ -539,9 +543,9 @@ class SlackFilePreviewDialog extends StatelessWidget {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open file')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not open file')));
       }
     }
   }

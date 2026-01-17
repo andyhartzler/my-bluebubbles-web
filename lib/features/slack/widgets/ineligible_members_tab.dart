@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -71,10 +72,10 @@ class _IneligibleMembersTabState extends State<IneligibleMembersTab> {
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
-                  ? _buildErrorState(theme)
-                  : _members.isEmpty
-                      ? _buildEmptyState(theme)
-                      : _buildMemberList(),
+              ? _buildErrorState(theme)
+              : _members.isEmpty
+              ? _buildEmptyState(theme)
+              : _buildMemberList(),
         ),
       ],
     );
@@ -84,39 +85,45 @@ class _IneligibleMembersTabState extends State<IneligibleMembersTab> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.2),
-          ),
+        gradient: LinearGradient(
+          colors: [const Color(0xFFDC2626), const Color(0xFFB91C1C)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
       ),
       child: Row(
         children: [
-          Icon(Icons.block, color: theme.colorScheme.error),
-          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.block, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Ineligible Members with Slack Access',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                const Text(
+                  'Ineligible Members',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  '${_members.length} ineligible members still have Slack access',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  '${_members.length} members still have Slack access',
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
                 ),
               ],
             ),
           ),
           IconButton(
             onPressed: _loadMembers,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white),
             tooltip: 'Refresh',
           ),
         ],
@@ -145,21 +152,33 @@ class _IneligibleMembersTabState extends State<IneligibleMembersTab> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 64,
-            color: theme.colorScheme.primary,
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: BrandColors.success.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_circle_outline,
+              size: 64,
+              color: BrandColors.success,
+            ),
           ),
-          const SizedBox(height: 16),
-          Text(
+          const SizedBox(height: 20),
+          const Text(
             'No ineligible members with Slack access',
-            style: theme.textTheme.titleMedium,
+            style: TextStyle(
+              color: BrandColors.unityBlue,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'All Slack users are eligible members',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            style: TextStyle(
+              color: BrandColors.unityBlue.withOpacity(0.7),
+              fontSize: 14,
             ),
           ),
         ],
@@ -174,16 +193,34 @@ class _IneligibleMembersTabState extends State<IneligibleMembersTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: theme.colorScheme.error,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: BrandColors.error.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: BrandColors.error,
+              ),
             ),
             const SizedBox(height: 16),
-            Text(_error ?? 'An error occurred', textAlign: TextAlign.center),
+            Text(
+              _error ?? 'An error occurred',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: BrandColors.unityBlue,
+                fontSize: 15,
+              ),
+            ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: _loadMembers,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: BrandColors.unityBlue,
+                foregroundColor: Colors.white,
+              ),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),
@@ -196,32 +233,27 @@ class _IneligibleMembersTabState extends State<IneligibleMembersTab> {
 
 /// Card widget for displaying an ineligible member
 class _IneligibleMemberCard extends StatelessWidget {
-  const _IneligibleMemberCard({
-    required this.member,
-    required this.onTap,
-  });
+  const _IneligibleMemberCard({required this.member, required this.onTap});
 
   final Member member;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final age = member.age;
     final email = member.email ?? member.schoolEmail;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      color: theme.colorScheme.errorContainer.withOpacity(0.1),
+      elevation: 4,
+      shadowColor: Colors.red.withOpacity(0.2),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: theme.colorScheme.error.withOpacity(0.3),
-        ),
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Colors.red, width: 2),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -229,15 +261,21 @@ class _IneligibleMemberCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  // Avatar
-                  CorsAwareAvatar(
-                    imageUrl: member.primaryProfilePhotoUrl,
-                    radius: 24,
-                    backgroundColor: theme.colorScheme.errorContainer,
-                    fallbackText: member.name,
-                    fallbackTextColor: theme.colorScheme.onErrorContainer,
+                  // Avatar with red border
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.red, width: 2),
+                    ),
+                    child: CorsAwareAvatar(
+                      imageUrl: member.primaryProfilePhotoUrl,
+                      radius: 26,
+                      backgroundColor: Colors.red.withOpacity(0.1),
+                      fallbackText: member.name,
+                      fallbackTextColor: Colors.red,
+                    ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   // Name and details
                   Expanded(
                     child: Column(
@@ -248,30 +286,41 @@ class _IneligibleMemberCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 member.name,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
+                                style: const TextStyle(
+                                  color: BrandColors.unityBlue,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            Chip(
-                              label: const Text('INELIGIBLE'),
-                              backgroundColor: theme.colorScheme.error,
-                              labelStyle: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
                               ),
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'INELIGIBLE',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
                             ),
                           ],
                         ),
                         if (email != null)
                           Text(
                             email,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                            style: TextStyle(
+                              color: BrandColors.unityBlue.withOpacity(0.7),
+                              fontSize: 13,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -280,7 +329,7 @@ class _IneligibleMemberCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               // Info row
               Wrap(
                 spacing: 16,
@@ -291,30 +340,34 @@ class _IneligibleMemberCard extends StatelessWidget {
                       context,
                       Icons.cake_outlined,
                       '$age years old',
-                      theme.colorScheme.error,
+                      Colors.red,
                     ),
                   if (member.slackUserId != null)
                     _buildInfoChip(
                       context,
                       Icons.tag,
                       'Slack: ${member.slackUserId}',
-                      theme.colorScheme.onSurfaceVariant,
+                      BrandColors.momentumBlue,
                     ),
                   if (member.county != null)
                     _buildInfoChip(
                       context,
                       Icons.location_on_outlined,
                       member.county!,
-                      theme.colorScheme.onSurfaceVariant,
+                      BrandColors.momentumBlue,
                     ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               // Action button
               Align(
                 alignment: Alignment.centerRight,
-                child: OutlinedButton.icon(
+                child: ElevatedButton.icon(
                   onPressed: onTap,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: BrandColors.unityBlue,
+                    foregroundColor: Colors.white,
+                  ),
                   icon: const Icon(Icons.open_in_new, size: 18),
                   label: const Text('View Profile'),
                 ),
@@ -332,8 +385,6 @@ class _IneligibleMemberCard extends StatelessWidget {
     String label,
     Color color,
   ) {
-    final theme = Theme.of(context);
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -342,8 +393,9 @@ class _IneligibleMemberCard extends StatelessWidget {
         Flexible(
           child: Text(
             label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            style: TextStyle(
+              color: BrandColors.unityBlue.withOpacity(0.7),
+              fontSize: 13,
             ),
             overflow: TextOverflow.ellipsis,
           ),

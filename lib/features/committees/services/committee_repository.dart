@@ -1364,6 +1364,90 @@ class CommitteeRepository {
     }
   }
 
+  /// Get legislation dashboard layout configs for a committee
+  /// Returns a map with 'desktop' and 'mobile' keys containing the JSON configs
+  Future<Map<String, Map<String, dynamic>?>> getLegislationDashboardLayouts(String committeeName) async {
+    if (!isReady) return {'desktop': null, 'mobile': null};
+
+    try {
+      final data = await _readClient
+          .from('committees')
+          .select('legislation_dashboard_desktop_config, legislation_dashboard_mobile_config')
+          .or('name.ilike.%$committeeName%,slug.ilike.%$committeeName%')
+          .maybeSingle();
+
+      if (data == null) return {'desktop': null, 'mobile': null};
+
+      return {
+        'desktop': data['legislation_dashboard_desktop_config'] as Map<String, dynamic>?,
+        'mobile': data['legislation_dashboard_mobile_config'] as Map<String, dynamic>?,
+      };
+    } catch (e) {
+      print('Error fetching legislation dashboard layouts: $e');
+      return {'desktop': null, 'mobile': null};
+    }
+  }
+
+  /// Update legislation dashboard desktop layout for a committee (executive only)
+  Future<bool> updateLegislationDashboardDesktopLayout(String committeeName, Map<String, dynamic> config) async {
+    if (!isReady) return false;
+
+    try {
+      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+
+      final existing = await _readClient
+          .from('committees')
+          .select('id')
+          .or('name.ilike.%$committeeName%,slug.ilike.%$committeeName%')
+          .maybeSingle();
+
+      if (existing == null) {
+        print('Committee not found: $committeeName');
+        return false;
+      }
+
+      await writeClient
+          .from('committees')
+          .update({'legislation_dashboard_desktop_config': config})
+          .eq('id', existing['id']);
+
+      return true;
+    } catch (e) {
+      print('Error updating legislation dashboard desktop layout: $e');
+      return false;
+    }
+  }
+
+  /// Update legislation dashboard mobile layout for a committee (executive only)
+  Future<bool> updateLegislationDashboardMobileLayout(String committeeName, Map<String, dynamic> config) async {
+    if (!isReady) return false;
+
+    try {
+      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+
+      final existing = await _readClient
+          .from('committees')
+          .select('id')
+          .or('name.ilike.%$committeeName%,slug.ilike.%$committeeName%')
+          .maybeSingle();
+
+      if (existing == null) {
+        print('Committee not found: $committeeName');
+        return false;
+      }
+
+      await writeClient
+          .from('committees')
+          .update({'legislation_dashboard_mobile_config': config})
+          .eq('id', existing['id']);
+
+      return true;
+    } catch (e) {
+      print('Error updating legislation dashboard mobile layout: $e');
+      return false;
+    }
+  }
+
   /// Default tools available for committee members
   static const List<String> _defaultCommitteeTools = [
     'overview',

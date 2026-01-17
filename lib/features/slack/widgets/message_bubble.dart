@@ -37,16 +37,17 @@ class SlackMessageBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final messageText = message['message_text']?.toString() ?? '';
     final postedAtStr = message['posted_at']?.toString();
-    final postedAt =
-        postedAtStr != null ? DateTime.tryParse(postedAtStr) : null;
-    final isThreadReply = message['thread_ts'] != null &&
+    final postedAt = postedAtStr != null
+        ? DateTime.tryParse(postedAtStr)
+        : null;
+    final isThreadReply =
+        message['thread_ts'] != null &&
         message['thread_ts'] != message['slack_message_ts'];
     final slackUserId = message['slack_user_id']?.toString();
     final hasFiles = message['has_files'] == true;
 
     // Get user info from mappings
-    final userMapping =
-        slackUserId != null ? userMappings[slackUserId] : null;
+    final userMapping = slackUserId != null ? userMappings[slackUserId] : null;
     String? userName;
     String? avatarUrl;
     String? memberId = userMapping?['member_id'];
@@ -191,7 +192,10 @@ class SlackMessageBubble extends StatelessWidget {
   }
 
   Widget _buildMessageText(
-      BuildContext context, String messageText, ThemeData theme) {
+    BuildContext context,
+    String messageText,
+    ThemeData theme,
+  ) {
     if (messageText.isEmpty) {
       return Text(
         '[No text content]',
@@ -220,15 +224,10 @@ class SlackMessageBubble extends StatelessWidget {
     );
 
     if (spans.isEmpty) {
-      return Text(
-        messageText,
-        style: theme.textTheme.bodyMedium,
-      );
+      return Text(messageText, style: theme.textTheme.bodyMedium);
     }
 
-    return RichText(
-      text: TextSpan(children: spans),
-    );
+    return RichText(text: TextSpan(children: spans));
   }
 
   Widget _buildFileIndicator(BuildContext context) {
@@ -254,8 +253,11 @@ class SlackMessageBubble extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.attach_file,
-              size: 14, color: theme.colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.attach_file,
+            size: 14,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 4),
           Text(
             '$fileCount file${fileCount > 1 ? 's' : ''} attached',
@@ -309,10 +311,7 @@ class SlackMessageBubble extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    emoji,
-                    style: const TextStyle(fontSize: 16),
-                  ),
+                  Text(emoji, style: const TextStyle(fontSize: 16)),
                   if (count > 1) ...[
                     const SizedBox(width: 4),
                     Text(
@@ -349,8 +348,8 @@ class SlackMessageBubble extends StatelessWidget {
           final name = userInfo['real_name']?.isNotEmpty == true
               ? userInfo['real_name']!
               : (userInfo['display_name']?.isNotEmpty == true
-                  ? userInfo['display_name']!
-                  : userIdStr);
+                    ? userInfo['display_name']!
+                    : userIdStr);
           userNames.add(name);
         } else {
           userNames.add(userIdStr);
@@ -366,10 +365,7 @@ class SlackMessageBubble extends StatelessWidget {
             Text(emoji, style: const TextStyle(fontSize: 24)),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                ':$emojiName:',
-                style: theme.textTheme.titleMedium,
-              ),
+              child: Text(':$emojiName:', style: theme.textTheme.titleMedium),
             ),
           ],
         ),
@@ -399,27 +395,30 @@ class SlackMessageBubble extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: userNames
-                              .map((name) => Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 4),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.person,
-                                          size: 16,
-                                          color:
-                                              theme.colorScheme.onSurfaceVariant,
+                              .map(
+                                (name) => Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.person,
+                                        size: 16,
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          name,
+                                          style: theme.textTheme.bodyMedium,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            name,
-                                            style: theme.textTheme.bodyMedium,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ))
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
                               .toList(),
                         ),
                       ),

@@ -30,7 +30,10 @@ class SlackChannel {
       slackChannelName: json['slack_channel_name']?.toString() ?? '',
       committeeName: json['committee_name']?.toString() ?? '',
       isActive: _coerceBool(json['is_active'], defaultValue: true),
-      archiveMessages: _coerceBool(json['archive_messages'], defaultValue: true),
+      archiveMessages: _coerceBool(
+        json['archive_messages'],
+        defaultValue: true,
+      ),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -49,14 +52,14 @@ class SlackChannel {
   String get displayName => '#$slackChannelName';
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'slack_channel_id': slackChannelId,
-        'slack_channel_name': slackChannelName,
-        'committee_name': committeeName,
-        'is_active': isActive,
-        'archive_messages': archiveMessages,
-        'created_at': createdAt?.toIso8601String(),
-      };
+    'id': id,
+    'slack_channel_id': slackChannelId,
+    'slack_channel_name': slackChannelName,
+    'committee_name': committeeName,
+    'is_active': isActive,
+    'archive_messages': archiveMessages,
+    'created_at': createdAt?.toIso8601String(),
+  };
 }
 
 /// Model representing archive status for a channel

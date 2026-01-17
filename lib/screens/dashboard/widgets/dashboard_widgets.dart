@@ -169,10 +169,11 @@ class StatCardWidget extends StatelessWidget {
 
     final displayValue = _formatValue(value);
     final isMini = config.size == DashboardWidgetSize.mini;
+    final isSmall = config.size == DashboardWidgetSize.small;
 
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isMini ? 12 : 16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isSmall ? 12 : 16)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -184,15 +185,53 @@ class StatCardWidget extends StatelessWidget {
               end: Alignment.bottomRight,
             ),
           ),
-          padding: EdgeInsets.all(isMini ? 12 : 20),
-          child: isMini ? _buildMiniLayout(displayValue) : _buildStandardLayout(displayValue),
+          padding: EdgeInsets.all(isSmall ? 12 : (isMini ? 16 : 20)),
+          child: isSmall
+              ? _buildSmallLayout(displayValue)
+              : (isMini ? _buildMiniLayout(displayValue) : _buildStandardLayout(displayValue)),
         ),
       ),
     );
   }
 
-  /// Compact horizontal layout for mini size
+  /// Compact square layout for mini size - number on top, name below
   Widget _buildMiniLayout(String displayValue) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Large number at the top
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            displayValue,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 36,
+              fontWeight: FontWeight.bold,
+              height: 1.1,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Stat name below
+        Text(
+          config.title,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.95),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  /// Compact horizontal layout for small size (half-height row)
+  Widget _buildSmallLayout(String displayValue) {
     return Row(
       children: [
         Container(

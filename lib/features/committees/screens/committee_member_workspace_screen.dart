@@ -15,18 +15,13 @@ import 'package:bluebubbles/features/committees/screens/tabs/social_media/social
 import 'package:bluebubbles/features/committees/screens/tabs/member/committee_member_overview_tab.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/member/committee_member_members_tab.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/canvas_board/screens/committee_canvas_tab.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/screens/legislation_tracker_screen.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/legislation_provider.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/bill_search_provider.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
-
-// Brand colors
-const _unityBlue = Color(0xFF273351);
-const _momentumBlue = Color(0xFF32A6DE);
-const _backgroundAsset = 'assets/images/Blue-Gradient-Background.png';
-const _overlayOpacity = 0.18;
 
 /// Workspace screen for committee members (non-executive)
 ///
@@ -43,10 +38,12 @@ class CommitteeMemberWorkspaceScreen extends StatefulWidget {
   });
 
   @override
-  State<CommitteeMemberWorkspaceScreen> createState() => _CommitteeMemberWorkspaceScreenState();
+  State<CommitteeMemberWorkspaceScreen> createState() =>
+      _CommitteeMemberWorkspaceScreenState();
 }
 
-class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspaceScreen>
+class _CommitteeMemberWorkspaceScreenState
+    extends State<CommitteeMemberWorkspaceScreen>
     with SingleTickerProviderStateMixin {
   final CommitteeRepository _repository = CommitteeRepository();
 
@@ -59,15 +56,17 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
   UserCommitteeInfo get committeeInfo => widget.committeeInfo;
 
   // Use the committee definition if available, otherwise create a basic one
-  Committee get committee => widget.committee ?? Committee(
-    id: committeeInfo.name,
-    name: committeeInfo.name,
-    displayName: committeeInfo.name,
-    description: committeeInfo.description ?? '',
-    icon: Icons.groups_outlined,
-    primaryColor: _momentumBlue,
-    secondaryColor: _unityBlue,
-  );
+  Committee get committee =>
+      widget.committee ??
+      Committee(
+        id: committeeInfo.name,
+        name: committeeInfo.name,
+        displayName: committeeInfo.name,
+        description: committeeInfo.description ?? '',
+        icon: Icons.groups_outlined,
+        primaryColor: BrandColors.momentumBlue,
+        secondaryColor: BrandColors.unityBlue,
+      );
 
   // Get available tabs based on configured tools
   List<_TabDefinition> get _tabs {
@@ -76,183 +75,212 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
 
     // Overview - always available if enabled
     if (tools.contains('overview')) {
-      tabs.add(_TabDefinition(
-        label: 'Overview',
-        icon: Icons.dashboard_outlined,
-        slug: 'overview',
-        builder: () => CommitteeMemberOverviewTab(
-          committee: committee,
-          leaders: _leaders,
-          onNavigateToMeetings: tools.contains('meetings')
-              ? () => _navigateToTabBySlug('meetings')
-              : null,
+      tabs.add(
+        _TabDefinition(
+          label: 'Overview',
+          icon: Icons.dashboard_outlined,
+          slug: 'overview',
+          builder: () => CommitteeMemberOverviewTab(
+            committee: committee,
+            leaders: _leaders,
+            onNavigateToMeetings: tools.contains('meetings')
+                ? () => _navigateToTabBySlug('meetings')
+                : null,
+          ),
         ),
-      ));
+      );
     }
 
     // Members - read-only version for committee members
     if (tools.contains('members')) {
-      tabs.add(_TabDefinition(
-        label: 'Members',
-        icon: Icons.people_outline,
-        slug: 'members',
-        builder: () => CommitteeMemberMembersTab(committee: committee),
-      ));
+      tabs.add(
+        _TabDefinition(
+          label: 'Members',
+          icon: Icons.people_outline,
+          slug: 'members',
+          builder: () => CommitteeMemberMembersTab(committee: committee),
+        ),
+      );
     }
 
     // Slack - with member view restrictions
     if (tools.contains('slack')) {
-      tabs.add(_TabDefinition(
-        label: 'Slack',
-        iconWidget: SvgPicture.asset(
-          'assets/icon/slack-icon.svg',
-          width: 24,
-          height: 24,
-          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+      tabs.add(
+        _TabDefinition(
+          label: 'Slack',
+          iconWidget: SvgPicture.asset(
+            'assets/icon/slack-icon.svg',
+            width: 24,
+            height: 24,
+            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          ),
+          slug: 'slack',
+          builder: () => CommitteeSlackTab(
+            committee: committee,
+            isMemberView: true, // Disable profile navigation for members
+          ),
         ),
-        slug: 'slack',
-        builder: () => CommitteeSlackTab(
-          committee: committee,
-          isMemberView: true, // Disable profile navigation for members
-        ),
-      ));
+      );
     }
 
     // Meetings - with member view restrictions (no editing, no profile navigation)
     if (tools.contains('meetings')) {
-      tabs.add(_TabDefinition(
-        label: 'Meetings',
-        icon: Icons.video_camera_front_outlined,
-        slug: 'meetings',
-        builder: () => CommitteeMeetingsTab(
-          committee: committee,
-          isMemberView: true,
+      tabs.add(
+        _TabDefinition(
+          label: 'Meetings',
+          icon: Icons.video_camera_front_outlined,
+          slug: 'meetings',
+          builder: () =>
+              CommitteeMeetingsTab(committee: committee, isMemberView: true),
         ),
-      ));
+      );
     }
 
     // Board
     if (tools.contains('board')) {
-      tabs.add(_TabDefinition(
-        label: 'Board',
-        icon: Icons.space_dashboard_outlined,
-        slug: 'board',
-        builder: () => CommitteeCanvasTab(
-          committee: committee,
-          isFullscreen: _isCanvasFullscreen,
-          onFullscreenChanged: _setCanvasFullscreen,
+      tabs.add(
+        _TabDefinition(
+          label: 'Board',
+          icon: Icons.space_dashboard_outlined,
+          slug: 'board',
+          builder: () => CommitteeCanvasTab(
+            committee: committee,
+            isFullscreen: _isCanvasFullscreen,
+            onFullscreenChanged: _setCanvasFullscreen,
+          ),
         ),
-      ));
+      );
     }
 
     // Votes - member view can only see results, not create/edit/delete
     if (tools.contains('votes')) {
-      tabs.add(_TabDefinition(
-        label: 'Votes',
-        icon: Icons.how_to_vote_outlined,
-        slug: 'votes',
-        builder: () => CommitteeVotesTab(
-          committee: committee,
-          isMemberView: true,
-          onNavigateToEmail: tools.contains('email')
-              ? () => _navigateToTabBySlug('email')
-              : null,
-          onNavigateToMessages: tools.contains('messages')
-              ? () => _navigateToTabBySlug('messages')
-              : null,
+      tabs.add(
+        _TabDefinition(
+          label: 'Votes',
+          icon: Icons.how_to_vote_outlined,
+          slug: 'votes',
+          builder: () => CommitteeVotesTab(
+            committee: committee,
+            isMemberView: true,
+            onNavigateToEmail: tools.contains('email')
+                ? () => _navigateToTabBySlug('email')
+                : null,
+            onNavigateToMessages: tools.contains('messages')
+                ? () => _navigateToTabBySlug('messages')
+                : null,
+          ),
         ),
-      ));
+      );
     }
 
     // Email
     if (tools.contains('email')) {
-      tabs.add(_TabDefinition(
-        label: 'Email',
-        icon: Icons.email_outlined,
-        slug: 'email',
-        builder: () => CommitteeEmailTab(committee: committee),
-      ));
+      tabs.add(
+        _TabDefinition(
+          label: 'Email',
+          icon: Icons.email_outlined,
+          slug: 'email',
+          builder: () => CommitteeEmailTab(committee: committee),
+        ),
+      );
     }
 
     // Messages
     if (tools.contains('messages')) {
-      tabs.add(_TabDefinition(
-        label: 'Messages',
-        icon: Icons.message_outlined,
-        slug: 'messages',
-        builder: () => CommitteeMessagesTab(committee: committee),
-      ));
+      tabs.add(
+        _TabDefinition(
+          label: 'Messages',
+          icon: Icons.message_outlined,
+          slug: 'messages',
+          builder: () => CommitteeMessagesTab(committee: committee),
+        ),
+      );
     }
 
     // Donors
     if (tools.contains('donors')) {
-      tabs.add(_TabDefinition(
-        label: 'Donors',
-        icon: Icons.volunteer_activism_outlined,
-        slug: 'donors',
-        builder: () => const CommitteeDonorsTab(),
-      ));
+      tabs.add(
+        _TabDefinition(
+          label: 'Donors',
+          icon: Icons.volunteer_activism_outlined,
+          slug: 'donors',
+          builder: () => const CommitteeDonorsTab(),
+        ),
+      );
     }
 
     // Chapters
     if (tools.contains('chapters')) {
-      tabs.add(_TabDefinition(
-        label: 'Chapters',
-        icon: Icons.account_tree_outlined,
-        slug: 'chapters',
-        builder: () => CommitteeChaptersTab(
-          chapterTypeFilter: committee.chapterTypeFilter,
+      tabs.add(
+        _TabDefinition(
+          label: 'Chapters',
+          icon: Icons.account_tree_outlined,
+          slug: 'chapters',
+          builder: () => CommitteeChaptersTab(
+            chapterTypeFilter: committee.chapterTypeFilter,
+          ),
         ),
-      ));
+      );
     }
 
     // Campaigns
     if (tools.contains('campaigns')) {
-      tabs.add(_TabDefinition(
-        label: 'Campaigns',
-        icon: Icons.campaign_outlined,
-        slug: 'campaigns',
-        builder: () => const CommitteeCampaignsTab(),
-      ));
+      tabs.add(
+        _TabDefinition(
+          label: 'Campaigns',
+          icon: Icons.campaign_outlined,
+          slug: 'campaigns',
+          builder: () => const CommitteeCampaignsTab(),
+        ),
+      );
     }
 
     // Legislation
     if (tools.contains('legislation')) {
-      tabs.add(_TabDefinition(
-        label: 'Legislation',
-        icon: Icons.gavel_outlined,
-        slug: 'legislation',
-        builder: () => MultiProvider(
-          providers: [
-            ChangeNotifierProvider(create: (_) => LegislationProvider()),
-            ChangeNotifierProvider(create: (_) => BillSearchProvider()),
-          ],
-          child: LegislationTrackerScreen(committeeId: committee.id),
+      tabs.add(
+        _TabDefinition(
+          label: 'Legislation',
+          icon: Icons.gavel_outlined,
+          slug: 'legislation',
+          builder: () => MultiProvider(
+            providers: [
+              ChangeNotifierProvider(create: (_) => LegislationProvider()),
+              ChangeNotifierProvider(create: (_) => BillSearchProvider()),
+            ],
+            child: LegislationTrackerScreen(
+              committeeId: committee.id,
+              isMemberView: true,
+            ),
+          ),
         ),
-      ));
+      );
     }
 
     // Social Media
     if (tools.contains('social-media')) {
-      tabs.add(_TabDefinition(
-        label: 'Social Media',
-        icon: Icons.analytics_outlined,
-        slug: 'social-media',
-        builder: () => SocialMediaAnalyticsTab(committee: committee),
-      ));
+      tabs.add(
+        _TabDefinition(
+          label: 'Social Media',
+          icon: Icons.analytics_outlined,
+          slug: 'social-media',
+          builder: () => SocialMediaAnalyticsTab(committee: committee),
+        ),
+      );
     }
 
     // If no tabs are configured, show at least overview
     if (tabs.isEmpty) {
-      tabs.add(_TabDefinition(
-        label: 'Overview',
-        icon: Icons.dashboard_outlined,
-        slug: 'overview',
-        builder: () => CommitteeMemberOverviewTab(
-          committee: committee,
-          leaders: _leaders,
+      tabs.add(
+        _TabDefinition(
+          label: 'Overview',
+          icon: Icons.dashboard_outlined,
+          slug: 'overview',
+          builder: () => CommitteeMemberOverviewTab(
+            committee: committee,
+            leaders: _leaders,
+          ),
         ),
-      ));
+      );
     }
 
     return tabs;
@@ -270,6 +298,12 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
     final tabs = _tabs;
     if (_currentTabIndex >= tabs.length) return false;
     return tabs[_currentTabIndex].slug == 'board';
+  }
+
+  bool get _isOnLegislationTab {
+    final tabs = _tabs;
+    if (_currentTabIndex >= tabs.length) return false;
+    return tabs[_currentTabIndex].slug == 'legislation';
   }
 
   void _setCanvasFullscreen(bool fullscreen) {
@@ -337,6 +371,11 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
       );
     }
 
+    // Legislation tab: special layout with pinned sub-tabs and collapsible parent header
+    if (_isOnLegislationTab) {
+      return _buildLegislationLayout(context, tabs);
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isVerySmall = screenWidth < 400;
@@ -348,12 +387,15 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
           if (!_isOnBoardTab)
             Positioned.fill(
               child: Image.asset(
-                _backgroundAsset,
+                BrandColors.backgroundAsset,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [committee.primaryColor, committee.secondaryColor],
+                      colors: [
+                        committee.primaryColor,
+                        committee.secondaryColor,
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -364,7 +406,9 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
           if (!_isOnBoardTab)
             Positioned.fill(
               child: Container(
-                color: Colors.white.withOpacity(_overlayOpacity),
+                color: Colors.white.withOpacity(
+                  BrandColors.backgroundOverlayOpacity,
+                ),
               ),
             ),
           // Content
@@ -394,7 +438,138 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
     );
   }
 
-  Widget _buildHeader(BuildContext context, List<_TabDefinition> tabs, bool isMobile, bool isVerySmall) {
+  /// Special layout for the Legislation tab:
+  /// - Committee header collapses on scroll and only shows when at the very top
+  /// - Legislation sub-tabs (Overview, All Bills, Legislators) stay pinned
+  Widget _buildLegislationLayout(
+    BuildContext context,
+    List<_TabDefinition> tabs,
+  ) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isVerySmall = screenWidth < 400;
+
+    return Scaffold(
+      body: NestedScrollView(
+        floatHeaderSlivers: false, // Don't float - only show at very top
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            // Collapsible committee header - only visible when scrolled to top
+            SliverAppBar(
+              expandedHeight: isMobile ? 100 : 140,
+              floating: false, // Don't float back on scroll up
+              pinned: false, // Don't pin - allow full collapse
+              snap: false, // Don't snap - must scroll fully to top
+              automaticallyImplyLeading: false,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        committee.primaryColor,
+                        committee.secondaryColor,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(4, 4, 12, isMobile ? 8 : 16),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          const SizedBox(width: 4),
+                          CircleAvatar(
+                            radius: isMobile ? 14 : 18,
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            child: Icon(
+                              committee.icon,
+                              color: Colors.white,
+                              size: isMobile ? 14 : 18,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              committee.displayName,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: Container(
+                  color: committee.primaryColor,
+                  child: TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    labelPadding: EdgeInsets.symmetric(
+                      horizontal: isVerySmall ? 6 : 10,
+                    ),
+                    indicatorWeight: 3,
+                    indicatorColor: Colors.white,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white70,
+                    tabs: tabs
+                        .map(
+                          (tab) => Tab(
+                            icon: tab.iconWidget ?? Icon(tab.icon, size: 18),
+                            text: isVerySmall ? null : tab.label,
+                            iconMargin: EdgeInsets.only(
+                              bottom: isVerySmall ? 0 : 2,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+            ),
+          ];
+        },
+        // The legislation tab content handles its own tabs internally
+        body: TabBarView(
+          controller: _tabController,
+          physics: const NeverScrollableScrollPhysics(),
+          children: tabs.asMap().entries.map((entry) {
+            final index = entry.key;
+            final tab = entry.value;
+            return _LazyTabContent(
+              key: ValueKey('${tab.slug}_$index'),
+              builder: tab.builder,
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(
+    BuildContext context,
+    List<_TabDefinition> tabs,
+    bool isMobile,
+    bool isVerySmall,
+  ) {
     final theme = Theme.of(context);
 
     return Container(
@@ -412,7 +587,12 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
           children: [
             // Header row with back button, icon, and title
             Padding(
-              padding: EdgeInsets.fromLTRB(isMobile ? 4 : 16, isMobile ? 8 : 16, 16, isMobile ? 4 : 8),
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 4 : 16,
+                isMobile ? 8 : 16,
+                16,
+                isMobile ? 4 : 8,
+              ),
               child: Row(
                 children: [
                   IconButton(
@@ -424,7 +604,11 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
                   CircleAvatar(
                     radius: isMobile ? 16 : 20,
                     backgroundColor: Colors.white.withOpacity(0.2),
-                    child: Icon(committee.icon, color: Colors.white, size: isMobile ? 16 : 20),
+                    child: Icon(
+                      committee.icon,
+                      color: Colors.white,
+                      size: isMobile ? 16 : 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -434,10 +618,14 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
                       children: [
                         Text(
                           committee.displayName,
-                          style: (isMobile ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style:
+                              (isMobile
+                                      ? theme.textTheme.titleSmall
+                                      : theme.textTheme.titleMedium)
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -467,16 +655,24 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
             TabBar(
               controller: _tabController,
               isScrollable: true,
-              labelPadding: EdgeInsets.symmetric(horizontal: isVerySmall ? 8 : 12),
+              labelPadding: EdgeInsets.symmetric(
+                horizontal: isVerySmall ? 8 : 12,
+              ),
               indicatorWeight: 3,
               indicatorColor: Colors.white,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white70,
-              tabs: tabs.map((tab) => Tab(
-                icon: tab.iconWidget ?? Icon(tab.icon, size: isMobile ? 18 : 24),
-                text: isVerySmall ? null : tab.label,
-                iconMargin: EdgeInsets.only(bottom: isVerySmall ? 0 : 4),
-              )).toList(),
+              tabs: tabs
+                  .map(
+                    (tab) => Tab(
+                      icon:
+                          tab.iconWidget ??
+                          Icon(tab.icon, size: isMobile ? 18 : 24),
+                      text: isVerySmall ? null : tab.label,
+                      iconMargin: EdgeInsets.only(bottom: isVerySmall ? 0 : 4),
+                    ),
+                  )
+                  .toList(),
             ),
           ],
         ),
@@ -491,7 +687,9 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
         height: 16,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.7)),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            Colors.white.withOpacity(0.7),
+          ),
         ),
       );
     }
@@ -505,8 +703,10 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
       ..sort((a, b) {
         final aTitle = a.title?.toLowerCase() ?? '';
         final bTitle = b.title?.toLowerCase() ?? '';
-        final aIsCoChair = aTitle.contains('co-chair') || aTitle.contains('vice');
-        final bIsCoChair = bTitle.contains('co-chair') || bTitle.contains('vice');
+        final aIsCoChair =
+            aTitle.contains('co-chair') || aTitle.contains('vice');
+        final bIsCoChair =
+            bTitle.contains('co-chair') || bTitle.contains('vice');
         if (aIsCoChair != bIsCoChair) {
           return aIsCoChair ? 1 : -1;
         }
@@ -518,10 +718,14 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
 
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: displayLeaders.map((leader) => Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: _buildLeaderChip(leader),
-      )).toList(),
+      children: displayLeaders
+          .map(
+            (leader) => Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: _buildLeaderChip(leader),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -570,7 +774,6 @@ class _CommitteeMemberWorkspaceScreenState extends State<CommitteeMemberWorkspac
       ),
     );
   }
-
 }
 
 class _TabDefinition {
@@ -594,10 +797,7 @@ class _TabDefinition {
 class _LazyTabContent extends StatefulWidget {
   final Widget Function() builder;
 
-  const _LazyTabContent({
-    super.key,
-    required this.builder,
-  });
+  const _LazyTabContent({super.key, required this.builder});
 
   @override
   State<_LazyTabContent> createState() => _LazyTabContentState();

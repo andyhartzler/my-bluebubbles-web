@@ -34,6 +34,13 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String? _selectedPosition;
+  final TextEditingController _searchController = TextEditingController();
+  bool _showFilters = false;
+
+  // Smart filter state
+  String? _partyFilter;
+  String? _stageFilter;
+  String? _categoryFilter;
 
   @override
   void initState() {
@@ -50,6 +57,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -135,7 +143,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                     isExecutive: !widget.isMemberView,
                   ),
                   _buildAllBillsTab(provider),
-                  LegislatorsListScreen(committeeId: widget.committeeId),
+                  LegislatorsListScreen(
+                    committeeId: widget.committeeId,
+                    isMemberView: widget.isMemberView,
+                  ),
                 ],
               ),
             ),
@@ -152,6 +163,17 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         slivers: [
+          // Search bar
+          SliverToBoxAdapter(
+            child: _buildSearchBar(provider),
+          ),
+
+          // Smart filters (collapsible)
+          if (_showFilters)
+            SliverToBoxAdapter(
+              child: _buildSmartFilters(provider),
+            ),
+
           // Sticky position filter tabs
           SliverPersistentHeader(
             pinned: true,
@@ -174,6 +196,278 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildSearchBar(LegislationProvider provider) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: _unityBlue,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: _unityBlue.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _searchController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search bills by name, text, or summary...',
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.7)),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear, color: Colors.white.withOpacity(0.7)),
+                          onPressed: () {
+                            _searchController.clear();
+                            provider.setSearchQuery('');
+                          },
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+                onChanged: (value) {
+                  provider.setSearchQuery(value);
+                  setState(() {}); // Update clear button visibility
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Filter toggle button
+          Container(
+            decoration: BoxDecoration(
+              color: _showFilters || _hasActiveFilters() ? _momentumBlue : _unityBlue,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: _unityBlue.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: Stack(
+                children: [
+                  const Icon(Icons.filter_list, color: Colors.white),
+                  if (_hasActiveFilters())
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: _sunriseGold,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              onPressed: () {
+                setState(() {
+                  _showFilters = !_showFilters;
+                });
+              },
+              tooltip: 'Toggle filters',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _hasActiveFilters() {
+    return _partyFilter != null || _stageFilter != null || _categoryFilter != null;
+  }
+
+  Widget _buildSmartFilters(LegislationProvider provider) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Filter chips row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Party filter
+                _buildFilterDropdown(
+                  label: 'Party',
+                  value: _partyFilter,
+                  icon: Icons.people_outline,
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('All Parties')),
+                    const DropdownMenuItem(value: 'Republican', child: Text('Republican (R)')),
+                    const DropdownMenuItem(value: 'Democratic', child: Text('Democrat (D)')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _partyFilter = value);
+                    _applyFilters(provider);
+                  },
+                ),
+                const SizedBox(width: 8),
+                // Stage filter
+                _buildFilterDropdown(
+                  label: 'Stage',
+                  value: _stageFilter,
+                  icon: Icons.stairs_outlined,
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('All Stages')),
+                    const DropdownMenuItem(value: 'introduced', child: Text('Introduced')),
+                    const DropdownMenuItem(value: 'passed_lower', child: Text('Passed House')),
+                    const DropdownMenuItem(value: 'passed_upper', child: Text('Passed Senate')),
+                    const DropdownMenuItem(value: 'signed', child: Text('Signed')),
+                    const DropdownMenuItem(value: 'vetoed', child: Text('Vetoed')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _stageFilter = value);
+                    _applyFilters(provider);
+                  },
+                ),
+                const SizedBox(width: 8),
+                // Category filter
+                _buildFilterDropdown(
+                  label: 'Category',
+                  value: _categoryFilter,
+                  icon: Icons.category_outlined,
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('All Categories')),
+                    const DropdownMenuItem(value: 'climate', child: Text('Climate')),
+                    const DropdownMenuItem(value: 'criminal_justice', child: Text('Criminal Justice')),
+                    const DropdownMenuItem(value: 'education', child: Text('Education')),
+                    const DropdownMenuItem(value: 'guns', child: Text('Guns')),
+                    const DropdownMenuItem(value: 'healthcare', child: Text('Healthcare')),
+                    const DropdownMenuItem(value: 'housing', child: Text('Housing')),
+                    const DropdownMenuItem(value: 'immigration', child: Text('Immigration')),
+                    const DropdownMenuItem(value: 'labor', child: Text('Labor')),
+                    const DropdownMenuItem(value: 'lgbtq', child: Text('LGBTQ+')),
+                    const DropdownMenuItem(value: 'taxes_budget', child: Text('Taxes & Budget')),
+                    const DropdownMenuItem(value: 'transportation', child: Text('Transportation')),
+                    const DropdownMenuItem(value: 'voting_rights', child: Text('Voting Rights')),
+                    const DropdownMenuItem(value: 'other', child: Text('Other')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _categoryFilter = value);
+                    provider.setCategoryFilter(value);
+                  },
+                ),
+                const SizedBox(width: 8),
+                // Search in bill text toggle
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: provider.searchBillText ? _momentumBlue : _unityBlue,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      provider.setSearchBillText(!provider.searchBillText);
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.article_outlined,
+                          size: 16,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Search Text',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Clear filters button
+          if (_hasActiveFilters())
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _partyFilter = null;
+                    _stageFilter = null;
+                    _categoryFilter = null;
+                  });
+                  provider.setCategoryFilter(null);
+                  _applyFilters(provider);
+                },
+                icon: Icon(Icons.clear_all, size: 16, color: _momentumBlue),
+                label: Text(
+                  'Clear all filters',
+                  style: TextStyle(color: _momentumBlue, fontSize: 12),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterDropdown({
+    required String label,
+    required String? value,
+    required IconData icon,
+    required List<DropdownMenuItem<String?>> items,
+    required void Function(String?) onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: value != null ? _momentumBlue : _unityBlue,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: value,
+          hint: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: Colors.white.withOpacity(0.7)),
+              const SizedBox(width: 4),
+              Text(label, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12)),
+            ],
+          ),
+          icon: Icon(Icons.arrow_drop_down, color: Colors.white.withOpacity(0.7), size: 18),
+          dropdownColor: _unityBlue,
+          style: const TextStyle(color: Colors.white, fontSize: 12),
+          items: items,
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  void _applyFilters(LegislationProvider provider) {
+    // Filter bills locally based on party and stage
+    // The category filter is handled by the provider
+    provider.loadTrackedBills();
   }
 
   Widget _buildPositionTabs(LegislationProvider provider) {
@@ -294,11 +588,48 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
   }
 
   List<TrackedBill> _getFilteredBills(LegislationProvider provider) {
-    if (_selectedPosition == null) return provider.trackedBills;
-    if (_selectedPosition == 'support') return provider.supportedBills;
-    if (_selectedPosition == 'oppose') return provider.opposedBills;
-    if (_selectedPosition == 'watching') return provider.watchingBills;
-    return provider.trackedBills;
+    List<TrackedBill> bills;
+    if (_selectedPosition == null) {
+      bills = provider.trackedBills;
+    } else if (_selectedPosition == 'support') {
+      bills = provider.supportedBills;
+    } else if (_selectedPosition == 'oppose') {
+      bills = provider.opposedBills;
+    } else if (_selectedPosition == 'watching') {
+      bills = provider.watchingBills;
+    } else {
+      bills = provider.trackedBills;
+    }
+
+    // Apply local party filter
+    if (_partyFilter != null) {
+      bills = bills.where((bill) {
+        if (bill.primarySponsorParty == null) return false;
+        return bill.primarySponsorParty == _partyFilter;
+      }).toList();
+    }
+
+    // Apply local stage filter
+    if (_stageFilter != null) {
+      bills = bills.where((bill) {
+        switch (_stageFilter) {
+          case 'introduced':
+            return !bill.passedLower && !bill.passedUpper && !bill.signedByGovernor && !bill.vetoed;
+          case 'passed_lower':
+            return bill.passedLower && !bill.passedUpper;
+          case 'passed_upper':
+            return bill.passedUpper && !bill.signedByGovernor && !bill.vetoed;
+          case 'signed':
+            return bill.signedByGovernor;
+          case 'vetoed':
+            return bill.vetoed;
+          default:
+            return true;
+        }
+      }).toList();
+    }
+
+    return bills;
   }
 
   Widget _buildBillCard(TrackedBill bill) {
@@ -382,10 +713,33 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                   Icon(Icons.person_outline, size: 14, color: Colors.white.withOpacity(0.7)),
                   const SizedBox(width: 4),
                   Text(
-                    bill.primarySponsorName!,
+                    '${bill.primarySponsorName!}${bill.primarySponsorParty != null ? ' (${_getPartyAbbreviation(bill.primarySponsorParty)})' : ''}',
                     style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.8)),
                   ),
                 ],
+              ),
+            ],
+            // Categories
+            if (bill.categories.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: bill.categories.take(3).map((cat) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _formatCategoryName(cat),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
+                )).toList(),
               ),
             ],
           ],
@@ -559,6 +913,28 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
         ),
       ),
     );
+  }
+
+  String _getPartyAbbreviation(String? party) {
+    if (party == null) return '?';
+    switch (party.toLowerCase()) {
+      case 'democratic':
+        return 'D';
+      case 'republican':
+        return 'R';
+      case 'independent':
+        return 'I';
+      default:
+        return party.isNotEmpty ? party[0].toUpperCase() : '?';
+    }
+  }
+
+  String _formatCategoryName(String category) {
+    return category
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1)}' : '')
+        .join(' ');
   }
 }
 

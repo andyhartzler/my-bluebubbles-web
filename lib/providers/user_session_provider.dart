@@ -99,8 +99,11 @@ class UserSessionProvider extends ChangeNotifier {
   /// This should be called after Supabase auth succeeds.
   /// It fetches the member record and their valid committees.
   Future<void> loadUserSession() async {
+    debugPrint('UserSessionProvider.loadUserSession called - isInitialized: $_isInitialized, currentMember: ${_currentMember?.email}');
+
     if (_isInitialized && _currentMember != null) {
       // Already loaded, just notify listeners
+      debugPrint('Session already initialized, skipping load');
       notifyListeners();
       return;
     }
@@ -123,6 +126,8 @@ class UserSessionProvider extends ChangeNotifier {
       }
 
       final email = currentUser.email;
+      debugPrint('Loading session for auth user email: $email');
+
       if (email == null || email.isEmpty) {
         throw Exception('User email not available');
       }
@@ -135,6 +140,7 @@ class UserSessionProvider extends ChangeNotifier {
           .maybeSingle();
 
       if (memberResponse == null) {
+        debugPrint('No member found by primary email, trying school_email');
         // Try school_email as fallback
         final schoolEmailResponse = await client
             .from('members')
@@ -151,14 +157,20 @@ class UserSessionProvider extends ChangeNotifier {
         _currentMember = Member.fromJson(memberResponse);
       }
 
+      debugPrint('Member loaded: ${_currentMember?.name}, executiveCommittee: ${_currentMember?.executiveCommittee}, isExecutive: $isExecutive');
+
       // If not executive, fetch their valid committees via RPC
       if (!isExecutive) {
+        debugPrint('Not executive - loading user committees');
         await _loadUserCommittees(email);
+      } else {
+        debugPrint('User is executive - skipping committee load');
       }
 
       _isInitialized = true;
       _isLoading = false;
       _error = null;
+      debugPrint('Session load complete - isExecutive: $isExecutive, isCommitteeMember: $isCommitteeMember, userCommittees: ${_userCommittees.length}');
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
@@ -256,6 +268,7 @@ class UserSessionProvider extends ChangeNotifier {
 
   /// Clear the session (for logout)
   void clearSession() {
+    debugPrint('UserSessionProvider.clearSession called - clearing all session data');
     _currentMember = null;
     _userCommittees = [];
     _isLoading = false;

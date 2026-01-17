@@ -13,10 +13,12 @@ const _momentumBlue = Color(0xFF32A6DE);
 /// Screen displaying list of all Missouri legislators
 class LegislatorsListScreen extends StatefulWidget {
   final String committeeId;
+  final bool isMemberView;
 
   const LegislatorsListScreen({
     super.key,
     required this.committeeId,
+    this.isMemberView = false,
   });
 
   @override
@@ -151,34 +153,35 @@ class _LegislatorsListScreenState extends State<LegislatorsListScreen>
         // Content
         Column(
           children: [
-            // Header with back button
-            Container(
-              padding: const EdgeInsets.fromLTRB(8, 12, 16, 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'Missouri Legislators',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+            // Header with back button (only show if not member view)
+            if (!widget.isMemberView)
+              Container(
+                padding: const EdgeInsets.fromLTRB(8, 12, 16, 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'Missouri Legislators',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                  ),
-                  // Refresh button
-                  IconButton(
-                    icon: const Icon(Icons.refresh, color: Colors.white),
-                    onPressed: _loadLegislators,
-                    tooltip: 'Refresh',
-                  ),
-                ],
+                    // Refresh button
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Colors.white),
+                      onPressed: _loadLegislators,
+                      tooltip: 'Refresh',
+                    ),
+                  ],
+                ),
               ),
-            ),
 
             // Stats banner
             if (_stats != null) _buildStatsBanner(theme),

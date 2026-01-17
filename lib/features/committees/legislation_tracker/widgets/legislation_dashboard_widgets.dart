@@ -40,10 +40,13 @@ class LegislationStatCardWidget extends StatelessWidget {
 
     final displayValue = _formatValue(value);
     final isMini = config.size == LegislationWidgetSize.mini;
+    final isSmall = config.size == LegislationWidgetSize.small;
 
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isMini ? 12 : 16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(isSmall ? 12 : 16),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -55,14 +58,55 @@ class LegislationStatCardWidget extends StatelessWidget {
               end: Alignment.bottomRight,
             ),
           ),
-          padding: EdgeInsets.all(isMini ? 12 : 20),
-          child: isMini ? _buildMiniLayout(displayValue) : _buildStandardLayout(displayValue),
+          padding: EdgeInsets.all(isSmall ? 12 : (isMini ? 16 : 20)),
+          child: isSmall
+              ? _buildSmallLayout(displayValue)
+              : (isMini
+                    ? _buildMiniLayout(displayValue)
+                    : _buildStandardLayout(displayValue)),
         ),
       ),
     );
   }
 
+  /// Compact square layout for mini size - number on top, name below
   Widget _buildMiniLayout(String displayValue) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Large number at the top
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            displayValue,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 36,
+              fontWeight: FontWeight.bold,
+              height: 1.1,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Stat name below
+        Text(
+          config.title,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.95),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  /// Compact horizontal layout for small size (half-height row)
+  Widget _buildSmallLayout(String displayValue) {
     return Row(
       children: [
         Container(
@@ -201,12 +245,14 @@ class LegislationPieChartWidget extends StatelessWidget {
   final LegislationWidgetConfig config;
   final List<PieChartItem> data;
   final bool isDonut;
+  final VoidCallback? onTap;
 
   const LegislationPieChartWidget({
     super.key,
     required this.config,
     required this.data,
     this.isDonut = false,
+    this.onTap,
   });
 
   @override
@@ -215,36 +261,43 @@ class LegislationPieChartWidget extends StatelessWidget {
       return _buildEmptyState();
     }
 
+    // Use config gradient colors or fall back to brand colors
+    final colors = config.gradientColors.isNotEmpty
+        ? config.gradientColors
+        : [_unityBlue, _momentumBlue];
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: _unityBlue,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 12),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _buildChart(),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: _buildLegend(),
-                  ),
-                ],
-              ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 12),
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(flex: 3, child: _buildChart()),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 2, child: _buildLegend()),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -314,10 +367,7 @@ class LegislationPieChartWidget extends StatelessWidget {
                 Expanded(
                   child: Text(
                     item.label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -351,7 +401,11 @@ class LegislationPieChartWidget extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.pie_chart, color: Colors.white.withOpacity(0.5), size: 48),
+              Icon(
+                Icons.pie_chart,
+                color: Colors.white.withOpacity(0.5),
+                size: 48,
+              ),
               const SizedBox(height: 8),
               Text(
                 'No data available',
@@ -370,12 +424,14 @@ class LegislationProgressRingWidget extends StatelessWidget {
   final LegislationWidgetConfig config;
   final int current;
   final int total;
+  final VoidCallback? onTap;
 
   const LegislationProgressRingWidget({
     super.key,
     required this.config,
     required this.current,
     required this.total,
+    this.onTap,
   });
 
   @override
@@ -390,86 +446,91 @@ class LegislationProgressRingWidget extends StatelessWidget {
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    config.icon ?? Icons.donut_large,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                Text(
-                  '${percentage.toStringAsFixed(0)}%',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            const Spacer(),
-            SizedBox(
-              width: 100,
-              height: 100,
-              child: Stack(
-                fit: StackFit.expand,
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  CircularProgressIndicator(
-                    value: percentage / 100,
-                    strokeWidth: 10,
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      config.icon ?? Icons.donut_large,
+                      color: Colors.white,
+                      size: 24,
+                    ),
                   ),
-                  Center(
-                    child: Text(
-                      '$current',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  Text(
+                    '${percentage.toStringAsFixed(0)}%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-            ),
-            const Spacer(),
-            Text(
-              config.title,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            if (config.subtitle != null)
-              Text(
-                config.subtitle!,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 12,
+              const Spacer(),
+              SizedBox(
+                width: 100,
+                height: 100,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CircularProgressIndicator(
+                      value: percentage / 100,
+                      strokeWidth: 10,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.white,
+                      ),
+                    ),
+                    Center(
+                      child: Text(
+                        '$current',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-          ],
+              const Spacer(),
+              Text(
+                config.title,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (config.subtitle != null)
+                Text(
+                  config.subtitle!,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 12,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -481,11 +542,13 @@ class LegislationProgressRingWidget extends StatelessWidget {
 class PartyComparisonWidget extends StatelessWidget {
   final LegislationWidgetConfig config;
   final LegislationStats stats;
+  final VoidCallback? onTap;
 
   const PartyComparisonWidget({
     super.key,
     required this.config,
     required this.stats,
+    this.onTap,
   });
 
   @override
@@ -498,131 +561,144 @@ class PartyComparisonWidget extends StatelessWidget {
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Calculate responsive sizes based on available space
-            final width = constraints.maxWidth;
-            final height = constraints.maxHeight;
-            final isCompact = height < 200 || width < 300;
-            final isVeryCompact = height < 150 || width < 250;
-            final padding = isVeryCompact ? 12.0 : (isCompact ? 14.0 : 20.0);
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Calculate responsive sizes based on available space
+              final width = constraints.maxWidth;
+              final height = constraints.maxHeight;
+              final isCompact = height < 200 || width < 300;
+              final isVeryCompact = height < 150 || width < 250;
+              final padding = isVeryCompact ? 12.0 : (isCompact ? 14.0 : 20.0);
 
-            // Font sizes based on available space
-            final titleSize = isVeryCompact ? 12.0 : (isCompact ? 14.0 : 18.0);
-            final partyNameSize = isVeryCompact ? 10.0 : (isCompact ? 12.0 : 14.0);
-            final countSize = isVeryCompact ? 20.0 : (isCompact ? 24.0 : 32.0);
-            final labelSize = isVeryCompact ? 9.0 : (isCompact ? 10.0 : 12.0);
-            final barHeight = isVeryCompact ? 10.0 : (isCompact ? 12.0 : 16.0);
+              // Font sizes based on available space
+              final titleSize = isVeryCompact
+                  ? 12.0
+                  : (isCompact ? 14.0 : 18.0);
+              final partyNameSize = isVeryCompact
+                  ? 10.0
+                  : (isCompact ? 12.0 : 14.0);
+              final countSize = isVeryCompact
+                  ? 20.0
+                  : (isCompact ? 24.0 : 32.0);
+              final labelSize = isVeryCompact ? 9.0 : (isCompact ? 10.0 : 12.0);
+              final barHeight = isVeryCompact
+                  ? 10.0
+                  : (isCompact ? 12.0 : 16.0);
 
-            return Padding(
-              padding: EdgeInsets.all(padding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Row(
-                    children: [
-                      Icon(
-                        config.icon ?? Icons.compare_arrows,
-                        color: Colors.white,
-                        size: isVeryCompact ? 16 : (isCompact ? 18 : 20),
-                      ),
-                      SizedBox(width: isVeryCompact ? 4 : 8),
-                      Expanded(
-                        child: Text(
-                          config.title,
-                          style: TextStyle(
-                            fontSize: titleSize,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: isVeryCompact ? 8 : (isCompact ? 12 : 16)),
-
-                  // Main content - side by side stats
-                  Expanded(
-                    child: Row(
+              return Padding(
+                padding: EdgeInsets.all(padding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
                       children: [
-                        // Democrat side
-                        Expanded(
-                          child: _buildPartyStats(
-                            party: 'Democrats',
-                            color: _democratBlue,
-                            primaryCount: stats.democratPrimarySponsorCount,
-                            avgPerLegislator: stats.avgBillsPerDemocratLegislator,
-                            partyNameSize: partyNameSize,
-                            countSize: countSize,
-                            labelSize: labelSize,
-                            alignment: CrossAxisAlignment.center,
-                            isCompact: isCompact,
-                            isVeryCompact: isVeryCompact,
-                          ),
+                        Icon(
+                          config.icon ?? Icons.compare_arrows,
+                          color: Colors.white,
+                          size: isVeryCompact ? 16 : (isCompact ? 18 : 20),
                         ),
-
-                        // Divider
-                        Container(
-                          width: 1,
-                          margin: EdgeInsets.symmetric(
-                            horizontal: isVeryCompact ? 8 : 12,
-                            vertical: isVeryCompact ? 4 : 8,
-                          ),
-                          color: Colors.white24,
-                        ),
-
-                        // Republican side
+                        SizedBox(width: isVeryCompact ? 4 : 8),
                         Expanded(
-                          child: _buildPartyStats(
-                            party: 'Republicans',
-                            color: _republicanRed,
-                            primaryCount: stats.republicanPrimarySponsorCount,
-                            avgPerLegislator: stats.avgBillsPerRepublicanLegislator,
-                            partyNameSize: partyNameSize,
-                            countSize: countSize,
-                            labelSize: labelSize,
-                            alignment: CrossAxisAlignment.center,
-                            isCompact: isCompact,
-                            isVeryCompact: isVeryCompact,
+                          child: Text(
+                            config.title,
+                            style: TextStyle(
+                              fontSize: titleSize,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                  ),
+                    SizedBox(height: isVeryCompact ? 8 : (isCompact ? 12 : 16)),
 
-                  // Comparison bars (only if enough space)
-                  if (!isVeryCompact) ...[
-                    SizedBox(height: isCompact ? 8 : 12),
-                    _buildComparisonBar(
-                      label: 'Primary',
-                      demValue: stats.democratPrimarySponsorCount,
-                      repValue: stats.republicanPrimarySponsorCount,
-                      labelSize: labelSize,
-                      barHeight: barHeight,
+                    // Main content - side by side stats
+                    Expanded(
+                      child: Row(
+                        children: [
+                          // Democrat side
+                          Expanded(
+                            child: _buildPartyStats(
+                              party: 'Democrats',
+                              color: _democratBlue,
+                              primaryCount: stats.democratPrimarySponsorCount,
+                              avgPerLegislator:
+                                  stats.avgBillsPerDemocratLegislator,
+                              partyNameSize: partyNameSize,
+                              countSize: countSize,
+                              labelSize: labelSize,
+                              alignment: CrossAxisAlignment.center,
+                              isCompact: isCompact,
+                              isVeryCompact: isVeryCompact,
+                            ),
+                          ),
+
+                          // Divider
+                          Container(
+                            width: 1,
+                            margin: EdgeInsets.symmetric(
+                              horizontal: isVeryCompact ? 8 : 12,
+                              vertical: isVeryCompact ? 4 : 8,
+                            ),
+                            color: Colors.white24,
+                          ),
+
+                          // Republican side
+                          Expanded(
+                            child: _buildPartyStats(
+                              party: 'Republicans',
+                              color: _republicanRed,
+                              primaryCount: stats.republicanPrimarySponsorCount,
+                              avgPerLegislator:
+                                  stats.avgBillsPerRepublicanLegislator,
+                              partyNameSize: partyNameSize,
+                              countSize: countSize,
+                              labelSize: labelSize,
+                              alignment: CrossAxisAlignment.center,
+                              isCompact: isCompact,
+                              isVeryCompact: isVeryCompact,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(height: isCompact ? 6 : 10),
-                    _buildComparisonBar(
-                      label: 'Co-Sponsors',
-                      demValue: stats.democratCosponsorCount,
-                      repValue: stats.republicanCosponsorCount,
-                      labelSize: labelSize,
-                      barHeight: barHeight,
-                    ),
+
+                    // Comparison bars (only if enough space)
+                    if (!isVeryCompact) ...[
+                      SizedBox(height: isCompact ? 8 : 12),
+                      _buildComparisonBar(
+                        label: 'Primary',
+                        demValue: stats.democratPrimarySponsorCount,
+                        repValue: stats.republicanPrimarySponsorCount,
+                        labelSize: labelSize,
+                        barHeight: barHeight,
+                      ),
+                      SizedBox(height: isCompact ? 6 : 10),
+                      _buildComparisonBar(
+                        label: 'Co-Sponsors',
+                        demValue: stats.democratCosponsorCount,
+                        repValue: stats.republicanCosponsorCount,
+                        labelSize: labelSize,
+                        barHeight: barHeight,
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            );
-          },
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -747,7 +823,9 @@ class PartyComparisonWidget extends StatelessWidget {
                 height: barHeight,
                 decoration: BoxDecoration(
                   color: _democratBlue,
-                  borderRadius: BorderRadius.horizontal(left: Radius.circular(barHeight / 2)),
+                  borderRadius: BorderRadius.horizontal(
+                    left: Radius.circular(barHeight / 2),
+                  ),
                 ),
               ),
             ),
@@ -758,7 +836,9 @@ class PartyComparisonWidget extends StatelessWidget {
                 height: barHeight,
                 decoration: BoxDecoration(
                   color: _republicanRed,
-                  borderRadius: BorderRadius.horizontal(right: Radius.circular(barHeight / 2)),
+                  borderRadius: BorderRadius.horizontal(
+                    right: Radius.circular(barHeight / 2),
+                  ),
                 ),
               ),
             ),
@@ -775,12 +855,14 @@ class LegislatorLeaderboardWidget extends StatelessWidget {
   final LegislationWidgetConfig config;
   final List<SponsorLeaderboardEntry> entries;
   final Color headerColor;
+  final Function(SponsorLeaderboardEntry)? onEntryTap;
 
   const LegislatorLeaderboardWidget({
     super.key,
     required this.config,
     required this.entries,
     required this.headerColor,
+    this.onEntryTap,
   });
 
   @override
@@ -885,7 +967,12 @@ class LegislatorLeaderboardWidget extends StatelessWidget {
                             padding: EdgeInsets.zero,
                             itemBuilder: (context, index) {
                               final entry = entries[index];
-                              return _buildEntryTile(entry, index, isCompact, isVeryCompact);
+                              return _buildEntryTile(
+                                entry,
+                                index,
+                                isCompact,
+                                isVeryCompact,
+                              );
                             },
                           ),
                   ),
@@ -898,37 +985,114 @@ class LegislatorLeaderboardWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildEntryTile(SponsorLeaderboardEntry entry, int index, bool isCompact, bool isVeryCompact) {
+  Widget _buildEntryTile(
+    SponsorLeaderboardEntry entry,
+    int index,
+    bool isCompact,
+    bool isVeryCompact,
+  ) {
     final tileHeight = isVeryCompact ? 36.0 : (isCompact ? 44.0 : 52.0);
     final avatarRadius = isVeryCompact ? 12.0 : (isCompact ? 14.0 : 16.0);
     final rankSize = isVeryCompact ? 10.0 : 12.0;
     final nameSize = isVeryCompact ? 11.0 : 13.0;
     final subtitleSize = isVeryCompact ? 9.0 : 11.0;
 
-    return Container(
-      height: tileHeight,
-      margin: EdgeInsets.only(bottom: isVeryCompact ? 4 : 6),
-      padding: EdgeInsets.symmetric(
-        horizontal: isVeryCompact ? 6 : 8,
-        vertical: isVeryCompact ? 4 : 6,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          // Rank badge
-          Container(
-            width: isVeryCompact ? 18 : 22,
-            height: isVeryCompact ? 18 : 22,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(index < 3 ? 0.3 : 0.15),
-              shape: BoxShape.circle,
+    return InkWell(
+      onTap: onEntryTap != null ? () => onEntryTap!(entry) : null,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: tileHeight,
+        margin: EdgeInsets.only(bottom: isVeryCompact ? 4 : 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: isVeryCompact ? 6 : 8,
+          vertical: isVeryCompact ? 4 : 6,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            // Rank badge
+            Container(
+              width: isVeryCompact ? 18 : 22,
+              height: isVeryCompact ? 18 : 22,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(index < 3 ? 0.3 : 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  '${index + 1}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: rankSize,
+                  ),
+                ),
+              ),
             ),
-            child: Center(
+            SizedBox(width: isVeryCompact ? 6 : 8),
+            // Photo
+            CircleAvatar(
+              radius: avatarRadius,
+              backgroundColor: Colors.white.withOpacity(0.2),
+              backgroundImage:
+                  entry.photoUrl != null && entry.photoUrl!.isNotEmpty
+                  ? NetworkImage(entry.photoUrl!)
+                  : null,
+              child: entry.photoUrl == null || entry.photoUrl!.isEmpty
+                  ? Text(
+                      entry.name.isNotEmpty ? entry.name.substring(0, 1) : '?',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: avatarRadius * 0.8,
+                      ),
+                    )
+                  : null,
+            ),
+            SizedBox(width: isVeryCompact ? 6 : 10),
+            // Name and info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    entry.name,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: nameSize,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  if (!isVeryCompact)
+                    Text(
+                      '${entry.chamber} ${entry.district}',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: subtitleSize,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            // Bill count badge
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: isVeryCompact ? 6 : 8,
+                vertical: isVeryCompact ? 2 : 4,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Text(
-                '${index + 1}',
+                '${entry.billsCount}',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -936,75 +1100,8 @@ class LegislatorLeaderboardWidget extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-          SizedBox(width: isVeryCompact ? 6 : 8),
-          // Photo
-          CircleAvatar(
-            radius: avatarRadius,
-            backgroundColor: Colors.white.withOpacity(0.2),
-            backgroundImage: entry.photoUrl != null && entry.photoUrl!.isNotEmpty
-                ? NetworkImage(entry.photoUrl!)
-                : null,
-            child: entry.photoUrl == null || entry.photoUrl!.isEmpty
-                ? Text(
-                    entry.name.isNotEmpty ? entry.name.substring(0, 1) : '?',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: avatarRadius * 0.8,
-                    ),
-                  )
-                : null,
-          ),
-          SizedBox(width: isVeryCompact ? 6 : 10),
-          // Name and info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  entry.name,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: nameSize,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-                if (!isVeryCompact)
-                  Text(
-                    '${entry.chamber} ${entry.district}',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
-                      fontSize: subtitleSize,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
-          ),
-          // Bill count badge
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isVeryCompact ? 6 : 8,
-              vertical: isVeryCompact ? 2 : 4,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '${entry.billsCount}',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: rankSize,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1014,120 +1111,235 @@ class LegislatorLeaderboardWidget extends StatelessWidget {
 class BillLeaderboardWidget extends StatelessWidget {
   final LegislationWidgetConfig config;
   final List<BillLeaderboardEntry> entries;
+  final Function(BillLeaderboardEntry)? onEntryTap;
 
   const BillLeaderboardWidget({
     super.key,
     required this.config,
     required this.entries,
+    this.onEntryTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Use config gradient colors or fall back to brand colors
+    final colors = config.gradientColors.isNotEmpty
+        ? config.gradientColors
+        : [_unityBlue, _momentumBlue];
+
+    // Accent color for badges (use second gradient color or fallback)
+    final accentColor = colors.length > 1 ? colors[1] : _momentumBlue;
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(color: _momentumBlue),
-            child: Row(
-              children: [
-                Icon(config.icon ?? Icons.star, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    config.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxHeight < 200;
+            final isVeryCompact = constraints.maxHeight < 150;
+            final padding = isVeryCompact ? 10.0 : (isCompact ? 12.0 : 16.0);
 
-          // Entries
-          Expanded(
-            child: Container(
-              color: _unityBlue,
-              child: entries.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No data available',
-                        style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            return Padding(
+              padding: EdgeInsets.all(padding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(isVeryCompact ? 6 : 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          config.icon ?? Icons.star,
+                          color: Colors.white,
+                          size: isVeryCompact ? 16 : 20,
+                        ),
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: entries.take(5).length,
-                      padding: EdgeInsets.zero,
-                      itemBuilder: (context, index) {
-                        final entry = entries[index];
-                        return _buildEntryTile(entry, index);
-                      },
-                    ),
-            ),
-          ),
-        ],
+                      SizedBox(width: isVeryCompact ? 8 : 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              config.title,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: isVeryCompact ? 12 : 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (!isVeryCompact)
+                              Text(
+                                '${entries.length} bills',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: isVeryCompact ? 8 : 12),
+
+                  // Entries list
+                  Expanded(
+                    child: entries.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.description_outlined,
+                                  color: Colors.white.withOpacity(0.4),
+                                  size: 32,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No data available',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: entries.length,
+                            padding: EdgeInsets.zero,
+                            itemBuilder: (context, index) {
+                              final entry = entries[index];
+                              return _buildEntryTile(
+                                entry,
+                                index,
+                                accentColor,
+                                isCompact,
+                                isVeryCompact,
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildEntryTile(BillLeaderboardEntry entry, int index) {
-    return ListTile(
-      dense: true,
-      leading: Container(
-        width: 24,
-        height: 24,
-        decoration: BoxDecoration(
-          color: _momentumBlue.withOpacity(0.2),
-          shape: BoxShape.circle,
+  Widget _buildEntryTile(
+    BillLeaderboardEntry entry,
+    int index,
+    Color accentColor,
+    bool isCompact,
+    bool isVeryCompact,
+  ) {
+    final tileHeight = isVeryCompact ? 40.0 : (isCompact ? 48.0 : 56.0);
+    final rankSize = isVeryCompact ? 10.0 : 12.0;
+    final titleSize = isVeryCompact ? 11.0 : 13.0;
+    final subtitleSize = isVeryCompact ? 9.0 : 11.0;
+
+    return InkWell(
+      onTap: onEntryTap != null ? () => onEntryTap!(entry) : null,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: tileHeight,
+        margin: EdgeInsets.only(bottom: isVeryCompact ? 4 : 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: isVeryCompact ? 6 : 8,
+          vertical: isVeryCompact ? 4 : 6,
         ),
-        child: Center(
-          child: Text(
-            '${index + 1}',
-            style: const TextStyle(
-              color: _momentumBlue,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            // Rank badge
+            Container(
+              width: isVeryCompact ? 18 : 22,
+              height: isVeryCompact ? 18 : 22,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(index < 3 ? 0.3 : 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  '${index + 1}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: rankSize,
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
-      title: Text(
-        entry.billIdentifier,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      subtitle: Text(
-        entry.title,
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.7),
-          fontSize: 11,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: _momentumBlue.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          '${entry.count}',
-          style: const TextStyle(
-            color: _momentumBlue,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
+            SizedBox(width: isVeryCompact ? 6 : 10),
+            // Bill info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    entry.billIdentifier,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: titleSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  if (!isVeryCompact)
+                    Text(
+                      entry.title,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: subtitleSize,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            // Count badge
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: isVeryCompact ? 6 : 8,
+                vertical: isVeryCompact ? 2 : 4,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${entry.count}',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: rankSize,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1138,11 +1350,15 @@ class BillLeaderboardWidget extends StatelessWidget {
 class LegislationBarChartWidget extends StatelessWidget {
   final LegislationWidgetConfig config;
   final List<PieChartItem> data;
+  final Function(PieChartItem)? onItemTap;
+  final VoidCallback? onTap;
 
   const LegislationBarChartWidget({
     super.key,
     required this.config,
     required this.data,
+    this.onItemTap,
+    this.onTap,
   });
 
   @override
@@ -1151,99 +1367,157 @@ class LegislationBarChartWidget extends StatelessWidget {
       return _buildEmptyState();
     }
 
+    // Use config gradient colors or fall back to brand colors
+    final colors = config.gradientColors.isNotEmpty
+        ? config.gradientColors
+        : [_unityBlue, _momentumBlue];
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: _unityBlue,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(config.icon ?? Icons.bar_chart, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  config.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxHeight < 200;
+              final isVeryCompact = constraints.maxHeight < 150;
+              final padding = isVeryCompact ? 10.0 : (isCompact ? 12.0 : 16.0);
+
+              return Padding(
+                padding: EdgeInsets.all(padding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(isVeryCompact ? 6 : 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            config.icon ?? Icons.bar_chart,
+                            color: Colors.white,
+                            size: isVeryCompact ? 16 : 20,
+                          ),
+                        ),
+                        SizedBox(width: isVeryCompact ? 8 : 12),
+                        Expanded(
+                          child: Text(
+                            config.title,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: isVeryCompact
+                                  ? 12
+                                  : (isCompact ? 14 : 16),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: isVeryCompact ? 8 : 12),
+                    Expanded(
+                      child: _buildHorizontalBars(isCompact, isVeryCompact),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _buildHorizontalBars(),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHorizontalBars() {
-    final maxValue = data.fold<int>(0, (max, item) => item.count > max ? item.count : max);
+  Widget _buildHorizontalBars(bool isCompact, bool isVeryCompact) {
+    final maxValue = data.fold<int>(
+      0,
+      (max, item) => item.count > max ? item.count : max,
+    );
+    final barHeight = isVeryCompact ? 14.0 : (isCompact ? 16.0 : 20.0);
+    final labelWidth = isVeryCompact ? 60.0 : (isCompact ? 70.0 : 80.0);
+    final labelSize = isVeryCompact ? 10.0 : 12.0;
+    final valueWidth = isVeryCompact ? 30.0 : 40.0;
 
     return ListView.builder(
       itemCount: data.length,
+      padding: EdgeInsets.zero,
       itemBuilder: (context, index) {
         final item = data[index];
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 80,
-                child: Text(
-                  item.label,
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                  overflow: TextOverflow.ellipsis,
+        return InkWell(
+          onTap: onItemTap != null ? () => onItemTap!(item) : null,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: isVeryCompact ? 2 : 4),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: labelWidth,
+                  child: Text(
+                    item.label,
+                    style: TextStyle(color: Colors.white, fontSize: labelSize),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Stack(
-                  children: [
-                    Container(
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    FractionallySizedBox(
-                      widthFactor: maxValue > 0 ? item.count / maxValue : 0,
-                      child: Container(
-                        height: 20,
+                SizedBox(width: isVeryCompact ? 4 : 8),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Container(
+                        height: barHeight,
                         decoration: BoxDecoration(
-                          color: item.color,
-                          borderRadius: BorderRadius.circular(4),
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(barHeight / 2),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 40,
-                child: Text(
-                  '${item.count}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                      FractionallySizedBox(
+                        widthFactor: maxValue > 0 ? item.count / maxValue : 0,
+                        child: Container(
+                          height: barHeight,
+                          decoration: BoxDecoration(
+                            color: item.color,
+                            borderRadius: BorderRadius.circular(barHeight / 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: item.color.withOpacity(0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  textAlign: TextAlign.right,
                 ),
-              ),
-            ],
+                SizedBox(width: isVeryCompact ? 4 : 8),
+                SizedBox(
+                  width: valueWidth,
+                  child: Text(
+                    '${item.count}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: labelSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -1251,20 +1525,32 @@ class LegislationBarChartWidget extends StatelessWidget {
   }
 
   Widget _buildEmptyState() {
+    final colors = config.gradientColors.isNotEmpty
+        ? config.gradientColors
+        : [_unityBlue, _momentumBlue];
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
       child: Container(
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _unityBlue,
-          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
+        padding: const EdgeInsets.all(16),
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.bar_chart, color: Colors.white.withOpacity(0.5), size: 48),
+              Icon(
+                Icons.bar_chart,
+                color: Colors.white.withOpacity(0.5),
+                size: 48,
+              ),
               const SizedBox(height: 8),
               Text(
                 'No data available',

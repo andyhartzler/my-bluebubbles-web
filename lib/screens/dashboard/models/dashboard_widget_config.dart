@@ -20,13 +20,13 @@ enum DashboardWidgetType {
 
 /// Size options for widgets
 enum DashboardWidgetSize {
-  mini,       // 1x0.5 on grid (half height of small)
-  small,      // 1x1 on grid
-  medium,     // 2x1 on grid
-  large,      // 2x2 on grid
-  wide,       // 3x1 on grid
-  tall,       // 1x2 on grid
-  hero,       // 3x2 on grid
+  mini,       // 1x1 on grid - compact square with number on top, name below
+  small,      // 1x0.5 on grid - half height compact row
+  medium,     // 1x1 on grid - standard card size
+  large,      // 2x1 on grid - wide card
+  wide,       // 3x1 on grid - extra wide
+  tall,       // 1x2 on grid - vertical
+  hero,       // 3x2 on grid - full featured
   mobileFull, // Full width on mobile with tall proportions (like tall but full width)
 }
 
@@ -42,6 +42,9 @@ enum DashboardDataCategory {
   growth,
   engagement,
   resources,  // Quick links, documents, tools
+  legislation,  // Legislation tracking and advocacy
+  socialMedia,  // Social media platform stats
+  email,  // Email campaigns and newsletters
 }
 
 /// Single widget configuration
@@ -175,40 +178,42 @@ class DashboardWidgetConfig {
   /// Get the width in grid units
   int get gridWidth {
     switch (size) {
-      case DashboardWidgetSize.mini:
-      case DashboardWidgetSize.small:
-      case DashboardWidgetSize.tall:
+      case DashboardWidgetSize.mini:    // 1x1 square
+      case DashboardWidgetSize.small:   // 1x0.5 compact
+      case DashboardWidgetSize.medium:  // 1x1 standard
+      case DashboardWidgetSize.tall:    // 1x2 vertical
         return 1;
-      case DashboardWidgetSize.medium:
-      case DashboardWidgetSize.large:
+      case DashboardWidgetSize.large:   // 2x1 wide
         return 2;
-      case DashboardWidgetSize.wide:
-      case DashboardWidgetSize.hero:
+      case DashboardWidgetSize.wide:    // 3x1 extra wide
+      case DashboardWidgetSize.hero:    // 3x2 full featured
       case DashboardWidgetSize.mobileFull:
-        return 3; // mobileFull uses full width (same grid units as hero/wide)
+        return 3;
     }
   }
 
-  /// Get the height in grid units (returns 1 for mini, but actual render uses 0.5 multiplier)
+  /// Get the height in grid units
   int get gridHeight {
     switch (size) {
-      case DashboardWidgetSize.mini:
-      case DashboardWidgetSize.small:
-      case DashboardWidgetSize.medium:
-      case DashboardWidgetSize.wide:
+      case DashboardWidgetSize.small:   // Half height
+        return 1; // Uses 0.5 multiplier
+      case DashboardWidgetSize.mini:    // Square
+      case DashboardWidgetSize.medium:  // Standard
+      case DashboardWidgetSize.large:   // Wide card
+      case DashboardWidgetSize.wide:    // Extra wide
         return 1;
-      case DashboardWidgetSize.tall:
-      case DashboardWidgetSize.large:
+      case DashboardWidgetSize.tall:    // Vertical
+      case DashboardWidgetSize.hero:    // Full featured
       case DashboardWidgetSize.mobileFull:
-        return 2; // mobileFull uses tall proportions (2 grid units height)
-      case DashboardWidgetSize.hero:
         return 2;
     }
   }
 
-  /// Get the actual height multiplier for rendering (mini is 0.5, others use gridHeight)
+  /// Get the actual height multiplier for rendering
+  /// - small is 0.5 (half height compact row)
+  /// - others use their gridHeight
   double get heightMultiplier {
-    return size == DashboardWidgetSize.mini ? 0.5 : gridHeight.toDouble();
+    return size == DashboardWidgetSize.small ? 0.5 : gridHeight.toDouble();
   }
 }
 
@@ -733,6 +738,214 @@ class DashboardDataSources {
       supportedWidgets: [DashboardWidgetType.quickLinksButton],
       icon: Icons.link,
       isDistribution: false,
+    ),
+
+    // ============ SLACK ANALYTICS ============
+    DashboardDataSource(
+      key: 'slackActiveUsers',
+      label: 'Slack Active Users',
+      description: 'Number of active users in Slack workspace',
+      category: DashboardDataCategory.communications,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.trendCard],
+      icon: Icons.group_work,
+    ),
+    DashboardDataSource(
+      key: 'slackMessagesThisWeek',
+      label: 'Slack This Week',
+      description: 'Slack messages sent this week',
+      category: DashboardDataCategory.communications,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.trendCard],
+      icon: Icons.chat_bubble,
+    ),
+    DashboardDataSource(
+      key: 'slackChannelActivity',
+      label: 'Channel Activity',
+      description: 'Message distribution across Slack channels',
+      category: DashboardDataCategory.communications,
+      supportedWidgets: [DashboardWidgetType.barChart, DashboardWidgetType.pieChart],
+      icon: Icons.tag,
+      isDistribution: true,
+    ),
+    DashboardDataSource(
+      key: 'slackEngagementTrend',
+      label: 'Slack Engagement Trend',
+      description: 'Slack engagement over time',
+      category: DashboardDataCategory.communications,
+      supportedWidgets: [DashboardWidgetType.lineChart, DashboardWidgetType.sparkline],
+      icon: Icons.trending_up,
+      isDistribution: true,
+    ),
+
+    // ============ SOCIAL MEDIA STATS ============
+    DashboardDataSource(
+      key: 'totalFollowers',
+      label: 'Total Followers',
+      description: 'Combined followers across all social platforms',
+      category: DashboardDataCategory.socialMedia,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.trendCard],
+      icon: Icons.people_outline,
+    ),
+    DashboardDataSource(
+      key: 'socialMediaReach',
+      label: 'Social Reach',
+      description: 'Total reach across social media platforms',
+      category: DashboardDataCategory.socialMedia,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.trendCard],
+      icon: Icons.language,
+    ),
+    DashboardDataSource(
+      key: 'socialEngagementRate',
+      label: 'Engagement Rate',
+      description: 'Average engagement rate across platforms',
+      category: DashboardDataCategory.socialMedia,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.progressRing],
+      icon: Icons.thumb_up_alt,
+    ),
+    DashboardDataSource(
+      key: 'followersByPlatform',
+      label: 'Followers by Platform',
+      description: 'Follower distribution across social platforms',
+      category: DashboardDataCategory.socialMedia,
+      supportedWidgets: [DashboardWidgetType.barChart, DashboardWidgetType.pieChart, DashboardWidgetType.donutChart],
+      icon: Icons.share,
+      isDistribution: true,
+    ),
+    DashboardDataSource(
+      key: 'socialGrowthTrend',
+      label: 'Social Growth',
+      description: 'Follower growth over time',
+      category: DashboardDataCategory.socialMedia,
+      supportedWidgets: [DashboardWidgetType.lineChart, DashboardWidgetType.sparkline],
+      icon: Icons.show_chart,
+      isDistribution: true,
+    ),
+
+    // ============ LEGISLATION STATISTICS ============
+    DashboardDataSource(
+      key: 'totalBillsTracked',
+      label: 'Bills Tracked',
+      description: 'Total number of bills being tracked',
+      category: DashboardDataCategory.legislation,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.trendCard],
+      icon: Icons.gavel,
+    ),
+    DashboardDataSource(
+      key: 'billsSupported',
+      label: 'Bills Supported',
+      description: 'Bills with support position',
+      category: DashboardDataCategory.legislation,
+      supportedWidgets: [DashboardWidgetType.statCard],
+      icon: Icons.thumb_up,
+    ),
+    DashboardDataSource(
+      key: 'billsOpposed',
+      label: 'Bills Opposed',
+      description: 'Bills with oppose position',
+      category: DashboardDataCategory.legislation,
+      supportedWidgets: [DashboardWidgetType.statCard],
+      icon: Icons.thumb_down,
+    ),
+    DashboardDataSource(
+      key: 'priorityBills',
+      label: 'Priority Bills',
+      description: 'High-priority legislation items',
+      category: DashboardDataCategory.legislation,
+      supportedWidgets: [DashboardWidgetType.statCard],
+      icon: Icons.priority_high,
+    ),
+    DashboardDataSource(
+      key: 'billsByPosition',
+      label: 'Bills by Position',
+      description: 'Distribution of bills by position (support/oppose/neutral)',
+      category: DashboardDataCategory.legislation,
+      supportedWidgets: [DashboardWidgetType.pieChart, DashboardWidgetType.donutChart, DashboardWidgetType.barChart],
+      icon: Icons.pie_chart,
+      isDistribution: true,
+    ),
+    DashboardDataSource(
+      key: 'billsByPriority',
+      label: 'Bills by Priority',
+      description: 'Distribution of bills by priority level',
+      category: DashboardDataCategory.legislation,
+      supportedWidgets: [DashboardWidgetType.barChart, DashboardWidgetType.pieChart],
+      icon: Icons.flag,
+      isDistribution: true,
+    ),
+    DashboardDataSource(
+      key: 'billsByCategory',
+      label: 'Bills by Category',
+      description: 'Distribution of bills by legislative category',
+      category: DashboardDataCategory.legislation,
+      supportedWidgets: [DashboardWidgetType.barChart, DashboardWidgetType.pieChart],
+      icon: Icons.category,
+      isDistribution: true,
+    ),
+    DashboardDataSource(
+      key: 'legislativeActionsTaken',
+      label: 'Actions Taken',
+      description: 'Total advocacy actions taken on legislation',
+      category: DashboardDataCategory.legislation,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.trendCard],
+      icon: Icons.campaign,
+    ),
+
+    // ============ EMAIL CAMPAIGN STATS ============
+    DashboardDataSource(
+      key: 'totalEmailsSent',
+      label: 'Emails Sent',
+      description: 'Total emails sent in campaigns',
+      category: DashboardDataCategory.email,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.trendCard],
+      icon: Icons.email,
+    ),
+    DashboardDataSource(
+      key: 'emailOpenRate',
+      label: 'Open Rate',
+      description: 'Average email open rate',
+      category: DashboardDataCategory.email,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.progressRing],
+      icon: Icons.mark_email_read,
+    ),
+    DashboardDataSource(
+      key: 'emailClickRate',
+      label: 'Click Rate',
+      description: 'Average email click-through rate',
+      category: DashboardDataCategory.email,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.progressRing],
+      icon: Icons.ads_click,
+    ),
+    DashboardDataSource(
+      key: 'emailUnsubscribeRate',
+      label: 'Unsubscribe Rate',
+      description: 'Average email unsubscribe rate',
+      category: DashboardDataCategory.email,
+      supportedWidgets: [DashboardWidgetType.statCard],
+      icon: Icons.unsubscribe,
+    ),
+    DashboardDataSource(
+      key: 'emailCampaignPerformance',
+      label: 'Campaign Performance',
+      description: 'Email campaign performance over time',
+      category: DashboardDataCategory.email,
+      supportedWidgets: [DashboardWidgetType.lineChart, DashboardWidgetType.barChart],
+      icon: Icons.insights,
+      isDistribution: true,
+    ),
+    DashboardDataSource(
+      key: 'emailsThisMonth',
+      label: 'Emails This Month',
+      description: 'Emails sent this month',
+      category: DashboardDataCategory.email,
+      supportedWidgets: [DashboardWidgetType.statCard, DashboardWidgetType.trendCard],
+      icon: Icons.calendar_month,
+    ),
+    DashboardDataSource(
+      key: 'activeCampaigns',
+      label: 'Active Campaigns',
+      description: 'Number of active email campaigns',
+      category: DashboardDataCategory.email,
+      supportedWidgets: [DashboardWidgetType.statCard],
+      icon: Icons.campaign,
     ),
   ];
 
