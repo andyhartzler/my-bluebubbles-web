@@ -1269,8 +1269,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildWidgetsGrid(DashboardMetrics metrics, int columns, double maxWidth) {
-    final widgetWidth = (maxWidth - 32 - (columns - 1) * 16) / columns;
-    final widgetHeight = widgetWidth * 0.8;
+    // Guard against invalid dimensions
+    if (maxWidth <= 0 || columns <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    final widgetWidth = ((maxWidth - 32 - (columns - 1) * 16) / columns).clamp(50.0, maxWidth);
+    final widgetHeight = (widgetWidth * 0.8).clamp(50.0, maxWidth);
+
+    // Guard against empty widgets list
+    if (_config.widgets.isEmpty) {
+      return Center(
+        child: Text(
+          'No widgets configured',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+      );
+    }
 
     // Sort widgets by position
     final sortedWidgets = List<DashboardWidgetConfig>.from(_config.widgets)
@@ -1287,8 +1302,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final height = _getWidgetHeight(widget, widgetHeight);
 
         return SizedBox(
-          width: width,
-          height: height,
+          width: width.clamp(50.0, maxWidth),
+          height: height.clamp(50.0, maxWidth * 2),
           child: _buildWidget(widget, metrics),
         );
       }).toList(),
@@ -1297,9 +1312,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   /// Build mobile-optimized grid with swipeable horizontal rows
   Widget _buildMobileWidgetsGrid(DashboardMetrics metrics, double maxWidth) {
-    final widgetWidth = maxWidth * 0.42; // Each swipeable card is ~42% of width
-    final widgetHeight = widgetWidth * 0.9;
-    final fullWidgetHeight = maxWidth * 0.75; // Height for full-width widgets (tall proportions)
+    // Guard against invalid dimensions
+    if (maxWidth <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    // Guard against empty widgets list
+    if (_config.widgets.isEmpty) {
+      return Center(
+        child: Text(
+          'No widgets configured',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+      );
+    }
+
+    final widgetWidth = (maxWidth * 0.42).clamp(80.0, maxWidth); // Each swipeable card is ~42% of width
+    final widgetHeight = (widgetWidth * 0.9).clamp(80.0, maxWidth);
+    final fullWidgetHeight = (maxWidth * 0.75).clamp(100.0, maxWidth * 2); // Height for full-width widgets (tall proportions)
 
     // Sort widgets by position
     final sortedWidgets = List<DashboardWidgetConfig>.from(_config.widgets)
@@ -1325,12 +1355,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final processedSwipeRows = <String>{};
 
     for (final widget in sortedWidgets) {
-      if (widget.swipeRowId != null) {
+      final swipeId = widget.swipeRowId;
+      if (swipeId != null) {
         // Check if we've already processed this swipe row
-        if (!processedSwipeRows.contains(widget.swipeRowId)) {
-          processedSwipeRows.add(widget.swipeRowId!);
-          final rowWidgets = swipeRows[widget.swipeRowId]!;
-          rows.add(_buildSwipeableRow(rowWidgets, metrics, widgetWidth, widgetHeight));
+        if (!processedSwipeRows.contains(swipeId)) {
+          processedSwipeRows.add(swipeId);
+          final rowWidgets = swipeRows[swipeId];
+          if (rowWidgets != null && rowWidgets.isNotEmpty) {
+            rows.add(_buildSwipeableRow(rowWidgets, metrics, widgetWidth, widgetHeight));
+          }
         }
       } else {
         // Standalone widget - use full width for mobileFull size
@@ -1359,6 +1392,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   /// Build a horizontally swipeable row of widgets
   Widget _buildSwipeableRow(List<DashboardWidgetConfig> widgets, DashboardMetrics metrics,
       double baseWidgetWidth, double baseWidgetHeight) {
+    // Guard against empty widgets or invalid dimensions
+    if (widgets.isEmpty || baseWidgetWidth <= 0 || baseWidgetHeight <= 0) {
+      return const SizedBox.shrink();
+    }
+
     // Determine row height based on the largest widget in the row
     double rowHeight = baseWidgetHeight;
     for (final widget in widgets) {
@@ -1445,7 +1483,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildWidget(DashboardWidgetConfig config, DashboardMetrics metrics) {
     try {
       return _buildWidgetInternal(config, metrics);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('[DashboardScreen] Error building widget ${config.id} (${config.type}): $e');
+      debugPrint('[DashboardScreen] Stack: ${stackTrace.toString().split('\n').take(5).join('\n')}');
       return Card(
         child: Center(
           child: Column(
@@ -1456,6 +1496,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               Text(
                 'Error loading widget',
                 style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${config.title}',
+                style: TextStyle(color: Colors.grey[500], fontSize: 10),
               ),
             ],
           ),
@@ -3726,7 +3771,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             Text('Unable to load dashboard', style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
-              _error!,
+              _error ?? 'An unexpected error occurred',
               style: theme.textTheme.bodyMedium?.copyWith(color: _actionRed),
               textAlign: TextAlign.center,
             ),
