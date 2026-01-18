@@ -4086,7 +4086,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Meetings will appear here once ${_member.firstName} attends one.',
+                      'Meetings will appear here once ${_member.name.split(' ').first} attends one.',
                       style: TextStyle(color: Colors.grey[500]),
                       textAlign: TextAlign.center,
                     ),
