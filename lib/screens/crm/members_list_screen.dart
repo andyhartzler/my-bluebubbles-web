@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
@@ -144,7 +145,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   bool get _shouldUsePaging => !_hasActiveFilters;
 
-  static const List<Color> _memberCardGradient = [Color(0xFF0F4C75), Color(0xFF3282B8)];
+  static const List<Color> _memberCardGradient = BrandColors.tileGradient;
   static const List<Color> _ineligibleMemberCardGradient = [Color(0xFFB71C1C), Color(0xFFE53935)];
   static const Color _executiveAccentColor = Color(0xFFFDB813);
   static const int _minAllowedAge = 14;
@@ -1330,7 +1331,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
             ),
         ],
       ),
-      body: body,
+      body: BrandedBackground(
+        child: body,
+      ),
     );
   }
 

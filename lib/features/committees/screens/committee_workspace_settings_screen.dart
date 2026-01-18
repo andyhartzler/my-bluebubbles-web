@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 
 // Brand colors
 const _unityBlue = Color(0xFF273351);
@@ -196,7 +197,9 @@ class _CommitteeWorkspaceSettingsScreenState
             ),
         ],
       ),
-      body: _buildContent(),
+      body: BrandedBackground(
+        child: _buildContent(),
+      ),
     );
   }
 

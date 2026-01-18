@@ -1604,9 +1604,67 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
           ),
         ].where((item) => item.count > 0).toList();
 
+      case 'topCategories':
+        // Parse the top categories from stats (format: [{category: 'name', count: N}, ...])
+        final colors = [
+          _momentumBlue, _grassrootsGreen, _justicePurple, _sunriseGold,
+          _actionRed, _democratBlue, _unityBlue, Colors.teal,
+          Colors.pink, Colors.orange, Colors.indigo, Colors.cyan,
+        ];
+        return (stats.topCategories).asMap().entries.map((entry) {
+          final item = entry.value as Map<String, dynamic>;
+          final category = (item['category'] as String?) ?? 'unknown';
+          final count = (item['count'] as int?) ?? 0;
+          return PieChartItem(
+            label: _formatCategoryLabel(category),
+            count: count,
+            color: colors[entry.key % colors.length],
+          );
+        }).where((item) => item.count > 0).take(10).toList();
+
+      case 'topSubjects':
+        // Parse the top subjects from stats (format: [{subject: 'name', count: N}, ...])
+        final colors = [
+          _unityBlue, _momentumBlue, _grassrootsGreen, _justicePurple,
+          _sunriseGold, _actionRed, _democratBlue, Colors.teal,
+          Colors.pink, Colors.orange, Colors.indigo, Colors.cyan,
+        ];
+        return (stats.topSubjects).asMap().entries.map((entry) {
+          final item = entry.value as Map<String, dynamic>;
+          final subject = (item['subject'] as String?) ?? 'unknown';
+          final count = (item['count'] as int?) ?? 0;
+          return PieChartItem(
+            label: _formatSubjectLabel(subject),
+            count: count,
+            color: colors[entry.key % colors.length],
+          );
+        }).where((item) => item.count > 0).take(10).toList();
+
       default:
         return [];
     }
+  }
+
+  /// Format category label from snake_case to Title Case
+  String _formatCategoryLabel(String category) {
+    if (category.isEmpty) return 'Unknown';
+    return category
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((word) => word.isEmpty ? '' : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  /// Format subject label - title case and truncate if too long
+  String _formatSubjectLabel(String subject) {
+    if (subject.isEmpty) return 'Unknown';
+    // Convert to title case
+    final titleCase = subject
+        .split(' ')
+        .map((word) => word.isEmpty ? '' : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+        .join(' ');
+    // Truncate if too long
+    return titleCase.length > 25 ? '${titleCase.substring(0, 22)}...' : titleCase;
   }
 
   Widget _buildErrorState() {
