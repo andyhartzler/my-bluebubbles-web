@@ -228,6 +228,44 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     });
 
     try {
+      // Pre-validate: Check if user has any committees with workspace access
+      final validationResponse = await client.rpc(
+        'get_user_valid_committees',
+        params: {'user_email': email},
+      );
+
+      final validCommittees = validationResponse as List<dynamic>? ?? [];
+
+      // Check if user exists in members table (either as executive or committee member)
+      final memberCheck = await client
+          .from('members')
+          .select('id, executive_committee')
+          .or('email.eq.$email,school_email.eq.$email')
+          .maybeSingle();
+
+      if (memberCheck == null) {
+        // User not found in members table at all
+        if (!mounted) return;
+        setState(() {
+          _isSending = false;
+          _errorMessage = 'This email is not associated with a Missouri Young Democrats member. If you believe this is an error, please contact info@moyoungdemocrats.org';
+        });
+        return;
+      }
+
+      final isExecutive = memberCheck['executive_committee'] == true;
+
+      // If not executive and no valid committees with workspace access, reject
+      if (!isExecutive && validCommittees.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _isSending = false;
+          _errorMessage = 'Your committee(s) do not have workspace access enabled. If you believe this is an error, please ask your committee leaders in Slack.';
+        });
+        return;
+      }
+
+      // User is valid - proceed with sending the OTP
       await client.auth.signInWithOtp(
         email: email,
         emailRedirectTo: _redirectUrl,
