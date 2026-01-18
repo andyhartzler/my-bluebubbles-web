@@ -4,6 +4,7 @@ import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -2032,18 +2033,32 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               ),
             )
           : DefaultTabController(
-              length: 3,
-              initialIndex: widget.initialTabIndex.clamp(0, 2),
+              length: 4,
+              initialIndex: widget.initialTabIndex.clamp(0, 3),
               child: Column(
                 children: [
-                  Material(
-                    elevation: 2,
-                    color: Theme.of(context).colorScheme.surface,
+                  // Branded tab bar with navy gradient
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: BrandColors.tileGradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
                     child: TabBar(
-                      labelColor: Theme.of(context).colorScheme.primary,
-                      unselectedLabelColor:
-                          Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
-                      indicatorColor: Theme.of(context).colorScheme.primary,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white70,
+                      indicatorColor: BrandColors.sunriseGold,
+                      indicatorWeight: 3,
+                      labelStyle: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontWeight: FontWeight.normal,
+                        fontSize: 13,
+                      ),
                       tabs: [
                         const Tab(icon: Icon(Icons.account_circle_outlined), text: 'Overview'),
                         const Tab(icon: Icon(Icons.email_outlined), text: 'Emails'),
@@ -2052,30 +2067,35 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                             'assets/icon/slack-icon.svg',
                             width: 24,
                             height: 24,
-                            colorFilter: ColorFilter.mode(
-                              Theme.of(context).colorScheme.onSurface,
+                            colorFilter: const ColorFilter.mode(
+                              Colors.white,
                               BlendMode.srcIn,
                             ),
                           ),
                           text: 'Slack',
                         ),
+                        const Tab(icon: Icon(Icons.video_camera_front_outlined), text: 'Meetings'),
                       ],
                     ),
                   ),
+                  // Tab content with branded background
                   Expanded(
-                    child: TabBarView(
-                      children: [
-                        _buildOverviewTab(context),
-                        EmailHistoryTab(
-                          memberId: _member.id,
-                          memberName: _member.name,
-                          memberEmail: _member.preferredEmail,
-                        ),
-                        SlackActivityTab(
-                          member: _member,
-                          onLinked: () => _fetchLatestMember(showFeedback: false),
-                        ),
-                      ],
+                    child: BrandedBackground(
+                      child: TabBarView(
+                        children: [
+                          _buildOverviewTab(context),
+                          EmailHistoryTab(
+                            memberId: _member.id,
+                            memberName: _member.name,
+                            memberEmail: _member.preferredEmail,
+                          ),
+                          SlackActivityTab(
+                            member: _member,
+                            onLinked: () => _fetchLatestMember(showFeedback: false),
+                          ),
+                          _buildMeetingsTab(context),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -3938,6 +3958,276 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
 
     return widgets;
+  }
+
+  /// Build the Meetings tab showing all meetings the member attended
+  Widget _buildMeetingsTab(BuildContext context) {
+    // Load attendance if not already loaded
+    if (!_hasLoadedAttendance && !_loadingAttendance) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadMeetingAttendance();
+      });
+    }
+
+    if (_loadingAttendance) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(BrandColors.momentumBlue),
+        ),
+      );
+    }
+
+    if (_attendanceError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+              const SizedBox(height: 16),
+              Text(
+                _attendanceError!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _loadMeetingAttendance,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Sort attendance by date (most recent first)
+    final sortedAttendance = [..._meetingAttendance]
+      ..sort((a, b) {
+        final aDate = a.meetingDate ?? a.meeting?.meetingDate;
+        final bDate = b.meetingDate ?? b.meeting?.meetingDate;
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return bDate.compareTo(aDate);
+      });
+
+    return RefreshIndicator(
+      onRefresh: _loadMeetingAttendance,
+      color: BrandColors.momentumBlue,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          // Header
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: BrandColors.momentumBlue,
+                    ),
+                    padding: const EdgeInsets.all(10),
+                    child: const Icon(Icons.video_camera_front_outlined, color: Colors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Meeting Attendance',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: BrandColors.unityBlue,
+                          ),
+                        ),
+                        Text(
+                          sortedAttendance.isEmpty
+                              ? 'No meetings attended yet'
+                              : '${sortedAttendance.length} meeting${sortedAttendance.length == 1 ? '' : 's'} attended',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh',
+                    icon: const Icon(Icons.refresh, color: BrandColors.unityBlue),
+                    onPressed: _loadMeetingAttendance,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Meeting list
+          if (sortedAttendance.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No meetings recorded',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Meetings will appear here once ${_member.firstName} attends one.',
+                      style: TextStyle(color: Colors.grey[500]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final attendance = sortedAttendance[index];
+                    return _buildMeetingAttendanceCard(attendance);
+                  },
+                  childCount: sortedAttendance.length,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Build a card for a single meeting attendance record
+  Widget _buildMeetingAttendanceCard(MeetingAttendance attendance) {
+    final dateLabel = attendance.formattedMeetingDate ?? 'Date unavailable';
+    final meeting = attendance.meeting;
+    final hostName = meeting?.host?.name ?? 'Unknown host';
+    final chapterName = meeting?.host?.chapterName;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: InkWell(
+          onTap: () => _navigateToMeeting(attendance),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.event_available,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            attendance.meetingLabel,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            dateLabel,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      color: Colors.white.withOpacity(0.7),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildMeetingChip(Icons.schedule, attendance.durationSummary),
+                    if (attendance.joinWindow != null)
+                      _buildMeetingChip(Icons.login, attendance.joinWindow!),
+                    _buildMeetingChip(Icons.person, hostName),
+                    if (chapterName != null)
+                      _buildMeetingChip(Icons.group, chapterName),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMeetingChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Card _buildMeetingSummaryCard(MeetingAttendance attendance) {
