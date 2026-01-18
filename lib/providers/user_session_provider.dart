@@ -14,6 +14,7 @@ class UserCommitteeInfo {
   final String? icon;
   final String? description;
   final int? memberCount;
+  final bool workspaceEnabled;
 
   const UserCommitteeInfo({
     required this.id,
@@ -24,6 +25,7 @@ class UserCommitteeInfo {
     this.icon,
     this.description,
     this.memberCount,
+    this.workspaceEnabled = true, // Default true since RPC now filters
   });
 
   factory UserCommitteeInfo.fromJson(Map<String, dynamic> json) {
@@ -46,6 +48,7 @@ class UserCommitteeInfo {
       icon: json['committee_icon']?.toString() ?? json['icon']?.toString(),
       description: json['committee_description']?.toString() ?? json['description']?.toString(),
       memberCount: json['member_count'] is int ? json['member_count'] : null,
+      workspaceEnabled: json['workspace_enabled'] == true,
     );
   }
 }
@@ -217,11 +220,13 @@ class UserSessionProvider extends ChangeNotifier {
       final supabase = CRMSupabaseService();
       final client = supabase.client;
 
-      // Query committees table for matching names
+      // Query committees table for matching names with workspace enabled
       final response = await client
           .from('committees')
           .select()
-          .inFilter('name', committeeNames);
+          .inFilter('name', committeeNames)
+          .eq('workspace_enabled', true)
+          .eq('is_active', true);
 
       if (response is List) {
         _userCommittees = response
@@ -230,13 +235,9 @@ class UserSessionProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error loading committees from member record: $e');
-      // Last resort: create basic committee info from names
-      _userCommittees = committeeNames.map((name) => UserCommitteeInfo(
-        id: name.toLowerCase().replaceAll(' ', '-'),
-        name: name,
-        slug: name.toLowerCase().replaceAll(' ', '-').replaceAll('&', 'and'),
-        tools: ['overview', 'members', 'slack', 'meetings'], // Default tools
-      )).toList();
+      // Don't create fake committee entries - we can't verify workspace_enabled
+      // User will see "no workspace access" which is safer than granting unverified access
+      _userCommittees = [];
     }
   }
 

@@ -59,15 +59,16 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
       final counts = <String, int>{};
       final allMeetings = <Meeting>[];
 
-      // Get committee names for workspace enabled check
-      final committeeNames = session.userCommittees.map((c) => c.name).toList();
-
-      // Load workspace enabled status for all committees
-      final workspaceEnabled = await _repository.getWorkspaceEnabledForCommittees(committeeNames);
+      // Build workspace enabled map from already-loaded committee data
+      // (RPC already filters by workspace_enabled = true, so all should be enabled)
+      final workspaceEnabled = <String, bool>{};
+      for (final committee in session.userCommittees) {
+        workspaceEnabled[committee.name] = committee.workspaceEnabled;
+      }
 
       for (final committee in session.userCommittees) {
         // Only load data for enabled committees
-        if (workspaceEnabled[committee.name] == true) {
+        if (committee.workspaceEnabled) {
           final count = await _repository.getMemberCountForCommittee(committee.name);
           counts[committee.name] = count;
 
@@ -87,8 +88,8 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
         }
       }
 
-      // Check if all workspaces are disabled
-      final anyEnabled = workspaceEnabled.values.any((enabled) => enabled);
+      // Check if any workspaces are enabled (should be true since RPC filters)
+      final anyEnabled = session.userCommittees.any((c) => c.workspaceEnabled);
 
       // Get upcoming meetings (next 7 days)
       final now = DateTime.now();
