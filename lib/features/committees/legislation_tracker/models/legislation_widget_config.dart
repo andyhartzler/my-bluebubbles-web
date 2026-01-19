@@ -9,6 +9,7 @@ enum LegislationWidgetType {
   pieChart,
   donutChart,
   leaderboard,
+  billLeaderboard,
   partyComparison,
   progressRing,
 }
