@@ -68,219 +68,144 @@ class _CommitteeMemberWorkspaceScreenState
         secondaryColor: BrandColors.unityBlue,
       );
 
-  // Get available tabs based on configured tools
+  // Get available tabs based on configured tools - ORDER MATTERS
+  // The tabs are built in the order specified by committeeInfo.tools
   List<_TabDefinition> get _tabs {
     final tools = committeeInfo.tools;
     final tabs = <_TabDefinition>[];
 
-    // Overview - always available if enabled
-    if (tools.contains('overview')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Overview',
-          icon: Icons.dashboard_outlined,
-          slug: 'overview',
-          builder: () => CommitteeMemberOverviewTab(
-            committee: committee,
-            leaders: _leaders,
-            onNavigateToMeetings: tools.contains('meetings')
-                ? () => _navigateToTabBySlug('meetings')
-                : null,
-          ),
+    // Build a map of all possible tab definitions
+    final tabDefinitions = <String, _TabDefinition>{
+      'overview': _TabDefinition(
+        label: 'Overview',
+        icon: Icons.dashboard_outlined,
+        slug: 'overview',
+        builder: () => CommitteeMemberOverviewTab(
+          committee: committee,
+          leaders: _leaders,
+          onNavigateToMeetings: tools.contains('meetings')
+              ? () => _navigateToTabBySlug('meetings')
+              : null,
         ),
-      );
-    }
-
-    // Members - read-only version for committee members
-    if (tools.contains('members')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Members',
-          icon: Icons.people_outline,
-          slug: 'members',
-          builder: () => CommitteeMemberMembersTab(committee: committee),
+      ),
+      'members': _TabDefinition(
+        label: 'Members',
+        icon: Icons.people_outline,
+        slug: 'members',
+        builder: () => CommitteeMemberMembersTab(committee: committee),
+      ),
+      'slack': _TabDefinition(
+        label: 'Slack',
+        iconWidget: SvgPicture.asset(
+          'assets/icon/slack-icon.svg',
+          width: 20,
+          height: 20,
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
         ),
-      );
-    }
-
-    // Slack - with member view restrictions
-    if (tools.contains('slack')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Slack',
-          iconWidget: SvgPicture.asset(
-            'assets/icon/slack-icon.svg',
-            width: 20,
-            height: 20,
-            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-          ),
-          slug: 'slack',
-          builder: () => CommitteeSlackTab(
-            committee: committee,
-            isMemberView: true, // Disable profile navigation for members
-          ),
+        slug: 'slack',
+        builder: () => CommitteeSlackTab(
+          committee: committee,
+          isMemberView: true,
         ),
-      );
-    }
-
-    // Meetings - with member view restrictions (no editing, no profile navigation)
-    if (tools.contains('meetings')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Meetings',
-          icon: Icons.video_camera_front_outlined,
-          slug: 'meetings',
-          builder: () =>
-              CommitteeMeetingsTab(committee: committee, isMemberView: true),
+      ),
+      'meetings': _TabDefinition(
+        label: 'Meetings',
+        icon: Icons.video_camera_front_outlined,
+        slug: 'meetings',
+        builder: () =>
+            CommitteeMeetingsTab(committee: committee, isMemberView: true),
+      ),
+      'board': _TabDefinition(
+        label: 'Board',
+        icon: Icons.space_dashboard_outlined,
+        slug: 'board',
+        builder: () => CommitteeCanvasTab(
+          committee: committee,
+          isFullscreen: _isCanvasFullscreen,
+          onFullscreenChanged: _setCanvasFullscreen,
         ),
-      );
-    }
-
-    // Board
-    if (tools.contains('board')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Board',
-          icon: Icons.space_dashboard_outlined,
-          slug: 'board',
-          builder: () => CommitteeCanvasTab(
-            committee: committee,
-            isFullscreen: _isCanvasFullscreen,
-            onFullscreenChanged: _setCanvasFullscreen,
-          ),
+      ),
+      'votes': _TabDefinition(
+        label: 'Votes',
+        icon: Icons.how_to_vote_outlined,
+        slug: 'votes',
+        builder: () => CommitteeVotesTab(
+          committee: committee,
+          isMemberView: true,
+          onNavigateToEmail: tools.contains('email')
+              ? () => _navigateToTabBySlug('email')
+              : null,
+          onNavigateToMessages: tools.contains('messages')
+              ? () => _navigateToTabBySlug('messages')
+              : null,
         ),
-      );
-    }
-
-    // Votes - member view can only see results, not create/edit/delete
-    if (tools.contains('votes')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Votes',
-          icon: Icons.how_to_vote_outlined,
-          slug: 'votes',
-          builder: () => CommitteeVotesTab(
-            committee: committee,
+      ),
+      'email': _TabDefinition(
+        label: 'Email',
+        icon: Icons.email_outlined,
+        slug: 'email',
+        builder: () => CommitteeEmailTab(committee: committee),
+      ),
+      'messages': _TabDefinition(
+        label: 'Messages',
+        icon: Icons.message_outlined,
+        slug: 'messages',
+        builder: () => CommitteeMessagesTab(committee: committee),
+      ),
+      'donors': _TabDefinition(
+        label: 'Donors',
+        icon: Icons.volunteer_activism_outlined,
+        slug: 'donors',
+        builder: () => const CommitteeDonorsTab(),
+      ),
+      'chapters': _TabDefinition(
+        label: 'Chapters',
+        icon: Icons.account_tree_outlined,
+        slug: 'chapters',
+        builder: () => CommitteeChaptersTab(
+          chapterTypeFilter: committee.chapterTypeFilter,
+        ),
+      ),
+      'campaigns': _TabDefinition(
+        label: 'Campaigns',
+        icon: Icons.campaign_outlined,
+        slug: 'campaigns',
+        builder: () => const CommitteeCampaignsTab(isMemberView: true),
+      ),
+      'legislation': _TabDefinition(
+        label: 'Legislation',
+        icon: Icons.gavel_outlined,
+        slug: 'legislation',
+        builder: () => MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => LegislationProvider()),
+            ChangeNotifierProvider(create: (_) => BillSearchProvider()),
+          ],
+          child: LegislationTrackerScreen(
+            committeeId: committee.id,
             isMemberView: true,
-            onNavigateToEmail: tools.contains('email')
-                ? () => _navigateToTabBySlug('email')
-                : null,
-            onNavigateToMessages: tools.contains('messages')
-                ? () => _navigateToTabBySlug('messages')
-                : null,
           ),
         ),
-      );
-    }
+      ),
+      'social-media': _TabDefinition(
+        label: 'Social Media',
+        icon: Icons.analytics_outlined,
+        slug: 'social-media',
+        builder: () => SocialMediaAnalyticsTab(committee: committee),
+      ),
+    };
 
-    // Email
-    if (tools.contains('email')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Email',
-          icon: Icons.email_outlined,
-          slug: 'email',
-          builder: () => CommitteeEmailTab(committee: committee),
-        ),
-      );
-    }
-
-    // Messages
-    if (tools.contains('messages')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Messages',
-          icon: Icons.message_outlined,
-          slug: 'messages',
-          builder: () => CommitteeMessagesTab(committee: committee),
-        ),
-      );
-    }
-
-    // Donors
-    if (tools.contains('donors')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Donors',
-          icon: Icons.volunteer_activism_outlined,
-          slug: 'donors',
-          builder: () => const CommitteeDonorsTab(),
-        ),
-      );
-    }
-
-    // Chapters
-    if (tools.contains('chapters')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Chapters',
-          icon: Icons.account_tree_outlined,
-          slug: 'chapters',
-          builder: () => CommitteeChaptersTab(
-            chapterTypeFilter: committee.chapterTypeFilter,
-          ),
-        ),
-      );
-    }
-
-    // Campaigns
-    if (tools.contains('campaigns')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Campaigns',
-          icon: Icons.campaign_outlined,
-          slug: 'campaigns',
-          builder: () => const CommitteeCampaignsTab(isMemberView: true),
-        ),
-      );
-    }
-
-    // Legislation
-    if (tools.contains('legislation')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Legislation',
-          icon: Icons.gavel_outlined,
-          slug: 'legislation',
-          builder: () => MultiProvider(
-            providers: [
-              ChangeNotifierProvider(create: (_) => LegislationProvider()),
-              ChangeNotifierProvider(create: (_) => BillSearchProvider()),
-            ],
-            child: LegislationTrackerScreen(
-              committeeId: committee.id,
-              isMemberView: true,
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Social Media
-    if (tools.contains('social-media')) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Social Media',
-          icon: Icons.analytics_outlined,
-          slug: 'social-media',
-          builder: () => SocialMediaAnalyticsTab(committee: committee),
-        ),
-      );
+    // Build tabs in the ORDER specified by the tools list
+    for (final toolSlug in tools) {
+      final tabDef = tabDefinitions[toolSlug];
+      if (tabDef != null) {
+        tabs.add(tabDef);
+      }
     }
 
     // If no tabs are configured, show at least overview
     if (tabs.isEmpty) {
-      tabs.add(
-        _TabDefinition(
-          label: 'Overview',
-          icon: Icons.dashboard_outlined,
-          slug: 'overview',
-          builder: () => CommitteeMemberOverviewTab(
-            committee: committee,
-            leaders: _leaders,
-          ),
-        ),
-      );
+      tabs.add(tabDefinitions['overview']!);
     }
 
     return tabs;
