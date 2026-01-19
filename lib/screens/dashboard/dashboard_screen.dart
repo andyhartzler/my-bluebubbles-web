@@ -1345,8 +1345,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return _buildPositionedGrid(sortedWidgets, metrics, columns, unitWidth, unitHeight, maxWidth);
   }
 
-  /// Build a true positioned grid that supports multi-row spanning widgets
-  /// Uses Stack with absolute positioning to allow multi-row spanning
+  /// Build a flow-based grid that packs widgets based on actual sizes
+  /// Widgets are placed row by row, advancing by their actual width
   Widget _buildPositionedGrid(
     List<DashboardWidgetConfig> widgets,
     DashboardMetrics metrics,
@@ -1357,47 +1357,59 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   ) {
     const spacing = 16.0;
 
-    // Create a grid map to track occupied cells
-    final gridMap = <String, int>{};
-    final widgetPositions = <int, _GridPosition>{};
+    // Track actual positions for each widget
+    final widgetPositions = <int, ({double left, double top, double width, double height})>{};
 
-    // Place widgets on the grid respecting their gridX, gridY positions
+    // Track current x position and max height for each row
+    final rowXPositions = <int, double>{};
+    final rowHeights = <int, double>{};
+
+    // Place widgets row by row based on gridY, packing by actual width
     for (int i = 0; i < widgets.length; i++) {
       final widget = widgets[i];
-      final widthCells = widget.widthMultiplier.ceil().clamp(1, columns);
-      final heightCells = widget.heightMultiplier.ceil().clamp(1, 10);
+      final widgetWidth = widget.widthMultiplier * unitWidth;
+      final widgetHeight = widget.heightMultiplier * unitHeight;
 
-      // Find position - prefer specified gridX/gridY, or find next available
-      int startRow = widget.gridY;
-      int startCol = widget.gridX.clamp(0, columns - 1);
+      int targetRow = widget.gridY;
 
-      // If specified position is occupied or invalid, find next available
-      if (startCol + widthCells > columns || _isOccupied(gridMap, startRow, startCol, widthCells, heightCells)) {
-        final pos = _findNextAvailablePosition(gridMap, columns, widthCells, heightCells);
-        startRow = pos.row;
-        startCol = pos.col;
+      // Get current x position for this row
+      double currentX = rowXPositions[targetRow] ?? 0.0;
+
+      // Check if widget fits in current row, if not move to next row
+      if (currentX > 0 && currentX + widgetWidth > maxWidth) {
+        // Find the next available row
+        targetRow = (rowXPositions.keys.isEmpty ? 0 : rowXPositions.keys.reduce((a, b) => a > b ? a : b)) + 1;
+        currentX = 0.0;
       }
 
-      // Mark cells as occupied
-      for (int r = 0; r < heightCells; r++) {
-        for (int c = 0; c < widthCells; c++) {
-          final key = '${startRow + r},${startCol + c}';
-          gridMap[key] = i;
-        }
+      // Calculate top position based on row heights
+      double top = 0.0;
+      for (int r = 0; r < targetRow; r++) {
+        top += (rowHeights[r] ?? unitHeight) + spacing;
       }
 
-      widgetPositions[i] = _GridPosition(startRow, startCol, widthCells, heightCells, widget.widthMultiplier, widget.heightMultiplier);
-    }
+      // Store widget position
+      widgetPositions[i] = (
+        left: currentX,
+        top: top,
+        width: widgetWidth,
+        height: widgetHeight,
+      );
 
-    // Find max row
-    int maxRow = 0;
-    for (final pos in widgetPositions.values) {
-      final endRow = pos.row + pos.heightCells;
-      if (endRow > maxRow) maxRow = endRow;
+      // Update row tracking
+      rowXPositions[targetRow] = currentX + widgetWidth + spacing;
+      final currentRowHeight = rowHeights[targetRow] ?? 0.0;
+      if (widgetHeight > currentRowHeight) {
+        rowHeights[targetRow] = widgetHeight;
+      }
     }
 
     // Calculate total height
-    final totalHeight = maxRow * unitHeight + (maxRow - 1) * spacing;
+    double totalHeight = 0.0;
+    for (int r = 0; r <= (rowHeights.keys.isEmpty ? 0 : rowHeights.keys.reduce((a, b) => a > b ? a : b)); r++) {
+      totalHeight += (rowHeights[r] ?? unitHeight);
+      if (r > 0) totalHeight += spacing;
+    }
 
     // Build positioned widgets using Stack
     final positionedWidgets = <Widget>[];
@@ -1407,21 +1419,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final pos = widgetPositions[i];
       if (pos == null) continue;
 
-      // Calculate actual dimensions using the multipliers (not ceil'd cells)
-      // This ensures mini (0.5x0.5) and small (1x0.5) render at proper fractional sizes
-      final width = pos.widthMultiplier * unitWidth + (pos.widthCells > 1 ? (pos.widthCells - 1) * spacing : 0);
-      final height = pos.heightMultiplier * unitHeight + (pos.heightCells > 1 ? (pos.heightCells - 1) * spacing : 0);
-
-      // Calculate position
-      final left = pos.col * (unitWidth + spacing);
-      final top = pos.row * (unitHeight + spacing);
-
       positionedWidgets.add(
         Positioned(
-          left: left,
-          top: top,
-          width: width.clamp(50.0, maxWidth),
-          height: height.clamp(50.0, totalHeight),
+          left: pos.left,
+          top: pos.top,
+          width: pos.width.clamp(50.0, maxWidth),
+          height: pos.height.clamp(50.0, totalHeight > 0 ? totalHeight : unitHeight),
           child: _buildWidget(widget, metrics),
         ),
       );
