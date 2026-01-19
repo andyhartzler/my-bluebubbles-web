@@ -106,13 +106,15 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
         overlays: [SystemUiOverlay.top],
       );
 
-      SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: Color(0xFF0d0d1a),
-        systemNavigationBarIconBrightness: Brightness.light,
-        systemNavigationBarDividerColor: Colors.transparent,
-      ));
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: Color(0xFF0d0d1a),
+          systemNavigationBarIconBrightness: Brightness.light,
+          systemNavigationBarDividerColor: Colors.transparent,
+        ),
+      );
 
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
@@ -138,17 +140,27 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
       StackTrace? stacktrace;
 
       FlutterError.onError = (details) {
-        Logger.error("Rendering Error: ${details.exceptionAsString()}", error: details.exception, trace: details.stack);
+        Logger.error(
+          "Rendering Error: ${details.exceptionAsString()}",
+          error: details.exception,
+          trace: details.stack,
+        );
       };
 
       try {
         // Once all the services are initialized, we need to perform some
         // startup tasks to ensure that the app has the information it needs.
-        StartupTasks.onStartup().then((_) {
-          Logger.info("Startup tasks completed");
-        }).catchError((e, s) {
-          Logger.error("Failed to complete startup tasks!", error: e, trace: s);
-        });
+        StartupTasks.onStartup()
+            .then((_) {
+              Logger.info("Startup tasks completed");
+            })
+            .catchError((e, s) {
+              Logger.error(
+                "Failed to complete startup tasks!",
+                error: e,
+                trace: s,
+              );
+            });
 
         /* ----- DATE FORMATTING INITIALIZATION ----- */
         await initializeDateFormatting();
@@ -158,13 +170,20 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
 
         /* ----- SPLASH SCREEN INITIALIZATION ----- */
         if (!ss.settings.finishedSetup.value && !kIsWeb && !kIsDesktop) {
-          runApp(MaterialApp(
+          runApp(
+            MaterialApp(
               home: SplashScreen(shouldNavigate: false),
               theme: ThemeData(
                 colorScheme: ColorScheme.fromSwatch(
-                    backgroundColor:
-                        PlatformDispatcher.instance.platformBrightness == Brightness.dark ? Colors.black : Colors.white),
-              )));
+                  backgroundColor:
+                      PlatformDispatcher.instance.platformBrightness ==
+                          Brightness.dark
+                      ? Colors.black
+                      : Colors.white,
+                ),
+              ),
+            ),
+          );
         }
 
         /* ----- ANDROID SPECIFIC INITIALIZATION ----- */
@@ -172,12 +191,19 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
           /* ----- TIME ZONE INITIALIZATION ----- */
           tz.initializeTimeZones();
           try {
-            tz.setLocalLocation(tz.getLocation(await FlutterTimezone.getLocalTimezone()));
+            tz.setLocalLocation(
+              tz.getLocation(await FlutterTimezone.getLocalTimezone()),
+            );
           } catch (_) {}
 
           /* ----- MLKIT INITIALIZATION ----- */
-          if (!await EntityExtractorModelManager().isModelDownloaded(EntityExtractorLanguage.english.name)) {
-            EntityExtractorModelManager().downloadModel(EntityExtractorLanguage.english.name, isWifiRequired: false);
+          if (!await EntityExtractorModelManager().isModelDownloaded(
+            EntityExtractorLanguage.english.name,
+          )) {
+            EntityExtractorModelManager().downloadModel(
+              EntityExtractorLanguage.english.name,
+              isWifiRequired: false,
+            );
           }
         }
 
@@ -191,13 +217,17 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
           if (Platform.isWindows) {
             await Window.hideWindowControls();
           } else if (Platform.isLinux) {
-            await windowManager
-                .setTitleBarStyle(ss.settings.useCustomTitleBar.value ? TitleBarStyle.hidden : TitleBarStyle.normal);
+            await windowManager.setTitleBarStyle(
+              ss.settings.useCustomTitleBar.value
+                  ? TitleBarStyle.hidden
+                  : TitleBarStyle.normal,
+            );
           }
           windowManager.addListener(DesktopWindowListener.instance);
           doWhenWindowReady(() async {
             await windowManager.setMinimumSize(const Size(300, 300));
-            Display primary = await ScreenRetriever.instance.getPrimaryDisplay();
+            Display primary = await ScreenRetriever.instance
+                .getPrimaryDisplay();
 
             Size size = await windowManager.getSize();
             double width = ss.prefs.getDouble("window-width") ?? size.width;
@@ -248,10 +278,7 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
         light = tuple.item1;
         dark = tuple.item2;
 
-        runApp(Main(
-          lightTheme: light,
-          darkTheme: dark,
-        ));
+        runApp(Main(lightTheme: light, darkTheme: dark));
       } else {
         runApp(FailureToStart(e: exception, s: stacktrace));
         throw Exception("$exception $stacktrace");
@@ -259,7 +286,7 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
     },
     (dynamic error, StackTrace stackTrace) {
       Logger.error("Unhandled Exception", trace: stackTrace, error: error);
-    }
+    },
   );
 }
 
@@ -347,55 +374,115 @@ class Main extends StatelessWidget {
         builder: (theme, darkTheme) => GetMaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Missouri Young Democrats CRM',
-          theme: theme.copyWith(appBarTheme: theme.appBarTheme.copyWith(elevation: 0.0)),
-          darkTheme: darkTheme.copyWith(appBarTheme: darkTheme.appBarTheme.copyWith(elevation: 0.0)),
+          theme: theme.copyWith(
+            appBarTheme: theme.appBarTheme.copyWith(elevation: 0.0),
+          ),
+          darkTheme: darkTheme.copyWith(
+            appBarTheme: darkTheme.appBarTheme.copyWith(elevation: 0.0),
+          ),
           navigatorKey: ns.key,
           scrollBehavior: const MaterialScrollBehavior().copyWith(
             // Specifically for GNU/Linux & Android-x86 family, where touch isn't interpreted as a drag device by Flutter apparently.
-            dragDevices: Platform.isLinux || Platform.isAndroid ? PointerDeviceKind.values.toSet() : null,
+            dragDevices: Platform.isLinux || Platform.isAndroid
+                ? PointerDeviceKind.values.toSet()
+                : null,
             // Prevent scrolling with multiple fingers accelerating the scrolling
             multitouchDragStrategy: MultitouchDragStrategy.latestPointer,
           ),
           getPages: [
             GetPage(name: '/auth/callback', page: AuthCallbackScreen.new),
             GetPage(name: '/crm/donors', page: () => const DonorsListScreen()),
-            GetPage(name: '/ai-assistant', page: () => const AIAssistantScreen()),
-            GetPage(name: '/ai-assistant/admin', page: () => const KnowledgeAdminScreen()),
+            GetPage(
+              name: '/ai-assistant',
+              page: () => const AIAssistantScreen(),
+            ),
+            GetPage(
+              name: '/ai-assistant/admin',
+              page: () => const KnowledgeAdminScreen(),
+            ),
           ],
           home: SupabaseAuthGate(child: const AuthenticatedApp()),
           shortcuts: {
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.comma): const OpenSettingsIntent(),
-            LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyN): const OpenNewChatCreatorIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.comma):
+                const OpenSettingsIntent(),
+            LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyN):
+                const OpenNewChatCreatorIntent(),
             if (kIsDesktop)
-              LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyN): const OpenNewChatCreatorIntent(),
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyF): const OpenSearchIntent(),
-            LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyR): const ReplyRecentIntent(),
-            if (kIsDesktop) LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyR): const ReplyRecentIntent(),
-            LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyG): const StartIncrementalSyncIntent(),
+              LogicalKeySet(
+                LogicalKeyboardKey.control,
+                LogicalKeyboardKey.keyN,
+              ): const OpenNewChatCreatorIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyF):
+                const OpenSearchIntent(),
+            LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyR):
+                const ReplyRecentIntent(),
             if (kIsDesktop)
-              LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.keyR):
-                  const StartIncrementalSyncIntent(),
+              LogicalKeySet(
+                LogicalKeyboardKey.control,
+                LogicalKeyboardKey.keyR,
+              ): const ReplyRecentIntent(),
+            LogicalKeySet(LogicalKeyboardKey.alt, LogicalKeyboardKey.keyG):
+                const StartIncrementalSyncIntent(),
             if (kIsDesktop)
-              LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyG): const StartIncrementalSyncIntent(),
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.exclamation):
-                const HeartRecentIntent(),
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.at):
-                const LikeRecentIntent(),
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.numberSign):
-                const DislikeRecentIntent(),
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.dollar):
-                const LaughRecentIntent(),
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.percent):
-                const EmphasizeRecentIntent(),
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.caret):
-                const QuestionRecentIntent(),
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.arrowDown): const OpenNextChatIntent(),
-            if (kIsDesktop) LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.tab): const OpenNextChatIntent(),
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.arrowUp): const OpenPreviousChatIntent(),
+              LogicalKeySet(
+                LogicalKeyboardKey.control,
+                LogicalKeyboardKey.shift,
+                LogicalKeyboardKey.keyR,
+              ): const StartIncrementalSyncIntent(),
             if (kIsDesktop)
-              LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.shift, LogicalKeyboardKey.tab):
-                  const OpenPreviousChatIntent(),
-            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyI): const OpenChatDetailsIntent(),
+              LogicalKeySet(
+                LogicalKeyboardKey.control,
+                LogicalKeyboardKey.keyG,
+              ): const StartIncrementalSyncIntent(),
+            LogicalKeySet(
+              LogicalKeyboardKey.control,
+              LogicalKeyboardKey.shift,
+              LogicalKeyboardKey.exclamation,
+            ): const HeartRecentIntent(),
+            LogicalKeySet(
+              LogicalKeyboardKey.control,
+              LogicalKeyboardKey.shift,
+              LogicalKeyboardKey.at,
+            ): const LikeRecentIntent(),
+            LogicalKeySet(
+              LogicalKeyboardKey.control,
+              LogicalKeyboardKey.shift,
+              LogicalKeyboardKey.numberSign,
+            ): const DislikeRecentIntent(),
+            LogicalKeySet(
+              LogicalKeyboardKey.control,
+              LogicalKeyboardKey.shift,
+              LogicalKeyboardKey.dollar,
+            ): const LaughRecentIntent(),
+            LogicalKeySet(
+              LogicalKeyboardKey.control,
+              LogicalKeyboardKey.shift,
+              LogicalKeyboardKey.percent,
+            ): const EmphasizeRecentIntent(),
+            LogicalKeySet(
+              LogicalKeyboardKey.control,
+              LogicalKeyboardKey.shift,
+              LogicalKeyboardKey.caret,
+            ): const QuestionRecentIntent(),
+            LogicalKeySet(
+              LogicalKeyboardKey.control,
+              LogicalKeyboardKey.arrowDown,
+            ): const OpenNextChatIntent(),
+            if (kIsDesktop)
+              LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.tab):
+                  const OpenNextChatIntent(),
+            LogicalKeySet(
+              LogicalKeyboardKey.control,
+              LogicalKeyboardKey.arrowUp,
+            ): const OpenPreviousChatIntent(),
+            if (kIsDesktop)
+              LogicalKeySet(
+                LogicalKeyboardKey.control,
+                LogicalKeyboardKey.shift,
+                LogicalKeyboardKey.tab,
+              ): const OpenPreviousChatIntent(),
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyI):
+                const OpenChatDetailsIntent(),
             LogicalKeySet(LogicalKeyboardKey.escape): const GoBackIntent(),
           },
           builder: (context, child) => SafeArea(
@@ -406,95 +493,131 @@ class Main extends StatelessWidget {
             child: SecureApplication(
               child: Builder(
                 builder: (context) {
-                  if (ss.canAuthenticate && (!ls.isAlive || !StartupTasks.uiReady.isCompleted)) {
+                  if (ss.canAuthenticate &&
+                      (!ls.isAlive || !StartupTasks.uiReady.isCompleted)) {
                     if (ss.settings.shouldSecure.value) {
-                      SecureApplicationProvider.of(context, listen: false)!.lock();
-                      if (ss.settings.securityLevel.value == SecurityLevel.locked_and_secured) {
-                        SecureApplicationProvider.of(context, listen: false)!.secure();
+                      SecureApplicationProvider.of(
+                        context,
+                        listen: false,
+                      )!.lock();
+                      if (ss.settings.securityLevel.value ==
+                          SecurityLevel.locked_and_secured) {
+                        SecureApplicationProvider.of(
+                          context,
+                          listen: false,
+                        )!.secure();
                       }
                     }
                   }
-                return TitleBarWrapper(
-                  child: SelectionArea(
-                    child: SecureGate(
-                    blurr: 5,
-                    opacity: 0,
-                    lockedBuilder: (context, controller) {
-                      final localAuth = LocalAuthentication();
-                      if (!isAuthing) {
-                        isAuthing = true;
-                        localAuth
-                            .authenticate(
-                                localizedReason: 'Please authenticate to unlock the Missouri Young Democrats hub',
-                                options: const AuthenticationOptions(stickyAuth: true))
-                            .then((result) {
-                          isAuthing = false;
-                          if (result) {
-                            SecureApplicationProvider.of(context, listen: false)!.authSuccess(unlock: true);
-                            if (kIsDesktop) {
-                              Future.delayed(Duration.zero, () {
-                                chats.init();
-                                socket;
-                              });
-                            }
-                          }
-                        });
-                      }
-                      return Container(
-                        color: context.theme.colorScheme.background,
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: <Widget>[
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                                child: Text(
-                                  "The Missouri Young Democrats hub is currently locked. Please unlock to access your messages.",
-                                  style: context.theme.textTheme.titleLarge,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                              Container(height: 20.0),
-                              ClipOval(
-                                child: Material(
-                                  color: context.theme.colorScheme.primary, // button color
-                                  child: InkWell(
-                                    child: SizedBox(
-                                        width: 60,
-                                        height: 60,
-                                        child: Icon(Icons.lock_open, color: context.theme.colorScheme.onPrimary)),
-                                    onTap: () async {
-                                      final localAuth = LocalAuthentication();
-                                      bool didAuthenticate = await localAuth.authenticate(
-                                          localizedReason: 'Please authenticate to unlock the Missouri Young Democrats hub',
-                                          options: const AuthenticationOptions(stickyAuth: true));
-                                      if (didAuthenticate) {
-                                        controller!.authSuccess(unlock: true);
-                                        if (kIsDesktop) {
-                                          Future.delayed(Duration.zero, () {
-                                            chats.init();
-                                            socket;
-                                          });
-                                        }
-                                      }
-                                    },
+                  return TitleBarWrapper(
+                    child: SelectionArea(
+                      child: SecureGate(
+                        blurr: 5,
+                        opacity: 0,
+                        lockedBuilder: (context, controller) {
+                          final localAuth = LocalAuthentication();
+                          if (!isAuthing) {
+                            isAuthing = true;
+                            localAuth
+                                .authenticate(
+                                  localizedReason:
+                                      'Please authenticate to unlock the Missouri Young Democrats hub',
+                                  options: const AuthenticationOptions(
+                                    stickyAuth: true,
                                   ),
-                                ),
+                                )
+                                .then((result) {
+                                  isAuthing = false;
+                                  if (result) {
+                                    SecureApplicationProvider.of(
+                                      context,
+                                      listen: false,
+                                    )!.authSuccess(unlock: true);
+                                    if (kIsDesktop) {
+                                      Future.delayed(Duration.zero, () {
+                                        chats.init();
+                                        socket;
+                                      });
+                                    }
+                                  }
+                                });
+                          }
+                          return Container(
+                            color: context.theme.colorScheme.background,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: <Widget>[
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20.0,
+                                    ),
+                                    child: Text(
+                                      "The Missouri Young Democrats hub is currently locked. Please unlock to access your messages.",
+                                      style: context.theme.textTheme.titleLarge,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                  Container(height: 20.0),
+                                  ClipOval(
+                                    child: Material(
+                                      color: context
+                                          .theme
+                                          .colorScheme
+                                          .primary, // button color
+                                      child: InkWell(
+                                        child: SizedBox(
+                                          width: 60,
+                                          height: 60,
+                                          child: Icon(
+                                            Icons.lock_open,
+                                            color: context
+                                                .theme
+                                                .colorScheme
+                                                .onPrimary,
+                                          ),
+                                        ),
+                                        onTap: () async {
+                                          final localAuth =
+                                              LocalAuthentication();
+                                          bool didAuthenticate = await localAuth
+                                              .authenticate(
+                                                localizedReason:
+                                                    'Please authenticate to unlock the Missouri Young Democrats hub',
+                                                options:
+                                                    const AuthenticationOptions(
+                                                      stickyAuth: true,
+                                                    ),
+                                              );
+                                          if (didAuthenticate) {
+                                            controller!.authSuccess(
+                                              unlock: true,
+                                            );
+                                            if (kIsDesktop) {
+                                              Future.delayed(Duration.zero, () {
+                                                chats.init();
+                                                socket;
+                                              });
+                                            }
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                    child: child ?? Container(),
-                  ),
-                  ),
-                );
-              },
+                            ),
+                          );
+                        },
+                        child: child ?? Container(),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
-        ),
-        defaultTransition: Transition.cupertino,
+          defaultTransition: Transition.cupertino,
         ),
       ),
     );
@@ -522,14 +645,17 @@ enum _HomeSection {
   slackManagement,
   campaigns,
   forms,
-  conversations
+  conversations,
 }
 
-class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayListener {
+class _HomeState extends OptimizedState<Home>
+    with WidgetsBindingObserver, TrayListener {
   bool serverCompatible = true;
   bool fullyLoaded = false;
   _HomeSection _currentSection = _HomeSection.dashboard;
-  final FocusNode _mobileMenuButtonFocusNode = FocusNode(debugLabel: 'mobileMenuButton');
+  final FocusNode _mobileMenuButtonFocusNode = FocusNode(
+    debugLabel: 'mobileMenuButton',
+  );
   final PageStorageBucket _bucket = PageStorageBucket();
   DateTime? _lastTouchTime;
 
@@ -555,7 +681,11 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
       }
 
       ErrorWidget.builder = (FlutterErrorDetails error) {
-        Logger.error("An unexpected error occurred when rendering.", error: error.exception, trace: error.stack);
+        Logger.error(
+          "An unexpected error occurred when rendering.",
+          error: error.exception,
+          trace: error.stack,
+        );
         return CustomErrorWidget(
           "An unexpected error occurred when rendering.",
         );
@@ -632,7 +762,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             if (target is html.Element) {
               final tagName = target.tagName.toLowerCase();
               // Skip refresh for input elements (text fields, textareas, etc.)
-              if (tagName == 'input' || tagName == 'textarea' ||
+              if (tagName == 'input' ||
+                  tagName == 'textarea' ||
                   target.getAttribute('contenteditable') == 'true') {
                 return;
               }
@@ -652,9 +783,39 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           // do a light refresh to ensure responsiveness
           if (html.document.visibilityState == 'visible') {
             final now = DateTime.now();
-            if (_lastTouchTime != null && now.difference(_lastTouchTime!).inSeconds > 10) {
+            if (_lastTouchTime != null &&
+                now.difference(_lastTouchTime!).inSeconds > 10) {
               _refreshPWAState(aggressive: false);
             }
+          }
+        });
+
+        // INITIAL PWA REFRESH - Critical fix for iOS Safari PWA standalone mode
+        // On initial PWA load, none of the event listeners above will fire immediately.
+        // This causes navigation to be unresponsive until the user interacts with
+        // something that triggers a focusin event (like tapping a dashboard stat tile).
+        // By calling _refreshPWAState on initial load, we ensure touch handling is
+        // properly initialized from the start.
+        //
+        // We use multiple delayed calls because iOS Safari PWA can take varying
+        // amounts of time to fully initialize touch handling after the initial render.
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            _refreshPWAState(aggressive: true);
+          }
+        });
+
+        // Additional delayed refresh to catch any late-initializing PWA scenarios
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _refreshPWAState(aggressive: true);
+          }
+        });
+
+        // Final safety net refresh for the most stubborn iOS Safari PWA cases
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted && !_isTextInputFocused()) {
+            _refreshPWAState(aggressive: false);
           }
         });
       }
@@ -668,22 +829,32 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           /* ----- BADGE ICON LISTENER ----- */
           GlobalChatService.unreadCount.listen((count) async {
             if (count == 0) {
-                await WindowsTaskbar.resetOverlayIcon();
-              } else if (count <= 9) {
-                await WindowsTaskbar.setOverlayIcon(ThumbnailToolbarAssetIcon('assets/badges/badge-$count.ico'));
-              } else {
-                await WindowsTaskbar.setOverlayIcon(ThumbnailToolbarAssetIcon('assets/badges/badge-10.ico'));
-              }
+              await WindowsTaskbar.resetOverlayIcon();
+            } else if (count <= 9) {
+              await WindowsTaskbar.setOverlayIcon(
+                ThumbnailToolbarAssetIcon('assets/badges/badge-$count.ico'),
+              );
+            } else {
+              await WindowsTaskbar.setOverlayIcon(
+                ThumbnailToolbarAssetIcon('assets/badges/badge-10.ico'),
+              );
+            }
           });
 
           /* ----- WINDOW EFFECT INITIALIZATION ----- */
           eventDispatcher.stream.listen((event) async {
             if (event.item1 == 'theme-update') {
-              EasyDebounce.debounce('window-effect', const Duration(milliseconds: 500), () async {
-                if (mounted) {
-                  await WindowEffects.setEffect(color: context.theme.colorScheme.background);
-                }
-              });
+              EasyDebounce.debounce(
+                'window-effect',
+                const Duration(milliseconds: 500),
+                () async {
+                  if (mounted) {
+                    await WindowEffects.setEffect(
+                      color: context.theme.colorScheme.background,
+                    );
+                  }
+                },
+              );
             }
           });
 
@@ -892,21 +1063,25 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
   /// Render
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      systemNavigationBarColor: ss.settings.immersiveMode.value
-          ? Colors.transparent
-          : context.theme.colorScheme.background, // navigation bar color
-      systemNavigationBarIconBrightness: context.theme.colorScheme.brightness.opposite,
-      statusBarColor: Colors.transparent, // status bar color
-      statusBarIconBrightness: context.theme.colorScheme.brightness.opposite,
-    ));
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        systemNavigationBarColor: ss.settings.immersiveMode.value
+            ? Colors.transparent
+            : context.theme.colorScheme.background, // navigation bar color
+        systemNavigationBarIconBrightness:
+            context.theme.colorScheme.brightness.opposite,
+        statusBarColor: Colors.transparent, // status bar color
+        statusBarIconBrightness: context.theme.colorScheme.brightness.opposite,
+      ),
+    );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         systemNavigationBarColor: ss.settings.immersiveMode.value
             ? Colors.transparent
             : context.theme.colorScheme.background, // navigation bar color
-        systemNavigationBarIconBrightness: context.theme.colorScheme.brightness.opposite,
+        systemNavigationBarIconBrightness:
+            context.theme.colorScheme.brightness.opposite,
         statusBarColor: Colors.transparent, // status bar color
         statusBarIconBrightness: context.theme.colorScheme.brightness.opposite,
       ),
@@ -953,7 +1128,8 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
 
   Widget _buildShell(BuildContext context) {
     final theme = Theme.of(context);
-    final bool crmReady = CRMConfig.crmEnabled && CRMSupabaseService().isInitialized;
+    final bool crmReady =
+        CRMConfig.crmEnabled && CRMSupabaseService().isInitialized;
     final bool useGradientBackground = ts.isGradientBg(context);
 
     final decoration = BoxDecoration(
@@ -987,17 +1163,32 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   child: IndexedStack(
                     index: _currentSection.index,
                     children: [
-                      const DashboardScreen(key: PageStorageKey('dashboard-view')),
-                      const MembersListScreen(key: PageStorageKey('members-view'), embed: true),
-                      const DonorsListScreen(key: PageStorageKey('donors-view'), embed: true),
-                      const SubscribersScreen(key: PageStorageKey('subscribers-view')),
+                      const DashboardScreen(
+                        key: PageStorageKey('dashboard-view'),
+                      ),
+                      const MembersListScreen(
+                        key: PageStorageKey('members-view'),
+                        embed: true,
+                      ),
+                      const DonorsListScreen(
+                        key: PageStorageKey('donors-view'),
+                        embed: true,
+                      ),
+                      const SubscribersScreen(
+                        key: PageStorageKey('subscribers-view'),
+                      ),
                       const MembersListScreen(
                         key: PageStorageKey('chapters-view'),
                         embed: true,
                         showChaptersOnly: true,
                       ),
-                      const CommitteesDashboardScreen(key: PageStorageKey('committees-view'), embed: true),
-                      const MeetingsScreen(key: PageStorageKey('meetings-view')),
+                      const CommitteesDashboardScreen(
+                        key: PageStorageKey('committees-view'),
+                        embed: true,
+                      ),
+                      const MeetingsScreen(
+                        key: PageStorageKey('meetings-view'),
+                      ),
                       const EventsScreen(key: PageStorageKey('events-view')),
                       const MemberPortalManagementScreen(
                         key: PageStorageKey('member-portal-view'),
@@ -1013,9 +1204,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                       const MauticEmbedScreen(
                         key: PageStorageKey('campaigns-view'),
                       ),
-                      const FormsMainScreen(
-                        key: PageStorageKey('forms-view'),
-                      ),
+                      const FormsMainScreen(key: PageStorageKey('forms-view')),
                       ConversationList(
                         key: const PageStorageKey('conversations-view'),
                         showArchivedChats: false,
@@ -1076,17 +1265,26 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             ),
           ),
           PopupMenuItem<VoidCallback>(
-            value: crmReady ? () => _setSection(_HomeSection.walletNotifications) : null,
+            value: crmReady
+                ? () => _setSection(_HomeSection.walletNotifications)
+                : null,
             enabled: crmReady,
             child: ListTile(
               leading: const Icon(Icons.notifications_active_outlined),
               title: const Text('Wallet Notifications'),
-              subtitle: crmReady ? null : const Text('Available when CRM is connected', style: TextStyle(fontSize: 11)),
+              subtitle: crmReady
+                  ? null
+                  : const Text(
+                      'Available when CRM is connected',
+                      style: TextStyle(fontSize: 11),
+                    ),
               contentPadding: EdgeInsets.zero,
             ),
           ),
           PopupMenuItem<VoidCallback>(
-            value: crmReady ? () => _setSection(_HomeSection.slackManagement) : null,
+            value: crmReady
+                ? () => _setSection(_HomeSection.slackManagement)
+                : null,
             enabled: crmReady,
             child: ListTile(
               leading: SvgPicture.asset(
@@ -1094,12 +1292,19 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                 width: 24,
                 height: 24,
                 colorFilter: ColorFilter.mode(
-                  crmReady ? theme.iconTheme.color ?? Colors.white : theme.disabledColor,
+                  crmReady
+                      ? theme.iconTheme.color ?? Colors.white
+                      : theme.disabledColor,
                   BlendMode.srcIn,
                 ),
               ),
               title: const Text('Slack'),
-              subtitle: crmReady ? null : const Text('Available when CRM is connected', style: TextStyle(fontSize: 11)),
+              subtitle: crmReady
+                  ? null
+                  : const Text(
+                      'Available when CRM is connected',
+                      style: TextStyle(fontSize: 11),
+                    ),
               contentPadding: EdgeInsets.zero,
             ),
           ),
@@ -1127,7 +1332,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     }
 
     final searchButton = Tooltip(
-      message: crmReady ? 'Search CRM' : 'Search available when CRM is connected',
+      message: crmReady
+          ? 'Search CRM'
+          : 'Search available when CRM is connected',
       child: IconButton(
         onPressed: crmReady ? () => _openGlobalSearch(context) : null,
         icon: const Icon(Icons.search),
@@ -1162,19 +1369,101 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
 
           // Navigation buttons that scroll
           final navChildren = [
-            _buildNavButton(context, _HomeSection.dashboard, 'Dashboard', Icons.dashboard_outlined, hideIcon: hideIcons),
+            _buildNavButton(
+              context,
+              _HomeSection.dashboard,
+              'Dashboard',
+              Icons.dashboard_outlined,
+              hideIcon: hideIcons,
+            ),
             buildOutreachButton(hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.members, 'Members', Icons.groups_outlined, enabled: crmReady, hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.donors, 'Donors', Icons.volunteer_activism_outlined, enabled: crmReady, hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.subscribers, 'Subscribers', Icons.mark_email_unread_outlined, enabled: crmReady, hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.chapters, 'Chapters', Icons.account_tree_outlined, enabled: crmReady, hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.committees, 'Committees', Icons.groups_3_outlined, enabled: crmReady, hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.meetings, 'Meetings', Icons.video_camera_front_outlined, enabled: crmReady, hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.events, 'Events', Icons.event_available_outlined, enabled: crmReady, hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.memberPortal, 'Member Portal', Icons.admin_panel_settings_outlined, enabled: crmReady, hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.campaigns, 'Campaigns', Icons.campaign_outlined, enabled: crmReady, hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.forms, 'Forms', Icons.dynamic_form_outlined, enabled: crmReady, hideIcon: hideIcons),
-            _buildNavButton(context, _HomeSection.conversations, 'Conversations', Icons.chat_bubble_outline, hideIcon: hideIcons),
+            _buildNavButton(
+              context,
+              _HomeSection.members,
+              'Members',
+              Icons.groups_outlined,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.donors,
+              'Donors',
+              Icons.volunteer_activism_outlined,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.subscribers,
+              'Subscribers',
+              Icons.mark_email_unread_outlined,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.chapters,
+              'Chapters',
+              Icons.account_tree_outlined,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.committees,
+              'Committees',
+              Icons.groups_3_outlined,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.meetings,
+              'Meetings',
+              Icons.video_camera_front_outlined,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.events,
+              'Events',
+              Icons.event_available_outlined,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.memberPortal,
+              'Member Portal',
+              Icons.admin_panel_settings_outlined,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.campaigns,
+              'Campaigns',
+              Icons.campaign_outlined,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.forms,
+              'Forms',
+              Icons.dynamic_form_outlined,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.conversations,
+              'Conversations',
+              Icons.chat_bubble_outline,
+              hideIcon: hideIcons,
+            ),
           ];
 
           // Always use Row layout - logo left (fixed), nav middle (scrollable), search/settings right (fixed)
@@ -1182,10 +1471,7 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Logo - always visible on left
-              Flexible(
-                flex: 0,
-                child: _buildBranding(theme, mobile: mobile),
-              ),
+              Flexible(flex: 0, child: _buildBranding(theme, mobile: mobile)),
               const SizedBox(width: 24),
               // Scrollable navigation buttons
               Expanded(
@@ -1213,7 +1499,11 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
     );
   }
 
-  Widget _buildMobileTopBar(BuildContext context, ThemeData theme, bool crmReady) {
+  Widget _buildMobileTopBar(
+    BuildContext context,
+    ThemeData theme,
+    bool crmReady,
+  ) {
     final shortcuts = <ShortcutActivator, Intent>{
       LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
       LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
@@ -1271,13 +1561,19 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                   FocusTraversalOrder(
                     order: const NumericFocusOrder(2),
                     child: Semantics(
-                      label: crmReady ? 'Open CRM search' : 'CRM search unavailable',
+                      label: crmReady
+                          ? 'Open CRM search'
+                          : 'CRM search unavailable',
                       button: true,
                       enabled: crmReady,
                       child: IconButton(
-                        tooltip: crmReady ? 'Search CRM' : 'Search available when CRM is connected',
+                        tooltip: crmReady
+                            ? 'Search CRM'
+                            : 'Search available when CRM is connected',
                         icon: const Icon(Icons.search),
-                        onPressed: crmReady ? () => _openGlobalSearch(context) : null,
+                        onPressed: crmReady
+                            ? () => _openGlobalSearch(context)
+                            : null,
                       ),
                     ),
                   ),
@@ -1347,7 +1643,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           );
         }
 
-        final disabledMessage = crmReady ? null : 'Available when CRM is connected';
+        final disabledMessage = crmReady
+            ? null
+            : 'Available when CRM is connected';
         final theme = Theme.of(parentContext);
 
         return Scaffold(
@@ -1379,7 +1677,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Members',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.members) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.members)
+                        : null,
                   ),
                   buildItem(
                     order: 2,
@@ -1387,7 +1687,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Donors',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.donors) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.donors)
+                        : null,
                   ),
                   buildItem(
                     order: 3,
@@ -1395,7 +1697,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Subscribers',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.subscribers) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.subscribers)
+                        : null,
                   ),
                   buildItem(
                     order: 4,
@@ -1403,7 +1707,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Chapters',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.chapters) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.chapters)
+                        : null,
                   ),
                   buildItem(
                     order: 5,
@@ -1411,7 +1717,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Committees',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.committees) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.committees)
+                        : null,
                   ),
                   buildItem(
                     order: 6,
@@ -1419,7 +1727,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Meetings',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.meetings) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.meetings)
+                        : null,
                   ),
                   buildItem(
                     order: 7,
@@ -1427,7 +1737,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Events',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.events) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.events)
+                        : null,
                   ),
                   buildItem(
                     order: 8,
@@ -1435,7 +1747,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Member Portal',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.memberPortal) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.memberPortal)
+                        : null,
                   ),
                   buildItem(
                     order: 9,
@@ -1443,7 +1757,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Wallet Notifications',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.walletNotifications) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.walletNotifications)
+                        : null,
                   ),
                   buildItem(
                     order: 10,
@@ -1452,14 +1768,18 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                       width: 24,
                       height: 24,
                       colorFilter: ColorFilter.mode(
-                        crmReady ? theme.iconTheme.color ?? Colors.white : theme.disabledColor,
+                        crmReady
+                            ? theme.iconTheme.color ?? Colors.white
+                            : theme.disabledColor,
                         BlendMode.srcIn,
                       ),
                     ),
                     label: 'Slack',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.slackManagement) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.slackManagement)
+                        : null,
                   ),
                   buildItem(
                     order: 11,
@@ -1467,7 +1787,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Campaigns',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.campaigns) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.campaigns)
+                        : null,
                   ),
                   buildItem(
                     order: 12,
@@ -1475,7 +1797,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Forms',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _setSection(_HomeSection.forms) : null,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.forms)
+                        : null,
                   ),
                   buildItem(
                     order: 13,
@@ -1490,7 +1814,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     label: 'Search CRM',
                     enabled: crmReady,
                     subtitle: disabledMessage,
-                    onActivate: crmReady ? () => _openGlobalSearch(parentContext) : null,
+                    onActivate: crmReady
+                        ? () => _openGlobalSearch(parentContext)
+                        : null,
                   ),
                   buildItem(
                     order: 15,
@@ -1508,7 +1834,10 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
                     order: 17,
                     icon: Icons.settings_outlined,
                     label: 'Settings',
-                    onActivate: () => Actions.invoke(parentContext, const OpenSettingsIntent()),
+                    onActivate: () => Actions.invoke(
+                      parentContext,
+                      const OpenSettingsIntent(),
+                    ),
                   ),
                 ],
               ),
@@ -1573,7 +1902,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         if (states.contains(MaterialState.disabled)) {
           return theme.disabledColor;
         }
-        return isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
+        return isSelected
+            ? theme.colorScheme.onPrimary
+            : theme.colorScheme.onSurface;
       }),
       padding: MaterialStateProperty.all(
         EdgeInsets.symmetric(
@@ -1581,7 +1912,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
           vertical: mobile ? 6 : 10,
         ),
       ),
-      shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
+      shape: MaterialStateProperty.all(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
     );
 
     if (hideIcon) {
@@ -1591,7 +1924,9 @@ class _HomeState extends OptimizedState<Home> with WidgetsBindingObserver, TrayL
         style: buttonStyle,
         child: Text(
           label,
-          style: mobile ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium,
+          style: mobile
+              ? theme.textTheme.bodySmall
+              : theme.textTheme.bodyMedium,
         ),
       );
     }
@@ -1788,10 +2123,7 @@ class _SessionErrorScreen extends StatelessWidget {
   final String error;
   final VoidCallback onRetry;
 
-  const _SessionErrorScreen({
-    required this.error,
-    required this.onRetry,
-  });
+  const _SessionErrorScreen({required this.error, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -1865,7 +2197,11 @@ class _NoAccessScreen extends StatelessWidget {
                   color: unityBlue.withOpacity(0.1),
                 ),
                 padding: const EdgeInsets.all(24),
-                child: const Icon(Icons.lock_outline, size: 64, color: unityBlue),
+                child: const Icon(
+                  Icons.lock_outline,
+                  size: 64,
+                  color: unityBlue,
+                ),
               ),
               const SizedBox(height: 24),
               Text(
@@ -1920,7 +2256,11 @@ Future<void> initSystemTray() async {
     if (isFlatpak) {
       path = 'app.bluebubbles.BlueBubbles';
     } else if (isSnap) {
-      path = p.joinAll([p.dirname(Platform.resolvedExecutable), 'data/flutter_assets/assets/icon', 'icon.png']);
+      path = p.joinAll([
+        p.dirname(Platform.resolvedExecutable),
+        'data/flutter_assets/assets/icon',
+        'icon.png',
+      ]);
     } else {
       path = 'assets/icon/icon.png';
     }
@@ -1959,12 +2299,17 @@ Future<void> setSystemTrayContextMenu({bool windowHidden = false}) async {
 
     await systemTray.setContextMenu(menu);
   } else {
-    await trayManager.setContextMenu(Menu(
-      items: [
-        MenuItem(label: windowHidden ? 'Show App' : 'Hide App', key: windowHidden ? 'show_app' : 'hide_app'),
-        MenuItem.separator(),
-        MenuItem(label: 'Close App', key: 'close_app'),
-      ],
-    ));
+    await trayManager.setContextMenu(
+      Menu(
+        items: [
+          MenuItem(
+            label: windowHidden ? 'Show App' : 'Hide App',
+            key: windowHidden ? 'show_app' : 'hide_app',
+          ),
+          MenuItem.separator(),
+          MenuItem(label: 'Close App', key: 'close_app'),
+        ],
+      ),
+    );
   }
 }

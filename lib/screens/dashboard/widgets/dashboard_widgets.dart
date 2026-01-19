@@ -908,9 +908,13 @@ class _DynamicDistributionChartWidgetState
             initialValue: _selectedKey,
             onSelected: (key) {
               if (!mounted) return;
-              setState(() {
-                _selectedKey = key;
-              });
+              try {
+                setState(() {
+                  _selectedKey = key;
+                });
+              } catch (e) {
+                // Silently ignore errors from setState during invalid states
+              }
             },
             constraints: const BoxConstraints(maxHeight: 400),
             child: Row(
@@ -1427,16 +1431,22 @@ class _PieChartWidgetState extends State<PieChartWidget> {
         pieTouchData: PieTouchData(
           touchCallback: (event, response) {
             // Guard against callbacks firing after widget disposal
+            // and handle any type errors from fl_chart touch handling on Flutter Web
             if (!mounted) return;
-            setState(() {
-              if (!event.isInterestedForInteractions ||
-                  response == null ||
-                  response.touchedSection == null) {
-                _touchedIndex = -1;
-                return;
-              }
-              _touchedIndex = response.touchedSection!.touchedSectionIndex;
-            });
+            try {
+              setState(() {
+                if (!event.isInterestedForInteractions ||
+                    response == null ||
+                    response.touchedSection == null) {
+                  _touchedIndex = -1;
+                  return;
+                }
+                _touchedIndex = response.touchedSection!.touchedSectionIndex;
+              });
+            } catch (e) {
+              // Silently ignore touch callback errors to prevent rendering crashes
+              // This can happen on Flutter Web with fl_chart touch handling
+            }
           },
         ),
         borderData: FlBorderData(show: false),
@@ -1490,9 +1500,13 @@ class _PieChartWidgetState extends State<PieChartWidget> {
             child: InkWell(
               onTap: () {
                 if (!mounted) return;
-                setState(() {
-                  _touchedIndex = _touchedIndex == index ? -1 : index;
-                });
+                try {
+                  setState(() {
+                    _touchedIndex = _touchedIndex == index ? -1 : index;
+                  });
+                } catch (e) {
+                  // Silently ignore errors from setState during invalid states
+                }
               },
               borderRadius: BorderRadius.circular(4),
               child: AnimatedContainer(
@@ -2133,6 +2147,7 @@ class LeaderboardWidget extends StatelessWidget {
 }
 
 /// Progress ring widget for showing percentage/goal progress
+/// Supports gradient backgrounds and customizable progress bar colors
 class ProgressRingWidget extends StatelessWidget {
   final DashboardWidgetConfig config;
   final int current;
@@ -2150,89 +2165,147 @@ class ProgressRingWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final percentage = total > 0 ? (current / total).clamp(0.0, 1.0) : 0.0;
-    final colors = config.gradientColors.isNotEmpty
+
+    // Check if using gradient background (default true for progress rings)
+    final useGradientBg = config.options['useGradientBackground'] as bool? ?? true;
+
+    // Get gradient colors for background
+    final gradientColors = config.gradientColors.isNotEmpty
         ? config.gradientColors
-        : [_momentumBlue, _justicePurple];
-    final backgroundColor = WidgetBackgrounds.getBackgroundColor(
-      config.options,
-    );
-    final isDark = WidgetBackgrounds.isDarkBackground(config.options);
-    final textColor = WidgetBackgrounds.getTextColor(config.options);
-    final secondaryTextColor = WidgetBackgrounds.getSecondaryTextColor(
-      config.options,
-    );
+        : WidgetGradients.all[0];
+
+    // Get progress bar color - can be customized independently
+    final progressBarColorIndex = config.options['progressBarColorIndex'] as int?;
+    final Color progressBarColor;
+    if (progressBarColorIndex != null && progressBarColorIndex >= 0 &&
+        progressBarColorIndex < WidgetGradients.all.length) {
+      progressBarColor = WidgetGradients.all[progressBarColorIndex].first;
+    } else {
+      // Default to white for gradient backgrounds, or primary color for solid
+      progressBarColor = useGradientBg ? Colors.white : gradientColors.first;
+    }
+
+    // Text colors - white for gradient backgrounds
+    final textColor = useGradientBg ? Colors.white : Colors.black87;
+    final secondaryTextColor = useGradientBg
+        ? Colors.white.withOpacity(0.8)
+        : Colors.grey[600]!;
+
+    // Progress background color
+    final progressBgColor = useGradientBg
+        ? Colors.white.withOpacity(0.25)
+        : progressBarColor.withOpacity(0.15);
 
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
       child: Container(
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: backgroundColor,
+          gradient: useGradientBg
+              ? LinearGradient(
+                  colors: gradientColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: useGradientBg ? null : Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: SizedBox(
-                  width: 120,
-                  height: 120,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CircularProgressIndicator(
-                        value: percentage,
-                        strokeWidth: 10,
-                        backgroundColor: colors.first.withOpacity(
-                          isDark ? 0.3 : 0.1,
-                        ),
-                        valueColor: AlwaysStoppedAnimation<Color>(colors.first),
-                      ),
-                      Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculate the ring size based on available space
+            // Use the smaller of width/height to ensure a perfect circle
+            final availableWidth = constraints.maxWidth;
+            final availableHeight = constraints.maxHeight;
+
+            // Reserve space for title and padding
+            final titleHeight = 40.0; // Space for title
+            final padding = 16.0;
+            final ringAreaHeight = availableHeight - titleHeight - (padding * 2);
+            final ringAreaWidth = availableWidth - (padding * 2);
+
+            // Ring size is the minimum of available width and height for the ring area
+            final ringSize = (ringAreaWidth < ringAreaHeight ? ringAreaWidth : ringAreaHeight) * 0.85;
+            final clampedRingSize = ringSize.clamp(60.0, 200.0);
+
+            // Scale font sizes based on ring size
+            final valueFontSize = (clampedRingSize * 0.25).clamp(16.0, 36.0);
+            final suffixFontSize = (clampedRingSize * 0.12).clamp(10.0, 16.0);
+            final strokeWidth = (clampedRingSize * 0.08).clamp(6.0, 12.0);
+
+            return Padding(
+              padding: EdgeInsets.all(padding),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Progress Ring - centered and properly circular
+                  Expanded(
+                    child: Center(
+                      child: SizedBox(
+                        width: clampedRingSize,
+                        height: clampedRingSize,
+                        child: Stack(
+                          fit: StackFit.expand,
                           children: [
-                            Text(
-                              current.toString(),
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: colors.first,
-                              ),
+                            // Progress ring
+                            CircularProgressIndicator(
+                              value: percentage,
+                              strokeWidth: strokeWidth,
+                              backgroundColor: progressBgColor,
+                              valueColor: AlwaysStoppedAnimation<Color>(progressBarColor),
+                              strokeCap: StrokeCap.round,
                             ),
-                            Text(
-                              suffix ?? '/ $total',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: secondaryTextColor,
+                            // Center content
+                            Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Current value
+                                  Text(
+                                    current.toString(),
+                                    style: TextStyle(
+                                      fontSize: valueFontSize,
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                      height: 1.1,
+                                    ),
+                                  ),
+                                  // Suffix (e.g., "/ 114" or "%" for percentages)
+                                  Text(
+                                    suffix ?? '/ $total',
+                                    style: TextStyle(
+                                      fontSize: suffixFontSize,
+                                      fontWeight: FontWeight.w500,
+                                      color: secondaryTextColor,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  // Title - always at bottom
+                  const SizedBox(height: 8),
+                  Text(
+                    config.title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: textColor,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              config.title,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: textColor,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            if (config.subtitle != null)
-              Text(
-                config.subtitle!,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                textAlign: TextAlign.center,
-              ),
-          ],
+            );
+          },
         ),
       ),
     );

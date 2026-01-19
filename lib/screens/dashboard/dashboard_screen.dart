@@ -43,6 +43,7 @@ const _justicePurple = Color(0xFF6A1B9A);
 const _grassrootsGreen = Color(0xFF43A047);
 
 const _prefsKey = 'dashboard_config_v2';
+const _prefsKeyMobile = 'dashboard_config_mobile_v1';
 
 /// Data class for dragging widgets from the palette
 class _PaletteDragData {
@@ -592,11 +593,36 @@ class _DashboardScreenState extends State<DashboardScreen>
           _mobileConfig = _getDefaultMobileConfig();
         }
       } else {
-        // No mobile layout saved yet, use default
+        // Fallback to local storage for backwards compatibility
         debugPrint(
-          '[DashboardScreen] No mobile layout in database, using default mobile config',
+          '[DashboardScreen] No mobile database layout, checking SharedPreferences...',
         );
-        _mobileConfig = _getDefaultMobileConfig();
+        final prefs = await SharedPreferences.getInstance();
+        final configJson = prefs.getString(_prefsKeyMobile);
+        if (configJson != null) {
+          try {
+            final config = DashboardConfig.fromJsonString(configJson);
+            debugPrint(
+              '[DashboardScreen] Loaded mobile from SharedPreferences: ${config.widgets.length} widgets',
+            );
+            _mobileConfig = config;
+            // Migrate to database
+            _metricsService.saveDashboardLayoutMobile(_mobileConfig.toJson());
+          } catch (parseError, stackTrace) {
+            _logDetailedParseError(
+              'DashboardConfig.fromJsonString (mobile)',
+              parseError,
+              stackTrace,
+              configJson,
+            );
+            _mobileConfig = _getDefaultMobileConfig();
+          }
+        } else {
+          debugPrint(
+            '[DashboardScreen] No mobile layout in database or local storage, using default',
+          );
+          _mobileConfig = _getDefaultMobileConfig();
+        }
       }
 
       if (mounted) {
@@ -730,8 +756,11 @@ class _DashboardScreenState extends State<DashboardScreen>
             '[DashboardScreen] ✓ Mobile dashboard layout saved to database',
           );
         } else {
+          // Fallback to local storage if database save fails
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_prefsKeyMobile, _mobileConfig.toJsonString());
           debugPrint(
-            '[DashboardScreen] ✗ Failed to save mobile dashboard layout to database',
+            '[DashboardScreen] Mobile dashboard layout saved to local storage (fallback)',
           );
         }
       } else {
@@ -756,13 +785,17 @@ class _DashboardScreenState extends State<DashboardScreen>
     } catch (e, stackTrace) {
       debugPrint('[DashboardScreen] Error saving dashboard config: $e');
       debugPrint('[DashboardScreen] Stack trace: $stackTrace');
-      // Fallback to local storage for desktop only
-      if (!_isMobileLayout) {
-        try {
-          final prefs = await SharedPreferences.getInstance();
+      // Fallback to local storage
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (_isMobileLayout) {
+          await prefs.setString(_prefsKeyMobile, _mobileConfig.toJsonString());
+          debugPrint('[DashboardScreen] Mobile layout saved to local storage (error fallback)');
+        } else {
           await prefs.setString(_prefsKey, _desktopConfig.toJsonString());
-        } catch (_) {}
-      }
+          debugPrint('[DashboardScreen] Desktop layout saved to local storage (error fallback)');
+        }
+      } catch (_) {}
     }
   }
 
@@ -3452,10 +3485,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   ) {
     return Stack(
       children: [
-        // The actual widget
+        // The actual widget - wrapped in AbsorbPointer to disable touch interactions
+        // in edit mode. This prevents fl_chart touch callbacks from firing and
+        // causing "type 'double' is not a subtype of type 'bool?'" errors on Flutter Web.
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: _buildWidget(config, metrics),
+          child: AbsorbPointer(
+            absorbing: true, // Disable all touch events on underlying widget
+            child: _buildWidget(config, metrics),
+          ),
         ),
         // Tap overlay for editing options - use translucent behavior to not block parent gestures
         Positioned.fill(
@@ -3938,6 +3976,122 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                     ),
                   ],
+                  // Progress Ring specific options
+                  if (config.type == DashboardWidgetType.progressRing) ...[
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Progress Bar Color:',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1.5,
+                          ),
+                      itemCount: WidgetGradients.all.length + 1, // +1 for white option
+                      itemBuilder: (context, index) {
+                        final currentProgressBarIndex =
+                            config.options['progressBarColorIndex'] as int?;
+                        final isSelected = currentProgressBarIndex == index ||
+                            (currentProgressBarIndex == null && index == WidgetGradients.all.length);
+
+                        // Last option is white (default)
+                        if (index == WidgetGradients.all.length) {
+                          return GestureDetector(
+                            onTap: () {
+                              final newOptions = Map<String, dynamic>.from(config.options);
+                              newOptions.remove('progressBarColorIndex'); // Remove to use default white
+                              _updateWidget(config.copyWith(options: newOptions));
+                              Navigator.pop(context);
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected ? _momentumBlue : Colors.grey[300]!,
+                                  width: isSelected ? 3 : 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: isSelected
+                                    ? const Icon(Icons.check, color: _momentumBlue, size: 24)
+                                    : Text(
+                                        'White',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        final gradient = WidgetGradients.all[index];
+                        return GestureDetector(
+                          onTap: () {
+                            final newOptions = Map<String, dynamic>.from(config.options);
+                            newOptions['progressBarColorIndex'] = index;
+                            _updateWidget(config.copyWith(options: newOptions));
+                            Navigator.pop(context);
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: gradient,
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              border: isSelected
+                                  ? Border.all(color: Colors.white, width: 3)
+                                  : null,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: gradient.last.withOpacity(0.4),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: isSelected
+                                ? const Center(
+                                    child: Icon(Icons.check, color: Colors.white, size: 24),
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Toggle for gradient vs solid background
+                    SwitchListTile(
+                      title: const Text('Use Gradient Background'),
+                      subtitle: const Text('Toggle between gradient and white background'),
+                      value: config.options['useGradientBackground'] as bool? ?? true,
+                      onChanged: (value) {
+                        final newOptions = Map<String, dynamic>.from(config.options);
+                        newOptions['useGradientBackground'] = value;
+                        _updateWidget(config.copyWith(options: newOptions));
+                        Navigator.pop(context);
+                      },
+                      activeColor: _momentumBlue,
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   // Grid Position options (for desktop positioned layout)
                   if (!_isMobileLayout) ...[
@@ -4391,6 +4545,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   /// Check if widget type supports background color customization
+  /// Note: progressRing now uses gradient backgrounds by default
   bool _widgetSupportsBackgroundColor(DashboardWidgetType type) {
     switch (type) {
       case DashboardWidgetType.barChart:
@@ -4398,12 +4553,12 @@ class _DashboardScreenState extends State<DashboardScreen>
       case DashboardWidgetType.pieChart:
       case DashboardWidgetType.donutChart:
       case DashboardWidgetType.leaderboard:
-      case DashboardWidgetType.progressRing:
       case DashboardWidgetType.memberList:
       case DashboardWidgetType.dynamicDistribution:
         return true;
       case DashboardWidgetType.statCard:
       case DashboardWidgetType.trendCard:
+      case DashboardWidgetType.progressRing: // Uses gradient backgrounds
       case DashboardWidgetType.sparkline:
       case DashboardWidgetType.heatmap:
       case DashboardWidgetType.quickLinksButton:

@@ -5,6 +5,10 @@ import 'package:bluebubbles/features/calendar/models/calendar_event.dart';
 import 'package:bluebubbles/features/calendar/services/calendar_service.dart';
 import 'package:bluebubbles/features/calendar/widgets/event_create_dialog.dart';
 
+// Brand colors matching desktop calendar
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 /// iOS Calendar-style mobile view with swipeable week strip
 class MobileCalendarView extends StatefulWidget {
   final String? committeeName;
@@ -196,15 +200,14 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
 
   Widget _buildHeader(bool isDark) {
     final monthFormat = DateFormat('MMMM yyyy');
-    const accentColor = Color(0xFF3B82F6);
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            accentColor.withOpacity(0.1),
-            accentColor.withOpacity(0.05),
+            _unityBlue.withOpacity(isDark ? 0.4 : 0.15),
+            _momentumBlue.withOpacity(isDark ? 0.2 : 0.08),
           ],
         ),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -217,12 +220,12 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.15),
+                  color: _momentumBlue.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
                   Icons.calendar_today_rounded,
-                  color: accentColor,
+                  color: _momentumBlue,
                   size: 20,
                 ),
               ),
@@ -257,7 +260,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
                   'Today',
                   style: TextStyle(
                     fontSize: 14,
-                    color: accentColor,
+                    color: _momentumBlue,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -267,7 +270,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
                 icon: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: accentColor,
+                    color: _momentumBlue,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.add, color: Colors.white, size: 18),
@@ -382,15 +385,23 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
                 ),
               ),
               const Spacer(),
-              Text(
-                '${dayEvents.length} event${dayEvents.length == 1 ? '' : 's'}',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isDark
-                      ? const Color(0xFF98989F)
-                      : const Color(0xFF6B7280),
+              // Only show event count when there are events
+              if (dayEvents.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _momentumBlue.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${dayEvents.length} event${dayEvents.length == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: _momentumBlue,
+                    ),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -483,7 +494,7 @@ class _WeekDayCell extends StatelessWidget {
         width: 44,
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF3B82F6) : null,
+          color: isSelected ? _momentumBlue : null,
           borderRadius: BorderRadius.circular(22),
         ),
         child: Column(
@@ -507,7 +518,7 @@ class _WeekDayCell extends StatelessWidget {
               height: 32,
               decoration: BoxDecoration(
                 color: isToday && !isSelected
-                    ? const Color(0xFF3B82F6).withOpacity(0.15)
+                    ? _momentumBlue.withOpacity(0.15)
                     : null,
                 shape: BoxShape.circle,
               ),
@@ -521,7 +532,7 @@ class _WeekDayCell extends StatelessWidget {
                     color: isSelected
                         ? Colors.white
                         : isToday
-                            ? const Color(0xFF3B82F6)
+                            ? _momentumBlue
                             : isDark
                                 ? Colors.white
                                 : const Color(0xFF1A1A1A),
@@ -535,7 +546,7 @@ class _WeekDayCell extends StatelessWidget {
               height: 5,
               decoration: BoxDecoration(
                 color: hasEvents
-                    ? (isSelected ? Colors.white : const Color(0xFF3B82F6))
+                    ? (isSelected ? Colors.white : _momentumBlue)
                     : Colors.transparent,
                 shape: BoxShape.circle,
               ),
@@ -560,7 +571,7 @@ class _MobileEventCard extends StatelessWidget {
   bool get _isZoom => event.hasZoomMeeting;
 
   Color get _eventColor =>
-      _isZoom ? const Color(0xFF2D8CFF) : const Color(0xFF3B82F6);
+      _isZoom ? const Color(0xFF2D8CFF) : _momentumBlue;
 
   @override
   Widget build(BuildContext context) {
@@ -681,7 +692,7 @@ class _MobileEventCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF3B82F6).withOpacity(0.1),
+                      color: _momentumBlue.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -689,7 +700,7 @@ class _MobileEventCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF3B82F6),
+                        color: _momentumBlue,
                       ),
                     ),
                   ),

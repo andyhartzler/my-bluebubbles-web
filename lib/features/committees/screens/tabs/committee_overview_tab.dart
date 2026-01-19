@@ -438,6 +438,8 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
                 fontSize: 13,
                 color: Colors.white.withOpacity(0.8),
               ),
+              maxLines: 1,
+              softWrap: false,
               overflow: TextOverflow.ellipsis,
             ),
           ),

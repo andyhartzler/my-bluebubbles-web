@@ -8,6 +8,12 @@ import 'package:bluebubbles/features/committees/screens/committee_workspace_scre
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
+// Brand colors matching Member Portal design
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+const _darkBgStart = Color(0xFF1B2336);
+const _darkBgEnd = Color(0xFF0F1624);
+
 class CommitteesDashboardScreen extends StatefulWidget {
   final bool embed;
 
@@ -130,28 +136,56 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
 
     if (_loading) {
       return _buildScaffold(
-        child: const Center(child: CircularProgressIndicator()),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_darkBgStart, _darkBgEnd],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(color: _momentumBlue),
+          ),
+        ),
       );
     }
 
     if (_error != null) {
       return _buildScaffold(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
-                const SizedBox(height: 16),
-                Text(_error!, textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _loadData,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                ),
-              ],
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_darkBgStart, _darkBgEnd],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.white70),
+                  const SizedBox(height: 16),
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: _loadData,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _momentumBlue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -161,6 +195,8 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
     return _buildScaffold(
       child: RefreshIndicator(
         onRefresh: _loadData,
+        color: _momentumBlue,
+        backgroundColor: _unityBlue,
         child: _buildContent(context),
       ),
     );
@@ -172,72 +208,92 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Committees'),
+        backgroundColor: _unityBlue,
+        foregroundColor: Colors.white,
       ),
       body: child,
     );
   }
 
   Widget _buildContent(BuildContext context) {
-    final theme = Theme.of(context);
     final sortedCommittees = _sortedCommittees;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 400;
 
-    return SelectionArea(
-      child: ListView(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Stack(
+      children: [
+        // Dark gradient background
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [_darkBgStart, _darkBgEnd],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+        ),
+        // Content
+        Positioned.fill(
+          child: SelectionArea(
+            child: ListView(
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              padding: const EdgeInsets.all(24),
+              children: [
+                // Header Card with gradient
+                _buildHeaderCard(),
+                const SizedBox(height: 32),
+
+                // Section title for committees
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Committees',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                    const Text(
+                      'Select a Committee',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
-                    const SizedBox(height: 4),
                     Text(
-                      'Select a committee to access its workspace',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                      '${sortedCommittees.length} committees',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.6),
                       ),
                     ),
                   ],
                 ),
-              ),
-              IconButton(
-                tooltip: 'Refresh',
-                icon: const Icon(Icons.refresh),
-                onPressed: _loadData,
-              ),
-            ],
+                const SizedBox(height: 16),
+
+                // Committee list
+                ...sortedCommittees.map((committee) {
+                  final stats = _stats[committee.id];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildCommitteeTile(context, committee, stats),
+                  );
+                }),
+
+                const SizedBox(height: 16),
+                // Footer note
+                Text(
+                  'Each committee workspace includes member management, Slack analytics, and collaborative tools.',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 13,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 24),
-
-          // Overall stat cards
-          _buildStatCardsRow(context),
-          const SizedBox(height: 32),
-
-          // Committee list (full-width horizontal tiles)
-          ...sortedCommittees.map((committee) {
-            final stats = _stats[committee.id];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: _buildCommitteeTile(context, committee, stats),
-            );
-          }),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildStatCardsRow(BuildContext context) {
-    final theme = Theme.of(context);
-
+  Widget _buildHeaderCard() {
     // Calculate totals
     int totalMembers = 0;
     for (final stats in _stats.values) {
@@ -248,161 +304,190 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
     final totalImpressions = _overallStats['totalImpressions'] ?? 0;
     final countiesRepresented = _overallStats['countiesRepresented'] ?? 0;
 
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_unityBlue, _momentumBlue],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.groups_3_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Committees Dashboard',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Manage and monitor committee activities',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+                tooltip: 'Refresh data',
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Stats grid
+          _buildStatsGrid(
+            slackMessages: slackMessages,
+            totalMembers: totalMembers,
+            totalImpressions: totalImpressions,
+            countiesRepresented: countiesRepresented,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsGrid({
+    required int slackMessages,
+    required int totalMembers,
+    required int totalImpressions,
+    required int countiesRepresented,
+  }) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isVeryNarrow = constraints.maxWidth < 400;
-        final isNarrow = constraints.maxWidth < 600;
+        final maxWidth = constraints.maxWidth;
+        int columns = 1;
+
+        if (maxWidth >= 800) {
+          columns = 4;
+        } else if (maxWidth >= 500) {
+          columns = 2;
+        }
+
+        const spacing = 12.0;
+        final cardWidth = columns > 1
+            ? (maxWidth - spacing * (columns - 1)) / columns
+            : maxWidth;
 
         final cards = [
-          _StatCard(
-            icon: Icons.chat_bubble_outline,
-            iconColor: Colors.purple,
-            label: 'Slack Messages',
+          _buildStatCard(
+            title: 'Slack Messages',
             value: _formatNumber(slackMessages),
+            icon: Icons.chat_bubble_outline_rounded,
+            width: cardWidth,
           ),
-          _StatCard(
-            icon: Icons.people_outline,
-            iconColor: Colors.blue,
-            label: 'Active Members',
+          _buildStatCard(
+            title: 'Active Members',
             value: _formatNumber(totalMembers),
+            icon: Icons.people_outline_rounded,
+            width: cardWidth,
           ),
-          _StatCard(
-            icon: Icons.visibility_outlined,
-            iconColor: Colors.green,
-            label: 'Impressions',
+          _buildStatCard(
+            title: 'Impressions',
             value: _formatNumber(totalImpressions),
+            icon: Icons.visibility_outlined,
+            width: cardWidth,
           ),
-          _StatCard(
-            icon: Icons.location_on_outlined,
-            iconColor: Colors.orange,
-            label: 'Counties',
+          _buildStatCard(
+            title: 'Counties',
             value: _formatNumber(countiesRepresented),
+            icon: Icons.location_on_outlined,
+            width: cardWidth,
           ),
         ];
 
-        // Very narrow: horizontal thin tiles stacked vertically
-        if (isVeryNarrow) {
-          return Column(
-            children: cards.map((card) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _buildMobileStatTile(card, theme),
-            )).toList(),
-          );
-        }
-
-        // Narrow: 2x2 grid
-        if (isNarrow) {
-          return Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(child: _buildStatCard(cards[0], theme)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildStatCard(cards[1], theme)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _buildStatCard(cards[2], theme)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildStatCard(cards[3], theme)),
-                ],
-              ),
-            ],
-          );
-        }
-
-        // Wide: 4 columns
-        return Row(
-          children: cards.map((card) => Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: _buildStatCard(card, theme),
-            ),
-          )).toList(),
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: cards,
         );
       },
     );
   }
 
-  Widget _buildMobileStatTile(_StatCard card, ThemeData theme) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: card.iconColor.withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: card.iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(card.icon, color: card.iconColor, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            card.value,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              card.label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(_StatCard card, ThemeData theme) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildStatCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required double width,
+  }) {
+    return SizedBox(
+      width: width,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.15)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: card.iconColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white.withOpacity(0.15),
+                shape: BoxShape.circle,
               ),
-              child: Icon(card.icon, color: card.iconColor, size: 24),
+              padding: const EdgeInsets.all(8),
+              child: Icon(icon, size: 18, color: Colors.white),
             ),
-            const SizedBox(height: 12),
-            Text(
-              card.value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              card.label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.7),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
           ],
@@ -412,87 +497,116 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
   }
 
   Widget _buildCommitteeTile(BuildContext context, Committee committee, CommitteeStats? stats) {
-    final theme = Theme.of(context);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 400;
-
-    return Card(
-      elevation: 2,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isMobile ? 12 : 16)),
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: () => _openCommitteeWorkspace(committee),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [committee.primaryColor, committee.secondaryColor],
+              colors: [
+                committee.primaryColor,
+                committee.secondaryColor,
+              ],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: committee.primaryColor.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-          padding: EdgeInsets.all(isMobile ? 14 : 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           child: Row(
             children: [
               // Committee icon
-              CircleAvatar(
-                radius: isMobile ? 20 : 28,
-                backgroundColor: Colors.white.withOpacity(0.2),
-                child: Icon(committee.icon, color: Colors.white, size: isMobile ? 20 : 28),
-              ),
-              SizedBox(width: isMobile ? 12 : 20),
-
-              // Committee name
-              Expanded(
-                child: Text(
-                  committee.displayName,
-                  style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                padding: const EdgeInsets.all(12),
+                child: Icon(
+                  committee.icon,
+                  color: Colors.white,
+                  size: 24,
                 ),
               ),
-              SizedBox(width: isMobile ? 8 : 16),
+              const SizedBox(width: 16),
+
+              // Committee name and description
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      committee.displayName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (committee.description != null && committee.description!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          committee.description!,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
 
               // Member count badge
               if (stats != null)
                 Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 10 : 16,
-                    vertical: isMobile ? 6 : 10,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.people, size: isMobile ? 14 : 18, color: Colors.white),
-                      SizedBox(width: isMobile ? 4 : 6),
+                      const Icon(Icons.people, size: 16, color: Colors.white),
+                      const SizedBox(width: 6),
                       Text(
                         '${stats.memberCount}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: isMobile ? 13 : 16,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
                         ),
                       ),
                     ],
                   ),
                 ),
-              SizedBox(width: isMobile ? 8 : 12),
+              const SizedBox(width: 12),
 
               // Arrow indicator
               Container(
-                padding: EdgeInsets.all(isMobile ? 6 : 10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withOpacity(0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.arrow_forward,
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
                   color: Colors.white,
-                  size: isMobile ? 16 : 20,
+                  size: 18,
                 ),
               ),
             ],
@@ -510,18 +624,4 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
     }
     return number.toString();
   }
-}
-
-class _StatCard {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-
-  const _StatCard({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-  });
 }
