@@ -49,8 +49,10 @@ class _LegislationGridPosition {
   final int col;
   final int widthCells;
   final int heightCells;
+  final double widthMultiplier;
+  final double heightMultiplier;
 
-  const _LegislationGridPosition(this.row, this.col, this.widthCells, this.heightCells);
+  const _LegislationGridPosition(this.row, this.col, this.widthCells, this.heightCells, this.widthMultiplier, this.heightMultiplier);
 }
 
 class LegislationStatsDashboard extends StatefulWidget {
@@ -957,7 +959,7 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         }
       }
 
-      widgetPositions[i] = _LegislationGridPosition(startRow, startCol, widthCells, heightCells);
+      widgetPositions[i] = _LegislationGridPosition(startRow, startCol, widthCells, heightCells, widget.widthMultiplier, widget.heightMultiplier);
     }
 
     // Find max row
@@ -978,9 +980,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       final pos = widgetPositions[i];
       if (pos == null) continue;
 
-      // Calculate actual dimensions
-      final width = pos.widthCells * unitWidth + (pos.widthCells - 1) * spacing;
-      final height = pos.heightCells * unitHeight + (pos.heightCells - 1) * spacing;
+      // Calculate actual dimensions using the multipliers (not ceil'd cells)
+      // This ensures mini (0.5x0.5) and small (1x0.5) render at proper fractional sizes
+      final width = pos.widthMultiplier * unitWidth + (pos.widthCells > 1 ? (pos.widthCells - 1) * spacing : 0);
+      final height = pos.heightMultiplier * unitHeight + (pos.heightCells > 1 ? (pos.heightCells - 1) * spacing : 0);
 
       // Calculate position
       final left = pos.col * (unitWidth + spacing);
@@ -1021,11 +1024,12 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     for (int row = 0; row < 100; row++) {
       for (int col = 0; col <= columns - widthCells; col++) {
         if (!_isGridOccupied(gridMap, row, col, widthCells, heightCells)) {
-          return _LegislationGridPosition(row, col, widthCells, heightCells);
+          // Multipliers are not needed here as this is only used for position finding
+          return _LegislationGridPosition(row, col, widthCells, heightCells, widthCells.toDouble(), heightCells.toDouble());
         }
       }
     }
-    return _LegislationGridPosition(0, 0, widthCells, heightCells);
+    return _LegislationGridPosition(0, 0, widthCells, heightCells, widthCells.toDouble(), heightCells.toDouble());
   }
 
   Widget _buildMobileWidgetsGrid(LegislationStats stats, double maxWidth) {

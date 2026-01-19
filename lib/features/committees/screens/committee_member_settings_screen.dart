@@ -70,6 +70,7 @@ class _CommitteeMemberSettingsScreenState
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isUploadingPhoto = false;
+  bool _isEditMode = false;
   String? _error;
 
   List<FieldVisibility> _fieldVisibility = [];
@@ -471,6 +472,35 @@ class _CommitteeMemberSettingsScreenState
             ),
           ),
           centerTitle: true,
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _isEditMode ? _momentumBlue : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _unityBlue.withOpacity(0.1),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    _isEditMode ? Icons.visibility : Icons.edit,
+                    color: _isEditMode ? Colors.white : _unityBlue,
+                    size: 20,
+                  ),
+                ),
+                onPressed: () {
+                  setState(() => _isEditMode = !_isEditMode);
+                },
+                tooltip: _isEditMode ? 'View mode' : 'Edit mode',
+              ),
+            ),
+          ],
         ),
 
         // Content
@@ -509,13 +539,41 @@ class _CommitteeMemberSettingsScreenState
                 _buildPhotoSection(member),
                 const SizedBox(height: 24),
 
+                // Edit mode indicator
+                if (_isEditMode)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _momentumBlue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _momentumBlue.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit_note, color: _momentumBlue, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Edit mode - Fill in your profile information',
+                            style: TextStyle(
+                              color: _momentumBlue.withOpacity(0.9),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Profile fields grouped by category
                 ..._buildFieldSections(),
 
                 const SizedBox(height: 24),
 
-                // Save button
-                _buildSaveButton(),
+                // Save button - only show in edit mode
+                if (_isEditMode) _buildSaveButton(),
 
                 const SizedBox(height: 32),
               ]),
@@ -637,6 +695,12 @@ class _CommitteeMemberSettingsScreenState
     // Group fields by category
     final categoryFields = <String, List<FieldVisibility>>{};
     for (final field in _fieldVisibility) {
+      // In view mode, only include fields with values
+      if (!_isEditMode) {
+        final controller = _controllers[field.fieldName];
+        final hasValue = controller != null && controller.text.trim().isNotEmpty;
+        if (!hasValue) continue;
+      }
       categoryFields.putIfAbsent(field.fieldCategory, () => []).add(field);
     }
 
@@ -644,10 +708,58 @@ class _CommitteeMemberSettingsScreenState
 
     for (final category in categoryFields.keys) {
       final fields = categoryFields[category]!;
+      if (fields.isEmpty) continue;
+
       fields.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
       widgets.add(_buildCategorySection(category, fields));
       widgets.add(const SizedBox(height: 16));
+    }
+
+    // Show message if no fields have values
+    if (!_isEditMode && widgets.isEmpty) {
+      widgets.add(
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: _unityBlue.withOpacity(0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 48,
+                color: _momentumBlue.withOpacity(0.5),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'No profile information yet',
+                style: TextStyle(
+                  color: _unityBlue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tap the edit icon to add your information',
+                style: TextStyle(
+                  color: _unityBlue.withOpacity(0.6),
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return widgets;
