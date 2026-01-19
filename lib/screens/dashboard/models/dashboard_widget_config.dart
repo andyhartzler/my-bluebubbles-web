@@ -215,7 +215,7 @@ class DashboardWidgetConfig {
   /// Get the actual height multiplier for rendering
   /// - mini is 0.5 (square - half height and half width)
   /// - small is 0.5 (half height compact row)
-  /// - featured is 1.5 (between large's 1 and hero's 2)
+  /// - featured/tall is 1.5 (between large's 1 and hero's 2)
   /// - others use their gridHeight
   double get heightMultiplier {
     switch (size) {
@@ -224,7 +224,8 @@ class DashboardWidgetConfig {
       case DashboardWidgetSize.small:
         return 0.5; // Small is half height
       case DashboardWidgetSize.featured:
-        return 1.5; // Featured is between large and hero
+      case DashboardWidgetSize.tall:
+        return 1.5; // Featured and tall are same height
       default:
         return gridHeight.toDouble();
     }
