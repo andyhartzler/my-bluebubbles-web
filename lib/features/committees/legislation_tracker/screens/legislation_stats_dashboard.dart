@@ -88,6 +88,9 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
   List<TrackedBill> _aiMediumBills = [];
   List<TrackedBill> _aiLowBills = [];
 
+  // Bipartisan bills (loaded separately for leaderboard)
+  List<TrackedBill> _bipartisanBills = [];
+
   // Edit mode state
   bool _isEditMode = false;
   late AnimationController _flipController;
@@ -480,6 +483,8 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
 
       // Load AI recommendation bills in background (don't block initial load)
       _loadAiRecommendationBills();
+      // Load bipartisan bills in background
+      _loadBipartisanBills();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -517,6 +522,19 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       });
     } catch (e) {
       debugPrint('Error loading AI recommendation bills: $e');
+    }
+  }
+
+  /// Load bipartisan bills (for leaderboard display)
+  Future<void> _loadBipartisanBills() async {
+    try {
+      final bills = await _service.getBipartisanBills(limit: 10000);
+      if (!mounted) return;
+      setState(() {
+        _bipartisanBills = bills;
+      });
+    } catch (e) {
+      debugPrint('Error loading bipartisan bills: $e');
     }
   }
 
@@ -1311,6 +1329,13 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
             config: config,
             bills: _aiLowBills,
             accentColor: _grassrootsGreen,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('bipartisanBillsLeaderboard')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _bipartisanBills,
+            accentColor: const Color(0xFF9B59B6), // Purple for bipartisan
             onBillTap: (bill) => _navigateToBillDetail(bill.id),
           );
         } else {

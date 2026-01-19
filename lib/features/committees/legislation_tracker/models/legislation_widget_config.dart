@@ -653,6 +653,14 @@ class LegislationDataSources {
       supportedWidgets: [LegislationWidgetType.statCard],
       icon: Icons.person,
     ),
+    LegislationDataSource(
+      key: 'bipartisanBillsLeaderboard',
+      label: 'Bipartisan Bills',
+      description: 'All bills with sponsors from both parties',
+      category: LegislationDataCategory.bipartisan,
+      supportedWidgets: [LegislationWidgetType.billLeaderboard],
+      icon: Icons.handshake,
+    ),
 
     // ==================== LEGISLATORS ====================
     LegislationDataSource(

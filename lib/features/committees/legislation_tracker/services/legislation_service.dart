@@ -1190,6 +1190,33 @@ class LegislationService {
         .map((json) => TrackedBill.fromJson(json as Map<String, dynamic>))
         .toList();
   }
+
+  /// Get bipartisan bills - bills with sponsors from both Democrat and Republican parties
+  Future<List<TrackedBill>> getBipartisanBills({int limit = 10000}) async {
+    // First get bill IDs that have both Democrat and Republican sponsors
+    final bipartisanBillIds = await _supabase.rpc('get_bipartisan_bill_ids');
+
+    if (bipartisanBillIds == null || (bipartisanBillIds as List).isEmpty) {
+      return [];
+    }
+
+    final billIds = (bipartisanBillIds as List)
+        .map((row) => row['bill_id'] as String)
+        .toList();
+
+    // Fetch the full bill details for these IDs
+    final response = await _supabase
+        .from('legislation_tracked_bills')
+        .select(_listSelectColumns)
+        .eq('is_archived', false)
+        .inFilter('id', billIds)
+        .order('last_action_date', ascending: false)
+        .limit(limit);
+
+    return (response as List)
+        .map((json) => TrackedBill.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
 }
 
 // Statistics model
