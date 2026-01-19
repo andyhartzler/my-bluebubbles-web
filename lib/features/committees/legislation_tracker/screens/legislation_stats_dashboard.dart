@@ -1058,7 +1058,8 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         return LegislationStatCardWidget(
           config: config,
           value: value,
-          onTap: () => _handleStatCardTap(config.dataSourceKey),
+          // Disabled - only bills and legislators should be tappable
+          onTap: null,
         );
 
       case LegislationWidgetType.pieChart:
@@ -1066,7 +1067,8 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         return LegislationPieChartWidget(
           config: config,
           data: data,
-          onTap: () => _handleChartTap(config.dataSourceKey),
+          // Disabled - only bills and legislators should be tappable
+          onTap: null,
         );
 
       case LegislationWidgetType.donutChart:
@@ -1075,7 +1077,8 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
           config: config,
           data: data,
           isDonut: true,
-          onTap: () => _handleChartTap(config.dataSourceKey),
+          // Disabled - only bills and legislators should be tappable
+          onTap: null,
         );
 
       case LegislationWidgetType.barChart:
@@ -1083,7 +1086,8 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         return LegislationBarChartWidget(
           config: config,
           data: data,
-          onTap: () => _handleChartTap(config.dataSourceKey),
+          // Disabled - only bills and legislators should be tappable
+          onTap: null,
         );
 
       case LegislationWidgetType.progressRing:
@@ -1093,14 +1097,16 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
           config: config,
           current: current,
           total: total,
-          onTap: () => _handleStatCardTap('billsAnalyzed'),
+          // Disabled - only bills and legislators should be tappable
+          onTap: null,
         );
 
       case LegislationWidgetType.partyComparison:
         return PartyComparisonWidget(
           config: config,
           stats: stats,
-          onTap: () => _navigateToFilteredBillList(),
+          // Disabled - only bills and legislators should be tappable
+          onTap: null,
         );
 
       case LegislationWidgetType.leaderboard:
@@ -1205,7 +1211,8 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
             return DistributionLeaderboardWidget(
               config: config,
               data: distributionData,
-              onTap: () => _handleChartTap(config.dataSourceKey),
+              // Disabled - only bills and legislators should be tappable
+              onTap: null,
             );
           }
         }
