@@ -1583,85 +1583,106 @@ class LegislationBarChartWidget extends StatelessWidget {
       0,
       (max, item) => item.count > max ? item.count : max,
     );
-    final barHeight = isVeryCompact ? 14.0 : (isCompact ? 16.0 : 20.0);
-    final labelWidth = isVeryCompact ? 60.0 : (isCompact ? 70.0 : 80.0);
-    final labelSize = isVeryCompact ? 10.0 : 12.0;
-    final valueWidth = isVeryCompact ? 30.0 : 40.0;
+    // Scale bar height based on available items - larger bars when fewer items
+    final itemCount = data.length;
+    final baseBarHeight = isVeryCompact ? 16.0 : (isCompact ? 20.0 : 28.0);
+    // Increase bar height for fewer items to fill space better
+    final barHeight = itemCount <= 4
+        ? baseBarHeight * 1.3
+        : (itemCount <= 6 ? baseBarHeight * 1.1 : baseBarHeight);
+    final labelWidth = isVeryCompact ? 65.0 : (isCompact ? 75.0 : 85.0);
+    final labelSize = isVeryCompact ? 11.0 : (isCompact ? 12.0 : 14.0);
+    final valueWidth = isVeryCompact ? 35.0 : 45.0;
+    final verticalSpacing = isVeryCompact ? 6.0 : (isCompact ? 8.0 : 12.0);
 
-    return ListView.builder(
-      itemCount: data.length,
-      padding: EdgeInsets.zero,
-      itemBuilder: (context, index) {
-        final item = data[index];
-        return Tooltip(
-          message: '${item.label}: ${item.count}',
-          waitDuration: const Duration(milliseconds: 300),
-          child: InkWell(
-            onTap: onItemTap != null ? () => onItemTap!(item) : null,
-            borderRadius: BorderRadius.circular(6),
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: isVeryCompact ? 2 : 4),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: labelWidth,
-                    child: Text(
-                      item.label,
-                      style: TextStyle(color: Colors.white, fontSize: labelSize),
-                      overflow: TextOverflow.ellipsis,
+    // Use Column for few items to center content and avoid empty space
+    final barWidgets = data.map((item) {
+      return Tooltip(
+        message: '${item.label}: ${item.count}',
+        waitDuration: const Duration(milliseconds: 300),
+        child: InkWell(
+          onTap: onItemTap != null ? () => onItemTap!(item) : null,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: verticalSpacing / 2),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: labelWidth,
+                  child: Text(
+                    item.label,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: labelSize,
+                      fontWeight: FontWeight.w500,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  SizedBox(width: isVeryCompact ? 4 : 8),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        Container(
+                ),
+                SizedBox(width: isVeryCompact ? 6 : 10),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Container(
+                        height: barHeight,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(barHeight / 2),
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: maxValue > 0 ? item.count / maxValue : 0,
+                        child: Container(
                           height: barHeight,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
+                            color: item.color,
                             borderRadius: BorderRadius.circular(barHeight / 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: item.color.withOpacity(0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                         ),
-                        FractionallySizedBox(
-                          widthFactor: maxValue > 0 ? item.count / maxValue : 0,
-                          child: Container(
-                            height: barHeight,
-                            decoration: BoxDecoration(
-                              color: item.color,
-                              borderRadius: BorderRadius.circular(barHeight / 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: item.color.withOpacity(0.3),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: isVeryCompact ? 4 : 8),
-                  SizedBox(
-                    width: valueWidth,
-                    child: Text(
-                      '${item.count}',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: labelSize,
-                        fontWeight: FontWeight.bold,
                       ),
-                      textAlign: TextAlign.right,
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                SizedBox(width: isVeryCompact ? 6 : 10),
+                SizedBox(
+                  width: valueWidth,
+                  child: Text(
+                    '${item.count}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: labelSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
-    );
+        ),
+      );
+    }).toList();
+
+    // For few items, use Column centered; for many items, use ListView
+    if (itemCount <= 8) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.max,
+        children: barWidgets,
+      );
+    } else {
+      return ListView(
+        padding: EdgeInsets.zero,
+        children: barWidgets,
+      );
+    }
   }
 
   Widget _buildEmptyState() {
