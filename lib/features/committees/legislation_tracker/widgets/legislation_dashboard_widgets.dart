@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
 import '../models/legislation_widget_config.dart';
+import '../models/tracked_bill.dart';
 import '../services/legislation_service.dart';
 
 // Brand colors
@@ -1193,7 +1194,7 @@ class LegislatorLeaderboardWidget extends StatelessWidget {
                   ),
                   if (!isVeryCompact)
                     Text(
-                      '${entry.chamber} ${entry.district}',
+                      _formatDistrictDisplay(entry.chamber, entry.district),
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.6),
                         fontSize: subtitleSize,
@@ -1226,6 +1227,19 @@ class LegislatorLeaderboardWidget extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Format chamber and district for display
+  /// Converts "upper" -> "Senate District" and "lower" -> "House District"
+  String _formatDistrictDisplay(String chamber, String district) {
+    final chamberName = switch (chamber.toLowerCase()) {
+      'upper' => 'Senate',
+      'lower' => 'House',
+      'senate' => 'Senate',
+      'house' => 'House',
+      _ => chamber,
+    };
+    return '$chamberName District $district';
   }
 }
 
@@ -1958,6 +1972,255 @@ class DistributionLeaderboardWidget extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// AI Recommendation Bill Leaderboard Widget
+/// Shows bills with a specific AI recommendation (position or priority)
+/// Displays bill identifier and AI short summary, allows navigation to bill detail
+class AiRecommendationBillLeaderboardWidget extends StatelessWidget {
+  final LegislationWidgetConfig config;
+  final List<TrackedBill> bills;
+  final Function(TrackedBill)? onBillTap;
+  final Color? accentColor;
+
+  const AiRecommendationBillLeaderboardWidget({
+    super.key,
+    required this.config,
+    required this.bills,
+    this.onBillTap,
+    this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = config.gradientColors.isNotEmpty
+        ? config.gradientColors
+        : [_unityBlue, _momentumBlue];
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxHeight < 200;
+            final isVeryCompact = constraints.maxHeight < 150;
+            final padding = isVeryCompact ? 10.0 : (isCompact ? 12.0 : 16.0);
+
+            return Padding(
+              padding: EdgeInsets.all(padding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(isVeryCompact ? 6 : 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          config.icon ?? Icons.psychology,
+                          color: Colors.white,
+                          size: isVeryCompact ? 16 : 20,
+                        ),
+                      ),
+                      SizedBox(width: isVeryCompact ? 8 : 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              config.title,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: isVeryCompact ? 12 : 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (!isVeryCompact)
+                              Text(
+                                '${bills.length} bills',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: isVeryCompact ? 8 : 12),
+
+                  // Bills list
+                  Expanded(
+                    child: bills.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.psychology_outlined,
+                                  color: Colors.white.withOpacity(0.4),
+                                  size: 32,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No AI recommendations',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: bills.length,
+                            padding: EdgeInsets.zero,
+                            itemBuilder: (context, index) {
+                              final bill = bills[index];
+                              return _buildBillTile(
+                                bill,
+                                index,
+                                isCompact,
+                                isVeryCompact,
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBillTile(
+    TrackedBill bill,
+    int index,
+    bool isCompact,
+    bool isVeryCompact,
+  ) {
+    // Calculate tile height based on whether we have a summary
+    final hasSummary = bill.aiSummaryShort != null && bill.aiSummaryShort!.isNotEmpty;
+    final baseHeight = isVeryCompact ? 40.0 : (isCompact ? 52.0 : 64.0);
+    final tileHeight = hasSummary && !isVeryCompact ? baseHeight + 16 : baseHeight;
+    final rankSize = isVeryCompact ? 10.0 : 12.0;
+    final titleSize = isVeryCompact ? 11.0 : 13.0;
+    final summarySize = isVeryCompact ? 9.0 : 11.0;
+
+    return InkWell(
+      onTap: onBillTap != null ? () => onBillTap!(bill) : null,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        constraints: BoxConstraints(minHeight: tileHeight),
+        margin: EdgeInsets.only(bottom: isVeryCompact ? 4 : 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: isVeryCompact ? 8 : 10,
+          vertical: isVeryCompact ? 6 : 8,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Rank badge
+            Container(
+              width: isVeryCompact ? 18 : 22,
+              height: isVeryCompact ? 18 : 22,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(index < 3 ? 0.3 : 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  '${index + 1}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: rankSize,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: isVeryCompact ? 8 : 10),
+            // Bill info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Bill identifier
+                  Text(
+                    bill.billIdentifier,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: titleSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  // AI Summary Short (if available)
+                  if (hasSummary && !isVeryCompact) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      bill.aiSummaryShort!,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: summarySize,
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ] else if (!isVeryCompact) ...[
+                    // Show title as fallback if no AI summary
+                    Text(
+                      bill.title,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: summarySize,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Position/Priority indicator
+            if (accentColor != null)
+              Container(
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(left: 8, top: 4),
+                decoration: BoxDecoration(
+                  color: accentColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
         ),
       ),
     );

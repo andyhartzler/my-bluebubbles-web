@@ -546,32 +546,38 @@ class LegislationService {
   Future<List<SponsorLeaderboardEntry>> enrichLeaderboardWithPhotos(
     List<SponsorLeaderboardEntry> entries,
   ) async {
-    // Collect IDs of entries that need photos
-    final idsNeedingPhotos = entries
-        .where((e) => e.legislatorId != null && (e.photoUrl == null || e.photoUrl!.isEmpty))
+    // Collect IDs of entries that need enrichment (photos or full names)
+    final idsNeedingEnrichment = entries
+        .where((e) => e.legislatorId != null)
         .map((e) => e.legislatorId!)
         .toSet()
         .toList();
 
-    if (idsNeedingPhotos.isEmpty) return entries;
+    if (idsNeedingEnrichment.isEmpty) return entries;
 
     // Fetch legislators
-    final legislatorsMap = await getLegislatorsByIds(idsNeedingPhotos);
+    final legislatorsMap = await getLegislatorsByIds(idsNeedingEnrichment);
 
-    // Update entries with photo URLs
+    // Update entries with photo URLs and full names
     return entries.map((entry) {
-      if (entry.photoUrl != null && entry.photoUrl!.isNotEmpty) {
-        return entry;
-      }
       if (entry.legislatorId == null) return entry;
 
       final legislator = legislatorsMap[entry.legislatorId];
       if (legislator == null) return entry;
 
-      final photoUrl = legislator.getPhotoPublicUrl();
-      if (photoUrl == null) return entry;
+      // Get photo URL if needed
+      String? photoUrl = entry.photoUrl;
+      if (photoUrl == null || photoUrl.isEmpty) {
+        photoUrl = legislator.getPhotoPublicUrl();
+      }
 
-      return entry.copyWith(photoUrl: photoUrl);
+      // Always use the full name from legislator record
+      final fullName = legislator.name;
+
+      return entry.copyWith(
+        name: fullName,
+        photoUrl: photoUrl,
+      );
     }).toList();
   }
 
@@ -1143,6 +1149,46 @@ class LegislationService {
         .limit(limit);
 
     return (response as List).map((json) => SyncLog.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  // ==================== AI RECOMMENDATION BILLS ====================
+
+  /// Get bills by AI position recommendation
+  /// Returns bills where AI recommends a specific position (support, oppose, watching, neutral)
+  Future<List<TrackedBill>> getBillsByAiPositionRecommendation({
+    required String position,
+    int limit = 50,
+  }) async {
+    final response = await _supabase
+        .from('legislation_tracked_bills')
+        .select(_listSelectColumns)
+        .eq('is_archived', false)
+        .eq('ai_position_recommendation', position)
+        .order('ai_analyzed_at', ascending: false)
+        .limit(limit);
+
+    return (response as List)
+        .map((json) => TrackedBill.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get bills by AI priority recommendation
+  /// Returns bills where AI recommends a specific priority (critical, high, medium, low)
+  Future<List<TrackedBill>> getBillsByAiPriorityRecommendation({
+    required String priority,
+    int limit = 50,
+  }) async {
+    final response = await _supabase
+        .from('legislation_tracked_bills')
+        .select(_listSelectColumns)
+        .eq('is_archived', false)
+        .eq('ai_priority_recommendation', priority)
+        .order('ai_analyzed_at', ascending: false)
+        .limit(limit);
+
+    return (response as List)
+        .map((json) => TrackedBill.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 }
 

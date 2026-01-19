@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../services/committee_repository.dart';
 import '../models/legislation_widget_config.dart';
+import '../models/tracked_bill.dart';
 import '../providers/legislation_provider.dart';
 import '../screens/bill_detail_screen.dart';
 import '../screens/legislator_detail_screen.dart';
@@ -66,6 +67,16 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
   LegislationStats? _stats;
   bool _loading = true;
   String? _error;
+
+  // AI Recommendation bills (loaded separately for leaderboards)
+  List<TrackedBill> _aiSupportBills = [];
+  List<TrackedBill> _aiOpposeBills = [];
+  List<TrackedBill> _aiWatchingBills = [];
+  List<TrackedBill> _aiNeutralBills = [];
+  List<TrackedBill> _aiCriticalBills = [];
+  List<TrackedBill> _aiHighBills = [];
+  List<TrackedBill> _aiMediumBills = [];
+  List<TrackedBill> _aiLowBills = [];
 
   // Edit mode state
   bool _isEditMode = false;
@@ -456,12 +467,46 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         _stats = stats;
         _loading = false;
       });
+
+      // Load AI recommendation bills in background (don't block initial load)
+      _loadAiRecommendationBills();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
       });
+    }
+  }
+
+  /// Load bills for each AI recommendation category (for leaderboard display)
+  Future<void> _loadAiRecommendationBills() async {
+    try {
+      // Load all AI recommendation bills in parallel
+      final results = await Future.wait([
+        _service.getBillsByAiPositionRecommendation(position: 'support', limit: 50),
+        _service.getBillsByAiPositionRecommendation(position: 'oppose', limit: 50),
+        _service.getBillsByAiPositionRecommendation(position: 'watching', limit: 50),
+        _service.getBillsByAiPositionRecommendation(position: 'neutral', limit: 50),
+        _service.getBillsByAiPriorityRecommendation(priority: 'critical', limit: 50),
+        _service.getBillsByAiPriorityRecommendation(priority: 'high', limit: 50),
+        _service.getBillsByAiPriorityRecommendation(priority: 'medium', limit: 50),
+        _service.getBillsByAiPriorityRecommendation(priority: 'low', limit: 50),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _aiSupportBills = results[0];
+        _aiOpposeBills = results[1];
+        _aiWatchingBills = results[2];
+        _aiNeutralBills = results[3];
+        _aiCriticalBills = results[4];
+        _aiHighBills = results[5];
+        _aiMediumBills = results[6];
+        _aiLowBills = results[7];
+      });
+    } catch (e) {
+      debugPrint('Error loading AI recommendation bills: $e');
     }
   }
 
@@ -1096,6 +1141,62 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
             config: config,
             entries: stats.top10MostActiveBills,
             onEntryTap: (entry) => _navigateToBillDetail(entry.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsSupport')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiSupportBills,
+            accentColor: _grassrootsGreen,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsOppose')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiOpposeBills,
+            accentColor: _republicanRed,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsWatching')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiWatchingBills,
+            accentColor: _sunriseGold,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsNeutral')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiNeutralBills,
+            accentColor: Colors.grey,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsCritical')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiCriticalBills,
+            accentColor: _actionRed,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsHigh')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiHighBills,
+            accentColor: _sunriseGold,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsMedium')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiMediumBills,
+            accentColor: _momentumBlue,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsLow')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiLowBills,
+            accentColor: _grassrootsGreen,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
           );
         } else {
           // Handle distribution data sources (topSubjects, topCategories, etc.)

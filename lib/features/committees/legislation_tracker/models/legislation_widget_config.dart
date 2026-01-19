@@ -894,7 +894,7 @@ class LegislationDataSources {
       label: 'AI: Support',
       description: 'Bills AI recommended support',
       category: LegislationDataCategory.aiRecommendations,
-      supportedWidgets: [LegislationWidgetType.statCard],
+      supportedWidgets: [LegislationWidgetType.statCard, LegislationWidgetType.leaderboard],
       icon: Icons.thumb_up,
     ),
     LegislationDataSource(
@@ -902,7 +902,7 @@ class LegislationDataSources {
       label: 'AI: Oppose',
       description: 'Bills AI recommended oppose',
       category: LegislationDataCategory.aiRecommendations,
-      supportedWidgets: [LegislationWidgetType.statCard],
+      supportedWidgets: [LegislationWidgetType.statCard, LegislationWidgetType.leaderboard],
       icon: Icons.thumb_down,
     ),
     LegislationDataSource(
@@ -910,7 +910,7 @@ class LegislationDataSources {
       label: 'AI: Watching',
       description: 'Bills AI recommended watching',
       category: LegislationDataCategory.aiRecommendations,
-      supportedWidgets: [LegislationWidgetType.statCard],
+      supportedWidgets: [LegislationWidgetType.statCard, LegislationWidgetType.leaderboard],
       icon: Icons.visibility,
     ),
     LegislationDataSource(
@@ -918,7 +918,7 @@ class LegislationDataSources {
       label: 'AI: Neutral',
       description: 'Bills AI recommended neutral',
       category: LegislationDataCategory.aiRecommendations,
-      supportedWidgets: [LegislationWidgetType.statCard],
+      supportedWidgets: [LegislationWidgetType.statCard, LegislationWidgetType.leaderboard],
       icon: Icons.remove_circle_outline,
     ),
     LegislationDataSource(
@@ -935,7 +935,7 @@ class LegislationDataSources {
       label: 'AI: Critical',
       description: 'Bills AI recommended critical priority',
       category: LegislationDataCategory.aiRecommendations,
-      supportedWidgets: [LegislationWidgetType.statCard],
+      supportedWidgets: [LegislationWidgetType.statCard, LegislationWidgetType.leaderboard],
       icon: Icons.priority_high,
     ),
     LegislationDataSource(
@@ -943,7 +943,7 @@ class LegislationDataSources {
       label: 'AI: High',
       description: 'Bills AI recommended high priority',
       category: LegislationDataCategory.aiRecommendations,
-      supportedWidgets: [LegislationWidgetType.statCard],
+      supportedWidgets: [LegislationWidgetType.statCard, LegislationWidgetType.leaderboard],
       icon: Icons.arrow_upward,
     ),
     LegislationDataSource(
@@ -951,7 +951,7 @@ class LegislationDataSources {
       label: 'AI: Medium',
       description: 'Bills AI recommended medium priority',
       category: LegislationDataCategory.aiRecommendations,
-      supportedWidgets: [LegislationWidgetType.statCard],
+      supportedWidgets: [LegislationWidgetType.statCard, LegislationWidgetType.leaderboard],
       icon: Icons.remove,
     ),
     LegislationDataSource(
@@ -959,7 +959,7 @@ class LegislationDataSources {
       label: 'AI: Low',
       description: 'Bills AI recommended low priority',
       category: LegislationDataCategory.aiRecommendations,
-      supportedWidgets: [LegislationWidgetType.statCard],
+      supportedWidgets: [LegislationWidgetType.statCard, LegislationWidgetType.leaderboard],
       icon: Icons.arrow_downward,
     ),
 
