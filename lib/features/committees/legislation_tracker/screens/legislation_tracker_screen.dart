@@ -42,6 +42,12 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
   String? _stageFilter;
   String? _categoryFilter;
 
+  // AI status filters
+  String? _aiAnalysisFilter; // 'analyzed', 'pending', 'not_analyzed', 'error'
+  String? _aiPositionFilter; // 'support', 'oppose', 'watching', 'neutral'
+  String? _aiPriorityFilter; // 'critical', 'high', 'medium', 'low'
+  String? _aiTalkingPointsFilter; // 'generated', 'pending', 'not_generated'
+
   @override
   void initState() {
     super.initState();
@@ -243,44 +249,59 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
             ),
           ),
           const SizedBox(width: 8),
-          // Filter toggle button
-          Container(
-            decoration: BoxDecoration(
-              color: _showFilters || _hasActiveFilters() ? _momentumBlue : _unityBlue,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: _unityBlue.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: IconButton(
-              icon: Stack(
-                children: [
-                  const Icon(Icons.filter_list, color: Colors.white),
-                  if (_hasActiveFilters())
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: _sunriseGold,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              onPressed: () {
+          // Advanced Search button
+          Material(
+            color: _showFilters || _hasActiveFilters() ? _momentumBlue : _unityBlue,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 4,
+            child: InkWell(
+              onTap: () {
                 setState(() {
                   _showFilters = !_showFilters;
                 });
               },
-              tooltip: 'Toggle filters',
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Stack(
+                      children: [
+                        const Icon(Icons.tune, color: Colors.white, size: 18),
+                        if (_hasActiveFilters())
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: _sunriseGold,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Advanced',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _showFilters ? Icons.expand_less : Icons.expand_more,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -289,16 +310,88 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
   }
 
   bool _hasActiveFilters() {
-    return _partyFilter != null || _stageFilter != null || _categoryFilter != null;
+    return _partyFilter != null ||
+           _stageFilter != null ||
+           _categoryFilter != null ||
+           _aiAnalysisFilter != null ||
+           _aiPositionFilter != null ||
+           _aiPriorityFilter != null ||
+           _aiTalkingPointsFilter != null;
+  }
+
+  int _countActiveFilters() {
+    int count = 0;
+    if (_partyFilter != null) count++;
+    if (_stageFilter != null) count++;
+    if (_categoryFilter != null) count++;
+    if (_aiAnalysisFilter != null) count++;
+    if (_aiPositionFilter != null) count++;
+    if (_aiPriorityFilter != null) count++;
+    if (_aiTalkingPointsFilter != null) count++;
+    return count;
   }
 
   Widget _buildSmartFilters(LegislationProvider provider) {
+    final filteredBills = _getFilteredBills(provider);
+    final resultCount = filteredBills.length;
+    final totalCount = provider.trackedBills.length;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Filter chips row
+          // Result count display
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _unityBlue.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.search, size: 14, color: Colors.white),
+                      const SizedBox(width: 4),
+                      Text(
+                        _hasActiveFilters() || provider.searchQuery.isNotEmpty
+                            ? '$resultCount of $totalCount bills'
+                            : '$totalCount bills',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_hasActiveFilters())
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _momentumBlue,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_countActiveFilters()} filter${_countActiveFilters() > 1 ? 's' : ''} active',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Basic filters row
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -308,10 +401,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                   label: 'Party',
                   value: _partyFilter,
                   icon: Icons.people_outline,
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('All Parties')),
-                    const DropdownMenuItem(value: 'Republican', child: Text('Republican (R)')),
-                    const DropdownMenuItem(value: 'Democratic', child: Text('Democrat (D)')),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('All Parties')),
+                    DropdownMenuItem(value: 'Republican', child: Text('Republican (R)')),
+                    DropdownMenuItem(value: 'Democratic', child: Text('Democrat (D)')),
                   ],
                   onChanged: (value) {
                     setState(() => _partyFilter = value);
@@ -324,13 +417,13 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                   label: 'Stage',
                   value: _stageFilter,
                   icon: Icons.stairs_outlined,
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('All Stages')),
-                    const DropdownMenuItem(value: 'introduced', child: Text('Introduced')),
-                    const DropdownMenuItem(value: 'passed_lower', child: Text('Passed House')),
-                    const DropdownMenuItem(value: 'passed_upper', child: Text('Passed Senate')),
-                    const DropdownMenuItem(value: 'signed', child: Text('Signed')),
-                    const DropdownMenuItem(value: 'vetoed', child: Text('Vetoed')),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('All Stages')),
+                    DropdownMenuItem(value: 'introduced', child: Text('Introduced')),
+                    DropdownMenuItem(value: 'passed_lower', child: Text('Passed House')),
+                    DropdownMenuItem(value: 'passed_upper', child: Text('Passed Senate')),
+                    DropdownMenuItem(value: 'signed', child: Text('Signed')),
+                    DropdownMenuItem(value: 'vetoed', child: Text('Vetoed')),
                   ],
                   onChanged: (value) {
                     setState(() => _stageFilter = value);
@@ -343,21 +436,21 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                   label: 'Category',
                   value: _categoryFilter,
                   icon: Icons.category_outlined,
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('All Categories')),
-                    const DropdownMenuItem(value: 'climate', child: Text('Climate')),
-                    const DropdownMenuItem(value: 'criminal_justice', child: Text('Criminal Justice')),
-                    const DropdownMenuItem(value: 'education', child: Text('Education')),
-                    const DropdownMenuItem(value: 'guns', child: Text('Guns')),
-                    const DropdownMenuItem(value: 'healthcare', child: Text('Healthcare')),
-                    const DropdownMenuItem(value: 'housing', child: Text('Housing')),
-                    const DropdownMenuItem(value: 'immigration', child: Text('Immigration')),
-                    const DropdownMenuItem(value: 'labor', child: Text('Labor')),
-                    const DropdownMenuItem(value: 'lgbtq', child: Text('LGBTQ+')),
-                    const DropdownMenuItem(value: 'taxes_budget', child: Text('Taxes & Budget')),
-                    const DropdownMenuItem(value: 'transportation', child: Text('Transportation')),
-                    const DropdownMenuItem(value: 'voting_rights', child: Text('Voting Rights')),
-                    const DropdownMenuItem(value: 'other', child: Text('Other')),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('All Categories')),
+                    DropdownMenuItem(value: 'climate', child: Text('Climate')),
+                    DropdownMenuItem(value: 'criminal_justice', child: Text('Criminal Justice')),
+                    DropdownMenuItem(value: 'education', child: Text('Education')),
+                    DropdownMenuItem(value: 'guns', child: Text('Guns')),
+                    DropdownMenuItem(value: 'healthcare', child: Text('Healthcare')),
+                    DropdownMenuItem(value: 'housing', child: Text('Housing')),
+                    DropdownMenuItem(value: 'immigration', child: Text('Immigration')),
+                    DropdownMenuItem(value: 'labor', child: Text('Labor')),
+                    DropdownMenuItem(value: 'lgbtq', child: Text('LGBTQ+')),
+                    DropdownMenuItem(value: 'taxes_budget', child: Text('Taxes & Budget')),
+                    DropdownMenuItem(value: 'transportation', child: Text('Transportation')),
+                    DropdownMenuItem(value: 'voting_rights', child: Text('Voting Rights')),
+                    DropdownMenuItem(value: 'other', child: Text('Other')),
                   ],
                   onChanged: (value) {
                     setState(() => _categoryFilter = value);
@@ -399,6 +492,85 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          // AI Status filters row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // AI Analysis status
+                _buildFilterDropdown(
+                  label: 'AI Analysis',
+                  value: _aiAnalysisFilter,
+                  icon: Icons.psychology,
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('All AI Status')),
+                    DropdownMenuItem(value: 'analyzed', child: Text('✅ Analyzed')),
+                    DropdownMenuItem(value: 'pending', child: Text('⏳ Pending')),
+                    DropdownMenuItem(value: 'not_analyzed', child: Text('⬜ Not Analyzed')),
+                    DropdownMenuItem(value: 'error', child: Text('❌ Error')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _aiAnalysisFilter = value);
+                    _applyFilters(provider);
+                  },
+                ),
+                const SizedBox(width: 8),
+                // AI Position Recommendation
+                _buildFilterDropdown(
+                  label: 'AI Position',
+                  value: _aiPositionFilter,
+                  icon: Icons.recommend,
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('All Positions')),
+                    DropdownMenuItem(value: 'support', child: Text('👍 Support')),
+                    DropdownMenuItem(value: 'oppose', child: Text('👎 Oppose')),
+                    DropdownMenuItem(value: 'watching', child: Text('👁️ Watching')),
+                    DropdownMenuItem(value: 'neutral', child: Text('➖ Neutral')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _aiPositionFilter = value);
+                    _applyFilters(provider);
+                  },
+                ),
+                const SizedBox(width: 8),
+                // AI Priority Recommendation
+                _buildFilterDropdown(
+                  label: 'AI Priority',
+                  value: _aiPriorityFilter,
+                  icon: Icons.flag,
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('All Priorities')),
+                    DropdownMenuItem(value: 'critical', child: Text('🔴 Critical')),
+                    DropdownMenuItem(value: 'high', child: Text('🟠 High')),
+                    DropdownMenuItem(value: 'medium', child: Text('🟡 Medium')),
+                    DropdownMenuItem(value: 'low', child: Text('🟢 Low')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _aiPriorityFilter = value);
+                    _applyFilters(provider);
+                  },
+                ),
+                const SizedBox(width: 8),
+                // AI Talking Points status
+                _buildFilterDropdown(
+                  label: 'Talking Points',
+                  value: _aiTalkingPointsFilter,
+                  icon: Icons.chat_bubble_outline,
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('All')),
+                    DropdownMenuItem(value: 'generated', child: Text('✅ Generated')),
+                    DropdownMenuItem(value: 'pending', child: Text('⏳ Pending')),
+                    DropdownMenuItem(value: 'not_generated', child: Text('⬜ Not Generated')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _aiTalkingPointsFilter = value);
+                    _applyFilters(provider);
+                  },
+                ),
+              ],
+            ),
+          ),
           // Clear filters button
           if (_hasActiveFilters())
             Padding(
@@ -409,6 +581,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                     _partyFilter = null;
                     _stageFilter = null;
                     _categoryFilter = null;
+                    _aiAnalysisFilter = null;
+                    _aiPositionFilter = null;
+                    _aiPriorityFilter = null;
+                    _aiTalkingPointsFilter = null;
                   });
                   provider.setCategoryFilter(null);
                   _applyFilters(provider);
@@ -623,6 +799,52 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
             return bill.signedByGovernor;
           case 'vetoed':
             return bill.vetoed;
+          default:
+            return true;
+        }
+      }).toList();
+    }
+
+    // Apply AI analysis status filter
+    if (_aiAnalysisFilter != null) {
+      bills = bills.where((bill) {
+        switch (_aiAnalysisFilter) {
+          case 'analyzed':
+            return bill.aiAnalyzedAt != null && bill.aiAnalysisError == null;
+          case 'pending':
+            return bill.aiAnalysisPending == true;
+          case 'not_analyzed':
+            return bill.aiAnalyzedAt == null && bill.aiAnalysisPending != true;
+          case 'error':
+            return bill.aiAnalysisError != null;
+          default:
+            return true;
+        }
+      }).toList();
+    }
+
+    // Apply AI position recommendation filter
+    if (_aiPositionFilter != null) {
+      bills = bills.where((bill) {
+        return bill.aiPositionRecommendation == _aiPositionFilter;
+      }).toList();
+    }
+
+    // Apply AI priority recommendation filter
+    if (_aiPriorityFilter != null) {
+      bills = bills.where((bill) {
+        return bill.aiPriorityRecommendation == _aiPriorityFilter;
+      }).toList();
+    }
+
+    // Apply AI talking points status filter
+    if (_aiTalkingPointsFilter != null) {
+      bills = bills.where((bill) {
+        switch (_aiTalkingPointsFilter) {
+          case 'generated':
+            return bill.hasTalkingPoints;
+          case 'not_generated':
+            return !bill.hasTalkingPoints;
           default:
             return true;
         }
