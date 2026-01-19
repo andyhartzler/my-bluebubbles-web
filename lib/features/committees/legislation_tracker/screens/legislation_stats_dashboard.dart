@@ -43,6 +43,16 @@ class _WidgetReorderData {
   const _WidgetReorderData({required this.fromIndex, required this.config});
 }
 
+/// Grid position for positioned layout
+class _LegislationGridPosition {
+  final int row;
+  final int col;
+  final int widthCells;
+  final int heightCells;
+
+  const _LegislationGridPosition(this.row, this.col, this.widthCells, this.heightCells);
+}
+
 class LegislationStatsDashboard extends StatefulWidget {
   final String committeeId;
   final bool isExecutive;
@@ -482,16 +492,16 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
   /// Load bills for each AI recommendation category (for leaderboard display)
   Future<void> _loadAiRecommendationBills() async {
     try {
-      // Load all AI recommendation bills in parallel
+      // Load all AI recommendation bills in parallel (no limit - show all)
       final results = await Future.wait([
-        _service.getBillsByAiPositionRecommendation(position: 'support', limit: 50),
-        _service.getBillsByAiPositionRecommendation(position: 'oppose', limit: 50),
-        _service.getBillsByAiPositionRecommendation(position: 'watching', limit: 50),
-        _service.getBillsByAiPositionRecommendation(position: 'neutral', limit: 50),
-        _service.getBillsByAiPriorityRecommendation(priority: 'critical', limit: 50),
-        _service.getBillsByAiPriorityRecommendation(priority: 'high', limit: 50),
-        _service.getBillsByAiPriorityRecommendation(priority: 'medium', limit: 50),
-        _service.getBillsByAiPriorityRecommendation(priority: 'low', limit: 50),
+        _service.getBillsByAiPositionRecommendation(position: 'support', limit: 10000),
+        _service.getBillsByAiPositionRecommendation(position: 'oppose', limit: 10000),
+        _service.getBillsByAiPositionRecommendation(position: 'watching', limit: 10000),
+        _service.getBillsByAiPositionRecommendation(position: 'neutral', limit: 10000),
+        _service.getBillsByAiPriorityRecommendation(priority: 'critical', limit: 10000),
+        _service.getBillsByAiPriorityRecommendation(priority: 'high', limit: 10000),
+        _service.getBillsByAiPriorityRecommendation(priority: 'medium', limit: 10000),
+        _service.getBillsByAiPriorityRecommendation(priority: 'low', limit: 10000),
       ]);
 
       if (!mounted) return;
@@ -876,8 +886,9 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     int columns,
     double maxWidth,
   ) {
-    final widgetWidth = (maxWidth - (columns - 1) * 16) / columns;
-    final widgetHeight = widgetWidth * 0.8;
+    final unitWidth = (maxWidth - (columns - 1) * 16) / columns;
+    final unitHeight = unitWidth * 0.8;
+    const spacing = 16.0;
 
     final sortedWidgets = List<LegislationWidgetConfig>.from(_config.widgets)
       ..sort((a, b) {
@@ -885,20 +896,118 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         return a.gridX.compareTo(b.gridX);
       });
 
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      children: sortedWidgets.map((widget) {
-        final width = _getWidgetWidth(widget, widgetWidth, columns);
-        final height = _getWidgetHeight(widget, widgetHeight);
+    // Build positioned grid using Stack for multi-row spanning support
+    return _buildPositionedGrid(sortedWidgets, stats, columns, unitWidth, unitHeight, maxWidth, spacing);
+  }
 
-        return SizedBox(
-          width: width,
-          height: height,
+  /// Build a true positioned grid that supports multi-row spanning widgets
+  Widget _buildPositionedGrid(
+    List<LegislationWidgetConfig> widgets,
+    LegislationStats stats,
+    int columns,
+    double unitWidth,
+    double unitHeight,
+    double maxWidth,
+    double spacing,
+  ) {
+    // Create a grid map to track occupied cells
+    final gridMap = <String, int>{};
+    final widgetPositions = <int, _LegislationGridPosition>{};
+
+    // Place widgets on the grid respecting their gridX, gridY positions
+    for (int i = 0; i < widgets.length; i++) {
+      final widget = widgets[i];
+      final widthCells = widget.widthMultiplier.ceil().clamp(1, columns);
+      final heightCells = widget.heightMultiplier.ceil().clamp(1, 10);
+
+      // Find position - prefer specified gridX/gridY, or find next available
+      int startRow = widget.gridY;
+      int startCol = widget.gridX.clamp(0, columns - 1);
+
+      // If specified position is occupied or invalid, find next available
+      if (startCol + widthCells > columns || _isGridOccupied(gridMap, startRow, startCol, widthCells, heightCells)) {
+        final pos = _findNextAvailableGridPosition(gridMap, columns, widthCells, heightCells);
+        startRow = pos.row;
+        startCol = pos.col;
+      }
+
+      // Mark cells as occupied
+      for (int r = 0; r < heightCells; r++) {
+        for (int c = 0; c < widthCells; c++) {
+          final key = '${startRow + r},${startCol + c}';
+          gridMap[key] = i;
+        }
+      }
+
+      widgetPositions[i] = _LegislationGridPosition(startRow, startCol, widthCells, heightCells);
+    }
+
+    // Find max row
+    int maxRow = 0;
+    for (final pos in widgetPositions.values) {
+      final endRow = pos.row + pos.heightCells;
+      if (endRow > maxRow) maxRow = endRow;
+    }
+
+    // Calculate total height
+    final totalHeight = maxRow * unitHeight + (maxRow - 1) * spacing;
+
+    // Build positioned widgets using Stack
+    final positionedWidgets = <Widget>[];
+
+    for (int i = 0; i < widgets.length; i++) {
+      final widget = widgets[i];
+      final pos = widgetPositions[i];
+      if (pos == null) continue;
+
+      // Calculate actual dimensions
+      final width = pos.widthCells * unitWidth + (pos.widthCells - 1) * spacing;
+      final height = pos.heightCells * unitHeight + (pos.heightCells - 1) * spacing;
+
+      // Calculate position
+      final left = pos.col * (unitWidth + spacing);
+      final top = pos.row * (unitHeight + spacing);
+
+      positionedWidgets.add(
+        Positioned(
+          left: left,
+          top: top,
+          width: width.clamp(50.0, maxWidth),
+          height: height.clamp(50.0, totalHeight > 0 ? totalHeight : unitHeight),
           child: _buildWidget(widget, stats),
-        );
-      }).toList(),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: maxWidth,
+      height: totalHeight > 0 ? totalHeight : unitHeight,
+      child: Stack(
+        children: positionedWidgets,
+      ),
     );
+  }
+
+  bool _isGridOccupied(Map<String, int> gridMap, int row, int col, int width, int height) {
+    for (int r = 0; r < height; r++) {
+      for (int c = 0; c < width; c++) {
+        if (gridMap.containsKey('${row + r},${col + c}')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  _LegislationGridPosition _findNextAvailableGridPosition(Map<String, int> gridMap, int columns, int widthCells, int heightCells) {
+    for (int row = 0; row < 100; row++) {
+      for (int col = 0; col <= columns - widthCells; col++) {
+        if (!_isGridOccupied(gridMap, row, col, widthCells, heightCells)) {
+          return _LegislationGridPosition(row, col, widthCells, heightCells);
+        }
+      }
+    }
+    return _LegislationGridPosition(0, 0, widthCells, heightCells);
   }
 
   Widget _buildMobileWidgetsGrid(LegislationStats stats, double maxWidth) {
@@ -2920,6 +3029,121 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                         ),
                       ),
                     ),
+                  const SizedBox(height: 24),
+
+                  // Grid Position controls
+                  const Text(
+                    'Grid Position:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Row',
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.remove, size: 18),
+                                    onPressed: config.gridY <= 0 ? null : () {
+                                      _updateWidget(config.copyWith(gridY: config.gridY - 1));
+                                    },
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      '${config.gridY}',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.add, size: 18),
+                                    onPressed: () {
+                                      _updateWidget(config.copyWith(gridY: config.gridY + 1));
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Column',
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.remove, size: 18),
+                                    onPressed: config.gridX <= 0 ? null : () {
+                                      _updateWidget(config.copyWith(gridX: config.gridX - 1));
+                                    },
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      '${config.gridX}',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.add, size: 18),
+                                    onPressed: () {
+                                      _updateWidget(config.copyWith(gridX: config.gridX + 1));
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _momentumBlue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 16, color: _momentumBlue),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Set row/column to position widgets. Use "Featured" or "Tall" size for multi-row spanning.',
+                            style: TextStyle(fontSize: 11, color: _momentumBlue.withOpacity(0.8)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             );

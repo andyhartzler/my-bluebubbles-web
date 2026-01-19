@@ -221,11 +221,13 @@ class CommitteeRepository {
         getMemberCountForCommittee(committee.name),
         getCommitteeLeadership(committee.name),
         _getCommitteeSpecificStats(committee),
+        getSlackMessageCountForCommittee(committee.name),
       ]);
 
       final memberCount = results[0] as int;
       final leaders = results[1] as List<CommitteeLeader>;
       final specificStats = results[2] as Map<String, dynamic>;
+      final slackMessageCount = results[3] as int;
 
       // Separate chairs and co-chairs (supports multiple of each)
       final chairs = <CommitteeLeader>[];
@@ -242,6 +244,7 @@ class CommitteeRepository {
 
       return CommitteeStats(
         memberCount: memberCount,
+        slackMessageCount: slackMessageCount,
         chairs: chairs,
         coChairs: coChairs,
         specificStats: specificStats,
@@ -1017,6 +1020,47 @@ class CommitteeRepository {
       'source': subscriber.source,
       'tags': subscriber.tags,
     };
+  }
+
+  /// Get Slack message count for a specific committee from slack_analytics_cache
+  Future<int> getSlackMessageCountForCommittee(String committeeName) async {
+    if (!isReady) return 0;
+
+    try {
+      // Get the messages_by_channel metric from slack_analytics_cache
+      final data = await _readClient
+          .from('slack_analytics_cache')
+          .select('metric_value')
+          .eq('metric_name', 'messages_by_channel')
+          .order('computed_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (data == null) return 0;
+
+      final metricValue = data['metric_value'];
+      if (metricValue is! Map<String, dynamic>) return 0;
+
+      final channelData = metricValue['data'];
+      if (channelData is! List) return 0;
+
+      // Find the committee in the data
+      for (final item in channelData) {
+        if (item is Map<String, dynamic>) {
+          final committee = item['committee']?.toString() ?? '';
+          // Match committee name (case-insensitive partial match)
+          if (committee.toLowerCase().contains(committeeName.toLowerCase()) ||
+              committeeName.toLowerCase().contains(committee.toLowerCase())) {
+            return _toInt(item['message_count']);
+          }
+        }
+      }
+
+      return 0;
+    } catch (e) {
+      print('Error getting Slack message count for committee: $e');
+      return 0;
+    }
   }
 
   /// Get overall stats for the committees dashboard

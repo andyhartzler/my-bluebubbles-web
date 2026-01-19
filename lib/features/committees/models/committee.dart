@@ -171,12 +171,14 @@ class CommitteeDefinitions {
 /// Committee statistics for the dashboard
 class CommitteeStats {
   final int memberCount;
+  final int slackMessageCount;
   final List<CommitteeLeader> chairs;
   final List<CommitteeLeader> coChairs;
   final Map<String, dynamic> specificStats;
 
   const CommitteeStats({
     this.memberCount = 0,
+    this.slackMessageCount = 0,
     this.chairs = const [],
     this.coChairs = const [],
     this.specificStats = const {},

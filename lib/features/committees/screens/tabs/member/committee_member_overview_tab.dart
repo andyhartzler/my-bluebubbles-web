@@ -1,6 +1,4 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:provider/provider.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
@@ -8,10 +6,7 @@ import 'package:bluebubbles/features/committees/services/committee_repository.da
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
-import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
-import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
-import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 
 /// Overview tab for committee members
@@ -37,10 +32,8 @@ class _CommitteeMemberOverviewTabState
     extends State<CommitteeMemberOverviewTab> {
   final MeetingRepository _meetingRepository = MeetingRepository();
   final CommitteeRepository _committeeRepository = CommitteeRepository();
-  final MemberRepository _memberRepository = MemberRepository();
 
   bool _isLoading = true;
-  bool _uploadingPhoto = false;
   List<Meeting> _meetings = [];
   CommitteeStats? _stats;
 
@@ -78,73 +71,6 @@ class _CommitteeMemberOverviewTabState
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _selectProfilePhoto() async {
-    if (_uploadingPhoto) return;
-
-    final userSession = context.read<UserSessionProvider>();
-    final currentMember = userSession.currentMember;
-    if (currentMember == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to load member info')),
-      );
-      return;
-    }
-
-    final result = await file_picker.FilePicker.platform.pickFiles(
-      type: file_picker.FileType.custom,
-      allowedExtensions: const ['png', 'jpg', 'jpeg', 'heic', 'heif', 'webp'],
-      withData: true,
-      withReadStream: !kIsWeb,
-    );
-
-    if (result == null || result.files.isEmpty) {
-      return;
-    }
-
-    final picked = result.files.first;
-    final platformFile = await materializePickedPlatformFile(
-      picked,
-      source: result,
-    );
-    if (platformFile == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to read the selected photo')),
-      );
-      return;
-    }
-
-    setState(() => _uploadingPhoto = true);
-
-    try {
-      final updated = await _memberRepository.uploadProfilePhoto(
-        member: currentMember,
-        file: platformFile,
-      );
-      if (!mounted) return;
-      if (updated != null) {
-        // Update the user session with new member data
-        userSession.refreshMember(updated);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Profile photo updated')));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to update profile photo')),
-        );
-      }
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error uploading photo: $error')));
-    } finally {
-      if (mounted) {
-        setState(() => _uploadingPhoto = false);
-      }
     }
   }
 
@@ -230,8 +156,6 @@ class _CommitteeMemberOverviewTabState
   Widget _buildWelcomeCard(ThemeData theme) {
     final userSession = context.watch<UserSessionProvider>();
     final currentMember = userSession.currentMember;
-    final photoUrl = currentMember?.primaryProfilePhotoUrl;
-    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
     return Card(
       elevation: 4,
@@ -248,64 +172,16 @@ class _CommitteeMemberOverviewTabState
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            // User's profile photo with upload capability
-            GestureDetector(
-              onTap: _uploadingPhoto ? null : _selectProfilePhoto,
-              child: Stack(
-                children: [
-                  if (_uploadingPhoto)
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.2),
-                      ),
-                      child: const Center(
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    CorsAwareAvatar(
-                      imageUrl: photoUrl,
-                      radius: 28,
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      fallbackText: currentMember?.name ?? '',
-                      fallbackIconColor: Colors.white,
-                      fallbackTextColor: Colors.white,
-                    ),
-                  // Camera icon overlay
-                  if (!_uploadingPhoto)
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: BrandColors.momentumBlue,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: BrandColors.unityBlue,
-                            width: 2,
-                          ),
-                        ),
-                        child: Icon(
-                          hasPhoto ? Icons.photo_camera : Icons.add_a_photo,
-                          color: Colors.white,
-                          size: 12,
-                        ),
-                      ),
-                    ),
-                ],
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.waving_hand_outlined,
+                color: Colors.white,
+                size: 28,
               ),
             ),
             const SizedBox(width: 16),
@@ -314,7 +190,7 @@ class _CommitteeMemberOverviewTabState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    currentMember?.name ?? 'Welcome',
+                    'Welcome, ${currentMember?.firstName ?? 'Member'}!',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -329,16 +205,6 @@ class _CommitteeMemberOverviewTabState
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (!_uploadingPhoto) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Tap photo to ${hasPhoto ? 'change' : 'add'}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: Colors.white.withOpacity(0.6),
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -407,6 +273,12 @@ class _CommitteeMemberOverviewTabState
                   icon: Icons.video_camera_front_outlined,
                   label: 'Meetings',
                   value: '${_meetings.length}',
+                  theme: theme,
+                ),
+                _buildStatItem(
+                  icon: Icons.chat_outlined,
+                  label: 'Slack Messages',
+                  value: '${stats.slackMessageCount}',
                   theme: theme,
                 ),
               ],
