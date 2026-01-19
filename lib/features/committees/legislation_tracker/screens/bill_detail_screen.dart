@@ -9,7 +9,6 @@ import '../providers/legislation_provider.dart';
 import '../models/tracked_bill.dart';
 import '../widgets/bill_status_badge.dart';
 import '../widgets/position_selector.dart';
-import '../widgets/priority_selector.dart';
 import '../widgets/category_chips.dart';
 import '../widgets/bill_timeline.dart';
 import '../widgets/vote_breakdown_chart.dart';
@@ -279,19 +278,15 @@ class _BillDetailScreenState extends State<BillDetailScreen>
           Row(
             children: [
               PositionSelector(
-                currentPosition: bill.position != null
-                    ? BillPosition.fromString(bill.position!)
-                    : BillPosition.watching,
-                onChanged: (position) => _updatePosition(provider, bill, position.value),
+                currentPosition: BillPosition.fromString(bill.position),
+                onChanged: (position) => _updatePosition(provider, bill, position?.value),
                 compact: true,
               ),
               const SizedBox(width: 6),
               PrioritySelector(
-                currentPriority: bill.priority != null
-                    ? BillPriority.fromString(bill.priority!)
-                    : BillPriority.medium,
-                onChanged: (priority) => _updatePriority(provider, bill, priority.value),
-                showLabel: false,
+                currentPriority: BillPriority.fromString(bill.priority),
+                onChanged: (priority) => _updatePriority(provider, bill, priority?.value),
+                showLabels: false,
                 compact: true,
               ),
             ],
@@ -380,17 +375,13 @@ class _BillDetailScreenState extends State<BillDetailScreen>
                                 _buildSectionPill('Position & Priority', Icons.flag_outlined),
                                 const SizedBox(height: 12),
                                 PositionSelector(
-                                  currentPosition: bill.position != null
-                                      ? BillPosition.fromString(bill.position!)
-                                      : BillPosition.watching,
-                                  onChanged: (position) => _updatePosition(provider, bill, position.value),
+                                  currentPosition: BillPosition.fromString(bill.position),
+                                  onChanged: (position) => _updatePosition(provider, bill, position?.value),
                                 ),
                                 const SizedBox(height: 12),
                                 PrioritySelector(
-                                  currentPriority: bill.priority != null
-                                      ? BillPriority.fromString(bill.priority!)
-                                      : BillPriority.medium,
-                                  onChanged: (priority) => _updatePriority(provider, bill, priority.value),
+                                  currentPriority: BillPriority.fromString(bill.priority),
+                                  onChanged: (priority) => _updatePriority(provider, bill, priority?.value),
                                 ),
                               ],
                             ),
@@ -1077,12 +1068,12 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     );
   }
 
-  Future<void> _updatePosition(LegislationProvider provider, TrackedBill bill, String position) async {
+  Future<void> _updatePosition(LegislationProvider provider, TrackedBill bill, String? position) async {
     final memberId = context.read<UserSessionProvider>().currentMember?.id;
     await provider.updatePosition(billId: bill.id, position: position, memberId: memberId);
   }
 
-  Future<void> _updatePriority(LegislationProvider provider, TrackedBill bill, String priority) async {
+  Future<void> _updatePriority(LegislationProvider provider, TrackedBill bill, String? priority) async {
     await provider.updatePriority(billId: bill.id, priority: priority);
   }
 

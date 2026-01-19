@@ -487,12 +487,14 @@ class TrackedBill {
     String? latestVoteResult,
     DateTime? latestVoteDate,
     String? position,
+    bool clearPosition = false,
     String? positionSetBy,
     String? positionSetByName,
     String? positionSetByPhotoUrl,
     DateTime? positionSetAt,
     String? positionRationale,
     String? priority,
+    bool clearPriority = false,
     List<String>? categories,
     List<String>? tags,
     String? addedBy,
@@ -575,13 +577,13 @@ class TrackedBill {
       primarySponsorDistrict: primarySponsorDistrict ?? this.primarySponsorDistrict,
       latestVoteResult: latestVoteResult ?? this.latestVoteResult,
       latestVoteDate: latestVoteDate ?? this.latestVoteDate,
-      position: position ?? this.position,
-      positionSetBy: positionSetBy ?? this.positionSetBy,
-      positionSetByName: positionSetByName ?? this.positionSetByName,
-      positionSetByPhotoUrl: positionSetByPhotoUrl ?? this.positionSetByPhotoUrl,
-      positionSetAt: positionSetAt ?? this.positionSetAt,
-      positionRationale: positionRationale ?? this.positionRationale,
-      priority: priority ?? this.priority,
+      position: clearPosition ? null : (position ?? this.position),
+      positionSetBy: clearPosition ? null : (positionSetBy ?? this.positionSetBy),
+      positionSetByName: clearPosition ? null : (positionSetByName ?? this.positionSetByName),
+      positionSetByPhotoUrl: clearPosition ? null : (positionSetByPhotoUrl ?? this.positionSetByPhotoUrl),
+      positionSetAt: clearPosition ? null : (positionSetAt ?? this.positionSetAt),
+      positionRationale: clearPosition ? null : (positionRationale ?? this.positionRationale),
+      priority: clearPriority ? null : (priority ?? this.priority),
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,
       addedBy: addedBy ?? this.addedBy,
@@ -752,11 +754,13 @@ enum BillPosition {
   final String emoji;
   final Color color;
 
-  static BillPosition fromString(String value) {
-    return BillPosition.values.firstWhere(
-      (e) => e.value == value,
-      orElse: () => BillPosition.watching,
-    );
+  static BillPosition? fromString(String? value) {
+    if (value == null || value.isEmpty) return null;
+    try {
+      return BillPosition.values.firstWhere((e) => e.value == value);
+    } catch (_) {
+      return null;
+    }
   }
 }
 
@@ -775,10 +779,12 @@ enum BillPriority {
   final Color color;
   final int sortOrder;
 
-  static BillPriority fromString(String value) {
-    return BillPriority.values.firstWhere(
-      (e) => e.value == value,
-      orElse: () => BillPriority.medium,
-    );
+  static BillPriority? fromString(String? value) {
+    if (value == null || value.isEmpty) return null;
+    try {
+      return BillPriority.values.firstWhere((e) => e.value == value);
+    } catch (_) {
+      return null;
+    }
   }
 }

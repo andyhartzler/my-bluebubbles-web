@@ -126,14 +126,14 @@ class BillFilters extends StatelessWidget {
     return Row(
       children: [
         // Position filter
-        _buildFilterDropdown(
+        _buildFilterDropdown<String?>(
           context: context,
           theme: theme,
           label: 'Position',
           value: positionFilter,
           items: [
-            const DropdownMenuItem(value: null, child: Text('All Positions')),
-            ...BillPosition.values.map((p) => DropdownMenuItem(
+            const DropdownMenuItem<String?>(value: null, child: Text('All Positions')),
+            ...BillPosition.values.map((p) => DropdownMenuItem<String?>(
                   value: p.value,
                   child: Row(
                     children: [
@@ -149,14 +149,14 @@ class BillFilters extends StatelessWidget {
         const SizedBox(width: 12),
 
         // Priority filter
-        _buildFilterDropdown(
+        _buildFilterDropdown<String?>(
           context: context,
           theme: theme,
           label: 'Priority',
           value: priorityFilter,
           items: [
-            const DropdownMenuItem(value: null, child: Text('All Priorities')),
-            ...BillPriority.values.map((p) => DropdownMenuItem(
+            const DropdownMenuItem<String?>(value: null, child: Text('All Priorities')),
+            ...BillPriority.values.map((p) => DropdownMenuItem<String?>(
                   value: p.value,
                   child: Row(
                     children: [
@@ -180,14 +180,14 @@ class BillFilters extends StatelessWidget {
 
         // Category filter
         if (categories.isNotEmpty)
-          _buildFilterDropdown(
+          _buildFilterDropdown<String?>(
             context: context,
             theme: theme,
             label: 'Category',
             value: categoryFilter,
             items: [
-              const DropdownMenuItem(value: null, child: Text('All Categories')),
-              ...categories.map((c) => DropdownMenuItem(
+              const DropdownMenuItem<String?>(value: null, child: Text('All Categories')),
+              ...categories.map((c) => DropdownMenuItem<String?>(
                     value: c.name,
                     child: Row(
                       children: [
@@ -204,14 +204,14 @@ class BillFilters extends StatelessWidget {
 
         // Sponsor filter
         if (sponsors.isNotEmpty)
-          _buildFilterDropdown(
+          _buildFilterDropdown<String?>(
             context: context,
             theme: theme,
             label: 'Sponsor',
             value: sponsorFilter,
             items: [
-              const DropdownMenuItem(value: null, child: Text('All Sponsors')),
-              ...sponsors.map((s) => DropdownMenuItem(
+              const DropdownMenuItem<String?>(value: null, child: Text('All Sponsors')),
+              ...sponsors.map((s) => DropdownMenuItem<String?>(
                     value: s,
                     child: Text(
                       s.length > 20 ? '${s.substring(0, 20)}...' : s,
@@ -256,7 +256,7 @@ class BillFilters extends StatelessWidget {
               _buildFilterChip(
                 context: context,
                 label: positionFilter != null
-                    ? BillPosition.fromString(positionFilter!).label
+                    ? (BillPosition.fromString(positionFilter!)?.label ?? positionFilter!)
                     : 'Position',
                 isActive: positionFilter != null,
                 onTap: () => _showPositionFilterDialog(context),
@@ -265,7 +265,7 @@ class BillFilters extends StatelessWidget {
               _buildFilterChip(
                 context: context,
                 label: priorityFilter != null
-                    ? BillPriority.fromString(priorityFilter!).label
+                    ? (BillPriority.fromString(priorityFilter!)?.label ?? priorityFilter!)
                     : 'Priority',
                 isActive: priorityFilter != null,
                 onTap: () => _showPriorityFilterDialog(context),

@@ -314,16 +314,26 @@ class LegislationService {
   /// [memberId] is the ID of the member setting the position (from members table)
   Future<TrackedBill> updatePosition({
     required String billId,
-    required String position,
+    String? position,
     String? memberId,
     String? rationale,
   }) async {
-    final response = await _supabase.from('legislation_tracked_bills').update({
+    final Map<String, dynamic> updateData = {
       'position': position,
-      'position_set_by': memberId,
-      'position_set_at': DateTime.now().toIso8601String(),
-      'position_rationale': rationale,
-    }).eq('id', billId).select().single();
+    };
+    // Only update position_set_by and position_set_at if we're setting a position
+    if (position != null) {
+      updateData['position_set_by'] = memberId;
+      updateData['position_set_at'] = DateTime.now().toIso8601String();
+      updateData['position_rationale'] = rationale;
+    } else {
+      // Clear position-related fields when unsetting position
+      updateData['position_set_by'] = null;
+      updateData['position_set_at'] = null;
+      updateData['position_rationale'] = null;
+    }
+
+    final response = await _supabase.from('legislation_tracked_bills').update(updateData).eq('id', billId).select().single();
 
     return TrackedBill.fromJson(response);
   }
@@ -331,7 +341,7 @@ class LegislationService {
   /// Update bill priority
   Future<TrackedBill> updatePriority({
     required String billId,
-    required String priority,
+    String? priority,
   }) async {
     final response = await _supabase.from('legislation_tracked_bills').update({
       'priority': priority,

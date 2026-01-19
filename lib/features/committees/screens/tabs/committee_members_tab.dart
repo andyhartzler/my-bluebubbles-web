@@ -5,6 +5,7 @@ import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 
@@ -231,10 +232,11 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
     final schoolLabel = committee.id == 'College Democrats' ? 'College' : 'High School';
 
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _loadMembers,
-        child: Column(
-          children: [
+      body: BrandedBackground(
+        child: RefreshIndicator(
+          onRefresh: _loadMembers,
+          child: Column(
+            children: [
             // Search bar
             Padding(
               padding: const EdgeInsets.all(16),
@@ -407,7 +409,8 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
+    ),
+    floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddMemberDialog,
         icon: const Icon(Icons.person_add),
         label: const Text('Add Member'),

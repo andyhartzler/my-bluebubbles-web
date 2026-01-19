@@ -414,7 +414,7 @@ class LegislationProvider extends ChangeNotifier {
   /// [memberId] is the ID of the member setting the position (from members table)
   Future<void> updatePosition({
     required String billId,
-    required String position,
+    String? position,
     String? memberId,
     String? rationale,
   }) async {
@@ -439,20 +439,21 @@ class LegislationProvider extends ChangeNotifier {
       loadStats();
     } catch (e) {
       // Rollback on error
-      _updateBillPositionLocally(billId, oldPosition ?? '', oldPositionSetBy);
+      _updateBillPositionLocally(billId, oldPosition, oldPositionSetBy);
       notifyListeners();
       rethrow;
     }
   }
 
   // Helper to update position in local state
-  void _updateBillPositionLocally(String billId, String position, String? memberId) {
+  void _updateBillPositionLocally(String billId, String? position, String? memberId) {
     // Update selected bill
     if (_selectedBill?.id == billId) {
       _selectedBill = _selectedBill!.copyWith(
         position: position,
         positionSetBy: memberId,
-        positionSetAt: DateTime.now(),
+        positionSetAt: position != null ? DateTime.now() : null,
+        clearPosition: position == null,
       );
     }
     // Update in tracked bills list
@@ -461,7 +462,8 @@ class LegislationProvider extends ChangeNotifier {
       _trackedBills[index] = _trackedBills[index].copyWith(
         position: position,
         positionSetBy: memberId,
-        positionSetAt: DateTime.now(),
+        positionSetAt: position != null ? DateTime.now() : null,
+        clearPosition: position == null,
       );
     }
     // Update in all tracked bills list
@@ -470,7 +472,8 @@ class LegislationProvider extends ChangeNotifier {
       _allTrackedBills[allIndex] = _allTrackedBills[allIndex].copyWith(
         position: position,
         positionSetBy: memberId,
-        positionSetAt: DateTime.now(),
+        positionSetAt: position != null ? DateTime.now() : null,
+        clearPosition: position == null,
       );
     }
   }
@@ -478,7 +481,7 @@ class LegislationProvider extends ChangeNotifier {
   // Update bill priority with optimistic UI update
   Future<void> updatePriority({
     required String billId,
-    required String priority,
+    String? priority,
   }) async {
     // Store old value for potential rollback
     final oldPriority = _selectedBill?.priority;
@@ -494,27 +497,36 @@ class LegislationProvider extends ChangeNotifier {
       loadStats();
     } catch (e) {
       // Rollback on error
-      _updateBillPriorityLocally(billId, oldPriority ?? '');
+      _updateBillPriorityLocally(billId, oldPriority);
       notifyListeners();
       rethrow;
     }
   }
 
   // Helper to update priority in local state
-  void _updateBillPriorityLocally(String billId, String priority) {
+  void _updateBillPriorityLocally(String billId, String? priority) {
     // Update selected bill
     if (_selectedBill?.id == billId) {
-      _selectedBill = _selectedBill!.copyWith(priority: priority);
+      _selectedBill = _selectedBill!.copyWith(
+        priority: priority,
+        clearPriority: priority == null,
+      );
     }
     // Update in tracked bills list
     final index = _trackedBills.indexWhere((b) => b.id == billId);
     if (index != -1) {
-      _trackedBills[index] = _trackedBills[index].copyWith(priority: priority);
+      _trackedBills[index] = _trackedBills[index].copyWith(
+        priority: priority,
+        clearPriority: priority == null,
+      );
     }
     // Update in all tracked bills list
     final allIndex = _allTrackedBills.indexWhere((b) => b.id == billId);
     if (allIndex != -1) {
-      _allTrackedBills[allIndex] = _allTrackedBills[allIndex].copyWith(priority: priority);
+      _allTrackedBills[allIndex] = _allTrackedBills[allIndex].copyWith(
+        priority: priority,
+        clearPriority: priority == null,
+      );
     }
   }
 

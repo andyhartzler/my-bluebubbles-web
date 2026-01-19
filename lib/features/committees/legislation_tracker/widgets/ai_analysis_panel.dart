@@ -461,8 +461,8 @@ class _AiAnalysisPanelState extends State<AiAnalysisPanel> {
                             label: 'Position',
                             value: bill.aiPositionRecommendation!,
                             currentValue: bill.position,
-                            color: BillPosition.fromString(bill.aiPositionRecommendation!).color,
-                            emoji: BillPosition.fromString(bill.aiPositionRecommendation!).emoji,
+                            color: BillPosition.fromString(bill.aiPositionRecommendation!)?.color ?? Colors.grey,
+                            emoji: BillPosition.fromString(bill.aiPositionRecommendation!)?.emoji ?? '❓',
                             onApply: widget.onApplyPosition != null
                                 ? () => widget.onApplyPosition!(bill.aiPositionRecommendation!)
                                 : null,
@@ -476,8 +476,8 @@ class _AiAnalysisPanelState extends State<AiAnalysisPanel> {
                             label: 'Priority',
                             value: bill.aiPriorityRecommendation!,
                             currentValue: bill.priority,
-                            color: BillPriority.fromString(bill.aiPriorityRecommendation!).color,
-                            emoji: BillPriority.fromString(bill.aiPriorityRecommendation!).emoji,
+                            color: BillPriority.fromString(bill.aiPriorityRecommendation!)?.color ?? Colors.grey,
+                            emoji: BillPriority.fromString(bill.aiPriorityRecommendation!)?.emoji ?? '❓',
                             onApply: widget.onApplyPriority != null
                                 ? () => widget.onApplyPriority!(bill.aiPriorityRecommendation!)
                                 : null,
