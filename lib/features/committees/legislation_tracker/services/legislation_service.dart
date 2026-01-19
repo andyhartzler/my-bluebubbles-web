@@ -1210,7 +1210,7 @@ class LegislationService {
         .select(_listSelectColumns)
         .eq('is_archived', false)
         .inFilter('id', billIds)
-        .order('last_action_date', ascending: false)
+        .order('latest_action_date', ascending: false)
         .limit(limit);
 
     return (response as List)

@@ -1474,7 +1474,83 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         return const SizedBox.shrink();
 
       case LegislationWidgetType.billLeaderboard:
-        // Bill leaderboard is handled via the leaderboard case with dataSourceKey checks
+        // Handle bill leaderboard types based on dataSourceKey
+        if (config.dataSourceKey.contains('MostSponsored')) {
+          return BillLeaderboardWidget(
+            config: config,
+            entries: stats.top10MostSponsoredBills,
+            onEntryTap: (entry) => _navigateToBillDetail(entry.id),
+          );
+        } else if (config.dataSourceKey.contains('MostActive')) {
+          return BillLeaderboardWidget(
+            config: config,
+            entries: stats.top10MostActiveBills,
+            onEntryTap: (entry) => _navigateToBillDetail(entry.id),
+          );
+        } else if (config.dataSourceKey.contains('bipartisanBillsLeaderboard')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _bipartisanBills,
+            accentColor: const Color(0xFF9B59B6), // Purple for bipartisan
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsSupport')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiSupportBills,
+            accentColor: _grassrootsGreen,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsOppose')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiOpposeBills,
+            accentColor: _republicanRed,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsWatching')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiWatchingBills,
+            accentColor: _sunriseGold,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsNeutral')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiNeutralBills,
+            accentColor: Colors.grey,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsCritical')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiCriticalBills,
+            accentColor: _actionRed,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsHigh')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiHighBills,
+            accentColor: _sunriseGold,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsMedium')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiMediumBills,
+            accentColor: _momentumBlue,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        } else if (config.dataSourceKey.contains('aiRecommendsLow')) {
+          return AiRecommendationBillLeaderboardWidget(
+            config: config,
+            bills: _aiLowBills,
+            accentColor: _grassrootsGreen,
+            onBillTap: (bill) => _navigateToBillDetail(bill.id),
+          );
+        }
         return const SizedBox.shrink();
     }
   }
