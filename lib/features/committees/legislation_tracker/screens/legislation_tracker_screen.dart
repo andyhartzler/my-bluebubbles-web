@@ -27,7 +27,8 @@ class LegislationTrackerScreen extends StatefulWidget {
   });
 
   @override
-  State<LegislationTrackerScreen> createState() => _LegislationTrackerScreenState();
+  State<LegislationTrackerScreen> createState() =>
+      _LegislationTrackerScreenState();
 }
 
 class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
@@ -43,10 +44,8 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
   String? _categoryFilter;
 
   // AI status filters
-  String? _aiAnalysisFilter; // 'analyzed', 'pending', 'not_analyzed', 'error'
   String? _aiPositionFilter; // 'support', 'oppose', 'watching', 'neutral'
   String? _aiPriorityFilter; // 'critical', 'high', 'medium', 'low'
-  String? _aiTalkingPointsFilter; // 'generated', 'pending', 'not_generated'
 
   @override
   void initState() {
@@ -86,10 +85,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
 
         if (provider.error != null && provider.trackedBills.isEmpty) {
           return Stack(
-            children: [
-              _buildGradientBackground(),
-              _buildErrorState(provider),
-            ],
+            children: [_buildGradientBackground(), _buildErrorState(provider)],
           );
         }
 
@@ -108,9 +104,7 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
             width: double.infinity,
             height: double.infinity,
           ),
-          Container(
-            color: Colors.white.withOpacity(0.18),
-          ),
+          Container(color: Colors.white.withOpacity(0.18)),
         ],
       ),
     );
@@ -132,9 +126,18 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                 indicatorColor: _momentumBlue,
                 indicatorWeight: 3,
                 tabs: const [
-                  Tab(text: 'Overview', icon: Icon(Icons.dashboard_outlined, size: 20)),
-                  Tab(text: 'All Bills', icon: Icon(Icons.list_alt_outlined, size: 20)),
-                  Tab(text: 'Legislators', icon: Icon(Icons.people_outline, size: 20)),
+                  Tab(
+                    text: 'Overview',
+                    icon: Icon(Icons.dashboard_outlined, size: 20),
+                  ),
+                  Tab(
+                    text: 'All Bills',
+                    icon: Icon(Icons.list_alt_outlined, size: 20),
+                  ),
+                  Tab(
+                    text: 'Legislators',
+                    icon: Icon(Icons.people_outline, size: 20),
+                  ),
                 ],
               ),
             ),
@@ -167,18 +170,16 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
       onRefresh: () => provider.loadTrackedBills(),
       color: _momentumBlue,
       child: CustomScrollView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         slivers: [
           // Search bar
-          SliverToBoxAdapter(
-            child: _buildSearchBar(provider),
-          ),
+          SliverToBoxAdapter(child: _buildSearchBar(provider)),
 
           // Smart filters (collapsible)
           if (_showFilters)
-            SliverToBoxAdapter(
-              child: _buildSmartFilters(provider),
-            ),
+            SliverToBoxAdapter(child: _buildSmartFilters(provider)),
 
           // Position filter tabs (not sticky)
           SliverPersistentHeader(
@@ -228,10 +229,16 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                 decoration: InputDecoration(
                   hintText: 'Search bills by name, text, or summary...',
                   hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
-                  prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.7)),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear, color: Colors.white.withOpacity(0.7)),
+                          icon: Icon(
+                            Icons.clear,
+                            color: Colors.white.withOpacity(0.7),
+                          ),
                           onPressed: () {
                             _searchController.clear();
                             provider.setSearchQuery('');
@@ -239,11 +246,20 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                         )
                       : null,
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                 ),
                 onChanged: (value) {
                   provider.setSearchQuery(value);
-                  setState(() {}); // Update clear button visibility
+                  setState(() {
+                    // Auto-select "All" tab when search changes
+                    if (value.isNotEmpty && _selectedPosition != null) {
+                      _selectedPosition = null;
+                      provider.setPositionFilter(null);
+                    }
+                  });
                 },
               ),
             ),
@@ -251,7 +267,9 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
           const SizedBox(width: 8),
           // Advanced Search button
           Material(
-            color: _showFilters || _hasActiveFilters() ? _momentumBlue : _unityBlue,
+            color: _showFilters || _hasActiveFilters()
+                ? _momentumBlue
+                : _unityBlue,
             borderRadius: BorderRadius.circular(12),
             elevation: 4,
             child: InkWell(
@@ -262,7 +280,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               },
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -311,12 +332,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
 
   bool _hasActiveFilters() {
     return _partyFilter != null ||
-           _stageFilter != null ||
-           _categoryFilter != null ||
-           _aiAnalysisFilter != null ||
-           _aiPositionFilter != null ||
-           _aiPriorityFilter != null ||
-           _aiTalkingPointsFilter != null;
+        _stageFilter != null ||
+        _categoryFilter != null ||
+        _aiPositionFilter != null ||
+        _aiPriorityFilter != null;
   }
 
   int _countActiveFilters() {
@@ -324,10 +343,8 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     if (_partyFilter != null) count++;
     if (_stageFilter != null) count++;
     if (_categoryFilter != null) count++;
-    if (_aiAnalysisFilter != null) count++;
     if (_aiPositionFilter != null) count++;
     if (_aiPriorityFilter != null) count++;
-    if (_aiTalkingPointsFilter != null) count++;
     return count;
   }
 
@@ -335,6 +352,171 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     final filteredBills = _getFilteredBills(provider);
     final resultCount = filteredBills.length;
     final totalCount = provider.trackedBills.length;
+
+    // Build the list of filter widgets
+    final filterWidgets = <Widget>[
+      // Party filter
+      _buildFilterDropdown(
+        label: 'Party',
+        value: _partyFilter,
+        icon: Icons.people_outline,
+        items: const [
+          DropdownMenuItem(value: null, child: Text('All Parties')),
+          DropdownMenuItem(value: 'Republican', child: Text('Republican (R)')),
+          DropdownMenuItem(value: 'Democratic', child: Text('Democrat (D)')),
+        ],
+        onChanged: (value) {
+          setState(() {
+            _partyFilter = value;
+            _selectedPosition = null; // Auto-select "All" tab
+          });
+          provider.setPositionFilter(null);
+          _applyFilters(provider);
+        },
+      ),
+      const SizedBox(width: 8),
+      // Stage filter
+      _buildFilterDropdown(
+        label: 'Stage',
+        value: _stageFilter,
+        icon: Icons.stairs_outlined,
+        items: const [
+          DropdownMenuItem(value: null, child: Text('All Stages')),
+          DropdownMenuItem(value: 'introduced', child: Text('Introduced')),
+          DropdownMenuItem(value: 'passed_lower', child: Text('Passed House')),
+          DropdownMenuItem(value: 'passed_upper', child: Text('Passed Senate')),
+          DropdownMenuItem(value: 'signed', child: Text('Signed')),
+          DropdownMenuItem(value: 'vetoed', child: Text('Vetoed')),
+        ],
+        onChanged: (value) {
+          setState(() {
+            _stageFilter = value;
+            _selectedPosition = null; // Auto-select "All" tab
+          });
+          provider.setPositionFilter(null);
+          _applyFilters(provider);
+        },
+      ),
+      const SizedBox(width: 8),
+      // Category filter
+      _buildFilterDropdown(
+        label: 'Category',
+        value: _categoryFilter,
+        icon: Icons.category_outlined,
+        items: const [
+          DropdownMenuItem(value: null, child: Text('All Categories')),
+          DropdownMenuItem(value: 'climate', child: Text('Climate')),
+          DropdownMenuItem(
+            value: 'criminal_justice',
+            child: Text('Criminal Justice'),
+          ),
+          DropdownMenuItem(value: 'education', child: Text('Education')),
+          DropdownMenuItem(value: 'guns', child: Text('Guns')),
+          DropdownMenuItem(value: 'healthcare', child: Text('Healthcare')),
+          DropdownMenuItem(value: 'housing', child: Text('Housing')),
+          DropdownMenuItem(value: 'immigration', child: Text('Immigration')),
+          DropdownMenuItem(value: 'labor', child: Text('Labor')),
+          DropdownMenuItem(value: 'lgbtq', child: Text('LGBTQ+')),
+          DropdownMenuItem(
+            value: 'taxes_budget',
+            child: Text('Taxes & Budget'),
+          ),
+          DropdownMenuItem(
+            value: 'transportation',
+            child: Text('Transportation'),
+          ),
+          DropdownMenuItem(
+            value: 'voting_rights',
+            child: Text('Voting Rights'),
+          ),
+          DropdownMenuItem(value: 'other', child: Text('Other')),
+        ],
+        onChanged: (value) {
+          setState(() {
+            _categoryFilter = value;
+            _selectedPosition = null; // Auto-select "All" tab
+          });
+          provider.setPositionFilter(null);
+          provider.setCategoryFilter(value);
+        },
+      ),
+      const SizedBox(width: 8),
+      // AI Position Recommendation
+      _buildFilterDropdown(
+        label: 'AI Position',
+        value: _aiPositionFilter,
+        icon: Icons.recommend,
+        items: const [
+          DropdownMenuItem(value: null, child: Text('All Positions')),
+          DropdownMenuItem(value: 'support', child: Text('Support')),
+          DropdownMenuItem(value: 'oppose', child: Text('Oppose')),
+          DropdownMenuItem(value: 'watching', child: Text('Watching')),
+          DropdownMenuItem(value: 'neutral', child: Text('Neutral')),
+        ],
+        onChanged: (value) {
+          setState(() {
+            _aiPositionFilter = value;
+            _selectedPosition = null; // Auto-select "All" tab
+          });
+          provider.setPositionFilter(null);
+          _applyFilters(provider);
+        },
+      ),
+      const SizedBox(width: 8),
+      // AI Priority Recommendation
+      _buildFilterDropdown(
+        label: 'AI Priority',
+        value: _aiPriorityFilter,
+        icon: Icons.flag,
+        items: const [
+          DropdownMenuItem(value: null, child: Text('All Priorities')),
+          DropdownMenuItem(value: 'critical', child: Text('Critical')),
+          DropdownMenuItem(value: 'high', child: Text('High')),
+          DropdownMenuItem(value: 'medium', child: Text('Medium')),
+          DropdownMenuItem(value: 'low', child: Text('Low')),
+        ],
+        onChanged: (value) {
+          setState(() {
+            _aiPriorityFilter = value;
+            _selectedPosition = null; // Auto-select "All" tab
+          });
+          provider.setPositionFilter(null);
+          _applyFilters(provider);
+        },
+      ),
+      const SizedBox(width: 8),
+      // Search in bill text toggle
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: provider.searchBillText ? _momentumBlue : _unityBlue,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: InkWell(
+          onTap: () {
+            provider.setSearchBillText(!provider.searchBillText);
+          },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.article_outlined,
+                size: 16,
+                color: Colors.white.withOpacity(0.9),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Search Text',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.9),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ];
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -347,7 +529,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: _unityBlue.withOpacity(0.8),
                     borderRadius: BorderRadius.circular(12),
@@ -374,7 +559,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                   Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _momentumBlue,
                         borderRadius: BorderRadius.circular(12),
@@ -391,185 +579,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               ],
             ),
           ),
-          // Basic filters row
+          // All filters in a single scrollable row
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                // Party filter
-                _buildFilterDropdown(
-                  label: 'Party',
-                  value: _partyFilter,
-                  icon: Icons.people_outline,
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('All Parties')),
-                    DropdownMenuItem(value: 'Republican', child: Text('Republican (R)')),
-                    DropdownMenuItem(value: 'Democratic', child: Text('Democrat (D)')),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _partyFilter = value);
-                    _applyFilters(provider);
-                  },
-                ),
-                const SizedBox(width: 8),
-                // Stage filter
-                _buildFilterDropdown(
-                  label: 'Stage',
-                  value: _stageFilter,
-                  icon: Icons.stairs_outlined,
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('All Stages')),
-                    DropdownMenuItem(value: 'introduced', child: Text('Introduced')),
-                    DropdownMenuItem(value: 'passed_lower', child: Text('Passed House')),
-                    DropdownMenuItem(value: 'passed_upper', child: Text('Passed Senate')),
-                    DropdownMenuItem(value: 'signed', child: Text('Signed')),
-                    DropdownMenuItem(value: 'vetoed', child: Text('Vetoed')),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _stageFilter = value);
-                    _applyFilters(provider);
-                  },
-                ),
-                const SizedBox(width: 8),
-                // Category filter
-                _buildFilterDropdown(
-                  label: 'Category',
-                  value: _categoryFilter,
-                  icon: Icons.category_outlined,
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('All Categories')),
-                    DropdownMenuItem(value: 'climate', child: Text('Climate')),
-                    DropdownMenuItem(value: 'criminal_justice', child: Text('Criminal Justice')),
-                    DropdownMenuItem(value: 'education', child: Text('Education')),
-                    DropdownMenuItem(value: 'guns', child: Text('Guns')),
-                    DropdownMenuItem(value: 'healthcare', child: Text('Healthcare')),
-                    DropdownMenuItem(value: 'housing', child: Text('Housing')),
-                    DropdownMenuItem(value: 'immigration', child: Text('Immigration')),
-                    DropdownMenuItem(value: 'labor', child: Text('Labor')),
-                    DropdownMenuItem(value: 'lgbtq', child: Text('LGBTQ+')),
-                    DropdownMenuItem(value: 'taxes_budget', child: Text('Taxes & Budget')),
-                    DropdownMenuItem(value: 'transportation', child: Text('Transportation')),
-                    DropdownMenuItem(value: 'voting_rights', child: Text('Voting Rights')),
-                    DropdownMenuItem(value: 'other', child: Text('Other')),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _categoryFilter = value);
-                    provider.setCategoryFilter(value);
-                  },
-                ),
-                const SizedBox(width: 8),
-                // Search in bill text toggle
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: provider.searchBillText ? _momentumBlue : _unityBlue,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: InkWell(
-                    onTap: () {
-                      provider.setSearchBillText(!provider.searchBillText);
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.article_outlined,
-                          size: 16,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Search Text',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          // AI Status filters row
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                // AI Analysis status
-                _buildFilterDropdown(
-                  label: 'AI Analysis',
-                  value: _aiAnalysisFilter,
-                  icon: Icons.psychology,
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('All AI Status')),
-                    DropdownMenuItem(value: 'analyzed', child: Text('✅ Analyzed')),
-                    DropdownMenuItem(value: 'pending', child: Text('⏳ Pending')),
-                    DropdownMenuItem(value: 'not_analyzed', child: Text('⬜ Not Analyzed')),
-                    DropdownMenuItem(value: 'error', child: Text('❌ Error')),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _aiAnalysisFilter = value);
-                    _applyFilters(provider);
-                  },
-                ),
-                const SizedBox(width: 8),
-                // AI Position Recommendation
-                _buildFilterDropdown(
-                  label: 'AI Position',
-                  value: _aiPositionFilter,
-                  icon: Icons.recommend,
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('All Positions')),
-                    DropdownMenuItem(value: 'support', child: Text('👍 Support')),
-                    DropdownMenuItem(value: 'oppose', child: Text('👎 Oppose')),
-                    DropdownMenuItem(value: 'watching', child: Text('👁️ Watching')),
-                    DropdownMenuItem(value: 'neutral', child: Text('➖ Neutral')),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _aiPositionFilter = value);
-                    _applyFilters(provider);
-                  },
-                ),
-                const SizedBox(width: 8),
-                // AI Priority Recommendation
-                _buildFilterDropdown(
-                  label: 'AI Priority',
-                  value: _aiPriorityFilter,
-                  icon: Icons.flag,
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('All Priorities')),
-                    DropdownMenuItem(value: 'critical', child: Text('🔴 Critical')),
-                    DropdownMenuItem(value: 'high', child: Text('🟠 High')),
-                    DropdownMenuItem(value: 'medium', child: Text('🟡 Medium')),
-                    DropdownMenuItem(value: 'low', child: Text('🟢 Low')),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _aiPriorityFilter = value);
-                    _applyFilters(provider);
-                  },
-                ),
-                const SizedBox(width: 8),
-                // AI Talking Points status
-                _buildFilterDropdown(
-                  label: 'Talking Points',
-                  value: _aiTalkingPointsFilter,
-                  icon: Icons.chat_bubble_outline,
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('All')),
-                    DropdownMenuItem(value: 'generated', child: Text('✅ Generated')),
-                    DropdownMenuItem(value: 'pending', child: Text('⏳ Pending')),
-                    DropdownMenuItem(value: 'not_generated', child: Text('⬜ Not Generated')),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _aiTalkingPointsFilter = value);
-                    _applyFilters(provider);
-                  },
-                ),
-              ],
-            ),
+            child: Row(children: filterWidgets),
           ),
           // Clear filters button
           if (_hasActiveFilters())
@@ -581,10 +594,8 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                     _partyFilter = null;
                     _stageFilter = null;
                     _categoryFilter = null;
-                    _aiAnalysisFilter = null;
                     _aiPositionFilter = null;
                     _aiPriorityFilter = null;
-                    _aiTalkingPointsFilter = null;
                   });
                   provider.setCategoryFilter(null);
                   _applyFilters(provider);
@@ -595,7 +606,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                   style: TextStyle(color: _momentumBlue, fontSize: 12),
                 ),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -627,10 +641,20 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
             children: [
               Icon(icon, size: 16, color: Colors.white.withOpacity(0.7)),
               const SizedBox(width: 4),
-              Text(label, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 12,
+                ),
+              ),
             ],
           ),
-          icon: Icon(Icons.arrow_drop_down, color: Colors.white.withOpacity(0.7), size: 18),
+          icon: Icon(
+            Icons.arrow_drop_down,
+            color: Colors.white.withOpacity(0.7),
+            size: 18,
+          ),
           dropdownColor: _unityBlue,
           style: const TextStyle(color: Colors.white, fontSize: 12),
           items: items,
@@ -673,7 +697,11 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     );
   }
 
-  Widget _buildTabButton(String label, String? position, LegislationProvider provider) {
+  Widget _buildTabButton(
+    String label,
+    String? position,
+    LegislationProvider provider,
+  ) {
     final isSelected = _selectedPosition == position;
     final count = _getCountForPosition(position, provider);
 
@@ -727,13 +755,80 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
   }
 
   int _getCountForPosition(String? position, LegislationProvider provider) {
-    // Use stats from the database for accurate counts
+    // When filters or search are active, use filtered counts
+    if (_hasActiveFilters() || provider.searchQuery.isNotEmpty) {
+      return _getFilteredCountForPosition(position, provider);
+    }
+    // Use stats from the database for accurate counts when no filters
     final stats = provider.stats;
     if (position == null) return stats.totalActiveBills;
     if (position == 'support') return stats.supportCount;
     if (position == 'oppose') return stats.opposeCount;
     if (position == 'watching') return stats.watchingCount;
     return 0;
+  }
+
+  int _getFilteredCountForPosition(
+    String? position,
+    LegislationProvider provider,
+  ) {
+    // Get bills filtered by position only
+    List<TrackedBill> bills;
+    if (position == null) {
+      bills = provider.trackedBills;
+    } else if (position == 'support') {
+      bills = provider.supportedBills;
+    } else if (position == 'oppose') {
+      bills = provider.opposedBills;
+    } else if (position == 'watching') {
+      bills = provider.watchingBills;
+    } else {
+      bills = provider.trackedBills;
+    }
+
+    // Apply the same additional filters as _getFilteredBills (without position)
+    if (_partyFilter != null) {
+      bills = bills.where((bill) {
+        if (bill.primarySponsorParty == null) return false;
+        return bill.primarySponsorParty == _partyFilter;
+      }).toList();
+    }
+
+    if (_stageFilter != null) {
+      bills = bills.where((bill) {
+        switch (_stageFilter) {
+          case 'introduced':
+            return !bill.passedLower &&
+                !bill.passedUpper &&
+                !bill.signedByGovernor &&
+                !bill.vetoed;
+          case 'passed_lower':
+            return bill.passedLower && !bill.passedUpper;
+          case 'passed_upper':
+            return bill.passedUpper && !bill.signedByGovernor && !bill.vetoed;
+          case 'signed':
+            return bill.signedByGovernor;
+          case 'vetoed':
+            return bill.vetoed;
+          default:
+            return true;
+        }
+      }).toList();
+    }
+
+    if (_aiPositionFilter != null) {
+      bills = bills.where((bill) {
+        return bill.aiPositionRecommendation == _aiPositionFilter;
+      }).toList();
+    }
+
+    if (_aiPriorityFilter != null) {
+      bills = bills.where((bill) {
+        return bill.aiPriorityRecommendation == _aiPriorityFilter;
+      }).toList();
+    }
+
+    return bills.length;
   }
 
   Widget _buildBillList(LegislationProvider provider) {
@@ -747,19 +842,16 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     }
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final bill = bills[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 0),
-            child: GestureDetector(
-              onTap: () => _navigateToBillDetail(bill),
-              child: _buildBillCard(bill),
-            ),
-          );
-        },
-        childCount: bills.length,
-      ),
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final bill = bills[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 0),
+          child: GestureDetector(
+            onTap: () => _navigateToBillDetail(bill),
+            child: _buildBillCard(bill),
+          ),
+        );
+      }, childCount: bills.length),
     );
   }
 
@@ -790,7 +882,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
       bills = bills.where((bill) {
         switch (_stageFilter) {
           case 'introduced':
-            return !bill.passedLower && !bill.passedUpper && !bill.signedByGovernor && !bill.vetoed;
+            return !bill.passedLower &&
+                !bill.passedUpper &&
+                !bill.signedByGovernor &&
+                !bill.vetoed;
           case 'passed_lower':
             return bill.passedLower && !bill.passedUpper;
           case 'passed_upper':
@@ -799,24 +894,6 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
             return bill.signedByGovernor;
           case 'vetoed':
             return bill.vetoed;
-          default:
-            return true;
-        }
-      }).toList();
-    }
-
-    // Apply AI analysis status filter
-    if (_aiAnalysisFilter != null) {
-      bills = bills.where((bill) {
-        switch (_aiAnalysisFilter) {
-          case 'analyzed':
-            return bill.aiAnalyzedAt != null && bill.aiAnalysisError == null;
-          case 'pending':
-            return bill.aiAnalysisPending == true;
-          case 'not_analyzed':
-            return bill.aiAnalyzedAt == null && bill.aiAnalysisPending != true;
-          case 'error':
-            return bill.aiAnalysisError != null;
           default:
             return true;
         }
@@ -837,26 +914,16 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
       }).toList();
     }
 
-    // Apply AI talking points status filter
-    if (_aiTalkingPointsFilter != null) {
-      bills = bills.where((bill) {
-        switch (_aiTalkingPointsFilter) {
-          case 'generated':
-            return bill.hasTalkingPoints;
-          case 'not_generated':
-            return !bill.hasTalkingPoints;
-          default:
-            return true;
-        }
-      }).toList();
-    }
-
     return bills;
   }
 
   Widget _buildBillCard(TrackedBill bill) {
-    final position = bill.position != null ? BillPosition.fromString(bill.position!) : null;
-    final priority = bill.priority != null ? BillPriority.fromString(bill.priority!) : null;
+    final position = bill.position != null
+        ? BillPosition.fromString(bill.position!)
+        : null;
+    final priority = bill.priority != null
+        ? BillPriority.fromString(bill.priority!)
+        : null;
 
     return Card(
       elevation: 2,
@@ -878,7 +945,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: _momentumBlue,
                     borderRadius: BorderRadius.circular(8),
@@ -895,7 +965,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                 const SizedBox(width: 8),
                 if (bill.chamber != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(6),
@@ -932,11 +1005,18 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.person_outline, size: 14, color: Colors.white.withOpacity(0.7)),
+                  Icon(
+                    Icons.person_outline,
+                    size: 14,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     '${bill.primarySponsorName!}${bill.primarySponsorParty != null ? ' (${_getPartyAbbreviation(bill.primarySponsorParty)})' : ''}',
-                    style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.8)),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white.withOpacity(0.8),
+                    ),
                   ),
                 ],
               ),
@@ -947,21 +1027,29 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               Wrap(
                 spacing: 4,
                 runSpacing: 4,
-                children: bill.categories.take(3).map((cat) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    _formatCategoryName(cat),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
-                  ),
-                )).toList(),
+                children: bill.categories
+                    .take(3)
+                    .map(
+                      (cat) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          _formatCategoryName(cat),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ],
           ],
@@ -1043,7 +1131,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: _unityBlue,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1068,7 +1159,11 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
                 color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.error_outline, size: 48, color: Colors.white),
+              child: const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -1096,7 +1191,10 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: _unityBlue,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1155,7 +1253,11 @@ class _LegislationTrackerScreenState extends State<LegislationTrackerScreen>
     return category
         .replaceAll('_', ' ')
         .split(' ')
-        .map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1)}' : '')
+        .map(
+          (word) => word.isNotEmpty
+              ? '${word[0].toUpperCase()}${word.substring(1)}'
+              : '',
+        )
         .join(' ');
   }
 }
@@ -1167,7 +1269,11 @@ class _StickyPositionTabsDelegate extends SliverPersistentHeaderDelegate {
   _StickyPositionTabsDelegate({required this.child});
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(
       decoration: BoxDecoration(
         // Add subtle gradient background when sticky

@@ -1345,8 +1345,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return _buildPositionedGrid(sortedWidgets, metrics, columns, unitWidth, unitHeight, maxWidth);
   }
 
-  /// Build a flow-based grid that packs widgets based on actual sizes
-  /// Widgets are placed row by row, advancing by their actual width
+  /// Build a flow-based grid using Wrap for natural widget packing
   Widget _buildPositionedGrid(
     List<DashboardWidgetConfig> widgets,
     DashboardMetrics metrics,
@@ -1357,85 +1356,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   ) {
     const spacing = 16.0;
 
-    // Track actual positions for each widget
-    final widgetPositions = <int, ({double left, double top, double width, double height})>{};
+    return Wrap(
+      spacing: spacing,
+      runSpacing: spacing,
+      children: widgets.map((widget) {
+        // Calculate widget dimensions using multipliers
+        final widgetWidth = widget.widthMultiplier * unitWidth;
+        final widgetHeight = widget.heightMultiplier * unitHeight;
 
-    // Track current x position and max height for each row
-    final rowXPositions = <int, double>{};
-    final rowHeights = <int, double>{};
+        // For widgets spanning multiple columns, add gap space
+        final gapAdjustment = widget.widthMultiplier > 1
+            ? (widget.widthMultiplier.floor() - 1) * spacing
+            : 0.0;
 
-    // Place widgets row by row based on gridY, packing by actual width
-    for (int i = 0; i < widgets.length; i++) {
-      final widget = widgets[i];
-      final widgetWidth = widget.widthMultiplier * unitWidth;
-      final widgetHeight = widget.heightMultiplier * unitHeight;
-
-      int targetRow = widget.gridY;
-
-      // Get current x position for this row
-      double currentX = rowXPositions[targetRow] ?? 0.0;
-
-      // Check if widget fits in current row, if not move to next row
-      if (currentX > 0 && currentX + widgetWidth > maxWidth) {
-        // Find the next available row
-        targetRow = (rowXPositions.keys.isEmpty ? 0 : rowXPositions.keys.reduce((a, b) => a > b ? a : b)) + 1;
-        currentX = 0.0;
-      }
-
-      // Calculate top position based on row heights
-      double top = 0.0;
-      for (int r = 0; r < targetRow; r++) {
-        top += (rowHeights[r] ?? unitHeight) + spacing;
-      }
-
-      // Store widget position
-      widgetPositions[i] = (
-        left: currentX,
-        top: top,
-        width: widgetWidth,
-        height: widgetHeight,
-      );
-
-      // Update row tracking
-      rowXPositions[targetRow] = currentX + widgetWidth + spacing;
-      final currentRowHeight = rowHeights[targetRow] ?? 0.0;
-      if (widgetHeight > currentRowHeight) {
-        rowHeights[targetRow] = widgetHeight;
-      }
-    }
-
-    // Calculate total height
-    double totalHeight = 0.0;
-    for (int r = 0; r <= (rowHeights.keys.isEmpty ? 0 : rowHeights.keys.reduce((a, b) => a > b ? a : b)); r++) {
-      totalHeight += (rowHeights[r] ?? unitHeight);
-      if (r > 0) totalHeight += spacing;
-    }
-
-    // Build positioned widgets using Stack
-    final positionedWidgets = <Widget>[];
-
-    for (int i = 0; i < widgets.length; i++) {
-      final widget = widgets[i];
-      final pos = widgetPositions[i];
-      if (pos == null) continue;
-
-      positionedWidgets.add(
-        Positioned(
-          left: pos.left,
-          top: pos.top,
-          width: pos.width.clamp(50.0, maxWidth),
-          height: pos.height.clamp(50.0, totalHeight > 0 ? totalHeight : unitHeight),
+        return SizedBox(
+          width: (widgetWidth + gapAdjustment).clamp(50.0, maxWidth),
+          height: widgetHeight.clamp(50.0, unitHeight * 3),
           child: _buildWidget(widget, metrics),
-        ),
-      );
-    }
-
-    return SizedBox(
-      width: maxWidth,
-      height: totalHeight > 0 ? totalHeight : unitHeight,
-      child: Stack(
-        children: positionedWidgets,
-      ),
+        );
+      }).toList(),
     );
   }
 
