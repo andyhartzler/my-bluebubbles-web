@@ -26,8 +26,29 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
   final Committee committee;
+  final int initialTabIndex;
 
-  const CommitteeWorkspaceScreen({super.key, required this.committee});
+  const CommitteeWorkspaceScreen({
+    super.key,
+    required this.committee,
+    this.initialTabIndex = 0,
+  });
+
+  /// Calculate the index of the Legislation tab for a given committee.
+  /// Returns -1 if the committee doesn't have a Legislation tab.
+  static int getLegislationTabIndex(Committee committee) {
+    if (!committee.hasLegislationTab) return -1;
+
+    // Base tabs: Overview, Members, Slack, Email, Messages, Meetings, Board, Votes
+    int index = 8;
+
+    // Add conditional tabs that come before Legislation
+    if (committee.hasDonorsTab) index++;
+    if (committee.hasChaptersTab) index++;
+    if (committee.hasCampaignsTab) index++;
+
+    return index;
+  }
 
   @override
   State<CommitteeWorkspaceScreen> createState() =>
@@ -214,7 +235,13 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabs.length, vsync: this);
+    final initialIndex = widget.initialTabIndex.clamp(0, _tabs.length - 1);
+    _tabController = TabController(
+      length: _tabs.length,
+      vsync: this,
+      initialIndex: initialIndex,
+    );
+    _currentTabIndex = initialIndex;
     _tabController.addListener(_onTabChanged);
     _loadLeaders();
   }

@@ -1168,6 +1168,23 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  void _openLegislationTab(BuildContext context) {
+    // Navigate to Policy & Advocacy committee with Legislation tab
+    final committee = CommitteeDefinitions.policyAdvocacy;
+    final legislationTabIndex =
+        CommitteeWorkspaceScreen.getLegislationTabIndex(committee);
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (_) => TitleBarWrapper(
+          child: CommitteeWorkspaceScreen(
+            committee: committee,
+            initialTabIndex: legislationTabIndex,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _openAIAssistant(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
@@ -1203,6 +1220,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (dataSourceKey.toLowerCase().contains('social') ||
         dataSourceKey.toLowerCase().contains('impression')) {
       return () => _openSocialMediaStats(context);
+    }
+
+    // Legislation / bills related keys - navigate to Policy & Advocacy Legislation tab
+    if (dataSourceKey.toLowerCase().contains('bill') ||
+        dataSourceKey.toLowerCase().contains('legislation')) {
+      return () => _openLegislationTab(context);
     }
 
     // Member-related keys (default fallback for most stats)
