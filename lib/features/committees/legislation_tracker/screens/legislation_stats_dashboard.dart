@@ -52,7 +52,14 @@ class _LegislationGridPosition {
   final double widthMultiplier;
   final double heightMultiplier;
 
-  const _LegislationGridPosition(this.row, this.col, this.widthCells, this.heightCells, this.widthMultiplier, this.heightMultiplier);
+  const _LegislationGridPosition(
+    this.row,
+    this.col,
+    this.widthCells,
+    this.heightCells,
+    this.widthMultiplier,
+    this.heightMultiplier,
+  );
 }
 
 class LegislationStatsDashboard extends StatefulWidget {
@@ -501,14 +508,38 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     try {
       // Load all AI recommendation bills in parallel (no limit - show all)
       final results = await Future.wait([
-        _service.getBillsByAiPositionRecommendation(position: 'support', limit: 10000),
-        _service.getBillsByAiPositionRecommendation(position: 'oppose', limit: 10000),
-        _service.getBillsByAiPositionRecommendation(position: 'watching', limit: 10000),
-        _service.getBillsByAiPositionRecommendation(position: 'neutral', limit: 10000),
-        _service.getBillsByAiPriorityRecommendation(priority: 'critical', limit: 10000),
-        _service.getBillsByAiPriorityRecommendation(priority: 'high', limit: 10000),
-        _service.getBillsByAiPriorityRecommendation(priority: 'medium', limit: 10000),
-        _service.getBillsByAiPriorityRecommendation(priority: 'low', limit: 10000),
+        _service.getBillsByAiPositionRecommendation(
+          position: 'support',
+          limit: 10000,
+        ),
+        _service.getBillsByAiPositionRecommendation(
+          position: 'oppose',
+          limit: 10000,
+        ),
+        _service.getBillsByAiPositionRecommendation(
+          position: 'watching',
+          limit: 10000,
+        ),
+        _service.getBillsByAiPositionRecommendation(
+          position: 'neutral',
+          limit: 10000,
+        ),
+        _service.getBillsByAiPriorityRecommendation(
+          priority: 'critical',
+          limit: 10000,
+        ),
+        _service.getBillsByAiPriorityRecommendation(
+          priority: 'high',
+          limit: 10000,
+        ),
+        _service.getBillsByAiPriorityRecommendation(
+          priority: 'medium',
+          limit: 10000,
+        ),
+        _service.getBillsByAiPriorityRecommendation(
+          priority: 'low',
+          limit: 10000,
+        ),
       ]);
 
       if (!mounted) return;
@@ -918,10 +949,20 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       });
 
     // Build positioned grid using Stack for multi-row spanning support
-    return _buildPositionedGrid(sortedWidgets, stats, columns, unitWidth, unitHeight, maxWidth, spacing);
+    return _buildPositionedGrid(
+      sortedWidgets,
+      stats,
+      columns,
+      unitWidth,
+      unitHeight,
+      maxWidth,
+      spacing,
+    );
   }
 
-  /// Build a flow-based grid using Wrap for natural widget packing
+  /// Build a masonry-style grid using auto-packing algorithm
+  /// Widgets are placed in the first available position that fits,
+  /// automatically filling vertical gaps left by taller widgets
   Widget _buildPositionedGrid(
     List<LegislationWidgetConfig> widgets,
     LegislationStats stats,
@@ -931,29 +972,134 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     double maxWidth,
     double spacing,
   ) {
-    return Wrap(
-      spacing: spacing,
-      runSpacing: spacing,
-      children: widgets.map((widget) {
-        // Calculate widget dimensions using multipliers
-        final widgetWidth = widget.widthMultiplier * unitWidth;
-        final widgetHeight = widget.heightMultiplier * unitHeight;
+    // Use a fine-grained grid (0.5 resolution) to handle mini widgets
+    // gridColumns = columns * 2 (so 4 columns becomes 8 half-columns)
+    final gridColumns = columns * 2;
 
-        // For widgets spanning multiple columns, add gap space
-        final gapAdjustment = widget.widthMultiplier > 1
-            ? (widget.widthMultiplier.floor() - 1) * spacing
-            : 0.0;
+    // Track occupied cells: Map<"row,col", true>
+    // Using half-unit resolution (0.5 = 1 grid cell)
+    final Map<String, bool> occupied = {};
 
-        return SizedBox(
-          width: (widgetWidth + gapAdjustment).clamp(50.0, maxWidth),
-          height: widgetHeight.clamp(50.0, unitHeight * 3),
+    // Helper to check if a position is available
+    bool isAvailable(
+      int startRow,
+      int startCol,
+      int widthCells,
+      int heightCells,
+    ) {
+      for (int r = 0; r < heightCells; r++) {
+        for (int c = 0; c < widthCells; c++) {
+          final key = '${startRow + r},${startCol + c}';
+          if (occupied[key] == true) return false;
+          if (startCol + c >= gridColumns) return false; // Out of bounds
+        }
+      }
+      return true;
+    }
+
+    // Helper to mark cells as occupied
+    void markOccupied(
+      int startRow,
+      int startCol,
+      int widthCells,
+      int heightCells,
+    ) {
+      for (int r = 0; r < heightCells; r++) {
+        for (int c = 0; c < widthCells; c++) {
+          occupied['${startRow + r},${startCol + c}'] = true;
+        }
+      }
+    }
+
+    // Find first available position for a widget
+    (int row, int col) findPosition(int widthCells, int heightCells) {
+      for (int row = 0; row < 200; row++) {
+        // Max 200 half-rows
+        for (int col = 0; col <= gridColumns - widthCells; col++) {
+          if (isAvailable(row, col, widthCells, heightCells)) {
+            return (row, col);
+          }
+        }
+      }
+      return (0, 0); // Fallback
+    }
+
+    final positionedWidgets = <Widget>[];
+    double maxBottom = 0;
+
+    // Half-unit size in pixels
+    final halfUnitWidth = unitWidth / 2;
+    final halfUnitHeight = unitHeight / 2;
+
+    for (final widget in widgets) {
+      // Convert widget size to half-unit cells
+      // widthMultiplier 0.5 = 1 cell, 1.0 = 2 cells, 2.0 = 4 cells
+      final widthCells = (widget.widthMultiplier * 2).round();
+      final heightCells = (widget.heightMultiplier * 2).round();
+
+      // Find position using auto-packing
+      final (row, col) = findPosition(widthCells, heightCells);
+
+      // Mark cells as occupied
+      markOccupied(row, col, widthCells, heightCells);
+
+      // Calculate pixel position
+      final left = col * halfUnitWidth + (col ~/ 2) * spacing;
+      final top = row * halfUnitHeight + (row ~/ 2) * spacing;
+
+      // Calculate widget dimensions
+      final widgetWidth = widthCells * halfUnitWidth;
+      final widgetHeight = heightCells * halfUnitHeight;
+
+      // Add gap space for widgets spanning multiple full units
+      final fullWidthUnits = (widthCells / 2).floor();
+      final fullHeightUnits = (heightCells / 2).floor();
+      final widthGapAdjustment = fullWidthUnits > 1
+          ? (fullWidthUnits - 1) * spacing
+          : 0.0;
+      final heightGapAdjustment = fullHeightUnits > 1
+          ? (fullHeightUnits - 1) * spacing
+          : 0.0;
+
+      final finalWidth = (widgetWidth + widthGapAdjustment).clamp(
+        50.0,
+        maxWidth,
+      );
+      final finalHeight = (widgetHeight + heightGapAdjustment).clamp(
+        50.0,
+        unitHeight * 4,
+      );
+
+      // Track maximum bottom for Stack height
+      final bottom = top + finalHeight;
+      if (bottom > maxBottom) {
+        maxBottom = bottom;
+      }
+
+      positionedWidgets.add(
+        Positioned(
+          left: left,
+          top: top,
+          width: finalWidth,
+          height: finalHeight,
           child: _buildWidget(widget, stats),
-        );
-      }).toList(),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: maxBottom + spacing,
+      child: Stack(children: positionedWidgets),
     );
   }
 
-  bool _isGridOccupied(Map<String, int> gridMap, int row, int col, int width, int height) {
+  bool _isGridOccupied(
+    Map<String, int> gridMap,
+    int row,
+    int col,
+    int width,
+    int height,
+  ) {
     for (int r = 0; r < height; r++) {
       for (int c = 0; c < width; c++) {
         if (gridMap.containsKey('${row + r},${col + c}')) {
@@ -964,16 +1110,35 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     return false;
   }
 
-  _LegislationGridPosition _findNextAvailableGridPosition(Map<String, int> gridMap, int columns, int widthCells, int heightCells) {
+  _LegislationGridPosition _findNextAvailableGridPosition(
+    Map<String, int> gridMap,
+    int columns,
+    int widthCells,
+    int heightCells,
+  ) {
     for (int row = 0; row < 100; row++) {
       for (int col = 0; col <= columns - widthCells; col++) {
         if (!_isGridOccupied(gridMap, row, col, widthCells, heightCells)) {
           // Multipliers are not needed here as this is only used for position finding
-          return _LegislationGridPosition(row, col, widthCells, heightCells, widthCells.toDouble(), heightCells.toDouble());
+          return _LegislationGridPosition(
+            row,
+            col,
+            widthCells,
+            heightCells,
+            widthCells.toDouble(),
+            heightCells.toDouble(),
+          );
         }
       }
     }
-    return _LegislationGridPosition(0, 0, widthCells, heightCells, widthCells.toDouble(), heightCells.toDouble());
+    return _LegislationGridPosition(
+      0,
+      0,
+      widthCells,
+      heightCells,
+      widthCells.toDouble(),
+      heightCells.toDouble(),
+    );
   }
 
   Widget _buildMobileWidgetsGrid(LegislationStats stats, double maxWidth) {
@@ -1279,7 +1444,9 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
             accentColor: _grassrootsGreen,
             onBillTap: (bill) => _navigateToBillDetail(bill.id),
           );
-        } else if (config.dataSourceKey.contains('bipartisanBillsLeaderboard')) {
+        } else if (config.dataSourceKey.contains(
+          'bipartisanBillsLeaderboard',
+        )) {
           return AiRecommendationBillLeaderboardWidget(
             config: config,
             bills: _bipartisanBills,
@@ -1288,7 +1455,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
           );
         } else {
           // Handle distribution data sources (topSubjects, topCategories, etc.)
-          final distributionData = _getDistributionData(config.dataSourceKey, stats);
+          final distributionData = _getDistributionData(
+            config.dataSourceKey,
+            stats,
+          );
           if (distributionData.isNotEmpty) {
             return DistributionLeaderboardWidget(
               config: config,
@@ -1812,38 +1982,68 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       case 'topCategories':
         // Parse the top categories from stats (format: [{category: 'name', count: N}, ...])
         final colors = [
-          _momentumBlue, _grassrootsGreen, _justicePurple, _sunriseGold,
-          _actionRed, _democratBlue, _unityBlue, Colors.teal,
-          Colors.pink, Colors.orange, Colors.indigo, Colors.cyan,
+          _momentumBlue,
+          _grassrootsGreen,
+          _justicePurple,
+          _sunriseGold,
+          _actionRed,
+          _democratBlue,
+          _unityBlue,
+          Colors.teal,
+          Colors.pink,
+          Colors.orange,
+          Colors.indigo,
+          Colors.cyan,
         ];
-        return (stats.topCategories).asMap().entries.map((entry) {
-          final item = entry.value as Map<String, dynamic>;
-          final category = (item['category'] as String?) ?? 'unknown';
-          final count = (item['count'] as int?) ?? 0;
-          return PieChartItem(
-            label: _formatCategoryLabel(category),
-            count: count,
-            color: colors[entry.key % colors.length],
-          );
-        }).where((item) => item.count > 0).take(10).toList();
+        return (stats.topCategories)
+            .asMap()
+            .entries
+            .map((entry) {
+              final item = entry.value as Map<String, dynamic>;
+              final category = (item['category'] as String?) ?? 'unknown';
+              final count = (item['count'] as int?) ?? 0;
+              return PieChartItem(
+                label: _formatCategoryLabel(category),
+                count: count,
+                color: colors[entry.key % colors.length],
+              );
+            })
+            .where((item) => item.count > 0)
+            .take(10)
+            .toList();
 
       case 'topSubjects':
         // Parse the top subjects from stats (format: [{subject: 'name', count: N}, ...])
         final colors = [
-          _unityBlue, _momentumBlue, _grassrootsGreen, _justicePurple,
-          _sunriseGold, _actionRed, _democratBlue, Colors.teal,
-          Colors.pink, Colors.orange, Colors.indigo, Colors.cyan,
+          _unityBlue,
+          _momentumBlue,
+          _grassrootsGreen,
+          _justicePurple,
+          _sunriseGold,
+          _actionRed,
+          _democratBlue,
+          Colors.teal,
+          Colors.pink,
+          Colors.orange,
+          Colors.indigo,
+          Colors.cyan,
         ];
-        return (stats.topSubjects).asMap().entries.map((entry) {
-          final item = entry.value as Map<String, dynamic>;
-          final subject = (item['subject'] as String?) ?? 'unknown';
-          final count = (item['count'] as int?) ?? 0;
-          return PieChartItem(
-            label: _formatSubjectLabel(subject),
-            count: count,
-            color: colors[entry.key % colors.length],
-          );
-        }).where((item) => item.count > 0).take(10).toList();
+        return (stats.topSubjects)
+            .asMap()
+            .entries
+            .map((entry) {
+              final item = entry.value as Map<String, dynamic>;
+              final subject = (item['subject'] as String?) ?? 'unknown';
+              final count = (item['count'] as int?) ?? 0;
+              return PieChartItem(
+                label: _formatSubjectLabel(subject),
+                count: count,
+                color: colors[entry.key % colors.length],
+              );
+            })
+            .where((item) => item.count > 0)
+            .take(10)
+            .toList();
 
       default:
         return [];
@@ -1856,7 +2056,11 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     return category
         .replaceAll('_', ' ')
         .split(' ')
-        .map((word) => word.isEmpty ? '' : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+        .map(
+          (word) => word.isEmpty
+              ? ''
+              : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}',
+        )
         .join(' ');
   }
 
@@ -1866,10 +2070,16 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     // Convert to title case
     final titleCase = subject
         .split(' ')
-        .map((word) => word.isEmpty ? '' : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+        .map(
+          (word) => word.isEmpty
+              ? ''
+              : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}',
+        )
         .join(' ');
     // Truncate if too long
-    return titleCase.length > 25 ? '${titleCase.substring(0, 22)}...' : titleCase;
+    return titleCase.length > 25
+        ? '${titleCase.substring(0, 22)}...'
+        : titleCase;
   }
 
   Widget _buildErrorState() {
@@ -3022,7 +3232,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                           children: [
                             Text(
                               'Row',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Container(
@@ -3034,21 +3247,33 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                                 children: [
                                   IconButton(
                                     icon: const Icon(Icons.remove, size: 18),
-                                    onPressed: config.gridY <= 0 ? null : () {
-                                      _updateWidget(config.copyWith(gridY: config.gridY - 1));
-                                    },
+                                    onPressed: config.gridY <= 0
+                                        ? null
+                                        : () {
+                                            _updateWidget(
+                                              config.copyWith(
+                                                gridY: config.gridY - 1,
+                                              ),
+                                            );
+                                          },
                                   ),
                                   Expanded(
                                     child: Text(
                                       '${config.gridY}',
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.add, size: 18),
                                     onPressed: () {
-                                      _updateWidget(config.copyWith(gridY: config.gridY + 1));
+                                      _updateWidget(
+                                        config.copyWith(
+                                          gridY: config.gridY + 1,
+                                        ),
+                                      );
                                     },
                                   ),
                                 ],
@@ -3064,7 +3289,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                           children: [
                             Text(
                               'Column',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Container(
@@ -3076,21 +3304,33 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                                 children: [
                                   IconButton(
                                     icon: const Icon(Icons.remove, size: 18),
-                                    onPressed: config.gridX <= 0 ? null : () {
-                                      _updateWidget(config.copyWith(gridX: config.gridX - 1));
-                                    },
+                                    onPressed: config.gridX <= 0
+                                        ? null
+                                        : () {
+                                            _updateWidget(
+                                              config.copyWith(
+                                                gridX: config.gridX - 1,
+                                              ),
+                                            );
+                                          },
                                   ),
                                   Expanded(
                                     child: Text(
                                       '${config.gridX}',
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.add, size: 18),
                                     onPressed: () {
-                                      _updateWidget(config.copyWith(gridX: config.gridX + 1));
+                                      _updateWidget(
+                                        config.copyWith(
+                                          gridX: config.gridX + 1,
+                                        ),
+                                      );
                                     },
                                   ),
                                 ],
@@ -3110,12 +3350,19 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info_outline, size: 16, color: _momentumBlue),
+                        const Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: _momentumBlue,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Set row/column to position widgets. Use "Featured" or "Tall" size for multi-row spanning.',
-                            style: TextStyle(fontSize: 11, color: _momentumBlue.withOpacity(0.8)),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _momentumBlue.withOpacity(0.8),
+                            ),
                           ),
                         ),
                       ],

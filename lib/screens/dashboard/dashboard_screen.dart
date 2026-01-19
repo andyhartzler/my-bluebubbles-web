@@ -69,7 +69,14 @@ class _GridPosition {
   final double widthMultiplier;
   final double heightMultiplier;
 
-  const _GridPosition(this.row, this.col, this.widthCells, this.heightCells, this.widthMultiplier, this.heightMultiplier);
+  const _GridPosition(
+    this.row,
+    this.col,
+    this.widthCells,
+    this.heightCells,
+    this.widthMultiplier,
+    this.heightMultiplier,
+  );
 }
 
 class DashboardScreen extends StatefulWidget {
@@ -79,7 +86,8 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+class _DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
   final MemberRepository _memberRepo = MemberRepository();
   final CRMSupabaseService _supabaseService = CRMSupabaseService();
   final QuickLinksRepository _quickLinksRepo = QuickLinksRepository();
@@ -111,7 +119,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _isMobileLayout = false;
 
   // Active config getter (returns mobile or desktop based on current screen)
-  DashboardConfig get _config => _isMobileLayout ? _mobileConfig : _desktopConfig;
+  DashboardConfig get _config =>
+      _isMobileLayout ? _mobileConfig : _desktopConfig;
 
   @override
   void initState() {
@@ -517,47 +526,76 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       // Parse desktop layout
       if (desktopLayoutJson != null) {
-        debugPrint('[DashboardScreen] Parsing desktop layout JSON with ${desktopLayoutJson['widgets']?.length ?? 0} widgets');
+        debugPrint(
+          '[DashboardScreen] Parsing desktop layout JSON with ${desktopLayoutJson['widgets']?.length ?? 0} widgets',
+        );
         try {
           final config = DashboardConfig.fromJson(desktopLayoutJson);
-          debugPrint('[DashboardScreen] Successfully parsed desktop config: ${config.widgets.length} widgets');
+          debugPrint(
+            '[DashboardScreen] Successfully parsed desktop config: ${config.widgets.length} widgets',
+          );
           _desktopConfig = config;
         } catch (parseError, stackTrace) {
-          _logDetailedParseError('DashboardConfig.fromJson (desktop)', parseError, stackTrace, desktopLayoutJson);
+          _logDetailedParseError(
+            'DashboardConfig.fromJson (desktop)',
+            parseError,
+            stackTrace,
+            desktopLayoutJson,
+          );
           _desktopConfig = _getDefaultConfig();
         }
       } else {
         // Fallback to local storage for backwards compatibility
-        debugPrint('[DashboardScreen] No desktop database layout, checking SharedPreferences...');
+        debugPrint(
+          '[DashboardScreen] No desktop database layout, checking SharedPreferences...',
+        );
         final prefs = await SharedPreferences.getInstance();
         final configJson = prefs.getString(_prefsKey);
         if (configJson != null) {
           try {
             final config = DashboardConfig.fromJsonString(configJson);
-            debugPrint('[DashboardScreen] Loaded desktop from SharedPreferences: ${config.widgets.length} widgets');
+            debugPrint(
+              '[DashboardScreen] Loaded desktop from SharedPreferences: ${config.widgets.length} widgets',
+            );
             _desktopConfig = config;
             // Migrate to database
             _metricsService.saveDashboardLayout(_desktopConfig.toJson());
           } catch (parseError, stackTrace) {
-            _logDetailedParseError('DashboardConfig.fromJsonString', parseError, stackTrace, configJson);
+            _logDetailedParseError(
+              'DashboardConfig.fromJsonString',
+              parseError,
+              stackTrace,
+              configJson,
+            );
           }
         }
       }
 
       // Parse mobile layout
       if (mobileLayoutJson != null) {
-        debugPrint('[DashboardScreen] Parsing mobile layout JSON with ${mobileLayoutJson['widgets']?.length ?? 0} widgets');
+        debugPrint(
+          '[DashboardScreen] Parsing mobile layout JSON with ${mobileLayoutJson['widgets']?.length ?? 0} widgets',
+        );
         try {
           final config = DashboardConfig.fromJson(mobileLayoutJson);
-          debugPrint('[DashboardScreen] Successfully parsed mobile config: ${config.widgets.length} widgets');
+          debugPrint(
+            '[DashboardScreen] Successfully parsed mobile config: ${config.widgets.length} widgets',
+          );
           _mobileConfig = config;
         } catch (parseError, stackTrace) {
-          _logDetailedParseError('DashboardConfig.fromJson (mobile)', parseError, stackTrace, mobileLayoutJson);
+          _logDetailedParseError(
+            'DashboardConfig.fromJson (mobile)',
+            parseError,
+            stackTrace,
+            mobileLayoutJson,
+          );
           _mobileConfig = _getDefaultMobileConfig();
         }
       } else {
         // No mobile layout saved yet, use default
-        debugPrint('[DashboardScreen] No mobile layout in database, using default mobile config');
+        debugPrint(
+          '[DashboardScreen] No mobile layout in database, using default mobile config',
+        );
         _mobileConfig = _getDefaultMobileConfig();
       }
 
@@ -569,12 +607,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  void _logDetailedParseError(String context, Object error, StackTrace stackTrace, dynamic data) {
+  void _logDetailedParseError(
+    String context,
+    Object error,
+    StackTrace stackTrace,
+    dynamic data,
+  ) {
     final buffer = StringBuffer();
     buffer.writeln('');
-    buffer.writeln('╔══════════════════════════════════════════════════════════════════════════════');
+    buffer.writeln(
+      '╔══════════════════════════════════════════════════════════════════════════════',
+    );
     buffer.writeln('║ DASHBOARD CONFIG PARSING ERROR');
-    buffer.writeln('╠══════════════════════════════════════════════════════════════════════════════');
+    buffer.writeln(
+      '╠══════════════════════════════════════════════════════════════════════════════',
+    );
     buffer.writeln('║ Context: $context');
     buffer.writeln('║ Error Type: ${error.runtimeType}');
     buffer.writeln('║ Error Message: $error');
@@ -592,7 +639,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       // Try to find the specific field
       if (data is Map) {
-        buffer.writeln('║ Checking data fields for int values that should be bool:');
+        buffer.writeln(
+          '║ Checking data fields for int values that should be bool:',
+        );
         _checkForIntBoolFields(data, buffer, '  ');
       }
     }
@@ -609,29 +658,51 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
 
     buffer.writeln('║');
-    buffer.writeln('╚══════════════════════════════════════════════════════════════════════════════');
+    buffer.writeln(
+      '╚══════════════════════════════════════════════════════════════════════════════',
+    );
     debugPrint(buffer.toString());
   }
 
-  void _checkForIntBoolFields(Map<dynamic, dynamic> data, StringBuffer buffer, String indent) {
+  void _checkForIntBoolFields(
+    Map<dynamic, dynamic> data,
+    StringBuffer buffer,
+    String indent,
+  ) {
     data.forEach((key, value) {
       if (value is int && (value == 0 || value == 1)) {
         // Likely a boolean field stored as int
-        final boolFieldNames = ['visible', 'required', 'enabled', 'active', 'is_'];
+        final boolFieldNames = [
+          'visible',
+          'required',
+          'enabled',
+          'active',
+          'is_',
+        ];
         final keyStr = key.toString().toLowerCase();
         for (final boolName in boolFieldNames) {
           if (keyStr.contains(boolName)) {
-            buffer.writeln('║ $indent⚠️  "$key": $value (likely should be bool)');
+            buffer.writeln(
+              '║ $indent⚠️  "$key": $value (likely should be bool)',
+            );
             break;
           }
         }
       } else if (value is Map) {
         buffer.writeln('║ $indent"$key": {nested}');
-        _checkForIntBoolFields(value as Map<dynamic, dynamic>, buffer, '$indent  ');
+        _checkForIntBoolFields(
+          value as Map<dynamic, dynamic>,
+          buffer,
+          '$indent  ',
+        );
       } else if (value is List && value.isNotEmpty && value.first is Map) {
         buffer.writeln('║ $indent"$key": [${value.length} items]');
         if (value.isNotEmpty) {
-          _checkForIntBoolFields(value.first as Map<dynamic, dynamic>, buffer, '$indent  ');
+          _checkForIntBoolFields(
+            value.first as Map<dynamic, dynamic>,
+            buffer,
+            '$indent  ',
+          );
         }
       }
     });
@@ -640,30 +711,46 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Future<void> _saveConfig() async {
     // Determine screen width for logging
     final screenWidth = MediaQuery.of(context).size.width;
-    debugPrint('[DashboardScreen] _saveConfig called - isMobile: $_isMobileLayout, screenWidth: $screenWidth');
+    debugPrint(
+      '[DashboardScreen] _saveConfig called - isMobile: $_isMobileLayout, screenWidth: $screenWidth',
+    );
 
     try {
       // Save to appropriate database column based on mobile/desktop
       if (_isMobileLayout) {
         final configJson = _mobileConfig.toJson();
-        debugPrint('[DashboardScreen] Saving mobile layout with ${_mobileConfig.widgets.length} widgets');
-        final success = await _metricsService.saveDashboardLayoutMobile(configJson);
+        debugPrint(
+          '[DashboardScreen] Saving mobile layout with ${_mobileConfig.widgets.length} widgets',
+        );
+        final success = await _metricsService.saveDashboardLayoutMobile(
+          configJson,
+        );
         if (success) {
-          debugPrint('[DashboardScreen] ✓ Mobile dashboard layout saved to database');
+          debugPrint(
+            '[DashboardScreen] ✓ Mobile dashboard layout saved to database',
+          );
         } else {
-          debugPrint('[DashboardScreen] ✗ Failed to save mobile dashboard layout to database');
+          debugPrint(
+            '[DashboardScreen] ✗ Failed to save mobile dashboard layout to database',
+          );
         }
       } else {
         final configJson = _desktopConfig.toJson();
-        debugPrint('[DashboardScreen] Saving desktop layout with ${_desktopConfig.widgets.length} widgets');
+        debugPrint(
+          '[DashboardScreen] Saving desktop layout with ${_desktopConfig.widgets.length} widgets',
+        );
         final success = await _metricsService.saveDashboardLayout(configJson);
         if (success) {
-          debugPrint('[DashboardScreen] ✓ Desktop dashboard layout saved to database');
+          debugPrint(
+            '[DashboardScreen] ✓ Desktop dashboard layout saved to database',
+          );
         } else {
           // Fallback to local storage if database save fails
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_prefsKey, _desktopConfig.toJsonString());
-          debugPrint('[DashboardScreen] Desktop dashboard layout saved to local storage (fallback)');
+          debugPrint(
+            '[DashboardScreen] Desktop dashboard layout saved to local storage (fallback)',
+          );
         }
       }
     } catch (e, stackTrace) {
@@ -736,25 +823,39 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       // Enrich top slack members with profile photos from member records
       if (metrics != null && metrics.top50SlackMembers.isNotEmpty) {
-        debugPrint('[DashboardScreen] Enriching ${metrics.top50SlackMembers.length} slack members with photos...');
+        debugPrint(
+          '[DashboardScreen] Enriching ${metrics.top50SlackMembers.length} slack members with photos...',
+        );
 
         final slackEmails = metrics.top50SlackMembers
             .where((m) => m.email != null && m.email!.isNotEmpty)
             .map((m) => m.email!)
             .toList();
 
-        debugPrint('[DashboardScreen] Found ${slackEmails.length} slack members with emails');
+        debugPrint(
+          '[DashboardScreen] Found ${slackEmails.length} slack members with emails',
+        );
         if (slackEmails.isNotEmpty) {
-          debugPrint('[DashboardScreen] Sample emails: ${slackEmails.take(3).join(', ')}');
+          debugPrint(
+            '[DashboardScreen] Sample emails: ${slackEmails.take(3).join(', ')}',
+          );
         }
 
         if (slackEmails.isNotEmpty) {
-          final photoMap = await _memberRepo.getMemberPhotosByEmails(slackEmails);
-          debugPrint('[DashboardScreen] Photo map returned ${photoMap.length} matches');
+          final photoMap = await _memberRepo.getMemberPhotosByEmails(
+            slackEmails,
+          );
+          debugPrint(
+            '[DashboardScreen] Photo map returned ${photoMap.length} matches',
+          );
 
           if (photoMap.isNotEmpty) {
-            debugPrint('[DashboardScreen] Sample photo matches: ${photoMap.keys.take(3).join(', ')}');
-            final enrichedSlackMembers = metrics.top50SlackMembers.map((member) {
+            debugPrint(
+              '[DashboardScreen] Sample photo matches: ${photoMap.keys.take(3).join(', ')}',
+            );
+            final enrichedSlackMembers = metrics.top50SlackMembers.map((
+              member,
+            ) {
               if (member.email == null || member.email!.isEmpty) return member;
               final photoUrl = photoMap[member.email!.toLowerCase()];
               if (photoUrl != null) {
@@ -764,8 +865,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             }).toList();
 
             // Count how many got enriched
-            final enrichedCount = enrichedSlackMembers.where((m) => m.profilePhotoUrl != null).length;
-            debugPrint('[DashboardScreen] Enriched $enrichedCount slack members with photos');
+            final enrichedCount = enrichedSlackMembers
+                .where((m) => m.profilePhotoUrl != null)
+                .length;
+            debugPrint(
+              '[DashboardScreen] Enriched $enrichedCount slack members with photos',
+            );
 
             // Create new metrics with enriched slack members using copyWith
             metrics = metrics.copyWith(top50SlackMembers: enrichedSlackMembers);
@@ -782,9 +887,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       debugPrint('[DashboardScreen]   metrics is null: ${metrics == null}');
       if (metrics != null) {
         debugPrint('[DashboardScreen]   totalMembers: ${metrics.totalMembers}');
-        debugPrint('[DashboardScreen]   top5Donors: ${metrics.top5Donors.length}');
-        debugPrint('[DashboardScreen]   top50SlackMembers: ${metrics.top50SlackMembers.length}');
-        debugPrint('[DashboardScreen]   membersByCounty: ${metrics.membersByCounty.length}');
+        debugPrint(
+          '[DashboardScreen]   top5Donors: ${metrics.top5Donors.length}',
+        );
+        debugPrint(
+          '[DashboardScreen]   top50SlackMembers: ${metrics.top50SlackMembers.length}',
+        );
+        debugPrint(
+          '[DashboardScreen]   membersByCounty: ${metrics.membersByCounty.length}',
+        );
       }
 
       setState(() {
@@ -798,7 +909,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       });
     } catch (e, stack) {
       debugPrint('[DashboardScreen] _load error: $e');
-      debugPrint('[DashboardScreen] Stack: ${stack.toString().split('\n').take(5).join('\n')}');
+      debugPrint(
+        '[DashboardScreen] Stack: ${stack.toString().split('\n').take(5).join('\n')}',
+      );
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -856,7 +969,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _addWidgetAtIndex(source, type, _config.widgets.length);
   }
 
-  void _addWidgetAtIndex(DashboardDataSource source, DashboardWidgetType type, int index) {
+  void _addWidgetAtIndex(
+    DashboardDataSource source,
+    DashboardWidgetType type,
+    int index,
+  ) {
     if (!mounted) return;
     final newWidget = DashboardWidgetConfig(
       id: _uuid.v4(),
@@ -877,16 +994,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       for (int i = 0; i < widgetsList.length; i++) {
         widgetsList[i] = widgetsList[i].copyWith(gridY: i);
       }
-      _setConfig(DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList));
+      _setConfig(
+        DashboardConfig(
+          id: _config.id,
+          name: _config.name,
+          widgets: widgetsList,
+        ),
+      );
     });
   }
 
   void _removeWidget(String widgetId) {
     if (!mounted) return;
     setState(() {
-      _setConfig(_config.copyWith(
-        widgets: _config.widgets.where((w) => w.id != widgetId).toList(),
-      ));
+      _setConfig(
+        _config.copyWith(
+          widgets: _config.widgets.where((w) => w.id != widgetId).toList(),
+        ),
+      );
     });
   }
 
@@ -894,9 +1019,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (!mounted) return;
     setState(() {
       final currentWidgets = _config.widgets;
-      _setConfig(_config.copyWith(
-        widgets: currentWidgets.map((w) => w.id == updated.id ? updated : w).toList(),
-      ));
+      _setConfig(
+        _config.copyWith(
+          widgets: currentWidgets
+              .map((w) => w.id == updated.id ? updated : w)
+              .toList(),
+        ),
+      );
     });
   }
 
@@ -944,26 +1073,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _openQuickLinksPage(BuildContext context) {
-    Navigator.of(context).push(
-      ThemeSwitcher.buildPageRoute(
-        builder: (_) => const QuickLinksScreen(),
-      ),
-    ).then((_) {
-      // Refresh quick links count when returning from the page
-      _quickLinksRepo.countQuickLinks().then((count) {
-        if (mounted) {
-          setState(() => _quickLinksCount = count);
-        }
-      });
-    });
+    Navigator.of(context)
+        .push(
+          ThemeSwitcher.buildPageRoute(
+            builder: (_) => const QuickLinksScreen(),
+          ),
+        )
+        .then((_) {
+          // Refresh quick links count when returning from the page
+          _quickLinksRepo.countQuickLinks().then((count) {
+            if (mounted) {
+              setState(() => _quickLinksCount = count);
+            }
+          });
+        });
   }
 
   void _openMemberDetail(BuildContext context, Member member) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (_) => TitleBarWrapper(
-          child: MemberDetailScreen(member: member),
-        ),
+        builder: (_) =>
+            TitleBarWrapper(child: MemberDetailScreen(member: member)),
       ),
     );
   }
@@ -971,9 +1101,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _openDonorsScreen(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (_) => TitleBarWrapper(
-          child: DonorsScreen(),
-        ),
+        builder: (_) => TitleBarWrapper(child: DonorsScreen()),
       ),
     );
   }
@@ -981,9 +1109,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _openSubscribersScreen(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (_) => TitleBarWrapper(
-          child: SubscribersScreen(),
-        ),
+        builder: (_) => TitleBarWrapper(child: SubscribersScreen()),
       ),
     );
   }
@@ -991,9 +1117,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _openSlackScreen(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (_) => TitleBarWrapper(
-          child: SlackManagementScreen(),
-        ),
+        builder: (_) => TitleBarWrapper(child: SlackManagementScreen()),
       ),
     );
   }
@@ -1014,9 +1138,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _openAIAssistant(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (_) => TitleBarWrapper(
-          child: const AIAssistantScreen(),
-        ),
+        builder: (_) => TitleBarWrapper(child: const AIAssistantScreen()),
       ),
     );
   }
@@ -1136,11 +1258,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   /// Build edit mode with stable constraints to prevent RenderBox errors
   /// This wrapper ensures the edit mode has fixed constraints regardless of animation state
   Widget _buildEditModeStable(double width, double height) {
-    return SizedBox(
-      width: width,
-      height: height,
-      child: _buildEditMode(),
-    );
+    return SizedBox(width: width, height: height, child: _buildEditMode());
   }
 
   Widget _buildViewMode() {
@@ -1162,7 +1280,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             errorBuilder: (_, __, ___) => Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [_unityBlue.withOpacity(0.1), _momentumBlue.withOpacity(0.1)],
+                  colors: [
+                    _unityBlue.withOpacity(0.1),
+                    _momentumBlue.withOpacity(0.1),
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -1195,7 +1316,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         }
 
         final isMobile = constraints.maxWidth < 600;
-        final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
+        final isTablet =
+            constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
         final horizontalPadding = isMobile ? 12.0 : (isTablet ? 20.0 : 32.0);
         final columns = isMobile ? 2 : (isTablet ? 3 : 4);
 
@@ -1203,20 +1325,36 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         // callback accumulation that was causing RenderBox layout errors
 
         return CustomScrollView(
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
           slivers: [
             // Header
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, isMobile ? 12 : 24, horizontalPadding, 0),
-              sliver: SliverToBoxAdapter(child: _buildHeader(isMobile: isMobile)),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                isMobile ? 12 : 24,
+                horizontalPadding,
+                0,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: _buildHeader(isMobile: isMobile),
+              ),
             ),
             // Widgets Grid - use swipeable rows on mobile
             SliverPadding(
               padding: EdgeInsets.all(horizontalPadding),
               sliver: SliverToBoxAdapter(
                 child: isMobile
-                    ? _buildMobileWidgetsGrid(metrics, constraints.maxWidth - horizontalPadding * 2)
-                    : _buildWidgetsGrid(metrics, columns, constraints.maxWidth - horizontalPadding * 2),
+                    ? _buildMobileWidgetsGrid(
+                        metrics,
+                        constraints.maxWidth - horizontalPadding * 2,
+                      )
+                    : _buildWidgetsGrid(
+                        metrics,
+                        columns,
+                        constraints.maxWidth - horizontalPadding * 2,
+                      ),
               ),
             ),
             // Bottom padding for mobile
@@ -1235,9 +1373,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return Row(
         children: [
           Container(
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: _momentumBlue),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: _momentumBlue,
+            ),
             padding: const EdgeInsets.all(8),
-            child: const Icon(Icons.dashboard_outlined, color: Colors.white, size: 20),
+            child: const Icon(
+              Icons.dashboard_outlined,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1251,7 +1396,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
           IconButton(
             tooltip: 'AI Assistant',
-            icon: const Icon(Icons.psychology_outlined, color: _unityBlue, size: 22),
+            icon: const Icon(
+              Icons.psychology_outlined,
+              color: _unityBlue,
+              size: 22,
+            ),
             onPressed: () => _openAIAssistant(context),
           ),
           IconButton(
@@ -1271,9 +1420,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return Row(
       children: [
         Container(
-          decoration: const BoxDecoration(shape: BoxShape.circle, color: _momentumBlue),
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: _momentumBlue,
+          ),
           padding: const EdgeInsets.all(12),
-          child: const Icon(Icons.dashboard_outlined, color: Colors.white, size: 28),
+          child: const Icon(
+            Icons.dashboard_outlined,
+            color: Colors.white,
+            size: 28,
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -1315,13 +1471,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildWidgetsGrid(DashboardMetrics metrics, int columns, double maxWidth) {
+  Widget _buildWidgetsGrid(
+    DashboardMetrics metrics,
+    int columns,
+    double maxWidth,
+  ) {
     // Guard against invalid dimensions
     if (maxWidth <= 0 || columns <= 0) {
       return const SizedBox.shrink();
     }
 
-    final unitWidth = ((maxWidth - 32 - (columns - 1) * 16) / columns).clamp(50.0, maxWidth);
+    final unitWidth = ((maxWidth - 32 - (columns - 1) * 16) / columns).clamp(
+      50.0,
+      maxWidth,
+    );
     final unitHeight = (unitWidth * 0.8).clamp(50.0, maxWidth);
 
     // Guard against empty widgets list
@@ -1342,10 +1505,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       });
 
     // Build a positioned grid layout
-    return _buildPositionedGrid(sortedWidgets, metrics, columns, unitWidth, unitHeight, maxWidth);
+    return _buildPositionedGrid(
+      sortedWidgets,
+      metrics,
+      columns,
+      unitWidth,
+      unitHeight,
+      maxWidth,
+    );
   }
 
-  /// Build a flow-based grid using Wrap for natural widget packing
+  /// Build a masonry-style grid using auto-packing algorithm
+  /// Widgets are placed in the first available position that fits,
+  /// automatically filling vertical gaps left by taller widgets
   Widget _buildPositionedGrid(
     List<DashboardWidgetConfig> widgets,
     DashboardMetrics metrics,
@@ -1356,29 +1528,136 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   ) {
     const spacing = 16.0;
 
-    return Wrap(
-      spacing: spacing,
-      runSpacing: spacing,
-      children: widgets.map((widget) {
-        // Calculate widget dimensions using multipliers
-        final widgetWidth = widget.widthMultiplier * unitWidth;
-        final widgetHeight = widget.heightMultiplier * unitHeight;
+    // Use a fine-grained grid (0.5 resolution) to handle mini widgets
+    // gridColumns = columns * 2 (so 4 columns becomes 8 half-columns)
+    final gridColumns = columns * 2;
 
-        // For widgets spanning multiple columns, add gap space
-        final gapAdjustment = widget.widthMultiplier > 1
-            ? (widget.widthMultiplier.floor() - 1) * spacing
-            : 0.0;
+    // Track occupied cells: Map<"row,col", true>
+    // Using half-unit resolution (0.5 = 1 grid cell)
+    final Map<String, bool> occupied = {};
 
-        return SizedBox(
-          width: (widgetWidth + gapAdjustment).clamp(50.0, maxWidth),
-          height: widgetHeight.clamp(50.0, unitHeight * 3),
+    // Helper to check if a position is available
+    bool isAvailable(
+      int startRow,
+      int startCol,
+      int widthCells,
+      int heightCells,
+    ) {
+      for (int r = 0; r < heightCells; r++) {
+        for (int c = 0; c < widthCells; c++) {
+          final key = '${startRow + r},${startCol + c}';
+          if (occupied[key] == true) return false;
+          if (startCol + c >= gridColumns) return false; // Out of bounds
+        }
+      }
+      return true;
+    }
+
+    // Helper to mark cells as occupied
+    void markOccupied(
+      int startRow,
+      int startCol,
+      int widthCells,
+      int heightCells,
+    ) {
+      for (int r = 0; r < heightCells; r++) {
+        for (int c = 0; c < widthCells; c++) {
+          occupied['${startRow + r},${startCol + c}'] = true;
+        }
+      }
+    }
+
+    // Find first available position for a widget
+    (int row, int col) findPosition(int widthCells, int heightCells) {
+      for (int row = 0; row < 200; row++) {
+        // Max 200 half-rows
+        for (int col = 0; col <= gridColumns - widthCells; col++) {
+          if (isAvailable(row, col, widthCells, heightCells)) {
+            return (row, col);
+          }
+        }
+      }
+      return (0, 0); // Fallback
+    }
+
+    final positionedWidgets = <Widget>[];
+    double maxBottom = 0;
+
+    // Half-unit size in pixels
+    final halfUnitWidth = unitWidth / 2;
+    final halfUnitHeight = unitHeight / 2;
+    final halfSpacing = spacing / 2;
+
+    for (final widget in widgets) {
+      // Convert widget size to half-unit cells
+      // widthMultiplier 0.5 = 1 cell, 1.0 = 2 cells, 2.0 = 4 cells
+      final widthCells = (widget.widthMultiplier * 2).round();
+      final heightCells = (widget.heightMultiplier * 2).round();
+
+      // Find position using auto-packing
+      final (row, col) = findPosition(widthCells, heightCells);
+
+      // Mark cells as occupied
+      markOccupied(row, col, widthCells, heightCells);
+
+      // Calculate pixel position
+      // Each half-unit cell = halfUnitWidth + halfSpacing for gaps between full units
+      final left = col * halfUnitWidth + (col ~/ 2) * spacing;
+      final top = row * halfUnitHeight + (row ~/ 2) * spacing;
+
+      // Calculate widget dimensions
+      final widgetWidth = widthCells * halfUnitWidth;
+      final widgetHeight = heightCells * halfUnitHeight;
+
+      // Add gap space for widgets spanning multiple full units
+      final fullWidthUnits = (widthCells / 2).floor();
+      final fullHeightUnits = (heightCells / 2).floor();
+      final widthGapAdjustment = fullWidthUnits > 1
+          ? (fullWidthUnits - 1) * spacing
+          : 0.0;
+      final heightGapAdjustment = fullHeightUnits > 1
+          ? (fullHeightUnits - 1) * spacing
+          : 0.0;
+
+      final finalWidth = (widgetWidth + widthGapAdjustment).clamp(
+        50.0,
+        maxWidth,
+      );
+      final finalHeight = (widgetHeight + heightGapAdjustment).clamp(
+        50.0,
+        unitHeight * 4,
+      );
+
+      // Track maximum bottom for Stack height
+      final bottom = top + finalHeight;
+      if (bottom > maxBottom) {
+        maxBottom = bottom;
+      }
+
+      positionedWidgets.add(
+        Positioned(
+          left: left,
+          top: top,
+          width: finalWidth,
+          height: finalHeight,
           child: _buildWidget(widget, metrics),
-        );
-      }).toList(),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: maxBottom + spacing,
+      child: Stack(children: positionedWidgets),
     );
   }
 
-  bool _isOccupied(Map<String, int> gridMap, int row, int col, int width, int height) {
+  bool _isOccupied(
+    Map<String, int> gridMap,
+    int row,
+    int col,
+    int width,
+    int height,
+  ) {
     for (int r = 0; r < height; r++) {
       for (int c = 0; c < width; c++) {
         if (gridMap.containsKey('${row + r},${col + c}')) {
@@ -1389,16 +1668,35 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return false;
   }
 
-  _GridPosition _findNextAvailablePosition(Map<String, int> gridMap, int columns, int widthCells, int heightCells) {
+  _GridPosition _findNextAvailablePosition(
+    Map<String, int> gridMap,
+    int columns,
+    int widthCells,
+    int heightCells,
+  ) {
     for (int row = 0; row < 100; row++) {
       for (int col = 0; col <= columns - widthCells; col++) {
         if (!_isOccupied(gridMap, row, col, widthCells, heightCells)) {
           // Multipliers are not needed here as this is only used for position finding
-          return _GridPosition(row, col, widthCells, heightCells, widthCells.toDouble(), heightCells.toDouble());
+          return _GridPosition(
+            row,
+            col,
+            widthCells,
+            heightCells,
+            widthCells.toDouble(),
+            heightCells.toDouble(),
+          );
         }
       }
     }
-    return _GridPosition(0, 0, widthCells, heightCells, widthCells.toDouble(), heightCells.toDouble());
+    return _GridPosition(
+      0,
+      0,
+      widthCells,
+      heightCells,
+      widthCells.toDouble(),
+      heightCells.toDouble(),
+    );
   }
 
   List<Widget> _intersperse(List<Widget> widgets, Widget separator) {
@@ -1430,9 +1728,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       );
     }
 
-    final widgetWidth = (maxWidth * 0.42).clamp(80.0, maxWidth); // Each swipeable card is ~42% of width
+    final widgetWidth = (maxWidth * 0.42).clamp(
+      80.0,
+      maxWidth,
+    ); // Each swipeable card is ~42% of width
     final widgetHeight = (widgetWidth * 0.9).clamp(80.0, maxWidth);
-    final fullWidgetHeight = (maxWidth * 0.75).clamp(100.0, maxWidth * 2); // Height for full-width widgets (tall proportions)
+    final fullWidgetHeight = (maxWidth * 0.75).clamp(
+      100.0,
+      maxWidth * 2,
+    ); // Height for full-width widgets (tall proportions)
 
     // Sort widgets by position
     final sortedWidgets = List<DashboardWidgetConfig>.from(_config.widgets)
@@ -1465,37 +1769,53 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           processedSwipeRows.add(swipeId);
           final rowWidgets = swipeRows[swipeId];
           if (rowWidgets != null && rowWidgets.isNotEmpty) {
-            rows.add(_buildSwipeableRow(rowWidgets, metrics, widgetWidth, widgetHeight));
+            rows.add(
+              _buildSwipeableRow(
+                rowWidgets,
+                metrics,
+                widgetWidth,
+                widgetHeight,
+              ),
+            );
           }
         }
       } else {
         // Standalone widget - use full width for mobileFull size
-        final isMobileFull = widget.size == DashboardWidgetSize.mobileFull ||
+        final isMobileFull =
+            widget.size == DashboardWidgetSize.mobileFull ||
             widget.size == DashboardWidgetSize.hero ||
             widget.size == DashboardWidgetSize.featured ||
             widget.size == DashboardWidgetSize.large;
         final height = isMobileFull ? fullWidgetHeight : widgetHeight;
 
-        rows.add(SizedBox(
-          width: maxWidth,
-          height: height,
-          child: _buildWidget(widget, metrics),
-        ));
+        rows.add(
+          SizedBox(
+            width: maxWidth,
+            height: height,
+            child: _buildWidget(widget, metrics),
+          ),
+        );
       }
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: rows.map((row) => Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: row,
-      )).toList(),
+      children: rows
+          .map(
+            (row) =>
+                Padding(padding: const EdgeInsets.only(bottom: 16), child: row),
+          )
+          .toList(),
     );
   }
 
   /// Build a horizontally swipeable row of widgets
-  Widget _buildSwipeableRow(List<DashboardWidgetConfig> widgets, DashboardMetrics metrics,
-      double baseWidgetWidth, double baseWidgetHeight) {
+  Widget _buildSwipeableRow(
+    List<DashboardWidgetConfig> widgets,
+    DashboardMetrics metrics,
+    double baseWidgetWidth,
+    double baseWidgetHeight,
+  ) {
     // Guard against empty widgets or invalid dimensions
     if (widgets.isEmpty || baseWidgetWidth <= 0 || baseWidgetHeight <= 0) {
       return const SizedBox.shrink();
@@ -1504,7 +1824,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     // Determine row height based on the largest widget in the row
     double rowHeight = baseWidgetHeight;
     for (final widget in widgets) {
-      final isLarge = widget.size == DashboardWidgetSize.large ||
+      final isLarge =
+          widget.size == DashboardWidgetSize.large ||
           widget.size == DashboardWidgetSize.featured ||
           widget.size == DashboardWidgetSize.hero ||
           widget.size == DashboardWidgetSize.mobileFull;
@@ -1554,7 +1875,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   widget.size == DashboardWidgetSize.featured ||
                   widget.size == DashboardWidgetSize.hero ||
                   widget.size == DashboardWidgetSize.mobileFull) {
-                itemWidth = baseWidgetWidth * 1.8; // Larger width for large widgets
+                itemWidth =
+                    baseWidgetWidth * 1.8; // Larger width for large widgets
               } else if (widget.size == DashboardWidgetSize.medium) {
                 itemWidth = baseWidgetWidth * 1.3; // Slightly larger for medium
               }
@@ -1570,7 +1892,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  double _getWidgetWidth(DashboardWidgetConfig widget, double unitWidth, int columns) {
+  double _getWidgetWidth(
+    DashboardWidgetConfig widget,
+    double unitWidth,
+    int columns,
+  ) {
     // Use widthMultiplier for proper mini widget support (0.5 width)
     final spanWidth = widget.widthMultiplier.clamp(0.5, columns.toDouble());
     // For mini widgets (0.5), no gap adjustment needed
@@ -1582,7 +1908,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     // Use heightMultiplier for proper mini widget support (0.5 height)
     final spanHeight = widget.heightMultiplier;
     // For mini widgets (0.5), no gap adjustment needed
-    final gapAdjustment = spanHeight >= 1 ? (spanHeight.floor() - 1) * 16.0 : 0.0;
+    final gapAdjustment = spanHeight >= 1
+        ? (spanHeight.floor() - 1) * 16.0
+        : 0.0;
     return unitHeight * spanHeight + gapAdjustment;
   }
 
@@ -1590,8 +1918,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     try {
       return _buildWidgetInternal(config, metrics);
     } catch (e, stackTrace) {
-      debugPrint('[DashboardScreen] Error building widget ${config.id} (${config.type}): $e');
-      debugPrint('[DashboardScreen] Stack: ${stackTrace.toString().split('\n').take(5).join('\n')}');
+      debugPrint(
+        '[DashboardScreen] Error building widget ${config.id} (${config.type}): $e',
+      );
+      debugPrint(
+        '[DashboardScreen] Stack: ${stackTrace.toString().split('\n').take(5).join('\n')}',
+      );
       return Card(
         child: Center(
           child: Column(
@@ -1615,7 +1947,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  Widget _buildWidgetInternal(DashboardWidgetConfig config, DashboardMetrics metrics) {
+  Widget _buildWidgetInternal(
+    DashboardWidgetConfig config,
+    DashboardMetrics metrics,
+  ) {
     final value = _getValueForDataSource(config.dataSourceKey, metrics);
 
     switch (config.type) {
@@ -1633,11 +1968,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       case DashboardWidgetType.lineChart:
         if (config.dataSourceKey == 'membersJoinedByMonth') {
-          return LineChartWidget(config: config, data: metrics.membersJoinedByMonth);
+          return LineChartWidget(
+            config: config,
+            data: metrics.membersJoinedByMonth,
+          );
         } else if (config.dataSourceKey == 'slackEngagementTrend') {
-          return LineChartWidget(config: config, data: metrics.slackEngagementTrend);
+          return LineChartWidget(
+            config: config,
+            data: metrics.slackEngagementTrend,
+          );
         } else if (config.dataSourceKey == 'socialGrowthTrend') {
-          return LineChartWidget(config: config, data: metrics.socialGrowthTrend);
+          return LineChartWidget(
+            config: config,
+            data: metrics.socialGrowthTrend,
+          );
         } else if (config.dataSourceKey == 'emailCampaignPerformance') {
           // Use existing monthly counts or create empty list
           return LineChartWidget(config: config, data: const []);
@@ -1679,7 +2023,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final current = _getValueForDataSource(config.dataSourceKey, metrics);
         int total = 114; // Default for counties
         bool isPercentage = false;
-        if (config.dataSourceKey == 'totalUniqueCongressionalDistricts') total = 8;
+        if (config.dataSourceKey == 'totalUniqueCongressionalDistricts')
+          total = 8;
         if (config.dataSourceKey == 'totalUniqueHouseDistricts') total = 163;
         if (config.dataSourceKey == 'totalUniqueSenateDistricts') total = 34;
         // Handle percentage-based metrics
@@ -1699,9 +2044,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       case DashboardWidgetType.sparkline:
       case DashboardWidgetType.heatmap:
-        return Card(
-          child: Center(child: Text(config.title)),
-        );
+        return Card(child: Center(child: Text(config.title)));
 
       case DashboardWidgetType.memberList:
         return MemberListWidget(
@@ -1711,10 +2054,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         );
 
       case DashboardWidgetType.dynamicDistribution:
-        return DynamicDistributionChartWidget(
-          config: config,
-          metrics: metrics,
-        );
+        return DynamicDistributionChartWidget(config: config, metrics: metrics);
 
       case DashboardWidgetType.quickLinksButton:
         return QuickLinksButtonWidget(
@@ -1917,10 +2257,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         children: [
           // Widget palette - only render when showing
           if (_showPalette)
-            SizedBox(
-              width: 300,
-              child: _buildWidgetPaletteSafe(),
-            ),
+            SizedBox(width: 300, child: _buildWidgetPaletteSafe()),
           // Main edit area
           Expanded(
             child: Column(
@@ -1989,9 +2326,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return _buildWidgetPalette();
     } catch (e, stackTrace) {
       debugPrint('');
-      debugPrint('╔══════════════════════════════════════════════════════════════════════════════');
+      debugPrint(
+        '╔══════════════════════════════════════════════════════════════════════════════',
+      );
       debugPrint('║ WIDGET PALETTE ERROR');
-      debugPrint('╠══════════════════════════════════════════════════════════════════════════════');
+      debugPrint(
+        '╠══════════════════════════════════════════════════════════════════════════════',
+      );
       debugPrint('║ Error: $e');
       debugPrint('║');
       debugPrint('║ Stack trace:');
@@ -2002,7 +2343,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           debugPrint('║     $line');
         }
       }
-      debugPrint('╚══════════════════════════════════════════════════════════════════════════════');
+      debugPrint(
+        '╚══════════════════════════════════════════════════════════════════════════════',
+      );
       debugPrint('');
 
       return Container(
@@ -2065,7 +2408,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
               // Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     const Icon(Icons.widgets, color: _unityBlue),
@@ -2093,7 +2439,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   controller: scrollController,
                   padding: const EdgeInsets.all(12),
                   children: DashboardDataCategory.values.map((category) {
-                    final sources = DashboardDataSources.getByCategory(category);
+                    final sources = DashboardDataSources.getByCategory(
+                      category,
+                    );
                     if (sources.isEmpty) return const SizedBox.shrink();
 
                     return _buildMobilePaletteCategory(category, sources);
@@ -2107,7 +2455,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildMobilePaletteCategory(DashboardDataCategory category, List<DashboardDataSource> sources) {
+  Widget _buildMobilePaletteCategory(
+    DashboardDataCategory category,
+    List<DashboardDataSource> sources,
+  ) {
     return Column(
       key: ValueKey('mobile_cat_${category.name}'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2222,8 +2573,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 children: [
                   // Cancel button
                   TextButton.icon(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white70, size: 20),
-                    label: const Text('Cancel', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
+                    label: const Text(
+                      'Cancel',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
@@ -2253,13 +2611,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   // Save button - prominent
                   ElevatedButton.icon(
                     icon: const Icon(Icons.check, size: 18),
-                    label: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'Save',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _grassrootsGreen,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       elevation: 4,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                     ),
                     onPressed: _toggleEditMode,
                   ),
@@ -2277,8 +2643,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white54),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                     onPressed: _showMobilePalette,
                   ),
@@ -2290,13 +2661,22 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white70,
                       side: const BorderSide(color: Colors.white38),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                     onPressed: () {
                       setState(() {
                         // Reset to appropriate default based on current layout
-                        _setConfig(_isMobileLayout ? _getDefaultMobileConfig() : _getDefaultConfig());
+                        _setConfig(
+                          _isMobileLayout
+                              ? _getDefaultMobileConfig()
+                              : _getDefaultConfig(),
+                        );
                       });
                     },
                   ),
@@ -2362,10 +2742,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           const SizedBox(width: 16),
           const Text(
             'Customize your dashboard',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white70,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.white70),
           ),
           const Spacer(),
           // Reset button
@@ -2375,7 +2752,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             onPressed: () {
               setState(() {
                 // Reset to appropriate default based on current layout
-                _setConfig(_isMobileLayout ? _getDefaultMobileConfig() : _getDefaultConfig());
+                _setConfig(
+                  _isMobileLayout
+                      ? _getDefaultMobileConfig()
+                      : _getDefaultConfig(),
+                );
               });
             },
           ),
@@ -2386,7 +2767,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               foregroundColor: Colors.white,
               side: const BorderSide(color: Colors.white54),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               _loadConfig();
@@ -2398,13 +2781,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           // Save button - prominent
           ElevatedButton.icon(
             icon: const Icon(Icons.check),
-            label: const Text('Save & Exit', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text(
+              'Save & Exit',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: _grassrootsGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: _toggleEditMode,
           ),
@@ -2415,86 +2803,89 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _buildWidgetPalette() {
     try {
-      final categories = DashboardDataCategory.values
-          .where((c) {
-            try {
-              return DashboardDataSources.getByCategory(c).isNotEmpty;
-            } catch (e) {
-              debugPrint('Error checking category $c: $e');
-              return false;
-            }
-          })
-          .toList();
+      final categories = DashboardDataCategory.values.where((c) {
+        try {
+          return DashboardDataSources.getByCategory(c).isNotEmpty;
+        } catch (e) {
+          debugPrint('Error checking category $c: $e');
+          return false;
+        }
+      }).toList();
 
       return RepaintBoundary(
         child: Container(
-        key: const ValueKey('widget_palette'),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(right: BorderSide(color: Colors.grey[300]!)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: _unityBlue,
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.widgets, color: Colors.white),
-                  SizedBox(width: 12),
-                  Text(
-                    'Add Widgets',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                key: const ValueKey('palette_list'),
-                padding: const EdgeInsets.all(12),
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  try {
-                    final category = categories[index];
-                    final sources = DashboardDataSources.getByCategory(category);
-
-                    return Theme(
-                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                      child: ExpansionTile(
-                        key: ValueKey('category_${category.name}'),
-                        title: Text(
-                          _getCategoryLabel(category),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                        initiallyExpanded: index == 0,
-                        children: sources.map((source) {
-                          return _buildPaletteItem(source);
-                        }).toList(),
+          key: const ValueKey('widget_palette'),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(right: BorderSide(color: Colors.grey[300]!)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(color: _unityBlue),
+                child: const Row(
+                  children: [
+                    Icon(Icons.widgets, color: Colors.white),
+                    SizedBox(width: 12),
+                    Text(
+                      'Add Widgets',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  } catch (e) {
-                    return ListTile(
-                      leading: const Icon(Icons.error_outline, color: Colors.red),
-                      title: const Text('Error loading category'),
-                    );
-                  }
-                },
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                child: ListView.builder(
+                  key: const ValueKey('palette_list'),
+                  padding: const EdgeInsets.all(12),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    try {
+                      final category = categories[index];
+                      final sources = DashboardDataSources.getByCategory(
+                        category,
+                      );
+
+                      return Theme(
+                        data: Theme.of(
+                          context,
+                        ).copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          key: ValueKey('category_${category.name}'),
+                          title: Text(
+                            _getCategoryLabel(category),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          initiallyExpanded: index == 0,
+                          children: sources.map((source) {
+                            return _buildPaletteItem(source);
+                          }).toList(),
+                        ),
+                      );
+                    } catch (e) {
+                      return ListTile(
+                        leading: const Icon(
+                          Icons.error_outline,
+                          color: Colors.red,
+                        ),
+                        title: const Text('Error loading category'),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       );
     } catch (e) {
       // Return error state for the entire palette
@@ -2566,7 +2957,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   children: [
                     Text(
                       sourceLabel,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     Text(
                       sourceDescription,
@@ -2579,7 +2973,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
               // Simple add icon without tooltip to avoid overlay issues
               Icon(
-                supportedWidgets.length > 1 ? Icons.add_circle_outline : Icons.add_circle,
+                supportedWidgets.length > 1
+                    ? Icons.add_circle_outline
+                    : Icons.add_circle,
                 color: _grassrootsGreen,
                 size: 24,
               ),
@@ -2611,7 +3007,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         try {
           if (mounted) _isDragging = false;
         } catch (e) {
-          debugPrint('[DashboardScreen] Error in palette onDraggableCanceled: $e');
+          debugPrint(
+            '[DashboardScreen] Error in palette onDraggableCanceled: $e',
+          );
         }
       },
       onDragCompleted: () {
@@ -2652,10 +3050,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
         ),
       ),
-      childWhenDragging: Opacity(
-        opacity: 0.5,
-        child: card,
-      ),
+      childWhenDragging: Opacity(opacity: 0.5, child: card),
       child: card,
     );
   }
@@ -2704,7 +3099,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
         final isMobile = constraints.maxWidth < 600;
         final columns = constraints.maxWidth > 800 ? 4 : 2;
-        final widgetWidth = (constraints.maxWidth - 32 - (columns - 1) * 16) / columns;
+        final widgetWidth =
+            (constraints.maxWidth - 32 - (columns - 1) * 16) / columns;
         final widgetHeight = widgetWidth * 0.8;
 
         // Use the widget list order directly (no sorting by grid position)
@@ -2746,7 +3142,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
-                            color: isHovering ? _momentumBlue : Colors.grey[600],
+                            color: isHovering
+                                ? _momentumBlue
+                                : Colors.grey[600],
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -2787,23 +3185,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         color: _momentumBlue,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Icon(Icons.drag_indicator, size: 14, color: Colors.white),
+                      child: const Icon(
+                        Icons.drag_indicator,
+                        size: 14,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       isMobile
                           ? 'Tap widgets to edit or reorder'
                           : 'Drag from palette to add, or tap widgets to edit',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ),
               ),
               // Wrap layout with drop zones
-              _buildWidgetsWithDropZones(widgets, metrics, widgetWidth, widgetHeight, columns),
+              _buildWidgetsWithDropZones(
+                widgets,
+                metrics,
+                widgetWidth,
+                widgetHeight,
+                columns,
+              ),
             ],
           ),
         );
@@ -2831,8 +3236,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       // Make the widget draggable for reordering
       // Store widget info locally to avoid closure issues
-      final widgetLabel = DashboardDataSources.getByKey(widget.dataSourceKey)?.label ?? widget.dataSourceKey;
-      final widgetIcon = DashboardDataSources.getByKey(widget.dataSourceKey)?.icon ?? Icons.widgets;
+      final widgetLabel =
+          DashboardDataSources.getByKey(widget.dataSourceKey)?.label ??
+          widget.dataSourceKey;
+      final widgetIcon =
+          DashboardDataSources.getByKey(widget.dataSourceKey)?.icon ??
+          Icons.widgets;
 
       items.add(
         RepaintBoundary(
@@ -2859,7 +3268,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               try {
                 if (mounted) _isDragging = false;
               } catch (e) {
-                debugPrint('[DashboardScreen] Error in onDraggableCanceled: $e');
+                debugPrint(
+                  '[DashboardScreen] Error in onDraggableCanceled: $e',
+                );
               }
             },
             onDragCompleted: () {
@@ -2989,7 +3400,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           margin: EdgeInsets.symmetric(horizontal: isHovering ? 4 : 0),
           decoration: BoxDecoration(
             color: isHovering
-                ? (isReorder ? _grassrootsGreen.withOpacity(0.15) : _momentumBlue.withOpacity(0.15))
+                ? (isReorder
+                      ? _grassrootsGreen.withOpacity(0.15)
+                      : _momentumBlue.withOpacity(0.15))
                 : Colors.transparent,
             border: Border.all(
               color: isHovering
@@ -3027,7 +3440,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildEditableWidget(DashboardWidgetConfig config, DashboardMetrics metrics, int index) {
+  Widget _buildEditableWidget(
+    DashboardWidgetConfig config,
+    DashboardMetrics metrics,
+    int index,
+  ) {
     return Stack(
       children: [
         // The actual widget
@@ -3052,7 +3469,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _momentumBlue.withOpacity(0.5), width: 2),
+                border: Border.all(
+                  color: _momentumBlue.withOpacity(0.5),
+                  width: 2,
+                ),
               ),
             ),
           ),
@@ -3126,12 +3546,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   if (_isDragging || !mounted) return;
                   _showWidgetOptions(config);
                 } catch (e) {
-                  debugPrint('[DashboardScreen] Error handling settings tap: $e');
+                  debugPrint(
+                    '[DashboardScreen] Error handling settings tap: $e',
+                  );
                 }
               },
               child: Container(
                 padding: const EdgeInsets.all(6),
-                child: const Icon(Icons.settings, size: 14, color: _momentumBlue),
+                child: const Icon(
+                  Icons.settings,
+                  size: 14,
+                  color: _momentumBlue,
+                ),
               ),
             ),
           ),
@@ -3183,10 +3609,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(4),
               boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 2,
-                ),
+                BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 2),
               ],
             ),
             child: Icon(icon, size: 16, color: _momentumBlue),
@@ -3211,7 +3634,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       for (int i = 0; i < widgetsList.length; i++) {
         widgetsList[i] = widgetsList[i].copyWith(gridY: i);
       }
-      _setConfig(DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList));
+      _setConfig(
+        DashboardConfig(
+          id: _config.id,
+          name: _config.name,
+          widgets: widgetsList,
+        ),
+      );
     });
     _saveConfig();
   }
@@ -3231,7 +3660,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       for (int i = 0; i < widgetsList.length; i++) {
         widgetsList[i] = widgetsList[i].copyWith(gridY: i);
       }
-      _setConfig(DashboardConfig(id: _config.id, name: _config.name, widgets: widgetsList));
+      _setConfig(
+        DashboardConfig(
+          id: _config.id,
+          name: _config.name,
+          widgets: widgetsList,
+        ),
+      );
     });
     _saveConfig();
   }
@@ -3239,7 +3674,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _showWidgetOptions(DashboardWidgetConfig config, [int? index]) {
     if (!mounted) return;
     final source = DashboardDataSources.getByKey(config.dataSourceKey);
-    final currentGradientIndex = WidgetGradients.indexOfColors(config.gradientColors);
+    final currentGradientIndex = WidgetGradients.indexOfColors(
+      config.gradientColors,
+    );
 
     showModalBottomSheet(
       context: context,
@@ -3273,7 +3710,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, color: _actionRed),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: _actionRed,
+                        ),
                         onPressed: () {
                           Navigator.pop(context);
                           _removeWidget(config.id);
@@ -3282,29 +3722,41 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ],
                   ),
                   const SizedBox(height: 20),
-                  const Text('Display as:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Display as:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: (source?.supportedWidgets ?? [DashboardWidgetType.statCard]).map((type) {
-                      final isSelected = config.type == type;
-                      return ChoiceChip(
-                        label: Text(_getWidgetTypeLabel(type)),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          if (selected) {
-                            _updateWidget(config.copyWith(
-                              type: type,
-                              size: _getSizeForType(type),
-                            ));
-                            Navigator.pop(context);
-                          }
-                        },
-                      );
-                    }).toList(),
+                    children:
+                        (source?.supportedWidgets ??
+                                [DashboardWidgetType.statCard])
+                            .map((type) {
+                              final isSelected = config.type == type;
+                              return ChoiceChip(
+                                label: Text(_getWidgetTypeLabel(type)),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    _updateWidget(
+                                      config.copyWith(
+                                        type: type,
+                                        size: _getSizeForType(type),
+                                      ),
+                                    );
+                                    Navigator.pop(context);
+                                  }
+                                },
+                              );
+                            })
+                            .toList(),
                   ),
                   const SizedBox(height: 20),
-                  const Text('Size:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Size:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -3323,24 +3775,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     }).toList(),
                   ),
                   const SizedBox(height: 20),
-                  const Text('Color:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Color:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 12),
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 1.5,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 4,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 1.5,
+                        ),
                     itemCount: WidgetGradients.all.length,
                     itemBuilder: (context, index) {
                       final gradient = WidgetGradients.all[index];
                       final isSelected = currentGradientIndex == index;
                       return GestureDetector(
                         onTap: () {
-                          _updateWidget(config.copyWith(gradientColors: gradient));
+                          _updateWidget(
+                            config.copyWith(gradientColors: gradient),
+                          );
                           Navigator.pop(context);
                         },
                         child: Container(
@@ -3364,7 +3822,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           ),
                           child: isSelected
                               ? const Center(
-                                  child: Icon(Icons.check, color: Colors.white, size: 24),
+                                  child: Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
                                 )
                               : null,
                         ),
@@ -3386,25 +3848,34 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   // Background color selection for widgets with white backgrounds
                   if (_widgetSupportsBackgroundColor(config.type)) ...[
                     const SizedBox(height: 20),
-                    const Text('Background:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Background:',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 12),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 6,
-                        mainAxisSpacing: 8,
-                        crossAxisSpacing: 8,
-                        childAspectRatio: 1.0,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 6,
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                            childAspectRatio: 1.0,
+                          ),
                       itemCount: WidgetBackgrounds.solidColors.length,
                       itemBuilder: (context, index) {
-                        final color = WidgetBackgrounds.solidColors[index] ?? Colors.white;
-                        final currentBgIndex = config.options['backgroundColorIndex'] as int? ?? 0;
+                        final color =
+                            WidgetBackgrounds.solidColors[index] ??
+                            Colors.white;
+                        final currentBgIndex =
+                            config.options['backgroundColorIndex'] as int? ?? 0;
                         final isSelected = currentBgIndex == index;
                         return GestureDetector(
                           onTap: () {
-                            final newOptions = Map<String, dynamic>.from(config.options);
+                            final newOptions = Map<String, dynamic>.from(
+                              config.options,
+                            );
                             newOptions['backgroundColorIndex'] = index;
                             _updateWidget(config.copyWith(options: newOptions));
                             Navigator.pop(context);
@@ -3414,7 +3885,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               color: color,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: isSelected ? _momentumBlue : Colors.grey[300]!,
+                                color: isSelected
+                                    ? _momentumBlue
+                                    : Colors.grey[300]!,
                                 width: isSelected ? 3 : 1,
                               ),
                               boxShadow: [
@@ -3429,7 +3902,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 ? Center(
                                     child: Icon(
                                       Icons.check,
-                                      color: index == WidgetBackgrounds.solidColors.length - 1
+                                      color:
+                                          index ==
+                                              WidgetBackgrounds
+                                                      .solidColors
+                                                      .length -
+                                                  1
                                           ? Colors.white
                                           : _momentumBlue,
                                       size: 20,
@@ -3443,7 +3921,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     const SizedBox(height: 8),
                     Center(
                       child: Text(
-                        WidgetBackgrounds.colorNames[config.options['backgroundColorIndex'] as int? ?? 0],
+                        WidgetBackgrounds.colorNames[config
+                                    .options['backgroundColorIndex']
+                                as int? ??
+                            0],
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -3455,7 +3936,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   const SizedBox(height: 24),
                   // Grid Position options (for desktop positioned layout)
                   if (!_isMobileLayout) ...[
-                    const Text('Grid Position:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Grid Position:',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -3463,7 +3947,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Row', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              const Text(
+                                'Row',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
                               const SizedBox(height: 4),
                               Container(
                                 decoration: BoxDecoration(
@@ -3474,21 +3964,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                   children: [
                                     IconButton(
                                       icon: const Icon(Icons.remove, size: 18),
-                                      onPressed: config.gridY <= 0 ? null : () {
-                                        _updateWidget(config.copyWith(gridY: config.gridY - 1));
-                                      },
+                                      onPressed: config.gridY <= 0
+                                          ? null
+                                          : () {
+                                              _updateWidget(
+                                                config.copyWith(
+                                                  gridY: config.gridY - 1,
+                                                ),
+                                              );
+                                            },
                                     ),
                                     Expanded(
                                       child: Text(
                                         '${config.gridY}',
                                         textAlign: TextAlign.center,
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.add, size: 18),
                                       onPressed: () {
-                                        _updateWidget(config.copyWith(gridY: config.gridY + 1));
+                                        _updateWidget(
+                                          config.copyWith(
+                                            gridY: config.gridY + 1,
+                                          ),
+                                        );
                                       },
                                     ),
                                   ],
@@ -3502,7 +4004,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Column', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              const Text(
+                                'Column',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
                               const SizedBox(height: 4),
                               Container(
                                 decoration: BoxDecoration(
@@ -3513,21 +4021,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                   children: [
                                     IconButton(
                                       icon: const Icon(Icons.remove, size: 18),
-                                      onPressed: config.gridX <= 0 ? null : () {
-                                        _updateWidget(config.copyWith(gridX: config.gridX - 1));
-                                      },
+                                      onPressed: config.gridX <= 0
+                                          ? null
+                                          : () {
+                                              _updateWidget(
+                                                config.copyWith(
+                                                  gridX: config.gridX - 1,
+                                                ),
+                                              );
+                                            },
                                     ),
                                     Expanded(
                                       child: Text(
                                         '${config.gridX}',
                                         textAlign: TextAlign.center,
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.add, size: 18),
                                       onPressed: () {
-                                        _updateWidget(config.copyWith(gridX: config.gridX + 1));
+                                        _updateWidget(
+                                          config.copyWith(
+                                            gridX: config.gridX + 1,
+                                          ),
+                                        );
                                       },
                                     ),
                                   ],
@@ -3547,12 +4067,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.info_outline, size: 16, color: _momentumBlue),
+                          const Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: _momentumBlue,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Set row/column to position widgets. Use "Featured" or "Tall" size for multi-row spanning, with smaller widgets beside it.',
-                              style: TextStyle(fontSize: 11, color: _momentumBlue.withOpacity(0.8)),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: _momentumBlue.withOpacity(0.8),
+                              ),
                             ),
                           ),
                         ],
@@ -3562,7 +4089,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ],
                   // Swipe Row options (mobile only)
                   if (_isMobileLayout) ...[
-                    const Text('Swipe Row:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Swipe Row:',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 8),
                     _buildSwipeRowOptions(config),
                     const SizedBox(height: 24),
@@ -3627,7 +4157,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
               'Not in a swipe row',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600], fontStyle: FontStyle.italic),
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ),
 
@@ -3654,11 +4188,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     color: isCurrentRow ? _grassrootsGreen : null,
                   ),
                 ),
-                backgroundColor: isCurrentRow ? _grassrootsGreen.withOpacity(0.1) : null,
-                onPressed: isCurrentRow ? null : () {
-                  _addWidgetToSwipeRow(config, rowId);
-                  Navigator.pop(context);
-                },
+                backgroundColor: isCurrentRow
+                    ? _grassrootsGreen.withOpacity(0.1)
+                    : null,
+                onPressed: isCurrentRow
+                    ? null
+                    : () {
+                        _addWidgetToSwipeRow(config, rowId);
+                        Navigator.pop(context);
+                      },
               );
             }).toList(),
           ),
@@ -3696,7 +4234,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   /// Get display name for a swipe row
   String _getSwipeRowDisplayName(String rowId) {
     // Count widgets in this row for the display name
-    final widgetCount = _mobileConfig.widgets.where((w) => w.swipeRowId == rowId).length;
+    final widgetCount = _mobileConfig.widgets
+        .where((w) => w.swipeRowId == rowId)
+        .length;
     // Try to make a friendlier name
     if (rowId.startsWith('stats_row_')) {
       final num = rowId.replaceFirst('stats_row_', '');
@@ -3711,7 +4251,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   /// Get the size of widgets in a swipe row
   DashboardWidgetSize _getSwipeRowSize(String rowId) {
-    final rowWidgets = _mobileConfig.widgets.where((w) => w.swipeRowId == rowId).toList();
+    final rowWidgets = _mobileConfig.widgets
+        .where((w) => w.swipeRowId == rowId)
+        .toList();
     if (rowWidgets.isEmpty) return DashboardWidgetSize.small;
     return rowWidgets.first.size;
   }
@@ -3727,9 +4269,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         swipeRowId: rowId,
         // Don't change size - keep widget's original size
       );
-      final widgetsList = _mobileConfig.widgets.map((w) =>
-        w.id == config.id ? updatedWidget : w
-      ).toList();
+      final widgetsList = _mobileConfig.widgets
+          .map((w) => w.id == config.id ? updatedWidget : w)
+          .toList();
       _mobileConfig = _mobileConfig.copyWith(widgets: widgetsList);
     });
     _saveConfig();
@@ -3741,9 +4283,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     setState(() {
       final updatedWidget = config.copyWith(clearSwipeRowId: true);
-      final widgetsList = _mobileConfig.widgets.map((w) =>
-        w.id == config.id ? updatedWidget : w
-      ).toList();
+      final widgetsList = _mobileConfig.widgets
+          .map((w) => w.id == config.id ? updatedWidget : w)
+          .toList();
       _mobileConfig = _mobileConfig.copyWith(widgets: widgetsList);
     });
     _saveConfig();
@@ -3786,12 +4328,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 18, color: _momentumBlue),
+                  const Icon(
+                    Icons.info_outline,
+                    size: 18,
+                    color: _momentumBlue,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'The widget\'s current size (${_getSizeLabel(config.size)}) will be the row size. Other widgets added to this row will be resized to match.',
-                      style: const TextStyle(fontSize: 12, color: _momentumBlue),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: _momentumBlue,
+                      ),
                     ),
                   ),
                 ],
@@ -3828,9 +4377,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     setState(() {
       // The widget keeps its current size (which becomes the row's size)
       final updatedWidget = config.copyWith(swipeRowId: rowId);
-      final widgetsList = _mobileConfig.widgets.map((w) =>
-        w.id == config.id ? updatedWidget : w
-      ).toList();
+      final widgetsList = _mobileConfig.widgets
+          .map((w) => w.id == config.id ? updatedWidget : w)
+          .toList();
       _mobileConfig = _mobileConfig.copyWith(widgets: widgetsList);
     });
     _saveConfig();
