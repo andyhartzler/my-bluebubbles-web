@@ -190,7 +190,7 @@ class _CommitteeMemberOverviewTabState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Welcome, ${currentMember?.firstName ?? 'Member'}!',
+                    'Welcome, ${currentMember?.name.split(' ').first ?? 'Member'}!',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,

@@ -187,7 +187,7 @@ class _CommitteeMemberSettingsScreenState
       case 'state':
         return member.state;
       case 'zip_code':
-        return member.zipCode;
+        return null; // Not stored in member model
       case 'county':
         return member.county;
       case 'date_of_birth':
@@ -203,25 +203,29 @@ class _CommitteeMemberSettingsScreenState
       case 'graduation_year':
         return member.graduationYear;
       case 'employer':
-        return member.employer;
+      case 'employed':
+        return member.employed;
       case 'occupation':
-        return member.occupation;
+      case 'industry':
+        return member.industry;
       case 'pronouns':
-        return member.pronouns;
+      case 'preferred_pronouns':
+        return member.preferredPronouns;
       case 'gender':
-        return member.gender;
+      case 'gender_identity':
+        return member.genderIdentity;
       case 'race':
         return member.race;
       case 'ethnicity':
-        return member.ethnicity;
+        return member.race; // Map ethnicity to race field
       case 'voter_registration_status':
-        return member.voterRegistrationStatus;
+      case 'registered_voter':
+        return member.registeredVoter == true ? 'Registered' : (member.registeredVoter == false ? 'Not Registered' : null);
       case 'congressional_district':
         return member.congressionalDistrict;
       case 'state_senate_district':
-        return member.stateSenateDistrict;
       case 'state_house_district':
-        return member.stateHouseDistrict;
+        return null; // Not stored in member model
       default:
         return null;
     }
