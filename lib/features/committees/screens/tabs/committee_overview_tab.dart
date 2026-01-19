@@ -121,6 +121,8 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
         children: [
           _buildStatsSection(context),
           const SizedBox(height: 24),
+          _buildQuickActionsSection(context),
+          const SizedBox(height: 24),
           UpcomingMeetingsWidget(
             committee: committee,
             accentColor: committee.primaryColor,
@@ -144,8 +146,6 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
             _buildSchoolVisualizationSection(context),
             const SizedBox(height: 24),
           ],
-          _buildQuickActionsSection(context),
-          const SizedBox(height: 24),
           _buildCommitteeInfoSection(context),
         ],
       ),

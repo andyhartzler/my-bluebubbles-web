@@ -124,92 +124,86 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Always use brand gradient styling (like other tiles)
+    const isDark = true; // Force dark mode styling for gradient background
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? _unityBlue : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: _unityBlue.withOpacity(isDark ? 0.3 : 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [_unityBlue, _momentumBlue],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(isDark),
-          _buildMonthNavigation(isDark),
-          _buildDayHeaders(isDark),
-          if (_loading)
-            Padding(
-              padding: const EdgeInsets.all(40),
-              child: Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(isDark),
+            _buildMonthNavigation(isDark),
+            _buildDayHeaders(isDark),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
                 ),
-              ),
-            )
-          else if (_error != null)
-            _buildError(isDark)
-          else ...[
-            _buildCalendarGrid(isDark),
-            Divider(
-              height: 1,
-              color: isDark ? Colors.white.withOpacity(0.1) : _unityBlue.withOpacity(0.1),
-            ),
-            _buildSelectedDayEvents(isDark),
+              )
+            else if (_error != null)
+              _buildError(isDark)
+            else ...[
+              _buildCalendarGrid(isDark),
+              // Only show selected day events section if there are events
+              if (_selectedDayEvents.isNotEmpty) ...[
+                Divider(
+                  height: 1,
+                  color: Colors.white.withOpacity(0.1),
+                ),
+                _buildSelectedDayEvents(isDark),
+              ],
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildHeader(bool isDark) {
-    final accentColor = widget.accentColor ?? _momentumBlue;
-
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            accentColor.withOpacity(0.15),
-            accentColor.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.15),
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.calendar_today_rounded,
-              color: accentColor,
+              color: Colors.white,
               size: 24,
             ),
           ),
           const SizedBox(width: 16),
-          Expanded(
+          const Expanded(
             child: Text(
               'Organization Events & Meetings',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : _unityBlue,
+                color: Colors.white,
               ),
             ),
           ),
           CalendarSubscribeButton(
             committeeName: widget.committeeName,
-            accentColor: widget.accentColor,
+            accentColor: Colors.white,
           ),
           const SizedBox(width: 8),
           if (widget.onAddEvent != null)
@@ -218,7 +212,8 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Add Event', style: TextStyle(fontSize: 13)),
               style: FilledButton.styleFrom(
-                backgroundColor: accentColor,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                foregroundColor: Colors.white,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 shape: RoundedRectangleBorder(
@@ -272,7 +267,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: _momentumBlue.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Text(
@@ -280,7 +275,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: _momentumBlue,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -486,65 +481,23 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
               ],
             ),
           ),
-          if (_selectedDayEvents.isEmpty)
-            _buildEmptyState(isDark)
-          else
-            Flexible(
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                shrinkWrap: true,
-                itemCount: _selectedDayEvents.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: _EventCard(
-                      event: _selectedDayEvents[index],
-                      isDark: isDark,
-                    ),
-                  );
-                },
-              ),
+          Flexible(
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              shrinkWrap: true,
+              itemCount: _selectedDayEvents.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _EventCard(
+                    event: _selectedDayEvents[index],
+                    isDark: isDark,
+                  ),
+                );
+              },
             ),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(
-              Icons.event_available_rounded,
-              size: 40,
-              color:
-                  isDark ? Colors.white.withOpacity(0.2) : _unityBlue.withOpacity(0.2),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No events scheduled',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isDark
-                    ? Colors.white.withOpacity(0.5)
-                    : _unityBlue.withOpacity(0.5),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Tap "Add Event" to create one',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? Colors.white.withOpacity(0.3)
-                    : _unityBlue.withOpacity(0.4),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

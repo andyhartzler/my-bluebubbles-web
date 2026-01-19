@@ -1404,6 +1404,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         // Standalone widget - use full width for mobileFull size
         final isMobileFull = widget.size == DashboardWidgetSize.mobileFull ||
             widget.size == DashboardWidgetSize.hero ||
+            widget.size == DashboardWidgetSize.featured ||
             widget.size == DashboardWidgetSize.large;
         final height = isMobileFull ? fullWidgetHeight : widgetHeight;
 
@@ -1436,6 +1437,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     double rowHeight = baseWidgetHeight;
     for (final widget in widgets) {
       final isLarge = widget.size == DashboardWidgetSize.large ||
+          widget.size == DashboardWidgetSize.featured ||
           widget.size == DashboardWidgetSize.hero ||
           widget.size == DashboardWidgetSize.mobileFull;
       if (isLarge) {
@@ -1481,6 +1483,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               // Calculate width based on widget size
               double itemWidth = baseWidgetWidth;
               if (widget.size == DashboardWidgetSize.large ||
+                  widget.size == DashboardWidgetSize.featured ||
                   widget.size == DashboardWidgetSize.hero ||
                   widget.size == DashboardWidgetSize.mobileFull) {
                 itemWidth = baseWidgetWidth * 1.8; // Larger width for large widgets
@@ -3782,6 +3785,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return 'Medium';
       case DashboardWidgetSize.large:
         return 'Large';
+      case DashboardWidgetSize.featured:
+        return 'Featured';
       case DashboardWidgetSize.wide:
         return 'Wide';
       case DashboardWidgetSize.tall:

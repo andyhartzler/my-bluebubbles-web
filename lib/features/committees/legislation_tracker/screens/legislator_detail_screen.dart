@@ -37,7 +37,7 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
   final LegislationService _service = LegislationService();
 
   Legislator? _legislator;
-  List<TrackedBill> _sponsoredBills = [];
+  List<SponsoredBillInfo> _sponsoredBills = [];
   bool _isLoading = true;
   bool _isUploadingPhoto = false;
   bool _isSavingBio = false;
@@ -58,12 +58,12 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
     try {
       final results = await Future.wait([
         _service.getLegislator(widget.legislatorId),
-        _service.getBillsBySponsor(widget.legislatorId),
+        _service.getBillsBySponsorWithType(widget.legislatorId),
       ]);
 
       setState(() {
         _legislator = results[0] as Legislator?;
-        _sponsoredBills = results[1] as List<TrackedBill>;
+        _sponsoredBills = results[1] as List<SponsoredBillInfo>;
         _isLoading = false;
       });
     } catch (e) {
@@ -441,8 +441,10 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
                     ),
                     const SizedBox(height: 8),
 
-                    // Party badge
-                    Row(
+                    // Party badge and member badge
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -459,6 +461,30 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
                             ),
                           ),
                         ),
+                        // Member badge - shows if legislator is linked to a member
+                        if (legislator.isMember)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _grassrootsGreen.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: _grassrootsGreen.withOpacity(0.5)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.verified, size: 16, color: _grassrootsGreen),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Member',
+                                  style: TextStyle(
+                                    color: _grassrootsGreen,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
 
@@ -805,111 +831,152 @@ class _LegislatorDetailScreenState extends State<LegislatorDetailScreen> {
   }
 
   Widget _buildBillsSection(ThemeData theme, Legislator legislator) {
-    return Container(
+    return Card(
+      elevation: 4,
       margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _unityBlue,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'Sponsored Bills',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const Spacer(),
-              // Stats chips
-              if (legislator.billsSponsoredCount > 0)
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [_unityBlue, _momentumBlue],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: _momentumBlue.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Text(
-                    '${legislator.billsSponsoredCount} primary',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
+                  child: const Icon(
+                    Icons.gavel,
+                    color: Colors.white,
+                    size: 20,
                   ),
                 ),
-              if (legislator.billsCosponsoredCount > 0) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${legislator.billsCosponsoredCount} co-sponsor',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Sponsored Bills',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          if (_sponsoredBills.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.gavel_outlined,
-                      size: 48,
-                      color: Colors.white.withOpacity(0.5),
+            ),
+            const SizedBox(height: 12),
+            // Stats chips row
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (legislator.billsSponsoredCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No tracked bills sponsored',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star, size: 14, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${legislator.billsSponsoredCount} Primary',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Bills will appear here when tracked',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            ..._sponsoredBills.map((bill) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: BillCard(
-                    bill: bill,
-                    onTap: () => _navigateToBillDetail(bill),
-                    compact: true,
                   ),
-                )),
-        ],
+                if (legislator.billsCosponsoredCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.group, size: 14, color: Colors.white.withOpacity(0.9)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${legislator.billsCosponsoredCount} Co-Sponsor',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            if (_sponsoredBills.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.gavel_outlined,
+                        size: 48,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No tracked bills sponsored',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Bills will appear here when tracked',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ..._sponsoredBills.map((billInfo) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: BillCard(
+                      bill: billInfo.bill,
+                      onTap: () => _navigateToBillDetail(billInfo.bill),
+                      compact: true,
+                      isPrimarySponsor: billInfo.isPrimarySponsor,
+                      onDarkBackground: true,
+                    ),
+                  )),
+          ],
+        ),
       ),
     );
   }

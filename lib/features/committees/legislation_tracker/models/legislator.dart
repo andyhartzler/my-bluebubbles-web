@@ -78,6 +78,9 @@ class Legislator {
   final String? scrapeError;
   final Map<String, dynamic>? extras;
 
+  // Member linkage - if set, this legislator is also a member of the organization
+  final String? linkedMemberId;
+
   Legislator({
     required this.id,
     required this.createdAt,
@@ -118,6 +121,7 @@ class Legislator {
     this.lastScrapedAt,
     this.scrapeError,
     this.extras,
+    this.linkedMemberId,
   });
 
   factory Legislator.fromJson(Map<String, dynamic> json) {
@@ -167,6 +171,7 @@ class Legislator {
           : null,
       scrapeError: json['scrape_error'] as String?,
       extras: json['extras'] as Map<String, dynamic>?,
+      linkedMemberId: json['linked_member_id'] as String?,
     );
   }
 
@@ -211,10 +216,13 @@ class Legislator {
       'last_scraped_at': lastScrapedAt?.toIso8601String(),
       'scrape_error': scrapeError,
       'extras': extras,
+      'linked_member_id': linkedMemberId,
     };
   }
 
   // Helper getters
+  /// Returns true if this legislator is linked to a member of the organization
+  bool get isMember => linkedMemberId != null;
   String get displayTitle => chamber == 'upper' ? 'Senator' : 'Representative';
   String get chamberName => chamber == 'upper' ? 'Senate' : 'House';
   String get fullTitle => '$displayTitle $name';
@@ -312,6 +320,7 @@ class Legislator {
     DateTime? lastScrapedAt,
     String? scrapeError,
     Map<String, dynamic>? extras,
+    String? linkedMemberId,
   }) {
     return Legislator(
       id: id ?? this.id,
@@ -353,6 +362,7 @@ class Legislator {
       lastScrapedAt: lastScrapedAt ?? this.lastScrapedAt,
       scrapeError: scrapeError ?? this.scrapeError,
       extras: extras ?? this.extras,
+      linkedMemberId: linkedMemberId ?? this.linkedMemberId,
     );
   }
 }

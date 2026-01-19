@@ -649,17 +649,29 @@ class LegislationService {
 
   /// Get bills sponsored by a legislator (optimized for list display)
   Future<List<TrackedBill>> getBillsBySponsor(String legislatorId) async {
-    // Get bill IDs where this legislator is a sponsor
+    final result = await getBillsBySponsorWithType(legislatorId);
+    return result.map((r) => r.bill).toList();
+  }
+
+  /// Get bills sponsored by a legislator with sponsor type info
+  Future<List<SponsoredBillInfo>> getBillsBySponsorWithType(String legislatorId) async {
+    // Get bill IDs and sponsor type where this legislator is a sponsor
     final sponsorships = await _supabase
         .from('legislation_bill_sponsors')
-        .select('bill_id')
+        .select('bill_id, is_primary')
         .eq('legislator_id', legislatorId);
 
     if ((sponsorships as List).isEmpty) {
       return [];
     }
 
-    final billIds = sponsorships.map((s) => s['bill_id'] as String).toList();
+    final sponsorMap = <String, bool>{};
+    final billIds = <String>[];
+    for (final s in sponsorships) {
+      final billId = s['bill_id'] as String;
+      billIds.add(billId);
+      sponsorMap[billId] = s['is_primary'] == true;
+    }
 
     // Use optimized column selection (excludes large text fields)
     final response = await _supabase
@@ -668,7 +680,11 @@ class LegislationService {
         .inFilter('id', billIds)
         .order('latest_action_date', ascending: false);
 
-    return (response as List).map((json) => TrackedBill.fromJson(json as Map<String, dynamic>)).toList();
+    return (response as List).map((json) {
+      final bill = TrackedBill.fromJson(json as Map<String, dynamic>);
+      final isPrimary = sponsorMap[bill.id] ?? false;
+      return SponsoredBillInfo(bill: bill, isPrimarySponsor: isPrimary);
+    }).toList();
   }
 
   /// Update legislator biography
@@ -1717,7 +1733,7 @@ class SponsorLeaderboardEntry {
       party: json['party'] as String? ?? '',
       district: json['district'] as String? ?? '',
       chamber: json['chamber'] as String? ?? '',
-      billsCount: json['bills_count'] as int? ?? 0,
+      billsCount: json['count'] as int? ?? json['bills_count'] as int? ?? 0,
       legislatorId: json['legislator_id'] as String?,
       photoUrl: photoUrl,
     );
@@ -1766,7 +1782,7 @@ class BillLeaderboardEntry {
 
   factory BillLeaderboardEntry.fromJson(Map<String, dynamic> json) {
     return BillLeaderboardEntry(
-      id: json['id'] as String? ?? '',
+      id: json['bill_id'] as String? ?? json['id'] as String? ?? '',
       billIdentifier: json['bill_identifier'] as String? ?? '',
       title: json['title'] as String? ?? '',
       count: json['sponsor_count'] as int? ?? json['action_count'] as int? ?? 0,
@@ -1871,4 +1887,15 @@ class LegislatorStats {
     withLeadershipCount: 0,
     withPhotosCount: 0,
   );
+}
+
+/// Info about a bill sponsored by a legislator, including sponsor type
+class SponsoredBillInfo {
+  final TrackedBill bill;
+  final bool isPrimarySponsor;
+
+  const SponsoredBillInfo({
+    required this.bill,
+    required this.isPrimarySponsor,
+  });
 }

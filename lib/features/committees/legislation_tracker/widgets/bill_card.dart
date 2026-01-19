@@ -14,6 +14,8 @@ class BillCard extends StatelessWidget {
   final bool showPosition;
   final bool showPriority;
   final bool compact;
+  final bool? isPrimarySponsor; // null = don't show, true = primary, false = co-sponsor
+  final bool onDarkBackground; // Use lighter card color when on dark background
 
   const BillCard({
     super.key,
@@ -22,6 +24,8 @@ class BillCard extends StatelessWidget {
     this.showPosition = true,
     this.showPriority = true,
     this.compact = false,
+    this.isPrimarySponsor,
+    this.onDarkBackground = false,
   });
 
   @override
@@ -30,10 +34,15 @@ class BillCard extends StatelessWidget {
     final position = bill.position != null ? BillPosition.fromString(bill.position!) : null;
     final priority = bill.priority != null ? BillPriority.fromString(bill.priority!) : null;
 
+    // Use lighter background when on dark background (e.g., inside gradient container)
+    final cardColor = onDarkBackground
+        ? Colors.white.withOpacity(0.15)
+        : _unityBlue;
+
     return Card(
-      elevation: 2,
+      elevation: onDarkBackground ? 0 : 2,
       margin: EdgeInsets.only(bottom: compact ? 8 : 12),
-      color: _unityBlue,
+      color: cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -94,13 +103,18 @@ class BillCard extends StatelessWidget {
                       ),
                     const Spacer(),
 
+                    // Sponsor type badge - show if isPrimarySponsor is set
+                    if (isPrimarySponsor != null)
+                      _buildSponsorBadge(isPrimarySponsor!),
                     // Priority badge - only show if priority is set
-                    if (showPriority && priority != null)
+                    if (showPriority && priority != null) ...[
+                      if (isPrimarySponsor != null) const SizedBox(width: 8),
                       _buildBadge(
                         emoji: priority.emoji,
                         label: priority.label,
                         color: priority.color,
                       ),
+                    ],
                     // Position badge - only show if position is set
                     if (showPosition && position != null) ...[
                       const SizedBox(width: 8),
@@ -260,6 +274,36 @@ class BillCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(emoji, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSponsorBadge(bool isPrimary) {
+    final color = isPrimary ? _momentumBlue : Colors.amber;
+    final label = isPrimary ? 'Primary Sponsor' : 'Co-Sponsor';
+    final icon = isPrimary ? Icons.star : Icons.group;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
           const SizedBox(width: 4),
           Text(
             label,

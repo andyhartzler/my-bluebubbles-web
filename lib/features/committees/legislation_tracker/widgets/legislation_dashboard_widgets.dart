@@ -436,35 +436,39 @@ class LegislationPieChartWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: data.map((item) {
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: spacing),
-            child: Row(
-              children: [
-                Container(
-                  width: dotSize,
-                  height: dotSize,
-                  decoration: BoxDecoration(
-                    color: item.color,
-                    shape: BoxShape.circle,
+          return Tooltip(
+            message: '${item.label}: ${item.count}',
+            waitDuration: const Duration(milliseconds: 300),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: spacing),
+              child: Row(
+                children: [
+                  Container(
+                    width: dotSize,
+                    height: dotSize,
+                    decoration: BoxDecoration(
+                      color: item.color,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-                SizedBox(width: isCompact ? 6 : 8),
-                Expanded(
-                  child: Text(
-                    item.label,
-                    style: TextStyle(color: Colors.white, fontSize: fontSize),
-                    overflow: TextOverflow.ellipsis,
+                  SizedBox(width: isCompact ? 6 : 8),
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      style: TextStyle(color: Colors.white, fontSize: fontSize),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                Text(
-                  '${item.count}',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.bold,
+                  Text(
+                    '${item.count}',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }).toList(),
@@ -1575,66 +1579,70 @@ class LegislationBarChartWidget extends StatelessWidget {
       padding: EdgeInsets.zero,
       itemBuilder: (context, index) {
         final item = data[index];
-        return InkWell(
-          onTap: onItemTap != null ? () => onItemTap!(item) : null,
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: isVeryCompact ? 2 : 4),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: labelWidth,
-                  child: Text(
-                    item.label,
-                    style: TextStyle(color: Colors.white, fontSize: labelSize),
-                    overflow: TextOverflow.ellipsis,
+        return Tooltip(
+          message: '${item.label}: ${item.count}',
+          waitDuration: const Duration(milliseconds: 300),
+          child: InkWell(
+            onTap: onItemTap != null ? () => onItemTap!(item) : null,
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: isVeryCompact ? 2 : 4),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: labelWidth,
+                    child: Text(
+                      item.label,
+                      style: TextStyle(color: Colors.white, fontSize: labelSize),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                SizedBox(width: isVeryCompact ? 4 : 8),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Container(
-                        height: barHeight,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(barHeight / 2),
-                        ),
-                      ),
-                      FractionallySizedBox(
-                        widthFactor: maxValue > 0 ? item.count / maxValue : 0,
-                        child: Container(
+                  SizedBox(width: isVeryCompact ? 4 : 8),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Container(
                           height: barHeight,
                           decoration: BoxDecoration(
-                            color: item.color,
+                            color: Colors.white.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(barHeight / 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: item.color.withOpacity(0.3),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: isVeryCompact ? 4 : 8),
-                SizedBox(
-                  width: valueWidth,
-                  child: Text(
-                    '${item.count}',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: labelSize,
-                      fontWeight: FontWeight.bold,
+                        FractionallySizedBox(
+                          widthFactor: maxValue > 0 ? item.count / maxValue : 0,
+                          child: Container(
+                            height: barHeight,
+                            decoration: BoxDecoration(
+                              color: item.color,
+                              borderRadius: BorderRadius.circular(barHeight / 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: item.color.withOpacity(0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    textAlign: TextAlign.right,
                   ),
-                ),
-              ],
+                  SizedBox(width: isVeryCompact ? 4 : 8),
+                  SizedBox(
+                    width: valueWidth,
+                    child: Text(
+                      '${item.count}',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: labelSize,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1693,4 +1701,265 @@ class PieChartItem {
     required this.count,
     required this.color,
   });
+}
+
+/// Generic Distribution Leaderboard Widget
+/// Displays distribution data (like top subjects, categories) in a ranked list format
+class DistributionLeaderboardWidget extends StatelessWidget {
+  final LegislationWidgetConfig config;
+  final List<PieChartItem> data;
+  final VoidCallback? onTap;
+
+  const DistributionLeaderboardWidget({
+    super.key,
+    required this.config,
+    required this.data,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (data.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    final colors = config.gradientColors.isNotEmpty
+        ? config.gradientColors
+        : [_unityBlue, _momentumBlue];
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxHeight < 200;
+              final isVeryCompact = constraints.maxHeight < 150;
+              final padding = isVeryCompact ? 10.0 : (isCompact ? 12.0 : 16.0);
+
+              return Padding(
+                padding: EdgeInsets.all(padding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(isVeryCompact ? 6 : 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            config.icon ?? Icons.leaderboard,
+                            color: Colors.white,
+                            size: isVeryCompact ? 16 : 20,
+                          ),
+                        ),
+                        SizedBox(width: isVeryCompact ? 8 : 12),
+                        Expanded(
+                          child: Text(
+                            config.title,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: isVeryCompact
+                                  ? 12
+                                  : (isCompact ? 14 : 16),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: isVeryCompact ? 8 : 12),
+                    Expanded(
+                      child: _buildLeaderboardList(isCompact, isVeryCompact),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLeaderboardList(bool isCompact, bool isVeryCompact) {
+    final maxValue = data.fold<int>(
+      0,
+      (max, item) => item.count > max ? item.count : max,
+    );
+    final itemHeight = isVeryCompact ? 28.0 : (isCompact ? 32.0 : 36.0);
+    final fontSize = isVeryCompact ? 11.0 : (isCompact ? 12.0 : 13.0);
+    final rankSize = isVeryCompact ? 18.0 : (isCompact ? 22.0 : 26.0);
+
+    return ListView.builder(
+      itemCount: data.length,
+      padding: EdgeInsets.zero,
+      itemBuilder: (context, index) {
+        final item = data[index];
+        final percentage = maxValue > 0 ? item.count / maxValue : 0.0;
+
+        return Tooltip(
+          message: '${item.label}: ${item.count}',
+          waitDuration: const Duration(milliseconds: 300),
+          child: Container(
+            height: itemHeight,
+            margin: EdgeInsets.symmetric(vertical: isVeryCompact ? 1 : 2),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                // Rank badge
+                Container(
+                  width: rankSize,
+                  height: rankSize,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: _getRankColor(index),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _getRankColor(index).withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: fontSize - 2,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                // Label - expands to fill space
+                Expanded(
+                  child: Text(
+                    item.label,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: fontSize,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // Progress bar (mini)
+                SizedBox(
+                  width: 50,
+                  child: Stack(
+                    children: [
+                      Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: percentage,
+                        child: Container(
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: item.color,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Count
+                SizedBox(
+                  width: 40,
+                  child: Text(
+                    '${item.count}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Color _getRankColor(int index) {
+    switch (index) {
+      case 0:
+        return _sunriseGold;
+      case 1:
+        return Colors.grey[400]!;
+      case 2:
+        return Colors.brown[400]!;
+      default:
+        return _momentumBlue.withOpacity(0.7);
+    }
+  }
+
+  Widget _buildEmptyState() {
+    final colors = config.gradientColors.isNotEmpty
+        ? config.gradientColors
+        : [_unityBlue, _momentumBlue];
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.leaderboard,
+                color: Colors.white.withOpacity(0.5),
+                size: 48,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No data available',
+                style: TextStyle(color: Colors.white.withOpacity(0.7)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

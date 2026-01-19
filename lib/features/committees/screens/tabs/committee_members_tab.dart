@@ -8,6 +8,10 @@ import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 
+// Brand colors
+const _unityBlue = Color(0xFF273351);
+const _momentumBlue = Color(0xFF32A6DE);
+
 class CommitteeMembersTab extends StatefulWidget {
   final Committee committee;
   final String? initialSchoolFilter;
@@ -190,7 +194,11 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
+        ),
+      );
     }
 
     if (_error != null) {
@@ -200,7 +208,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+              const Icon(Icons.error_outline, size: 48, color: _unityBlue),
               const SizedBox(height: 16),
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
@@ -208,6 +216,10 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
                 onPressed: _loadMembers,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _momentumBlue,
+                  foregroundColor: Colors.white,
+                ),
               ),
             ],
           ),
@@ -215,6 +227,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
       );
     }
 
+    final theme = Theme.of(context);
     final schoolLabel = committee.id == 'College Democrats' ? 'College' : 'High School';
 
     return Scaffold(
@@ -227,16 +240,25 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
               padding: const EdgeInsets.all(16),
               child: TextField(
                 controller: _searchController,
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                style: const TextStyle(color: _unityBlue),
                 decoration: InputDecoration(
                   hintText: 'Search ${committee.displayName} members...',
-                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
-                  prefixIcon: const Icon(Icons.search),
+                  hintStyle: TextStyle(color: _unityBlue.withOpacity(0.5)),
+                  prefixIcon: const Icon(Icons.search, color: _momentumBlue),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: _momentumBlue.withOpacity(0.3)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: _momentumBlue.withOpacity(0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _momentumBlue, width: 2),
                   ),
                   filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
+                  fillColor: Colors.white,
                 ),
               ),
             ),
@@ -250,20 +272,24 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
                     Icon(
                       committee.id == 'College Democrats' ? Icons.school : Icons.domain,
                       size: 20,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: Colors.white,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Filter by $schoolLabel:',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _momentumBlue.withOpacity(0.3)),
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String?>(
@@ -293,7 +319,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
                     if (_selectedSchoolFilter != null) ...[
                       const SizedBox(width: 8),
                       IconButton(
-                        icon: const Icon(Icons.clear, size: 20),
+                        icon: const Icon(Icons.clear, size: 20, color: Colors.white),
                         onPressed: () => _setSchoolFilter(null),
                         tooltip: 'Clear filter',
                         padding: EdgeInsets.zero,
@@ -312,21 +338,38 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  Text(
-                    '${_filteredMembers.length} member${_filteredMembers.length == 1 ? '' : 's'}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.people_outline, size: 16, color: Colors.white),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${_filteredMembers.length} member${_filteredMembers.length == 1 ? '' : 's'}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.refresh),
+                    icon: const Icon(Icons.refresh, color: Colors.white),
                     onPressed: _loadMembers,
                     tooltip: 'Refresh',
                   ),
                 ],
               ),
             ),
+
+            const SizedBox(height: 8),
 
             // Member list
             Expanded(
@@ -338,14 +381,16 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
                           Icon(
                             Icons.people_outline,
                             size: 64,
-                            color: Theme.of(context).disabledColor,
+                            color: Colors.white.withOpacity(0.5),
                           ),
                           const SizedBox(height: 16),
                           Text(
                             _searchController.text.isNotEmpty
                                 ? 'No members match your search'
                                 : 'No members in this committee',
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                            ),
                           ),
                         ],
                       ),
@@ -366,7 +411,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
         onPressed: _showAddMemberDialog,
         icon: const Icon(Icons.person_add),
         label: const Text('Add Member'),
-        backgroundColor: committee.primaryColor,
+        backgroundColor: _momentumBlue,
         foregroundColor: Colors.white,
       ),
     );
@@ -567,25 +612,27 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
   Widget _buildMemberCard(Member member) {
     final theme = Theme.of(context);
     final photoUrl = member.primaryProfilePhotoUrl;
+    final schoolName = _getSchoolDisplayName(member);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      color: _unityBlue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
         onTap: () => _openMemberDetail(member),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Row(
             children: [
               CorsAwareAvatar(
                 imageUrl: photoUrl,
-                radius: 28,
-                backgroundColor: committee.primaryColor.withOpacity(0.2),
+                radius: 26,
+                backgroundColor: Colors.white.withOpacity(0.2),
                 fallbackText: member.name,
-                fallbackIconColor: committee.primaryColor,
-                fallbackTextColor: committee.primaryColor,
+                fallbackIconColor: Colors.white,
+                fallbackTextColor: Colors.white,
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -595,57 +642,84 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
                     Text(
                       member.name,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    if (member.preferredEmail != null)
-                      Text(
-                        member.preferredEmail!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    if (member.primaryPhone != null)
-                      Text(
-                        member.primaryPhone!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-                        ),
-                      ),
-                    // Show school name for College/HS Democrats, otherwise chapter name
-                    if (_getSchoolDisplayName(member) != null) ...[
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: committee.primaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _getSchoolDisplayName(member)!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: committee.primaryColor,
-                            fontWeight: FontWeight.w500,
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        if (member.preferredEmail != null)
+                          _buildInfoChip(
+                            icon: Icons.email_outlined,
+                            text: member.preferredEmail!,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                        if (member.primaryPhone != null)
+                          _buildInfoChip(
+                            icon: Icons.phone_outlined,
+                            text: member.primaryPhone!,
+                          ),
+                        if (schoolName != null)
+                          _buildInfoChip(
+                            icon: committee.id == 'College Democrats'
+                                ? Icons.school_outlined
+                                : Icons.domain_outlined,
+                            text: schoolName,
+                            highlight: true,
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              Icon(
+              const Icon(
                 Icons.chevron_right,
-                color: theme.disabledColor,
+                color: Colors.white54,
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip({
+    required IconData icon,
+    required String text,
+    bool highlight = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: highlight
+            ? _momentumBlue.withOpacity(0.3)
+            : Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: highlight ? Colors.white : Colors.white70,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                color: highlight ? Colors.white : Colors.white70,
+                fontWeight: highlight ? FontWeight.w600 : FontWeight.normal,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

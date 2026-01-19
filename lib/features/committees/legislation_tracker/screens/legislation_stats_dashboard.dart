@@ -891,6 +891,7 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         final isMobileFull =
             widget.size == LegislationWidgetSize.mobileFull ||
             widget.size == LegislationWidgetSize.hero ||
+            widget.size == LegislationWidgetSize.featured ||
             widget.size == LegislationWidgetSize.large;
         final height = isMobileFull ? fullWidgetHeight : widgetHeight;
 
@@ -1096,6 +1097,16 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
             entries: stats.top10MostActiveBills,
             onEntryTap: (entry) => _navigateToBillDetail(entry.id),
           );
+        } else {
+          // Handle distribution data sources (topSubjects, topCategories, etc.)
+          final distributionData = _getDistributionData(config.dataSourceKey, stats);
+          if (distributionData.isNotEmpty) {
+            return DistributionLeaderboardWidget(
+              config: config,
+              data: distributionData,
+              onTap: () => _handleChartTap(config.dataSourceKey),
+            );
+          }
         }
         return const SizedBox.shrink();
 
@@ -2834,6 +2845,8 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         return 'Medium';
       case LegislationWidgetSize.large:
         return 'Large';
+      case LegislationWidgetSize.featured:
+        return 'Featured';
       case LegislationWidgetSize.wide:
         return 'Wide';
       case LegislationWidgetSize.tall:

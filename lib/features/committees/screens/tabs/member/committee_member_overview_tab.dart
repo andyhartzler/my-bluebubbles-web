@@ -235,9 +235,16 @@ class _CommitteeMemberOverviewTabState
 
     return Card(
       elevation: 4,
-      color: BrandColors.unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
@@ -345,23 +352,42 @@ class _CommitteeMemberOverviewTabState
     final stats = _stats!;
 
     return Card(
-      elevation: 2,
-      color: Colors.white,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.insights_outlined, color: BrandColors.momentumBlue),
-                const SizedBox(width: 8),
-                Text(
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.insights_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
                   'Committee Stats',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: BrandColors.unityBlue,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
@@ -400,13 +426,13 @@ class _CommitteeMemberOverviewTabState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: BrandColors.momentumBlue.withOpacity(0.1),
+        color: Colors.white.withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20, color: BrandColors.momentumBlue),
+          Icon(icon, size: 20, color: Colors.white),
           const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,13 +441,13 @@ class _CommitteeMemberOverviewTabState
                 value,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: BrandColors.unityBlue,
+                  color: Colors.white,
                 ),
               ),
               Text(
                 label,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: BrandColors.unityBlue.withOpacity(0.7),
+                  color: Colors.white.withOpacity(0.8),
                 ),
               ),
             ],
@@ -433,26 +459,42 @@ class _CommitteeMemberOverviewTabState
 
   Widget _buildLeadershipCard(ThemeData theme) {
     return Card(
-      elevation: 2,
-      color: Colors.white,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.supervisor_account_outlined,
-                  color: BrandColors.momentumBlue,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.supervisor_account_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
-                const SizedBox(width: 8),
-                Text(
+                const SizedBox(width: 12),
+                const Text(
                   'Committee Leadership',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: BrandColors.unityBlue,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
@@ -466,17 +508,22 @@ class _CommitteeMemberOverviewTabState
   }
 
   Widget _buildLeaderItem(CommitteeLeader leader, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
         children: [
           CorsAwareAvatar(
             imageUrl: leader.photoUrl,
             radius: 20,
-            backgroundColor: BrandColors.momentumBlue.withOpacity(0.2),
+            backgroundColor: Colors.white.withOpacity(0.2),
             fallbackText: leader.name,
-            fallbackIconColor: BrandColors.unityBlue,
-            fallbackTextColor: BrandColors.unityBlue,
+            fallbackIconColor: Colors.white,
+            fallbackTextColor: Colors.white,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -487,14 +534,14 @@ class _CommitteeMemberOverviewTabState
                   leader.name,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: BrandColors.unityBlue,
+                    color: Colors.white,
                   ),
                 ),
                 if (leader.title != null)
                   Text(
                     leader.title!,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: BrandColors.momentumBlue,
+                      color: Colors.white.withOpacity(0.8),
                     ),
                   ),
               ],
@@ -513,35 +560,57 @@ class _CommitteeMemberOverviewTabState
     final displayMeetings = upcoming.take(3).toList();
 
     return Card(
-      elevation: 2,
-      color: Colors.white,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.upcoming_outlined, color: BrandColors.momentumBlue),
-                const SizedBox(width: 8),
-                Expanded(
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.upcoming_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
                   child: Text(
                     'Upcoming Meetings',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: BrandColors.unityBlue,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 if (widget.onNavigateToMeetings != null && upcoming.isNotEmpty)
                   TextButton(
                     onPressed: widget.onNavigateToMeetings,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                    ),
                     child: const Text('See all'),
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             if (displayMeetings.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -551,13 +620,13 @@ class _CommitteeMemberOverviewTabState
                       Icon(
                         Icons.event_busy_outlined,
                         size: 32,
-                        color: BrandColors.unityBlue.withOpacity(0.4),
+                        color: Colors.white.withOpacity(0.4),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'No upcoming meetings',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: BrandColors.unityBlue.withOpacity(0.6),
+                          color: Colors.white.withOpacity(0.7),
                         ),
                       ),
                     ],
@@ -579,7 +648,7 @@ class _CommitteeMemberOverviewTabState
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: BrandColors.unityBlue,
+        color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(

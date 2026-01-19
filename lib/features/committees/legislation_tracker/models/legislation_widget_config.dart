@@ -19,6 +19,7 @@ enum LegislationWidgetSize {
   small,      // 1x0.5 on grid - half height compact row
   medium,     // 1x1 on grid - standard card size
   large,      // 2x1 on grid - wide card
+  featured,   // 2.5x1.5 on grid - between large and hero
   wide,       // 3x1 on grid - extra wide
   tall,       // 1x2 on grid - vertical
   hero,       // 3x2 on grid - full featured
@@ -182,6 +183,7 @@ class LegislationWidgetConfig {
       case LegislationWidgetSize.tall:    // 1x2 vertical
         return 1;
       case LegislationWidgetSize.large:   // 2x1 wide
+      case LegislationWidgetSize.featured: // 2.5x1.5 - uses 2 grid but wider multiplier
         return 2;
       case LegislationWidgetSize.wide:    // 3x1 extra wide
       case LegislationWidgetSize.hero:    // 3x2 full featured
@@ -200,6 +202,7 @@ class LegislationWidgetConfig {
       case LegislationWidgetSize.large:   // Wide card
       case LegislationWidgetSize.wide:    // Extra wide
         return 1;
+      case LegislationWidgetSize.featured: // 2.5x1.5 - uses 2 grid but shorter multiplier
       case LegislationWidgetSize.tall:    // Vertical
       case LegislationWidgetSize.hero:    // Full featured
       case LegislationWidgetSize.mobileFull:
@@ -210,6 +213,7 @@ class LegislationWidgetConfig {
   /// Get the actual height multiplier for rendering
   /// - mini is 0.5 (square - half height and half width)
   /// - small is 0.5 (half height compact row)
+  /// - featured is 1.5 (between large's 1 and hero's 2)
   /// - others use their gridHeight
   double get heightMultiplier {
     switch (size) {
@@ -217,6 +221,8 @@ class LegislationWidgetConfig {
         return 0.5; // Mini is a square: half height
       case LegislationWidgetSize.small:
         return 0.5; // Small is half height
+      case LegislationWidgetSize.featured:
+        return 1.5; // Featured is between large and hero
       default:
         return gridHeight.toDouble();
     }
@@ -224,11 +230,14 @@ class LegislationWidgetConfig {
 
   /// Get the actual width multiplier for rendering
   /// - mini is 0.5 (square - half width)
+  /// - featured is 2.5 (between large's 2 and hero's 3)
   /// - others use their gridWidth
   double get widthMultiplier {
     switch (size) {
       case LegislationWidgetSize.mini:
         return 0.5; // Mini is a square: half width
+      case LegislationWidgetSize.featured:
+        return 2.5; // Featured is between large and hero
       default:
         return gridWidth.toDouble();
     }

@@ -396,7 +396,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
         ),
         Expanded(
           child: dayEvents.isEmpty
-              ? _buildEmptyState(isDark)
+              ? const SizedBox.shrink()
               : RefreshIndicator(
                   onRefresh: _loadEvents,
                   child: ListView.builder(

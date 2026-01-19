@@ -230,7 +230,7 @@ class _CommitteeMemberWorkspaceScreenState
           label: 'Campaigns',
           icon: Icons.campaign_outlined,
           slug: 'campaigns',
-          builder: () => const CommitteeCampaignsTab(),
+          builder: () => const CommitteeCampaignsTab(isMemberView: true),
         ),
       );
     }

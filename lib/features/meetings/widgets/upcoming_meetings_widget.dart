@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/services/committee_repository.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/meetings/models/scheduled_meeting.dart';
 import 'package:bluebubbles/features/meetings/services/zoom_meeting_service.dart';
 import 'package:bluebubbles/features/meetings/widgets/notification_options_dialog.dart';
@@ -76,13 +77,18 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = widget.accentColor ?? widget.committee.primaryColor;
-
     return Card(
-      elevation: 2,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,12 +96,25 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
             // Header
             Row(
               children: [
-                Icon(Icons.videocam, color: color),
-                const SizedBox(width: 8),
-                Expanded(
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.videocam,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
                   child: Text(
                     'Upcoming Zoom Meetings',
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -105,7 +124,8 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('Schedule'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: color,
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 8,
@@ -123,7 +143,9 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(24),
-                  child: CircularProgressIndicator(),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
                 ),
               )
             else if (_error != null)
@@ -145,18 +167,22 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
+            Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Colors.white.withOpacity(0.5),
+            ),
             const SizedBox(height: 12),
             Text(
               _error!,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.red.shade700),
+              style: TextStyle(color: Colors.white.withOpacity(0.8)),
             ),
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: _loadData,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              label: const Text('Retry', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -165,31 +191,48 @@ class _UpcomingMeetingsWidgetState extends State<UpcomingMeetingsWidget> {
   }
 
   Widget _buildEmptyState() {
-    final theme = Theme.of(context);
-    final color = widget.accentColor ?? widget.committee.primaryColor;
-
     return Container(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.event_available,
+            Icons.videocam_off_outlined,
             size: 48,
-            color: color.withOpacity(0.5),
+            color: Colors.white.withOpacity(0.4),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
-            'No upcoming meetings scheduled',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+            'No upcoming meetings',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Schedule a Zoom meeting for your committee',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodySmall?.color?.withOpacity(0.5),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 13,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          // Prominent schedule button
+          ElevatedButton.icon(
+            onPressed: _scheduleMeeting,
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('Schedule a Meeting'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: BrandColors.unityBlue,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
             ),
           ),
         ],

@@ -538,8 +538,8 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
                 ],
               ),
 
-              // Recent participants preview (only for exec view)
-              if (!widget.isMemberView && recentParticipants.isNotEmpty) ...[
+              // Participant preview section
+              if (campaign.participants.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -547,38 +547,42 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
                     color: Colors.white.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Row(
-                    children: [
-                      // Avatar stack
-                      SizedBox(
-                        width: 100,
-                        height: 32,
-                        child: Stack(
-                          children: recentParticipants.asMap().entries.take(4).map((entry) {
-                            final index = entry.key;
-                            final participant = entry.value;
-                            return Positioned(
-                              left: index * 20.0,
-                              child: _buildParticipantAvatar(participant),
-                            );
-                          }).toList(),
+                  child: widget.isMemberView
+                      // Member view: show counts only
+                      ? _buildParticipantCountsRow(campaign)
+                      // Exec view: show avatar stack with names
+                      : Row(
+                          children: [
+                            // Avatar stack
+                            SizedBox(
+                              width: 100,
+                              height: 32,
+                              child: Stack(
+                                children: recentParticipants.asMap().entries.take(4).map((entry) {
+                                  final index = entry.key;
+                                  final participant = entry.value;
+                                  return Positioned(
+                                    left: index * 20.0,
+                                    child: _buildParticipantAvatar(participant),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                campaign.participants.length > 5
+                                    ? '${recentParticipants.first.name} and ${campaign.participants.length - 1} more'
+                                    : recentParticipants.map((p) => p.name.split(' ').first).join(', '),
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 13,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          campaign.participants.length > 5
-                              ? '${recentParticipants.first.name} and ${campaign.participants.length - 1} more'
-                              : recentParticipants.map((p) => p.name.split(' ').first).join(', '),
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 13,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
 
@@ -640,6 +644,106 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildParticipantCountsRow(CampaignData campaign) {
+    // Count members and subscribers
+    int memberCount = 0;
+    int subscriberCount = 0;
+
+    for (final participant in campaign.participants) {
+      if (participant.linkedMember != null) {
+        memberCount++;
+      } else if (participant.linkedSubscriber != null) {
+        subscriberCount++;
+      } else {
+        // Count as subscriber if not linked to either
+        subscriberCount++;
+      }
+    }
+
+    return Row(
+      children: [
+        // Members count
+        Expanded(
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: _grassrootsGreen.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.badge, size: 16, color: _grassrootsGreen),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$memberCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    'Members',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: 1,
+          height: 36,
+          color: Colors.white.withOpacity(0.2),
+        ),
+        // Subscribers count
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: _momentumBlue.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.mail_outline, size: 16, color: _momentumBlue),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$subscriberCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    'Subscribers',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

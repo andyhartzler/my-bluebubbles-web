@@ -109,79 +109,73 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: _unityBlue.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [_unityBlue, _momentumBlue],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          _buildMonthNavigation(),
-          _buildDayHeaders(),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.all(40),
-              child: Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(_momentumBlue),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            _buildMonthNavigation(),
+            _buildDayHeaders(),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
                 ),
-              ),
-            )
-          else if (_error != null)
-            _buildError()
-          else ...[
-            _buildCalendarGrid(),
-            Divider(height: 1, color: _unityBlue.withOpacity(0.1)),
-            _buildSelectedDayEvents(),
+              )
+            else if (_error != null)
+              _buildError()
+            else ...[
+              _buildCalendarGrid(),
+              // Only show selected day events section if there are events
+              if (_selectedDayEvents.isNotEmpty) ...[
+                Divider(height: 1, color: Colors.white.withOpacity(0.2)),
+                _buildSelectedDayEvents(),
+              ],
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildHeader() {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            _momentumBlue.withOpacity(0.1),
-            _momentumBlue.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: _momentumBlue.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
               Icons.calendar_today_rounded,
-              color: _momentumBlue,
-              size: 22,
+              color: Colors.white,
+              size: 20,
             ),
           ),
           const SizedBox(width: 12),
-          Text(
+          const Text(
             'Organization Calendar',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: _unityBlue,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -190,7 +184,6 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
   }
 
   Widget _buildMonthNavigation() {
-    final theme = Theme.of(context);
     final monthFormat = DateFormat('MMMM yyyy');
     final now = DateTime.now();
     final isCurrentMonth =
@@ -203,9 +196,9 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
         children: [
           IconButton(
             onPressed: _previousMonth,
-            icon: const Icon(Icons.chevron_left_rounded, color: _unityBlue),
+            icon: const Icon(Icons.chevron_left_rounded, color: Colors.white),
             style: IconButton.styleFrom(
-              backgroundColor: _unityBlue.withOpacity(0.05),
+              backgroundColor: Colors.white.withOpacity(0.15),
             ),
           ),
           GestureDetector(
@@ -215,9 +208,10 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
               children: [
                 Text(
                   monthFormat.format(_focusedMonth),
-                  style: theme.textTheme.titleSmall?.copyWith(
+                  style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: _unityBlue,
+                    color: Colors.white,
+                    fontSize: 16,
                   ),
                 ),
                 if (!isCurrentMonth) ...[
@@ -225,7 +219,7 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: _momentumBlue.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Text(
@@ -233,7 +227,7 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: _momentumBlue,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -243,9 +237,9 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
           ),
           IconButton(
             onPressed: _nextMonth,
-            icon: const Icon(Icons.chevron_right_rounded, color: _unityBlue),
+            icon: const Icon(Icons.chevron_right_rounded, color: Colors.white),
             style: IconButton.styleFrom(
-              backgroundColor: _unityBlue.withOpacity(0.05),
+              backgroundColor: Colors.white.withOpacity(0.15),
             ),
           ),
         ],
@@ -267,7 +261,7 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: _unityBlue.withOpacity(0.6),
+                        color: Colors.white.withOpacity(0.8),
                       ),
                     ),
                   ),
@@ -308,7 +302,7 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
           if (dayOffset < 0 || dayOffset >= daysInMonth) {
             return Container(
               decoration: BoxDecoration(
-                color: _unityBlue.withOpacity(0.02),
+                color: Colors.white.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(6),
               ),
             );
@@ -350,7 +344,7 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
             Icon(
               Icons.error_outline,
               size: 40,
-              color: Colors.red.shade300,
+              color: Colors.white.withOpacity(0.5),
             ),
             const SizedBox(height: 12),
             Text(
@@ -358,14 +352,14 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.red.shade700,
+                color: Colors.white.withOpacity(0.8),
               ),
             ),
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: _loadEvents,
-              icon: const Icon(Icons.refresh, color: _momentumBlue),
-              label: const Text('Retry', style: TextStyle(color: _momentumBlue)),
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              label: const Text('Retry', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -374,7 +368,6 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
   }
 
   Widget _buildSelectedDayEvents() {
-    final theme = Theme.of(context);
     final dayFormat = DateFormat('EEEE, MMMM d');
     final isToday = _selectedDate.year == DateTime.now().year &&
         _selectedDate.month == DateTime.now().month &&
@@ -392,9 +385,10 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
               children: [
                 Text(
                   dayFormat.format(_selectedDate),
-                  style: theme.textTheme.titleSmall?.copyWith(
+                  style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: _unityBlue,
+                    color: Colors.white,
+                    fontSize: 14,
                   ),
                 ),
                 if (isToday) ...[
@@ -402,7 +396,7 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: _momentumBlue,
+                      color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
@@ -420,55 +414,26 @@ class _MemberCalendarWidgetState extends State<MemberCalendarWidget> {
                   '${_selectedDayEvents.length} event${_selectedDayEvents.length == 1 ? '' : 's'}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: _unityBlue.withOpacity(0.5),
+                    color: Colors.white.withOpacity(0.7),
                   ),
                 ),
               ],
             ),
           ),
-          if (_selectedDayEvents.isEmpty)
-            _buildEmptyState()
-          else
-            Flexible(
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                shrinkWrap: true,
-                itemCount: _selectedDayEvents.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: _EventCard(event: _selectedDayEvents[index]),
-                  );
-                },
-              ),
+          Flexible(
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              shrinkWrap: true,
+              itemCount: _selectedDayEvents.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _EventCard(event: _selectedDayEvents[index]),
+                );
+              },
             ),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(
-              Icons.event_available_rounded,
-              size: 40,
-              color: _unityBlue.withOpacity(0.2),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No events scheduled',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: _unityBlue.withOpacity(0.5),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -517,14 +482,14 @@ class _CalendarDayCell extends StatelessWidget {
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           color: isSelected
-              ? _momentumBlue.withOpacity(0.15)
+              ? Colors.white.withOpacity(0.25)
               : isToday
-                  ? _momentumBlue.withOpacity(0.08)
-                  : _unityBlue.withOpacity(0.02),
+                  ? Colors.white.withOpacity(0.15)
+                  : Colors.white.withOpacity(0.08),
           borderRadius: BorderRadius.circular(8),
           border: isToday
-              ? Border.all(color: _momentumBlue, width: 2)
-              : Border.all(color: _unityBlue.withOpacity(0.08), width: 0.5),
+              ? Border.all(color: Colors.white, width: 2)
+              : Border.all(color: Colors.white.withOpacity(0.15), width: 0.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -538,7 +503,7 @@ class _CalendarDayCell extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: isToday
                       ? BoxDecoration(
-                          color: _momentumBlue,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(11),
                         )
                       : null,
@@ -548,10 +513,8 @@ class _CalendarDayCell extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: isToday || isSelected ? FontWeight.w700 : FontWeight.w500,
                       color: isToday
-                          ? Colors.white
-                          : isSelected
-                              ? _momentumBlue
-                              : _unityBlue,
+                          ? _unityBlue
+                          : Colors.white,
                     ),
                   ),
                 ),
@@ -560,7 +523,7 @@ class _CalendarDayCell extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                     decoration: BoxDecoration(
-                      color: _momentumBlue.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -568,7 +531,7 @@ class _CalendarDayCell extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 8,
                         fontWeight: FontWeight.w600,
-                        color: _momentumBlue,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -587,7 +550,7 @@ class _CalendarDayCell extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 2),
                       padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
                       decoration: BoxDecoration(
-                        color: eventColor.withOpacity(0.2),
+                        color: eventColor.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(3),
                         border: Border(
                           left: BorderSide(color: eventColor, width: 2),
@@ -595,10 +558,10 @@ class _CalendarDayCell extends StatelessWidget {
                       ),
                       child: Text(
                         event.title,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
-                          color: _unityBlue,
+                          color: Colors.white,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -627,13 +590,12 @@ class _EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final timeFormat = DateFormat('h:mm a');
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _unityBlue.withOpacity(0.03),
+        color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border(
           left: BorderSide(
@@ -654,10 +616,10 @@ class _EventCard extends StatelessWidget {
                   event.allDay
                       ? 'All Day'
                       : timeFormat.format(event.startTime.toLocal()),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: _eventColor,
+                    color: Colors.white,
                   ),
                 ),
                 if (!event.allDay)
@@ -665,7 +627,7 @@ class _EventCard extends StatelessWidget {
                     timeFormat.format(event.endTime.toLocal()),
                     style: TextStyle(
                       fontSize: 11,
-                      color: _unityBlue.withOpacity(0.5),
+                      color: Colors.white.withOpacity(0.7),
                     ),
                   ),
               ],
@@ -682,9 +644,10 @@ class _EventCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         event.title,
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        style: const TextStyle(
                           fontWeight: FontWeight.w500,
-                          color: _unityBlue,
+                          color: Colors.white,
+                          fontSize: 14,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -724,7 +687,7 @@ class _EventCard extends StatelessWidget {
                       Icon(
                         Icons.location_on_outlined,
                         size: 12,
-                        color: _unityBlue.withOpacity(0.5),
+                        color: Colors.white.withOpacity(0.7),
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -732,7 +695,7 @@ class _EventCard extends StatelessWidget {
                           event.location!,
                           style: TextStyle(
                             fontSize: 12,
-                            color: _unityBlue.withOpacity(0.6),
+                            color: Colors.white.withOpacity(0.8),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -746,7 +709,7 @@ class _EventCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: _momentumBlue.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -754,7 +717,7 @@ class _EventCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
-                        color: _momentumBlue,
+                        color: Colors.white,
                       ),
                     ),
                   ),

@@ -21,7 +21,7 @@ import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/screens/legislation_tracker_screen.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/legislation_provider.dart';
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/bill_search_provider.dart';
-import 'package:bluebubbles/features/committees/screens/committee_workspace_settings_screen.dart';
+import 'package:bluebubbles/features/committees/screens/tabs/committee_settings_tab.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
@@ -198,6 +198,15 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         ),
       );
     }
+
+    // Settings tab is always last
+    tabs.add(
+      _TabDefinition(
+        label: 'Settings',
+        icon: Icons.settings_outlined,
+        builder: () => CommitteeSettingsTab(committee: committee),
+      ),
+    );
 
     return tabs;
   }
@@ -396,137 +405,6 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
     );
   }
 
-  Widget _buildMobileLayout(BuildContext context, bool isVerySmall) {
-    final theme = Theme.of(context);
-
-    // Use a fixed header layout so back button is always visible
-    return Scaffold(
-      body: Column(
-        children: [
-          // Fixed header with back button and tabs - always visible
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [committee.primaryColor, committee.secondaryColor],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header row with back button, icon, and title
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
-                          ),
-                          onPressed: () => Navigator.of(context).pop(),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        const SizedBox(width: 4),
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: Colors.white.withOpacity(0.2),
-                          child: Icon(
-                            committee.icon,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            committee.displayName,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        // Settings button for mobile
-                        PopupMenuButton<String>(
-                          icon: const Icon(
-                            Icons.more_vert,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          padding: EdgeInsets.zero,
-                          offset: const Offset(0, 40),
-                          onSelected: (value) {
-                            if (value == 'workspace_settings') {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      CommitteeWorkspaceSettingsScreen(
-                                        committee: committee,
-                                      ),
-                                ),
-                              );
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'workspace_settings',
-                              child: ListTile(
-                                leading: Icon(Icons.settings_outlined),
-                                title: Text('Workspace Settings'),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Tab bar
-                  TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    labelPadding: EdgeInsets.symmetric(
-                      horizontal: isVerySmall ? 6 : 10,
-                    ),
-                    indicatorWeight: 3,
-                    indicatorColor: Colors.white,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.white70,
-                    tabs: _tabs
-                        .map(
-                          (tab) => Tab(
-                            icon: tab.iconWidget ?? Icon(tab.icon, size: 18),
-                            text: isVerySmall ? null : tab.label,
-                            iconMargin: EdgeInsets.only(
-                              bottom: isVerySmall ? 0 : 2,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Tab content - scrollable
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: _tabs.map((tab) => tab.builder()).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Fixed header matching the member workspace styling
   Widget _buildFixedHeader(
     BuildContext context,
@@ -610,40 +488,6 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
                   if (!isMobile) ...[
                     const SizedBox(width: 16),
                     _buildLeadershipChips(),
-                    const SizedBox(width: 12),
-                    _buildSettingsButton(context),
-                  ] else ...[
-                    // Settings button for mobile
-                    PopupMenuButton<String>(
-                      icon: const Icon(
-                        Icons.more_vert,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      padding: EdgeInsets.zero,
-                      offset: const Offset(0, 40),
-                      onSelected: (value) {
-                        if (value == 'workspace_settings') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => CommitteeWorkspaceSettingsScreen(
-                                committee: committee,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'workspace_settings',
-                          child: ListTile(
-                            leading: Icon(Icons.settings_outlined),
-                            title: Text('Workspace Settings'),
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ],
               ),
@@ -717,172 +561,6 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: displayLeaders
-          .map(
-            (leader) => Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: _buildLeaderChip(leader),
-            ),
-          )
-          .toList(),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    final theme = Theme.of(context);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final isVerySmall = screenWidth < 400;
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [committee.primaryColor, committee.secondaryColor],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            isMobile ? 56 : 72,
-            isMobile ? 8 : 16,
-            isMobile ? 16 : 24,
-            isMobile ? 40 : 60,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Left side: Committee icon and name
-              Expanded(
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: isMobile ? 20 : 28,
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      child: Icon(
-                        committee.icon,
-                        color: Colors.white,
-                        size: isMobile ? 20 : 28,
-                      ),
-                    ),
-                    SizedBox(width: isMobile ? 12 : 16),
-                    Expanded(
-                      child: Text(
-                        committee.displayName,
-                        style:
-                            (isMobile
-                                    ? theme.textTheme.titleMedium
-                                    : theme.textTheme.headlineSmall)
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!isMobile) const SizedBox(width: 16),
-
-              // Right side: Leadership section
-              _buildLeadershipSection(context),
-
-              // Settings button
-              if (!isMobile) ...[
-                const SizedBox(width: 12),
-                _buildSettingsButton(context),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSettingsButton(BuildContext context) {
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.settings_outlined, color: Colors.white),
-      tooltip: 'Workspace Settings',
-      offset: const Offset(0, 40),
-      onSelected: (value) {
-        if (value == 'workspace_settings') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) =>
-                  CommitteeWorkspaceSettingsScreen(committee: committee),
-            ),
-          );
-        }
-      },
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'workspace_settings',
-          child: ListTile(
-            leading: Icon(Icons.settings_outlined),
-            title: Text('Workspace Settings'),
-            subtitle: Text('Configure access and member tools'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLeadershipSection(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-
-    // Hide leadership section on mobile - shown elsewhere
-    if (isMobile) {
-      return const SizedBox.shrink();
-    }
-
-    if (_loadingLeaders) {
-      return SizedBox(
-        width: 16,
-        height: 16,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(
-            Colors.white.withOpacity(0.7),
-          ),
-        ),
-      );
-    }
-
-    if (_leaders.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    // Sort leaders: Chairs first, then Co-Chairs, alphabetical within each group
-    final sortedLeaders = List<CommitteeLeader>.from(_leaders)
-      ..sort((a, b) {
-        final aTitle = a.title?.toLowerCase() ?? '';
-        final bTitle = b.title?.toLowerCase() ?? '';
-
-        // Determine if each is a chair or co-chair
-        final aIsCoChair =
-            aTitle.contains('co-chair') || aTitle.contains('vice');
-        final bIsCoChair =
-            bTitle.contains('co-chair') || bTitle.contains('vice');
-
-        // Chairs come before Co-Chairs
-        if (aIsCoChair != bIsCoChair) {
-          return aIsCoChair ? 1 : -1; // Co-chairs come after chairs
-        }
-
-        // Same role - sort alphabetically by name
-        return a.name.compareTo(b.name);
-      });
-
-    // Display leaders side by side in a horizontal row (Chair first, then Co-Chair)
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: sortedLeaders
           .map(
             (leader) => Padding(
               padding: const EdgeInsets.only(left: 8),
