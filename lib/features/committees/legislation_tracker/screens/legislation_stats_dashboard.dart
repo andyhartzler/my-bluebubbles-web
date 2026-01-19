@@ -732,6 +732,7 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       case LegislationWidgetType.donutChart:
         return LegislationWidgetSize.large;
       case LegislationWidgetType.leaderboard:
+      case LegislationWidgetType.billLeaderboard:
         return LegislationWidgetSize.medium;
       case LegislationWidgetType.partyComparison:
         return LegislationWidgetSize.hero;
@@ -1357,6 +1358,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         return const SizedBox.shrink();
 
       case LegislationWidgetType.lineChart:
+        return const SizedBox.shrink();
+
+      case LegislationWidgetType.billLeaderboard:
+        // Bill leaderboard is handled via the leaderboard case with dataSourceKey checks
         return const SizedBox.shrink();
     }
   }
@@ -3233,6 +3238,8 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         return Icons.donut_small;
       case LegislationWidgetType.leaderboard:
         return Icons.leaderboard;
+      case LegislationWidgetType.billLeaderboard:
+        return Icons.format_list_numbered;
       case LegislationWidgetType.partyComparison:
         return Icons.compare_arrows;
       case LegislationWidgetType.progressRing:
@@ -3254,6 +3261,8 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         return 'Donut Chart';
       case LegislationWidgetType.leaderboard:
         return 'Leaderboard';
+      case LegislationWidgetType.billLeaderboard:
+        return 'Bill Leaderboard';
       case LegislationWidgetType.partyComparison:
         return 'Party Comparison';
       case LegislationWidgetType.progressRing:
