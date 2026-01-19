@@ -78,6 +78,7 @@ class _MemberVotesViewState extends State<MemberVotesView> {
       // Listen to streams and update state
       activeStream.listen((votes) async {
         final openVotes = <VotingForm>[];
+        final endedVotes = <VotingForm>[];
         for (final vote in votes) {
           if (vote.isVotingActive) {
             openVotes.add(vote);
@@ -86,14 +87,18 @@ class _MemberVotesViewState extends State<MemberVotesView> {
             _hasVotedMap[vote.id] = hasVoted;
           } else if (vote.hasEnded) {
             // Active status but ended - treat as closed
-            if (!_closedVotes.any((v) => v.id == vote.id)) {
-              _closedVotes.add(vote);
-            }
+            endedVotes.add(vote);
           }
         }
         if (mounted) {
           setState(() {
             _openVotes = openVotes;
+            // Merge ended votes into closed votes (avoiding duplicates)
+            for (final vote in endedVotes) {
+              if (!_closedVotes.any((v) => v.id == vote.id)) {
+                _closedVotes.add(vote);
+              }
+            }
             _isLoading = false;
           });
         }
@@ -102,7 +107,13 @@ class _MemberVotesViewState extends State<MemberVotesView> {
       closedStream.listen((votes) {
         if (mounted) {
           setState(() {
-            _closedVotes = votes;
+            // Merge with existing closed votes (from ended active votes)
+            final existingIds = _closedVotes.map((v) => v.id).toSet();
+            for (final vote in votes) {
+              if (!existingIds.contains(vote.id)) {
+                _closedVotes.add(vote);
+              }
+            }
             _isLoading = false;
           });
         }
