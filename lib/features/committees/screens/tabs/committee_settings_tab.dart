@@ -38,16 +38,24 @@ class _CommitteeSettingsTabState extends State<CommitteeSettingsTab> {
   bool _workspaceEnabled = false;
   bool _originalWorkspaceEnabled = false;
 
-  // Tools state
-  Set<String> _enabledTools = {};
-  Set<String> _originalTools = {};
+  // Tools state - ordered list for reordering support
+  List<String> _enabledTools = [];
+  List<String> _originalTools = [];
 
   Committee get committee => widget.committee;
 
   bool get _hasChanges =>
       _workspaceEnabled != _originalWorkspaceEnabled ||
-      !_enabledTools.difference(_originalTools).isEmpty ||
-      !_originalTools.difference(_enabledTools).isEmpty;
+      !_listEquals(_enabledTools, _originalTools);
+
+  /// Compare two lists for equality (including order)
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   @override
   void initState() {
@@ -76,8 +84,8 @@ class _CommitteeSettingsTabState extends State<CommitteeSettingsTab> {
       setState(() {
         _workspaceEnabled = workspaceEnabled;
         _originalWorkspaceEnabled = workspaceEnabled;
-        _enabledTools = tools.toSet();
-        _originalTools = tools.toSet();
+        _enabledTools = List<String>.from(tools);
+        _originalTools = List<String>.from(tools);
         _isLoading = false;
       });
     } catch (e) {
@@ -108,12 +116,11 @@ class _CommitteeSettingsTabState extends State<CommitteeSettingsTab> {
         ));
       }
 
-      // Save tools if changed
-      if (!_enabledTools.difference(_originalTools).isEmpty ||
-          !_originalTools.difference(_enabledTools).isEmpty) {
+      // Save tools if changed (including order changes)
+      if (!_listEquals(_enabledTools, _originalTools)) {
         futures.add(_repository.updateCommitteeTools(
           committee.name,
-          _enabledTools.toList(),
+          _enabledTools,
         ));
       }
 
@@ -125,7 +132,7 @@ class _CommitteeSettingsTabState extends State<CommitteeSettingsTab> {
       if (allSuccess) {
         setState(() {
           _originalWorkspaceEnabled = _workspaceEnabled;
-          _originalTools = Set.from(_enabledTools);
+          _originalTools = List<String>.from(_enabledTools);
           _isSaving = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -154,8 +161,19 @@ class _CommitteeSettingsTabState extends State<CommitteeSettingsTab> {
       if (_enabledTools.contains(slug)) {
         _enabledTools.remove(slug);
       } else {
+        // Add at the end when enabling
         _enabledTools.add(slug);
       }
+    });
+  }
+
+  void _reorderTool(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) {
+        newIndex -= 1;
+      }
+      final tool = _enabledTools.removeAt(oldIndex);
+      _enabledTools.insert(newIndex, tool);
     });
   }
 
@@ -164,7 +182,7 @@ class _CommitteeSettingsTabState extends State<CommitteeSettingsTab> {
       _enabledTools = CommitteeRepository.allAvailableTools
           .where((t) => t.isDefault)
           .map((t) => t.slug)
-          .toSet();
+          .toList();
     });
   }
 
@@ -288,7 +306,14 @@ class _CommitteeSettingsTabState extends State<CommitteeSettingsTab> {
           const SizedBox(height: 8),
           // View Member View button
           _buildViewMemberViewButton(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+
+          // Tab Order Section - only show if there are enabled tools
+          if (_enabledTools.length > 1) ...[
+            _buildTabOrderSection(),
+            const SizedBox(height: 24),
+          ] else
+            const SizedBox(height: 8),
 
           // Member Tools Section
           _buildSectionHeader('Member Tools', Icons.build_outlined),
@@ -580,8 +605,11 @@ class _CommitteeSettingsTabState extends State<CommitteeSettingsTab> {
   }
 
   Widget _buildPreview() {
-    final enabledToolsList = CommitteeRepository.allAvailableTools
-        .where((t) => _enabledTools.contains(t.slug))
+    // Build list preserving the order in _enabledTools
+    final toolMap = {for (var t in CommitteeRepository.allAvailableTools) t.slug: t};
+    final enabledToolsList = _enabledTools
+        .where((slug) => toolMap.containsKey(slug))
+        .map((slug) => toolMap[slug]!)
         .toList();
 
     if (enabledToolsList.isEmpty) {
@@ -674,6 +702,141 @@ class _CommitteeSettingsTabState extends State<CommitteeSettingsTab> {
                 color: Colors.white.withOpacity(0.7),
                 fontSize: 12,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabOrderSection() {
+    // Build list preserving the order in _enabledTools
+    final toolMap = {for (var t in CommitteeRepository.allAvailableTools) t.slug: t};
+    final enabledToolsList = _enabledTools
+        .where((slug) => toolMap.containsKey(slug))
+        .map((slug) => toolMap[slug]!)
+        .toList();
+
+    return Card(
+      elevation: 2,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: _momentumBlue.withOpacity(0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _momentumBlue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.swap_vert,
+                    color: _momentumBlue,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Tab Order',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: _unityBlue,
+                            ),
+                      ),
+                      Text(
+                        'Drag to reorder tabs',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: _unityBlue.withOpacity(0.6),
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              itemCount: enabledToolsList.length,
+              onReorder: _reorderTool,
+              itemBuilder: (context, index) {
+                final tool = enabledToolsList[index];
+                return ReorderableDragStartListener(
+                  key: ValueKey(tool.slug),
+                  index: index,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _momentumBlue.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _momentumBlue.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: _momentumBlue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${index + 1}',
+                              style: const TextStyle(
+                                color: _momentumBlue,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(
+                          _getIconForSlug(tool.icon),
+                          size: 18,
+                          color: _unityBlue,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            tool.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: _unityBlue,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.drag_handle,
+                          color: Colors.grey,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),

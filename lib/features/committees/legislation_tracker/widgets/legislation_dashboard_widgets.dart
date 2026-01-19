@@ -2119,35 +2119,32 @@ class AiRecommendationBillLeaderboardWidget extends StatelessWidget {
     bool isCompact,
     bool isVeryCompact,
   ) {
-    // Calculate tile height based on whether we have a summary
+    // Use intrinsic sizing - no fixed height to avoid wasted space
     final hasSummary = bill.aiSummaryShort != null && bill.aiSummaryShort!.isNotEmpty;
-    final baseHeight = isVeryCompact ? 40.0 : (isCompact ? 52.0 : 64.0);
-    final tileHeight = hasSummary && !isVeryCompact ? baseHeight + 16 : baseHeight;
-    final rankSize = isVeryCompact ? 10.0 : 12.0;
-    final titleSize = isVeryCompact ? 11.0 : 13.0;
-    final summarySize = isVeryCompact ? 9.0 : 11.0;
+    final rankSize = isVeryCompact ? 10.0 : 11.0;
+    final titleSize = isVeryCompact ? 11.0 : 12.0;
+    final summarySize = isVeryCompact ? 9.0 : 10.0;
 
     return InkWell(
       onTap: onBillTap != null ? () => onBillTap!(bill) : null,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        constraints: BoxConstraints(minHeight: tileHeight),
-        margin: EdgeInsets.only(bottom: isVeryCompact ? 4 : 6),
+        margin: EdgeInsets.only(bottom: isVeryCompact ? 3 : 4),
         padding: EdgeInsets.symmetric(
-          horizontal: isVeryCompact ? 8 : 10,
-          vertical: isVeryCompact ? 6 : 8,
+          horizontal: isVeryCompact ? 6 : 8,
+          vertical: isVeryCompact ? 4 : 6,
         ),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Rank badge
+            // Rank badge - smaller
             Container(
-              width: isVeryCompact ? 18 : 22,
-              height: isVeryCompact ? 18 : 22,
+              width: isVeryCompact ? 16 : 18,
+              height: isVeryCompact ? 16 : 18,
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(index < 3 ? 0.3 : 0.15),
                 shape: BoxShape.circle,
@@ -2163,12 +2160,12 @@ class AiRecommendationBillLeaderboardWidget extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(width: isVeryCompact ? 8 : 10),
-            // Bill info
+            SizedBox(width: isVeryCompact ? 6 : 8),
+            // Bill info - compact layout
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Bill identifier
                   Text(
@@ -2181,40 +2178,27 @@ class AiRecommendationBillLeaderboardWidget extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
-                  // AI Summary Short (if available)
-                  if (hasSummary && !isVeryCompact) ...[
-                    const SizedBox(height: 4),
+                  // AI Summary Short or title (single line only)
+                  if (!isVeryCompact)
                     Text(
-                      bill.aiSummaryShort!,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: summarySize,
-                        height: 1.3,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ] else if (!isVeryCompact) ...[
-                    // Show title as fallback if no AI summary
-                    Text(
-                      bill.title,
+                      hasSummary ? bill.aiSummaryShort! : bill.title,
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.7),
                         fontSize: summarySize,
+                        height: 1.2,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
                 ],
               ),
             ),
             // Position/Priority indicator
             if (accentColor != null)
               Container(
-                width: 8,
-                height: 8,
-                margin: const EdgeInsets.only(left: 8, top: 4),
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.only(left: 6),
                 decoration: BoxDecoration(
                   color: accentColor,
                   shape: BoxShape.circle,

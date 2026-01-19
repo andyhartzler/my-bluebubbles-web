@@ -1579,12 +1579,12 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
             color: _justicePurple,
           ),
           PieChartItem(
-            label: 'Democrat Only',
+            label: 'Dem Only',
             count: stats.democratOnlyBillsCount,
             color: _democratBlue,
           ),
           PieChartItem(
-            label: 'Republican Only',
+            label: 'GOP Only',
             count: stats.republicanOnlyBillsCount,
             color: _republicanRed,
           ),
