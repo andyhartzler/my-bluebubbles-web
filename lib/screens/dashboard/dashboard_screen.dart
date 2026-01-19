@@ -2322,7 +2322,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// Safe version of _buildWidgetPalette with error handling and logging
   Widget _buildWidgetPaletteSafe() {
     try {
-      debugPrint('[DashboardScreen] Building widget palette...');
       return _buildWidgetPalette();
     } catch (e, stackTrace) {
       debugPrint('');
@@ -2367,7 +2366,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
               ),
               TextButton(
-                onPressed: () => setState(() {}),
+                onPressed: () {
+                  if (mounted) setState(() {});
+                },
                 child: const Text('Retry'),
               ),
             ],
@@ -2713,7 +2714,9 @@ class _DashboardScreenState extends State<DashboardScreen>
               _showPalette ? Icons.chevron_left : Icons.menu,
               color: Colors.white,
             ),
-            onPressed: () => setState(() => _showPalette = !_showPalette),
+            onPressed: () {
+              if (mounted) setState(() => _showPalette = !_showPalette);
+            },
             tooltip: _showPalette ? 'Hide palette' : 'Show palette',
           ),
           const SizedBox(width: 12),
@@ -2901,7 +2904,9 @@ class _DashboardScreenState extends State<DashboardScreen>
               const Text('Error loading widget palette'),
               const SizedBox(height: 8),
               TextButton(
-                onPressed: () => setState(() {}),
+                onPressed: () {
+                  if (mounted) setState(() {});
+                },
                 child: const Text('Retry'),
               ),
             ],

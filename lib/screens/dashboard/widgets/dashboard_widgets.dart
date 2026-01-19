@@ -907,6 +907,7 @@ class _DynamicDistributionChartWidgetState
           child: PopupMenuButton<String>(
             initialValue: _selectedKey,
             onSelected: (key) {
+              if (!mounted) return;
               setState(() {
                 _selectedKey = key;
               });
@@ -1425,6 +1426,8 @@ class _PieChartWidgetState extends State<PieChartWidget> {
       PieChartData(
         pieTouchData: PieTouchData(
           touchCallback: (event, response) {
+            // Guard against callbacks firing after widget disposal
+            if (!mounted) return;
             setState(() {
               if (!event.isInterestedForInteractions ||
                   response == null ||
@@ -1486,6 +1489,7 @@ class _PieChartWidgetState extends State<PieChartWidget> {
             waitDuration: const Duration(milliseconds: 300),
             child: InkWell(
               onTap: () {
+                if (!mounted) return;
                 setState(() {
                   _touchedIndex = _touchedIndex == index ? -1 : index;
                 });
