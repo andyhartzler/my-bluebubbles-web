@@ -85,6 +85,7 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
 
   LegislationStats? _stats;
   bool _loading = true;
+  bool _configLoading = true;
   String? _error;
 
   // AI Recommendation bills (loaded separately for leaderboards)
@@ -410,15 +411,33 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
       final mobileConfig = layouts['mobile'];
 
       if (desktopConfig != null) {
-        _desktopConfig = LegislationDashboardConfig.fromJson(desktopConfig);
+        final loadedDesktop = LegislationDashboardConfig.fromJson(desktopConfig);
+        // Only use saved config if it has widgets, otherwise keep default
+        if (loadedDesktop.widgets.isNotEmpty) {
+          _desktopConfig = loadedDesktop;
+        }
       }
       if (mobileConfig != null) {
-        _mobileConfig = LegislationDashboardConfig.fromJson(mobileConfig);
+        final loadedMobile = LegislationDashboardConfig.fromJson(mobileConfig);
+        // Only use saved config if it has widgets, otherwise keep default
+        if (loadedMobile.widgets.isNotEmpty) {
+          _mobileConfig = loadedMobile;
+        }
       }
 
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {
+          _configLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading legislation dashboard config: $e');
+      // Still mark config as loaded on error so we show default config
+      if (mounted) {
+        setState(() {
+          _configLoading = false;
+        });
+      }
     }
   }
 
@@ -806,7 +825,9 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
   }
 
   Widget _buildViewMode() {
-    if (_loading) {
+    // Wait for both config and stats to load before showing content
+    // This prevents the "random layout" flash where default config shows first
+    if (_loading || _configLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -942,7 +963,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     final unitHeight = unitWidth * 0.8;
     const spacing = 16.0;
 
-    final sortedWidgets = List<LegislationWidgetConfig>.from(_config.widgets)
+    // Filter out invisible widgets first
+    final visibleWidgets = _config.widgets.where((w) => w.visible).toList();
+
+    final sortedWidgets = List<LegislationWidgetConfig>.from(visibleWidgets)
       ..sort((a, b) {
         if (a.gridY != b.gridY) return a.gridY.compareTo(b.gridY);
         return a.gridX.compareTo(b.gridX);
@@ -1146,7 +1170,10 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
     final widgetHeight = widgetWidth * 0.9;
     final fullWidgetHeight = maxWidth * 0.75;
 
-    final sortedWidgets = List<LegislationWidgetConfig>.from(_config.widgets)
+    // Filter out invisible widgets first
+    final visibleWidgets = _config.widgets.where((w) => w.visible).toList();
+
+    final sortedWidgets = List<LegislationWidgetConfig>.from(visibleWidgets)
       ..sort((a, b) {
         if (a.gridY != b.gridY) return a.gridY.compareTo(b.gridY);
         return a.gridX.compareTo(b.gridX);
@@ -1168,9 +1195,13 @@ class _LegislationStatsDashboardState extends State<LegislationStatsDashboard>
         if (!processedSwipeRows.contains(widget.swipeRowId)) {
           processedSwipeRows.add(widget.swipeRowId!);
           final rowWidgets = swipeRows[widget.swipeRowId]!;
-          rows.add(
-            _buildSwipeableRow(rowWidgets, stats, widgetWidth, widgetHeight),
-          );
+          // Filter swipe row widgets to only include visible ones
+          final visibleRowWidgets = rowWidgets.where((w) => w.visible).toList();
+          if (visibleRowWidgets.isNotEmpty) {
+            rows.add(
+              _buildSwipeableRow(visibleRowWidgets, stats, widgetWidth, widgetHeight),
+            );
+          }
         }
       } else {
         final isMobileFull =

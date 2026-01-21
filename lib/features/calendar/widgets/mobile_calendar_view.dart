@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/features/calendar/models/calendar_event.dart';
 import 'package:bluebubbles/features/calendar/services/calendar_service.dart';
@@ -31,6 +33,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
   late DateTime _focusedWeek;
   List<CalendarEvent> _events = [];
   bool _isLoading = true;
+  bool _isSyncing = false;
   String? _error;
 
   @override
@@ -80,6 +83,65 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
         _error = 'Failed to load events: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  /// Sync Google Calendar and refresh events
+  Future<void> _syncGoogleCalendar() async {
+    if (_isSyncing) return;
+
+    setState(() {
+      _isSyncing = true;
+    });
+
+    try {
+      // Get auth token for the edge function
+      final session = Supabase.instance.client.auth.currentSession;
+      final accessToken = session?.accessToken;
+
+      if (accessToken == null) {
+        throw Exception('Not authenticated');
+      }
+
+      // Call the sync edge function
+      final response = await http.post(
+        Uri.parse('https://faajpcarasilbfndzkmd.supabase.co/functions/v1/sync-google-calendar'),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Sync failed: ${response.body}');
+      }
+
+      // Reload events to reflect the sync
+      await _loadEvents();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Calendar synced successfully'),
+            backgroundColor: Color(0xFF43A047),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
     }
   }
 
@@ -165,35 +227,43 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
         : (dayEvents.length.clamp(1, maxEventsToShow) * eventCardHeight);
     final totalHeight = baseHeight + eventsHeight;
 
-    return Container(
-      height: totalHeight,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF38383A) : const Color(0xFFE5E7EB),
-          width: 1,
+    // Use brand gradient styling like desktop calendar
+    // Always use dark mode styling since gradient background is dark
+    const useDarkStyling = true;
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        height: totalHeight,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [_unityBlue, _momentumBlue],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with month/year
-          _buildHeader(isDark),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with month/year - use dark styling for gradient bg
+            _buildHeader(useDarkStyling),
 
-          // Scrollable week strip
-          _buildWeekStrip(isDark),
+            // Scrollable week strip - use dark styling for gradient bg
+            _buildWeekStrip(useDarkStyling),
 
-          Divider(
-            height: 1,
-            color: isDark ? const Color(0xFF38383A) : const Color(0xFFE5E7EB),
-          ),
+            Divider(
+              height: 1,
+              color: Colors.white.withOpacity(0.1),
+            ),
 
-          // Events list
-          Expanded(
-            child: _buildEventsList(isDark),
-          ),
-        ],
+            // Events list - use dark styling for gradient bg
+            Expanded(
+              child: _buildEventsList(useDarkStyling),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -201,17 +271,9 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
   Widget _buildHeader(bool isDark) {
     final monthFormat = DateFormat('MMMM yyyy');
 
+    // With gradient background, use white/light colors for all elements
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            _unityBlue.withOpacity(isDark ? 0.4 : 0.15),
-            _momentumBlue.withOpacity(isDark ? 0.2 : 0.08),
-          ],
-        ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -220,12 +282,12 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: _momentumBlue.withOpacity(0.15),
+                  color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
                   Icons.calendar_today_rounded,
-                  color: _momentumBlue,
+                  color: Colors.white,
                   size: 20,
                 ),
               ),
@@ -234,21 +296,19 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Events & Meetings',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                        color: Colors.white,
                       ),
                     ),
                     Text(
                       monthFormat.format(_selectedDate),
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark
-                            ? const Color(0xFF98989F)
-                            : const Color(0xFF6B7280),
+                        color: Colors.white.withOpacity(0.7),
                       ),
                     ),
                   ],
@@ -256,21 +316,46 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
               ),
               TextButton(
                 onPressed: _goToToday,
-                child: const Text(
+                child: Text(
                   'Today',
                   style: TextStyle(
                     fontSize: 14,
-                    color: _momentumBlue,
+                    color: Colors.white.withOpacity(0.9),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
+              // Sync/Refresh button
+              IconButton(
+                onPressed: _isSyncing ? null : _syncGoogleCalendar,
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: _isSyncing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.refresh, color: Colors.white, size: 18),
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Sync Calendar',
+              ),
+              const SizedBox(width: 4),
               IconButton(
                 onPressed: widget.onAddEvent ?? _showCreateEventDialog,
                 icon: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: _momentumBlue,
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.add, color: Colors.white, size: 18),
@@ -332,11 +417,14 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
     final dayEvents = _getEventsForDay(_selectedDate);
     final dayFormat = DateFormat('EEEE, MMMM d');
 
+    // With gradient background, use white-based colors
     if (_isLoading) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(40),
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
         ),
       );
     }
@@ -349,19 +437,18 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.error_outline,
-                  size: 40, color: isDark ? Colors.red.shade300 : Colors.red),
+                  size: 40, color: Colors.red.shade300),
               const SizedBox(height: 12),
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: isDark ? Colors.red.shade300 : Colors.red.shade700),
+                style: TextStyle(color: Colors.red.shade300),
               ),
               const SizedBox(height: 12),
               TextButton.icon(
                 onPressed: _loadEvents,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                label: const Text('Retry', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -378,10 +465,10 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
             children: [
               Text(
                 dayFormat.format(_selectedDate),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                  color: Colors.white,
                 ),
               ),
               const Spacer(),
@@ -390,7 +477,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _momentumBlue.withOpacity(0.15),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -398,7 +485,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: _momentumBlue,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -430,6 +517,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
   }
 
   Widget _buildEmptyState(bool isDark) {
+    // With gradient background, use white-based colors
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -437,7 +525,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
           Icon(
             Icons.event_note_outlined,
             size: 56,
-            color: isDark ? const Color(0xFF48484A) : const Color(0xFFD1D5DB),
+            color: Colors.white.withOpacity(0.4),
           ),
           const SizedBox(height: 16),
           Text(
@@ -445,9 +533,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w500,
-              color: isDark
-                  ? const Color(0xFF98989F)
-                  : const Color(0xFF6B7280),
+              color: Colors.white.withOpacity(0.7),
             ),
           ),
           const SizedBox(height: 4),
@@ -455,9 +541,7 @@ class _MobileCalendarViewState extends State<MobileCalendarView> {
             'Tap + to add an event',
             style: TextStyle(
               fontSize: 14,
-              color: isDark
-                  ? const Color(0xFF636366)
-                  : const Color(0xFF9CA3AF),
+              color: Colors.white.withOpacity(0.5),
             ),
           ),
         ],
@@ -488,13 +572,14 @@ class _WeekDayCell extends StatelessWidget {
   Widget build(BuildContext context) {
     const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
+    // With gradient background, use white-based colors
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 44,
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? _momentumBlue : null,
+          color: isSelected ? Colors.white.withOpacity(0.25) : null,
           borderRadius: BorderRadius.circular(22),
         ),
         child: Column(
@@ -506,10 +591,8 @@ class _WeekDayCell extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
                 color: isSelected
-                    ? Colors.white.withOpacity(0.8)
-                    : isDark
-                        ? const Color(0xFF98989F)
-                        : const Color(0xFF6B7280),
+                    ? Colors.white
+                    : Colors.white.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 6),
@@ -518,9 +601,12 @@ class _WeekDayCell extends StatelessWidget {
               height: 32,
               decoration: BoxDecoration(
                 color: isToday && !isSelected
-                    ? _momentumBlue.withOpacity(0.15)
+                    ? Colors.white.withOpacity(0.2)
                     : null,
                 shape: BoxShape.circle,
+                border: isToday
+                    ? Border.all(color: Colors.white.withOpacity(0.5), width: 2)
+                    : null,
               ),
               child: Center(
                 child: Text(
@@ -529,13 +615,7 @@ class _WeekDayCell extends StatelessWidget {
                     fontSize: 15,
                     fontWeight:
                         isToday || isSelected ? FontWeight.w600 : FontWeight.w400,
-                    color: isSelected
-                        ? Colors.white
-                        : isToday
-                            ? _momentumBlue
-                            : isDark
-                                ? Colors.white
-                                : const Color(0xFF1A1A1A),
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -546,7 +626,7 @@ class _WeekDayCell extends StatelessWidget {
               height: 5,
               decoration: BoxDecoration(
                 color: hasEvents
-                    ? (isSelected ? Colors.white : _momentumBlue)
+                    ? Colors.white
                     : Colors.transparent,
                 shape: BoxShape.circle,
               ),
@@ -571,24 +651,22 @@ class _MobileEventCard extends StatelessWidget {
   bool get _isZoom => event.hasZoomMeeting;
 
   Color get _eventColor =>
-      _isZoom ? const Color(0xFF2D8CFF) : _momentumBlue;
+      _isZoom ? const Color(0xFF2D8CFF) : Colors.white;
 
   @override
   Widget build(BuildContext context) {
     final timeFormat = DateFormat('h:mm a');
 
+    // With gradient background, use semi-transparent white cards
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+        color: Colors.white.withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1,
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -650,12 +728,13 @@ class _MobileEventCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
+                // With gradient background, use white text
                 Text(
                   event.title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                    color: Colors.white,
                   ),
                 ),
                 if (event.location != null && event.location!.isNotEmpty) ...[
@@ -665,9 +744,7 @@ class _MobileEventCard extends StatelessWidget {
                       Icon(
                         Icons.location_on_outlined,
                         size: 14,
-                        color: isDark
-                            ? const Color(0xFF98989F)
-                            : const Color(0xFF6B7280),
+                        color: Colors.white.withOpacity(0.7),
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -675,9 +752,7 @@ class _MobileEventCard extends StatelessWidget {
                           event.location!,
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDark
-                                ? const Color(0xFF98989F)
-                                : const Color(0xFF6B7280),
+                            color: Colors.white.withOpacity(0.7),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -692,7 +767,7 @@ class _MobileEventCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: _momentumBlue.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -700,7 +775,7 @@ class _MobileEventCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: _momentumBlue,
+                        color: Colors.white,
                       ),
                     ),
                   ),

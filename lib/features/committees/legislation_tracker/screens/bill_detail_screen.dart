@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
@@ -46,6 +50,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   LegislationProvider? _provider;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -72,6 +77,72 @@ class _BillDetailScreenState extends State<BillDetailScreen>
     _tabController.dispose();
     _provider?.clearSelectedBill();
     super.dispose();
+  }
+
+  /// Refresh bill data from Open States via edge function
+  Future<void> _refreshBillFromOpenStates(TrackedBill bill) async {
+    if (_isRefreshing) return;
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    try {
+      // Get auth token for the edge function
+      final session = Supabase.instance.client.auth.currentSession;
+      final accessToken = session?.accessToken;
+
+      if (accessToken == null) {
+        throw Exception('Not authenticated');
+      }
+
+      // Call the edge function with bill details
+      final response = await http.post(
+        Uri.parse('https://faajpcarasilbfndzkmd.supabase.co/functions/v1/openstates-get-bill'),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'jurisdiction': bill.jurisdiction,
+          'session': bill.session,
+          'bill_id': bill.billIdentifier,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Refresh failed: ${response.body}');
+      }
+
+      // Reload the bill to reflect updates
+      await _provider?.selectBill(widget.billId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bill refreshed from Open States'),
+            backgroundColor: Color(0xFF43A047),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh bill: $e'),
+            backgroundColor: const Color(0xFFE63946),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
   }
 
   @override
@@ -101,7 +172,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
             backgroundColor: _unityBlue,
             foregroundColor: Colors.white,
             actions: [
-              provider.isSyncing
+              _isRefreshing
                   ? const Padding(
                       padding: EdgeInsets.all(12),
                       child: SizedBox(
@@ -115,22 +186,7 @@ class _BillDetailScreenState extends State<BillDetailScreen>
                     )
                   : IconButton(
                       icon: const Icon(Icons.refresh),
-                      onPressed: () async {
-                        final result = await provider.syncBills(billId: widget.billId);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                result.success
-                                    ? 'Bill refreshed from Open States'
-                                    : 'Failed to refresh bill',
-                              ),
-                              backgroundColor: result.success ? _grassrootsGreen : _actionRed,
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
+                      onPressed: () => _refreshBillFromOpenStates(bill),
                       tooltip: 'Refresh bill from Open States',
                     ),
               PopupMenuButton<String>(

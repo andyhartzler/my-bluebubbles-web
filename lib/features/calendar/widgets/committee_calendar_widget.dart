@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/features/calendar/models/calendar_event.dart';
 import 'package:bluebubbles/features/calendar/services/calendar_service.dart';
@@ -34,6 +36,7 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
   DateTime _selectedDate = DateTime.now();
   List<CalendarEvent> _selectedDayEvents = [];
   bool _loading = true;
+  bool _isSyncing = false;
   String? _error;
 
   @override
@@ -67,6 +70,65 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
         _error = 'Failed to load events: $e';
         _loading = false;
       });
+    }
+  }
+
+  /// Sync Google Calendar and refresh events
+  Future<void> _syncGoogleCalendar() async {
+    if (_isSyncing) return;
+
+    setState(() {
+      _isSyncing = true;
+    });
+
+    try {
+      // Get auth token for the edge function
+      final session = Supabase.instance.client.auth.currentSession;
+      final accessToken = session?.accessToken;
+
+      if (accessToken == null) {
+        throw Exception('Not authenticated');
+      }
+
+      // Call the sync edge function
+      final response = await http.post(
+        Uri.parse('https://faajpcarasilbfndzkmd.supabase.co/functions/v1/sync-google-calendar'),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Sync failed: ${response.body}');
+      }
+
+      // Reload events to reflect the sync
+      await _loadEvents();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Calendar synced successfully'),
+            backgroundColor: Color(0xFF43A047),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sync failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
     }
   }
 
@@ -204,6 +266,35 @@ class _CommitteeCalendarWidgetState extends State<CommitteeCalendarWidget> {
           CalendarSubscribeButton(
             committeeName: widget.committeeName,
             accentColor: Colors.white,
+          ),
+          const SizedBox(width: 8),
+          // Sync/Refresh button
+          FilledButton.icon(
+            onPressed: _isSyncing ? null : _syncGoogleCalendar,
+            icon: _isSyncing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh, size: 16),
+            label: Text(
+              _isSyncing ? 'Syncing...' : 'Sync',
+              style: const TextStyle(fontSize: 13),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white.withOpacity(0.2),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.white.withOpacity(0.15),
+              disabledForegroundColor: Colors.white.withOpacity(0.7),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
           ),
           const SizedBox(width: 8),
           if (widget.onAddEvent != null)
