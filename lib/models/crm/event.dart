@@ -392,6 +392,9 @@ class EventAttendee {
   final String? checkedInBy;
   final DateTime rsvpAt;
   final DateTime updatedAt;
+  final DateTime? rsvpNotificationSentAt;
+  final DateTime? reminder4hSentAt;
+  final DateTime? reminder30mSentAt;
   final Member? member;
   final double? totalDonated;
   final bool? isRecurringDonor;
@@ -403,6 +406,9 @@ class EventAttendee {
     required this.checkedIn,
     required this.rsvpAt,
     required this.updatedAt,
+    this.rsvpNotificationSentAt,
+    this.reminder4hSentAt,
+    this.reminder30mSentAt,
     this.memberId,
     this.guestName,
     this.guestEmail,
@@ -429,6 +435,9 @@ class EventAttendee {
     bool? checkedIn,
     DateTime? checkedInAt,
     String? checkedInBy,
+    DateTime? rsvpNotificationSentAt,
+    DateTime? reminder4hSentAt,
+    DateTime? reminder30mSentAt,
     Member? member,
     double? totalDonated,
     bool? isRecurringDonor,
@@ -455,6 +464,9 @@ class EventAttendee {
       notes: notes,
       checkedInAt: checkedInAt ?? this.checkedInAt,
       checkedInBy: checkedInBy ?? this.checkedInBy,
+      rsvpNotificationSentAt: rsvpNotificationSentAt ?? this.rsvpNotificationSentAt,
+      reminder4hSentAt: reminder4hSentAt ?? this.reminder4hSentAt,
+      reminder30mSentAt: reminder30mSentAt ?? this.reminder30mSentAt,
       member: member ?? this.member,
       totalDonated: totalDonated ?? this.totalDonated,
       isRecurringDonor: isRecurringDonor ?? this.isRecurringDonor,
@@ -490,6 +502,9 @@ class EventAttendee {
       checkedInBy: json['checked_in_by'] as String?,
       rsvpAt: _parseDateTime(json['rsvp_at'], required: true, fieldName: 'rsvp_at')!,
       updatedAt: _parseDateTime(json['updated_at'], required: true, fieldName: 'updated_at')!,
+      rsvpNotificationSentAt: _parseDateTime(json['rsvp_notification_sent_at'], fieldName: 'rsvp_notification_sent_at'),
+      reminder4hSentAt: _parseDateTime(json['reminder_4h_sent_at'], fieldName: 'reminder_4h_sent_at'),
+      reminder30mSentAt: _parseDateTime(json['reminder_30m_sent_at'], fieldName: 'reminder_30m_sent_at'),
       member: member,
       totalDonated: _parseDouble(json['total_donated']),
       isRecurringDonor: _coerceBool(json['is_recurring_donor']),

@@ -1675,6 +1675,21 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                   Chip(
                     label: Text('Checked in at ${DateFormat.jm().format(attendee.checkedInAt!.toLocal())}'),
                   ),
+                if (attendee.rsvpNotificationSentAt != null)
+                  Chip(
+                    avatar: const Icon(Icons.textsms, size: 18, color: Colors.green),
+                    label: const Text('RSVP text sent'),
+                  ),
+                if (attendee.reminder4hSentAt != null)
+                  Chip(
+                    avatar: const Icon(Icons.alarm, size: 18, color: Colors.blue),
+                    label: const Text('4h reminder sent'),
+                  ),
+                if (attendee.reminder30mSentAt != null)
+                  Chip(
+                    avatar: const Icon(Icons.alarm_on, size: 18, color: Colors.orange),
+                    label: const Text('30m reminder sent'),
+                  ),
               ],
             ),
             const SizedBox(height: 8),
