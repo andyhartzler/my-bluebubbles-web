@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/models/crm/analytics.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
@@ -59,6 +61,13 @@ class _AttendeeProspect {
   String? get email => member?.email ?? donor?.email ?? attendee?.guestEmail;
 
   String? get phone => member?.phone ?? member?.phoneE164 ?? donor?.phoneE164 ?? donor?.phone ?? attendee?.guestPhone;
+}
+
+class _FunnelStep {
+  final String label;
+  final int count;
+  final Color color;
+  const _FunnelStep(this.label, this.count, this.color);
 }
 
 class _ImagePagerButton extends StatelessWidget {
@@ -145,6 +154,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   late final PageController _websiteImagePageController;
   int _currentWebsiteImageIndex = 0;
 
+  // Analytics state
+  List<PageView> _pageViews = [];
+  List<FormEvent> _formEvents = [];
+  List<TrackingLink> _trackingLinks = [];
+  EventAnalyticsSummary? _analyticsSummary;
+  bool _analyticsLoading = false;
+  int? _expandedVisitorIndex;
+
   bool _hasText(String? value) => value?.trim().isNotEmpty == true;
 
   String? _trimmed(TextEditingController controller) {
@@ -209,6 +226,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     if (event.id != null) {
       _loadAttendees();
       _startAttendeeStream();
+      _loadAnalytics();
     }
   }
 
@@ -243,6 +261,31 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   void _resetFocusNodes() {
     _disposeFocusNodes();
     _initFocusNodes();
+  }
+
+  Future<void> _loadAnalytics() async {
+    final eventId = _currentEvent.id;
+    if (eventId == null) return;
+    setState(() => _analyticsLoading = true);
+    try {
+      final results = await Future.wait([
+        _repository.fetchEventAnalyticsSummary(eventId),
+        _repository.fetchEventPageViews(eventId),
+        _repository.fetchEventFormEvents(eventId),
+        _repository.fetchEventTrackingLinks(eventId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _analyticsSummary = results[0] as EventAnalyticsSummary?;
+        _pageViews = results[1] as List<PageView>;
+        _formEvents = results[2] as List<FormEvent>;
+        _trackingLinks = results[3] as List<TrackingLink>;
+        _analyticsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _analyticsLoading = false);
+    }
   }
 
   @override
@@ -2713,10 +2756,641 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     );
   }
 
+  // ── Analytics Tab ──────────────────────────────────────────────────
+
+  Widget _buildAnalyticsTab() {
+    if (_analyticsLoading) {
+      return const Center(child: CircularProgressIndicator(color: _momentumBlue));
+    }
+
+    final summary = _analyticsSummary ?? EventAnalyticsSummary();
+    final formViews = _formEvents.where((e) => e.eventType == 'form_view').length;
+    final formStarts = _formEvents.where((e) => e.eventType == 'form_start').length;
+    final submitAttempts = _formEvents.where((e) => e.eventType == 'submit_attempt').length;
+    final submitSuccesses = _formEvents.where((e) => e.eventType == 'submit_success').length;
+    final conversionRate = summary.totalViews > 0
+        ? (submitSuccesses / summary.totalViews * 100)
+        : 0.0;
+
+    return RefreshIndicator(
+      onRefresh: _loadAnalytics,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Summary Cards ──
+            _buildAnalyticsSectionTitle('Overview'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildStatCard('Total Views', '${summary.totalViews}', Icons.visibility, _momentumBlue),
+                _buildStatCard('Unique Visitors', '${summary.uniqueVisitors}', Icons.people, _justicePurple),
+                _buildStatCard('Avg Duration', '${summary.avgDuration.toStringAsFixed(0)}s', Icons.timer, _grassrootsGreen),
+                _buildStatCard('Conversion', '${conversionRate.toStringAsFixed(1)}%', Icons.trending_up, _sunriseGold),
+                _buildStatCard('Avg Scroll', '${summary.avgScrollDepth.toStringAsFixed(0)}%', Icons.swap_vert, _actionRed),
+                _buildStatCard('Sessions', '${summary.totalSessions}', Icons.devices, _unityBlue),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // ── Views Over Time Chart ──
+            if (_pageViews.isNotEmpty) ...[
+              _buildAnalyticsSectionTitle('Views Over Time'),
+              SizedBox(
+                height: 200,
+                child: _buildViewsOverTimeChart(),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // ── Device & Browser Charts ──
+            if (summary.totalViews > 0) ...[
+              _buildAnalyticsSectionTitle('Devices & Browsers'),
+              SizedBox(
+                height: 180,
+                child: Row(
+                  children: [
+                    Expanded(child: _buildDevicePieChart(summary)),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildBrowserPieChart()),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // ── Top Locations ──
+            if (_pageViews.isNotEmpty) ...[
+              _buildAnalyticsSectionTitle('Top Locations'),
+              _buildLocationsTable(),
+              const SizedBox(height: 24),
+            ],
+
+            // ── Traffic Sources ──
+            if (_pageViews.any((pv) => pv.referrer != null && pv.referrer!.isNotEmpty)) ...[
+              _buildAnalyticsSectionTitle('Traffic Sources'),
+              SizedBox(
+                height: 160,
+                child: _buildSourcesChart(),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // ── CRM Link Funnel ──
+            if (_trackingLinks.isNotEmpty) ...[
+              _buildAnalyticsSectionTitle('CRM Link Funnel'),
+              _buildTrackingLinksFunnel(),
+              const SizedBox(height: 24),
+            ],
+
+            // ── Form Funnel ──
+            if (_formEvents.isNotEmpty) ...[
+              _buildAnalyticsSectionTitle('Registration Funnel'),
+              _buildFormFunnel(summary.totalViews, formViews, formStarts, submitAttempts, submitSuccesses),
+              const SizedBox(height: 24),
+            ],
+
+            // ── Recent Visitors ──
+            if (_pageViews.isNotEmpty) ...[
+              _buildAnalyticsSectionTitle('Recent Visitors'),
+              _buildVisitorsTable(),
+              const SizedBox(height: 24),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(title,
+        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+    return SizedBox(
+      width: 160,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color.withOpacity(0.25), color.withOpacity(0.10)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 6),
+            Text(value,
+              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+            Text(label,
+              style: TextStyle(color: Colors.white70, fontSize: 11)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewsOverTimeChart() {
+    // Group page views by day
+    final Map<String, int> byDay = {};
+    final dateFormat = DateFormat('MM/dd');
+    for (final pv in _pageViews) {
+      final key = DateFormat('yyyy-MM-dd').format(pv.createdAt.toLocal());
+      byDay[key] = (byDay[key] ?? 0) + 1;
+    }
+    final sortedDays = byDay.keys.toList()..sort();
+    if (sortedDays.isEmpty) return const SizedBox();
+
+    final spots = <FlSpot>[];
+    for (int i = 0; i < sortedDays.length; i++) {
+      spots.add(FlSpot(i.toDouble(), byDay[sortedDays[i]]!.toDouble()));
+    }
+
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(show: false),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: (sortedDays.length / 5).ceilToDouble().clamp(1, double.infinity),
+              getTitlesWidget: (value, meta) {
+                final idx = value.toInt();
+                if (idx < 0 || idx >= sortedDays.length) return const SizedBox();
+                return Text(dateFormat.format(DateTime.parse(sortedDays[idx])),
+                  style: const TextStyle(color: Colors.white54, fontSize: 10));
+              },
+            ),
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: _momentumBlue,
+            barWidth: 2,
+            belowBarData: BarAreaData(
+              show: true,
+              color: _momentumBlue.withOpacity(0.15),
+            ),
+            dotData: FlDotData(show: spots.length < 15),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDevicePieChart(EventAnalyticsSummary summary) {
+    final sections = <PieChartSectionData>[];
+    final total = summary.desktopViews + summary.mobileViews + summary.tabletViews;
+    if (total == 0) return const Center(child: Text('No data', style: TextStyle(color: Colors.white54)));
+
+    if (summary.desktopViews > 0) {
+      sections.add(PieChartSectionData(
+        value: summary.desktopViews.toDouble(),
+        title: 'Desktop\n${(summary.desktopViews / total * 100).toStringAsFixed(0)}%',
+        color: _momentumBlue,
+        titleStyle: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+        radius: 55,
+      ));
+    }
+    if (summary.mobileViews > 0) {
+      sections.add(PieChartSectionData(
+        value: summary.mobileViews.toDouble(),
+        title: 'Mobile\n${(summary.mobileViews / total * 100).toStringAsFixed(0)}%',
+        color: _grassrootsGreen,
+        titleStyle: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+        radius: 55,
+      ));
+    }
+    if (summary.tabletViews > 0) {
+      sections.add(PieChartSectionData(
+        value: summary.tabletViews.toDouble(),
+        title: 'Tablet\n${(summary.tabletViews / total * 100).toStringAsFixed(0)}%',
+        color: _sunriseGold,
+        titleStyle: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+        radius: 55,
+      ));
+    }
+    return PieChart(PieChartData(
+      sections: sections,
+      sectionsSpace: 2,
+      centerSpaceRadius: 20,
+    ));
+  }
+
+  Widget _buildBrowserPieChart() {
+    final Map<String, int> counts = {};
+    for (final pv in _pageViews) {
+      final b = pv.browser ?? 'Unknown';
+      counts[b] = (counts[b] ?? 0) + 1;
+    }
+    if (counts.isEmpty) return const Center(child: Text('No data', style: TextStyle(color: Colors.white54)));
+
+    final sorted = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final top = sorted.take(5).toList();
+    final colors = [_momentumBlue, _grassrootsGreen, _sunriseGold, _justicePurple, _actionRed];
+    final total = top.fold<int>(0, (s, e) => s + e.value);
+
+    return PieChart(PieChartData(
+      sections: top.asMap().entries.map((entry) {
+        final i = entry.key;
+        final e = entry.value;
+        return PieChartSectionData(
+          value: e.value.toDouble(),
+          title: '${e.key}\n${(e.value / total * 100).toStringAsFixed(0)}%',
+          color: colors[i % colors.length],
+          titleStyle: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+          radius: 55,
+        );
+      }).toList(),
+      sectionsSpace: 2,
+      centerSpaceRadius: 20,
+    ));
+  }
+
+  Widget _buildLocationsTable() {
+    final Map<String, Map<String, dynamic>> locs = {};
+    for (final pv in _pageViews) {
+      final city = pv.city ?? 'Unknown';
+      final key = '$city|${pv.region ?? ''}|${pv.country ?? ''}';
+      if (!locs.containsKey(key)) {
+        locs[key] = {'city': city, 'region': pv.region ?? '', 'country': pv.country ?? '', 'views': 0, 'visitors': <String>{}};
+      }
+      locs[key]!['views'] = (locs[key]!['views'] as int) + 1;
+      if (pv.visitorId != null) (locs[key]!['visitors'] as Set<String>).add(pv.visitorId!);
+    }
+    final sorted = locs.values.toList()..sort((a, b) => (b['views'] as int).compareTo(a['views'] as int));
+    final top = sorted.take(10).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(Colors.white.withOpacity(0.05)),
+          dataRowColor: WidgetStateProperty.all(Colors.transparent),
+          columns: const [
+            DataColumn(label: Text('City', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
+            DataColumn(label: Text('Region', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
+            DataColumn(label: Text('Country', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
+            DataColumn(label: Text('Views', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)), numeric: true),
+            DataColumn(label: Text('Visitors', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)), numeric: true),
+          ],
+          rows: top.map((loc) => DataRow(cells: [
+            DataCell(Text(loc['city'] as String, style: const TextStyle(color: Colors.white))),
+            DataCell(Text(loc['region'] as String, style: const TextStyle(color: Colors.white70))),
+            DataCell(Text(loc['country'] as String, style: const TextStyle(color: Colors.white70))),
+            DataCell(Text('${loc['views']}', style: const TextStyle(color: Colors.white))),
+            DataCell(Text('${(loc['visitors'] as Set).length}', style: const TextStyle(color: Colors.white))),
+          ])).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourcesChart() {
+    final Map<String, int> sources = {};
+    for (final pv in _pageViews) {
+      if (pv.referrer == null || pv.referrer!.isEmpty) continue;
+      String domain;
+      try {
+        domain = Uri.parse(pv.referrer!).host;
+        if (domain.isEmpty) domain = pv.referrer!;
+      } catch (_) {
+        domain = pv.referrer!;
+      }
+      sources[domain] = (sources[domain] ?? 0) + 1;
+    }
+    if (sources.isEmpty) return const SizedBox();
+
+    final sorted = sources.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final top = sorted.take(6).toList();
+    final maxVal = top.first.value.toDouble();
+
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: maxVal * 1.2,
+        gridData: FlGridData(show: false),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                final idx = value.toInt();
+                if (idx < 0 || idx >= top.length) return const SizedBox();
+                final label = top[idx].key.length > 15
+                    ? '${top[idx].key.substring(0, 12)}...'
+                    : top[idx].key;
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(label, style: const TextStyle(color: Colors.white54, fontSize: 9)),
+                );
+              },
+            ),
+          ),
+        ),
+        barGroups: top.asMap().entries.map((entry) {
+          return BarChartGroupData(
+            x: entry.key,
+            barRods: [
+              BarChartRodData(
+                toY: entry.value.value.toDouble(),
+                color: _momentumBlue,
+                width: 18,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildTrackingLinksFunnel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(Colors.white.withOpacity(0.05)),
+          columns: const [
+            DataColumn(label: Text('Phone', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
+            DataColumn(label: Text('Name', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
+            DataColumn(label: Text('Sent', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
+            DataColumn(label: Text('Clicked', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
+            DataColumn(label: Text('Started', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
+            DataColumn(label: Text('Completed', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
+            DataColumn(label: Text('Clicks', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)), numeric: true),
+          ],
+          rows: _trackingLinks.map((tl) {
+            final fmt = DateFormat('M/d h:mm a');
+            return DataRow(cells: [
+              DataCell(Text(tl.phoneE164 ?? '-', style: const TextStyle(color: Colors.white))),
+              DataCell(Text(tl.attendeeName ?? '-', style: const TextStyle(color: Colors.white70))),
+              DataCell(Text(fmt.format(tl.sentAt.toLocal()), style: const TextStyle(color: Colors.white70, fontSize: 12))),
+              DataCell(_funnelIcon(tl.clickedAt != null)),
+              DataCell(_funnelIcon(tl.formStartedAt != null)),
+              DataCell(_funnelIcon(tl.formCompletedAt != null)),
+              DataCell(Text('${tl.clickCount}', style: const TextStyle(color: Colors.white))),
+            ]);
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _funnelIcon(bool completed) {
+    return Icon(
+      completed ? Icons.check_circle : Icons.circle_outlined,
+      color: completed ? _grassrootsGreen : Colors.white24,
+      size: 20,
+    );
+  }
+
+  Widget _buildFormFunnel(int pageViews, int formViews, int formStarts, int attempts, int successes) {
+    final steps = [
+      _FunnelStep('Page Views', pageViews, _momentumBlue),
+      _FunnelStep('Form Views', formViews, _justicePurple),
+      _FunnelStep('Form Starts', formStarts, _sunriseGold),
+      _FunnelStep('Submit Attempts', attempts, Colors.orange),
+      _FunnelStep('Completions', successes, _grassrootsGreen),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: steps.asMap().entries.map((entry) {
+          final i = entry.key;
+          final step = entry.value;
+          final maxWidth = steps.first.count > 0 ? steps.first.count : 1;
+          final width = step.count / maxWidth;
+          final dropOff = i > 0 && steps[i - 1].count > 0
+              ? ((steps[i - 1].count - step.count) / steps[i - 1].count * 100).toStringAsFixed(0)
+              : null;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 110,
+                  child: Text(step.label,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Container(
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: width.clamp(0.0, 1.0),
+                        child: Container(
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: step.color.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text('${step.count}',
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (dropOff != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: Text('-$dropOff%',
+                      style: const TextStyle(color: _actionRed, fontSize: 11)),
+                  )
+                else
+                  const SizedBox(width: 40),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildVisitorsTable() {
+    final fmt = DateFormat('M/d h:mm a');
+    final visitors = _pageViews.take(50).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: visitors.length,
+        itemBuilder: (context, index) {
+          final pv = visitors[index];
+          final isExpanded = _expandedVisitorIndex == index;
+
+          return Column(
+            children: [
+              InkWell(
+                onTap: () => setState(() => _expandedVisitorIndex = isExpanded ? null : index),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        pv.deviceType == 'mobile' ? Icons.phone_android
+                            : pv.deviceType == 'tablet' ? Icons.tablet_android
+                            : Icons.desktop_windows,
+                        color: Colors.white54, size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          fmt.format(pv.createdAt.toLocal()),
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          [pv.city, pv.region].where((s) => s != null && s.isNotEmpty).join(', '),
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          '${pv.browser ?? ''} / ${pv.os ?? ''}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 50,
+                        child: Text(
+                          pv.durationSeconds != null ? '${pv.durationSeconds}s' : '-',
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 45,
+                        child: Text(
+                          pv.scrollDepthPct != null ? '${pv.scrollDepthPct}%' : '-',
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                      Icon(isExpanded ? Icons.expand_less : Icons.expand_more,
+                        color: Colors.white38, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+              if (isExpanded)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  color: Colors.white.withOpacity(0.03),
+                  child: Wrap(
+                    spacing: 16,
+                    runSpacing: 4,
+                    children: [
+                      _detailChip('IP', pv.ipAddress ?? '-'),
+                      _detailChip('User Agent', pv.userAgent ?? '-'),
+                      _detailChip('Screen', '${pv.screenWidth ?? '-'}x${pv.screenHeight ?? '-'}'),
+                      _detailChip('Viewport', '${pv.viewportWidth ?? '-'}x${pv.viewportHeight ?? '-'}'),
+                      _detailChip('Pixel Ratio', '${pv.pixelRatio ?? '-'}'),
+                      _detailChip('Color Depth', '${pv.colorDepth ?? '-'}'),
+                      _detailChip('GPU', pv.webglRenderer ?? '-'),
+                      _detailChip('Memory', pv.deviceMemory != null ? '${pv.deviceMemory}GB' : '-'),
+                      _detailChip('CPU Cores', '${pv.hardwareConcurrency ?? '-'}'),
+                      _detailChip('Touch', '${pv.touchSupport ?? '-'} (${pv.maxTouchPoints ?? 0})'),
+                      _detailChip('Language', pv.language ?? '-'),
+                      _detailChip('Platform', pv.platform ?? '-'),
+                      _detailChip('Connection', '${pv.connectionType ?? '-'} ${pv.connectionDownlink != null ? '(${pv.connectionDownlink}Mbps)' : ''}'),
+                      _detailChip('Timezone', pv.timezone ?? '-'),
+                      _detailChip('Country', pv.country ?? '-'),
+                      _detailChip('Lat/Lon', pv.latitude != null ? '${pv.latitude}, ${pv.longitude}' : '-'),
+                      _detailChip('Referrer', pv.referrer ?? 'direct'),
+                      if (pv.utmSource != null) _detailChip('UTM Source', pv.utmSource!),
+                      if (pv.utmMedium != null) _detailChip('UTM Medium', pv.utmMedium!),
+                      if (pv.utmCampaign != null) _detailChip('UTM Campaign', pv.utmCampaign!),
+                      if (pv.trackingId != null) _detailChip('Tracking ID', pv.trackingId!),
+                      _detailChip('Cookies', '${pv.cookieEnabled ?? '-'}'),
+                      _detailChip('DNT', '${pv.doNotTrack ?? '-'}'),
+                      _detailChip('PDF Viewer', '${pv.pdfViewerEnabled ?? '-'}'),
+                      _detailChip('Scroll', '${pv.scrollDepthPct ?? '-'}% (max ${pv.maxScrollY ?? '-'}px)'),
+                      _detailChip('Duration', '${pv.durationSeconds ?? '-'}s'),
+                    ],
+                  ),
+                ),
+              Divider(color: Colors.white.withOpacity(0.08), height: 1),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _detailChip(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: RichText(
+        text: TextSpan(children: [
+          TextSpan(text: '$label: ', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+          TextSpan(text: value, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasEventId = _currentEvent.id != null;
-    final tabCount = hasEventId ? 3 : 1;
+    final tabCount = hasEventId ? 4 : 1;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -2757,10 +3431,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                           indicatorColor: _sunriseGold,
                           labelColor: Colors.white,
                           unselectedLabelColor: Colors.white70,
+                          isScrollable: true,
                           tabs: [
                             Tab(text: 'Details'),
                             Tab(text: 'Attendees'),
                             Tab(text: 'Check-In'),
+                            Tab(text: 'Analytics'),
                           ],
                         ),
                       ),
@@ -2791,6 +3467,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                                   ],
                                 ),
                               ),
+                            if (hasEventId) _buildAnalyticsTab(),
                           ],
                         ),
                       ),

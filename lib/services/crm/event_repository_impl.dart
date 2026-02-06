@@ -482,8 +482,15 @@ class EventRepository {
       return _insertAttendee(payload);
     }
 
+    final token = const Uuid().v4();
+    await _writeClient.from('tracking_links').insert({
+      'token': token,
+      'event_id': eventId,
+      'phone_e164': phoneNumber,
+      'attendee_name': eventName,
+    });
     final registrationLink =
-        'https://events.moyoungdemocrats.org/events/$eventId/register?phone=${Uri.encodeComponent(phoneNumber)}';
+        'https://events.moyoungdemocrats.org/events/$eventId/register?phone=${Uri.encodeComponent(phoneNumber)}&tid=$token';
     await CRMMessageService.instance.sendRegistrationLink(
       phoneNumber: phoneNumber,
       eventName: eventName,
@@ -576,8 +583,15 @@ class EventRepository {
     final attendee = await _insertAttendee(payload);
 
     if (sendRsvpConfirmation && guestPhone != null && guestPhone.isNotEmpty) {
+      final token = const Uuid().v4();
+      await _writeClient.from('tracking_links').insert({
+        'token': token,
+        'event_id': eventId,
+        'phone_e164': guestPhone,
+        'attendee_name': attendee.displayName,
+      });
       final registrationLink =
-          'https://events.moyoungdemocrats.org/events/$eventId/register?phone=${Uri.encodeComponent(guestPhone)}';
+          'https://events.moyoungdemocrats.org/events/$eventId/register?phone=${Uri.encodeComponent(guestPhone)}&tid=$token';
       await CRMMessageService.instance.sendRegistrationLink(
         phoneNumber: guestPhone,
         eventName: attendee.displayName,
@@ -636,6 +650,51 @@ class EventRepository {
     }
 
     throw Exception('Image uploaded, but event could not be loaded.');
+  }
+
+  // ── Analytics methods ──────────────────────────────────────────────
+
+  Future<EventAnalyticsSummary?> fetchEventAnalyticsSummary(String eventId) async {
+    if (!isReady) return null;
+    final response = await _readClient
+        .from('event_analytics_summary')
+        .select()
+        .eq('event_id', eventId)
+        .maybeSingle();
+    if (response == null) return EventAnalyticsSummary();
+    return EventAnalyticsSummary.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<List<PageView>> fetchEventPageViews(String eventId, {int limit = 500}) async {
+    if (!isReady) return [];
+    final response = await _readClient
+        .from('page_views')
+        .select()
+        .eq('event_id', eventId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return (response as List).map((r) => PageView.fromJson(r as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<FormEvent>> fetchEventFormEvents(String eventId) async {
+    if (!isReady) return [];
+    final response = await _readClient
+        .from('form_events')
+        .select()
+        .eq('event_id', eventId)
+        .order('created_at', ascending: false)
+        .limit(500);
+    return (response as List).map((r) => FormEvent.fromJson(r as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<TrackingLink>> fetchEventTrackingLinks(String eventId) async {
+    if (!isReady) return [];
+    final response = await _readClient
+        .from('tracking_links')
+        .select()
+        .eq('event_id', eventId)
+        .order('sent_at', ascending: false);
+    return (response as List).map((r) => TrackingLink.fromJson(r as Map<String, dynamic>)).toList();
   }
 
   Future<Uint8List> _resolveFileBytes(PlatformFile file) async {

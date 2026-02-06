@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/models/crm/analytics.dart';
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
