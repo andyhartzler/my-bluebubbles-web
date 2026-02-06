@@ -126,6 +126,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   String _status = 'draft';
   bool _multipleLocations = false;
   bool _hideAddressBeforeRsvp = false;
+  bool _youngDemsOnly = false;
   bool _rsvpEnabled = true;
   bool _checkinEnabled = false;
   bool _editingDetails = false;
@@ -192,6 +193,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     _status = event.status;
     _multipleLocations = event.multipleLocations;
     _hideAddressBeforeRsvp = event.hideAddressBeforeRsvp;
+    _youngDemsOnly = event.youngDemsOnly;
     _rsvpEnabled = event.rsvpEnabled;
     _checkinEnabled = event.checkinEnabled;
     _editingDetails = event.id == null;
@@ -301,6 +303,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         _currentEvent = saved;
         _status = saved.status;
         _hideAddressBeforeRsvp = saved.hideAddressBeforeRsvp;
+        _youngDemsOnly = saved.youngDemsOnly;
         _autoSavingDraft = false;
       });
       _resetWebsiteImageCarousel();
@@ -333,6 +336,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       locationThreeAddress: _multipleLocations ? _trimmed(_locationThreeAddressController) : null,
       multipleLocations: _multipleLocations,
       hideAddressBeforeRsvp: _hideAddressBeforeRsvp,
+      youngDemsOnly: _youngDemsOnly,
       eventType: _eventType,
       rsvpEnabled: _rsvpEnabled,
       rsvpDeadline: _rsvpDeadline,
@@ -371,6 +375,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
         _saving = false;
         _currentEvent = saved;
         _hideAddressBeforeRsvp = saved.hideAddressBeforeRsvp;
+        _youngDemsOnly = saved.youngDemsOnly;
         _multipleLocations = saved.multipleLocations;
       });
       _resetWebsiteImageCarousel();
@@ -2603,6 +2608,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
               onChanged: (value) => setState(() => _hideAddressBeforeRsvp = value),
               title: const Text('Hide address until RSVP'),
               subtitle: const Text('Keep the event address hidden until someone RSVPs'),
+            ),
+            SwitchListTile(
+              value: _youngDemsOnly,
+              onChanged: (value) => setState(() => _youngDemsOnly = value),
+              title: const Text('Young Dems Only'),
+              subtitle: const Text('Restrict to attendees 35 and under (by calendar year)'),
             ),
             const SizedBox(height: 12),
             _buildImageUploadSection(),

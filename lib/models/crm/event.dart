@@ -77,6 +77,7 @@ class Event {
   final String? locationThreeAddress;
   final bool multipleLocations;
   final bool hideAddressBeforeRsvp;
+  final bool youngDemsOnly;
   final String? eventType;
   final bool rsvpEnabled;
   final DateTime? rsvpDeadline;
@@ -96,6 +97,7 @@ class Event {
     required this.eventDate,
     required this.status,
     this.hideAddressBeforeRsvp = false,
+    this.youngDemsOnly = false,
     this.multipleLocations = false,
     this.id,
     this.description,
@@ -138,6 +140,7 @@ class Event {
     String? locationThreeAddress,
     bool? multipleLocations,
     bool? hideAddressBeforeRsvp,
+    bool? youngDemsOnly,
     String? eventType,
     bool? rsvpEnabled,
     DateTime? rsvpDeadline,
@@ -168,6 +171,7 @@ class Event {
       locationThreeAddress: locationThreeAddress ?? this.locationThreeAddress,
       multipleLocations: multipleLocations ?? this.multipleLocations,
       hideAddressBeforeRsvp: hideAddressBeforeRsvp ?? this.hideAddressBeforeRsvp,
+      youngDemsOnly: youngDemsOnly ?? this.youngDemsOnly,
       eventType: eventType ?? this.eventType,
       rsvpEnabled: rsvpEnabled ?? this.rsvpEnabled,
       rsvpDeadline: rsvpDeadline ?? this.rsvpDeadline,
@@ -200,6 +204,7 @@ class Event {
       'location_three_address': locationThreeAddress,
       'multiple_locations': multipleLocations,
       'hide_address_before_rsvp': hideAddressBeforeRsvp,
+      'young_dems_only': youngDemsOnly,
       'event_type': eventType,
       'rsvp_enabled': rsvpEnabled,
       'rsvp_deadline': rsvpDeadline?.toUtc().toIso8601String(),
@@ -229,6 +234,7 @@ class Event {
       'location_three_address': locationThreeAddress,
       'multiple_locations': multipleLocations,
       'hide_address_before_rsvp': hideAddressBeforeRsvp,
+      'young_dems_only': youngDemsOnly,
       'event_type': eventType,
       'rsvp_enabled': rsvpEnabled,
       'rsvp_deadline': rsvpDeadline?.toUtc().toIso8601String(),
@@ -267,6 +273,7 @@ class Event {
       locationThreeAddress: json['location_three_address'] as String?,
       multipleLocations: _coerceBool(json['multiple_locations']) ?? false,
       hideAddressBeforeRsvp: _coerceBool(json['hide_address_before_rsvp']) ?? false,
+      youngDemsOnly: _coerceBool(json['young_dems_only']) ?? false,
       eventType: json['event_type'] as String?,
       rsvpEnabled: _coerceBool(json['rsvp_enabled']) ?? true,
       rsvpDeadline: _parseDateTime(json['rsvp_deadline'], fieldName: 'rsvp_deadline'),
