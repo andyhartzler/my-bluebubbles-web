@@ -159,10 +159,7 @@ serve(async (req) => {
       .select(
         `
         id, survey_id, current_question_order, status, phone_e164,
-        survey:surveys!inner(id, title),
-        current_question:survey_questions!inner(
-          id, question_text, question_type, options, question_order
-        )
+        survey:surveys(id, title)
         `
       )
       .eq("phone_e164", phone)
