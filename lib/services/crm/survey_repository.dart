@@ -116,7 +116,7 @@ class SurveyRepository {
     // Insert questions
     if (questions.isNotEmpty) {
       final questionPayloads = questions
-          .map((q) => {
+          .map((q) {
             final p = q.toInsertPayload(surveyId);
             p['id'] = const Uuid().v4();
             return p;
@@ -149,7 +149,7 @@ class SurveyRepository {
 
     if (questions.isNotEmpty) {
       final questionPayloads = questions
-          .map((q) => {
+          .map((q) {
             final p = q.toInsertPayload(surveyId);
             p['id'] = q.id ?? const Uuid().v4();
             return p;
