@@ -9,7 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
-import 'package:bluebubbles/models/crm/analytics.dart';
+import 'package:bluebubbles/models/crm/analytics.dart' as analytics;
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
@@ -159,10 +159,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   int _currentWebsiteImageIndex = 0;
 
   // Analytics state
-  List<PageView> _pageViews = [];
-  List<FormEvent> _formEvents = [];
-  List<TrackingLink> _trackingLinks = [];
-  EventAnalyticsSummary? _analyticsSummary;
+  List<analytics.PageView> _pageViews = [];
+  List<analytics.FormEvent> _formEvents = [];
+  List<analytics.TrackingLink> _trackingLinks = [];
+  analytics.EventAnalyticsSummary? _analyticsSummary;
   bool _analyticsLoading = false;
   int? _expandedVisitorIndex;
 
@@ -302,10 +302,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       ]);
       if (!mounted) return;
       setState(() {
-        _analyticsSummary = results[0] as EventAnalyticsSummary?;
-        _pageViews = results[1] as List<PageView>;
-        _formEvents = results[2] as List<FormEvent>;
-        _trackingLinks = results[3] as List<TrackingLink>;
+        _analyticsSummary = results[0] as analytics.EventAnalyticsSummary?;
+        _pageViews = results[1] as List<analytics.PageView>;
+        _formEvents = results[2] as List<analytics.FormEvent>;
+        _trackingLinks = results[3] as List<analytics.TrackingLink>;
         _analyticsLoading = false;
       });
     } catch (e) {
@@ -2789,7 +2789,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       return const Center(child: CircularProgressIndicator(color: _momentumBlue));
     }
 
-    final summary = _analyticsSummary ?? EventAnalyticsSummary();
+    final summary = _analyticsSummary ?? analytics.EventAnalyticsSummary();
     final formViews = _formEvents.where((e) => e.eventType == 'form_view').length;
     final formStarts = _formEvents.where((e) => e.eventType == 'form_start').length;
     final submitAttempts = _formEvents.where((e) => e.eventType == 'submit_attempt').length;
@@ -2982,7 +2982,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     );
   }
 
-  Widget _buildDevicePieChart(EventAnalyticsSummary summary) {
+  Widget _buildDevicePieChart(analytics.EventAnalyticsSummary summary) {
     final sections = <PieChartSectionData>[];
     final total = summary.desktopViews + summary.mobileViews + summary.tabletViews;
     if (total == 0) return const Center(child: Text('No data', style: TextStyle(color: Colors.white54)));
