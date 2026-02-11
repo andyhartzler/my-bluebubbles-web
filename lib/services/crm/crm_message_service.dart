@@ -21,6 +21,7 @@ import 'package:slugify/slugify.dart';
 import 'package:universal_io/io.dart';
 
 import 'member_repository.dart';
+import 'survey_repository.dart';
 import 'supabase_service.dart';
 
 /// Bridge between CRM and BlueBubbles messaging
@@ -33,8 +34,14 @@ class CRMMessageService {
   factory CRMMessageService() => instance;
 
   final MemberRepository _memberRepo = MemberRepository();
+  final SurveyRepository _surveyRepo = SurveyRepository();
   final Map<String, String> _serviceCache = {};
   final LinkedHashMap<String, _AutomationGuardEntry> _automationGuardCache = LinkedHashMap();
+
+  /// Fires when a survey response is received, so the UI can refresh.
+  final StreamController<String> _surveyResponseController =
+      StreamController<String>.broadcast();
+  Stream<String> get onSurveyResponse => _surveyResponseController.stream;
 
   // Rate limiting
   static const int messagesPerMinute = CRMConfig.messagesPerMinute;
@@ -236,6 +243,21 @@ class CRMMessageService {
 
     final text = message.text?.trim();
     if (text == null || text.isEmpty) return;
+
+    // Check if sender has an active survey session — if so, the webhook handles
+    // the actual processing server-side. We just notify the UI to refresh.
+    final senderAddress = message.handle?.address;
+    if (senderAddress != null && senderAddress.isNotEmpty) {
+      try {
+        final hasSurvey = await _surveyRepo.hasActiveSurveySession(senderAddress);
+        if (hasSurvey) {
+          _surveyResponseController.add(senderAddress);
+          // Don't return — still check for STOP/START below in case they want to opt out
+        }
+      } catch (_) {
+        // Non-critical — don't block automation
+      }
+    }
 
     final normalized = text.toUpperCase();
     if (normalized != 'STOP' && normalized != 'START') {

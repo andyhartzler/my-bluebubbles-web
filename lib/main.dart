@@ -40,6 +40,7 @@ import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/mautic_embed_screen.dart';
 import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
+import 'package:bluebubbles/screens/crm/surveys_screen.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:provider/provider.dart';
@@ -646,6 +647,7 @@ enum _HomeSection {
   campaigns,
   forms,
   conversations,
+  surveys,
 }
 
 class _HomeState extends OptimizedState<Home>
@@ -1210,6 +1212,7 @@ class _HomeState extends OptimizedState<Home>
                         showArchivedChats: false,
                         showUnknownSenders: false,
                       ),
+                      const SurveysScreen(key: PageStorageKey('surveys-view')),
                     ],
                   ),
                 ),
@@ -1299,6 +1302,23 @@ class _HomeState extends OptimizedState<Home>
                 ),
               ),
               title: const Text('Slack'),
+              subtitle: crmReady
+                  ? null
+                  : const Text(
+                      'Available when CRM is connected',
+                      style: TextStyle(fontSize: 11),
+                    ),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          PopupMenuItem<VoidCallback>(
+            value: crmReady
+                ? () => _setSection(_HomeSection.surveys)
+                : null,
+            enabled: crmReady,
+            child: ListTile(
+              leading: const Icon(Icons.poll_outlined),
+              title: const Text('Surveys'),
               subtitle: crmReady
                   ? null
                   : const Text(

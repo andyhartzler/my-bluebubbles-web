@@ -1,0 +1,358 @@
+/// Models for the survey system: Survey, SurveyQuestion, SurveySession, SurveyResponse.
+
+DateTime? _parseSurveyDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value.toLocal();
+  if (value is String && value.isNotEmpty) {
+    final parsed = DateTime.tryParse(value);
+    return parsed?.toLocal();
+  }
+  return null;
+}
+
+bool _parseSurveyBool(dynamic value, {bool defaultValue = false}) {
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.trim().toLowerCase();
+    if (lower == 'true' || lower == '1') return true;
+    if (lower == 'false' || lower == '0') return false;
+  }
+  return defaultValue;
+}
+
+int? _parseSurveyInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+// ─── Survey ──────────────────────────────────────────────────────────────────
+
+class Survey {
+  final String? id;
+  final String? eventId;
+  final String title;
+  final String? description;
+  final String status;
+  final String targetAudience;
+  final bool autoSend;
+  final DateTime? createdAt;
+  final DateTime? scheduledAt;
+  final DateTime? completedAt;
+
+  /// Joined data (not persisted)
+  final List<SurveyQuestion> questions;
+  final int sessionCount;
+  final int completedCount;
+
+  const Survey({
+    this.id,
+    this.eventId,
+    required this.title,
+    this.description,
+    this.status = 'draft',
+    this.targetAudience = 'all_attendees',
+    this.autoSend = false,
+    this.createdAt,
+    this.scheduledAt,
+    this.completedAt,
+    this.questions = const [],
+    this.sessionCount = 0,
+    this.completedCount = 0,
+  });
+
+  factory Survey.fromJson(Map<String, dynamic> json) {
+    final questionsList = json['survey_questions'];
+    List<SurveyQuestion> questions = [];
+    if (questionsList is List) {
+      questions = questionsList
+          .whereType<Map<String, dynamic>>()
+          .map((q) => SurveyQuestion.fromJson(q))
+          .toList()
+        ..sort((a, b) => a.questionOrder.compareTo(b.questionOrder));
+    }
+
+    return Survey(
+      id: json['id'] as String?,
+      eventId: json['event_id'] as String?,
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String?,
+      status: json['status'] as String? ?? 'draft',
+      targetAudience: json['target_audience'] as String? ?? 'all_attendees',
+      autoSend: _parseSurveyBool(json['auto_send']),
+      createdAt: _parseSurveyDateTime(json['created_at']),
+      scheduledAt: _parseSurveyDateTime(json['scheduled_at']),
+      completedAt: _parseSurveyDateTime(json['completed_at']),
+      questions: questions,
+      sessionCount: _parseSurveyInt(json['session_count']) ?? 0,
+      completedCount: _parseSurveyInt(json['completed_count']) ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toInsertPayload() => {
+        if (eventId != null) 'event_id': eventId,
+        'title': title,
+        if (description != null) 'description': description,
+        'status': status,
+        'target_audience': targetAudience,
+        'auto_send': autoSend,
+        if (scheduledAt != null) 'scheduled_at': scheduledAt!.toUtc().toIso8601String(),
+      };
+
+  Map<String, dynamic> toUpdatePayload() => {
+        'title': title,
+        'description': description,
+        'status': status,
+        'target_audience': targetAudience,
+        'auto_send': autoSend,
+        'scheduled_at': scheduledAt?.toUtc().toIso8601String(),
+        'completed_at': completedAt?.toUtc().toIso8601String(),
+      };
+
+  Survey copyWith({
+    String? id,
+    String? eventId,
+    String? title,
+    String? description,
+    String? status,
+    String? targetAudience,
+    bool? autoSend,
+    DateTime? createdAt,
+    DateTime? scheduledAt,
+    DateTime? completedAt,
+    List<SurveyQuestion>? questions,
+    int? sessionCount,
+    int? completedCount,
+  }) =>
+      Survey(
+        id: id ?? this.id,
+        eventId: eventId ?? this.eventId,
+        title: title ?? this.title,
+        description: description ?? this.description,
+        status: status ?? this.status,
+        targetAudience: targetAudience ?? this.targetAudience,
+        autoSend: autoSend ?? this.autoSend,
+        createdAt: createdAt ?? this.createdAt,
+        scheduledAt: scheduledAt ?? this.scheduledAt,
+        completedAt: completedAt ?? this.completedAt,
+        questions: questions ?? this.questions,
+        sessionCount: sessionCount ?? this.sessionCount,
+        completedCount: completedCount ?? this.completedCount,
+      );
+}
+
+// ─── SurveyQuestion ──────────────────────────────────────────────────────────
+
+class SurveyQuestion {
+  final String? id;
+  final String? surveyId;
+  final String questionText;
+  final String questionType;
+  final List<String> options;
+  final int questionOrder;
+
+  const SurveyQuestion({
+    this.id,
+    this.surveyId,
+    required this.questionText,
+    required this.questionType,
+    this.options = const [],
+    required this.questionOrder,
+  });
+
+  factory SurveyQuestion.fromJson(Map<String, dynamic> json) {
+    List<String> options = [];
+    final raw = json['options'];
+    if (raw is List) {
+      options = raw.map((e) => e.toString()).toList();
+    }
+
+    return SurveyQuestion(
+      id: json['id'] as String?,
+      surveyId: json['survey_id'] as String?,
+      questionText: json['question_text'] as String? ?? '',
+      questionType: json['question_type'] as String? ?? 'short_answer',
+      options: options,
+      questionOrder: _parseSurveyInt(json['question_order']) ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toInsertPayload(String surveyId) => {
+        'survey_id': surveyId,
+        'question_text': questionText,
+        'question_type': questionType,
+        if (options.isNotEmpty) 'options': options,
+        'question_order': questionOrder,
+      };
+
+  SurveyQuestion copyWith({
+    String? id,
+    String? surveyId,
+    String? questionText,
+    String? questionType,
+    List<String>? options,
+    int? questionOrder,
+  }) =>
+      SurveyQuestion(
+        id: id ?? this.id,
+        surveyId: surveyId ?? this.surveyId,
+        questionText: questionText ?? this.questionText,
+        questionType: questionType ?? this.questionType,
+        options: options ?? this.options,
+        questionOrder: questionOrder ?? this.questionOrder,
+      );
+
+  /// Format the question text as it will appear in an iMessage.
+  String formatForMessage({required int questionNumber, required int totalQuestions}) {
+    final buf = StringBuffer();
+    buf.writeln('Q$questionNumber of $totalQuestions: $questionText');
+    buf.writeln();
+
+    switch (questionType) {
+      case 'yes_no':
+        buf.writeln('Reply YES or NO');
+        break;
+      case 'rating':
+        buf.writeln('Reply 1-5 (1=Poor, 5=Excellent)');
+        break;
+      case 'multiple_choice':
+        for (int i = 0; i < options.length; i++) {
+          buf.writeln('${i + 1}. ${options[i]}');
+        }
+        buf.writeln();
+        buf.writeln('Reply with the number');
+        break;
+      case 'short_answer':
+        buf.writeln('Reply with your answer');
+        break;
+    }
+
+    buf.writeln();
+    buf.write('Reply SKIP to skip · STOP to opt out');
+    return buf.toString();
+  }
+}
+
+// ─── SurveySession ───────────────────────────────────────────────────────────
+
+class SurveySession {
+  final String? id;
+  final String? surveyId;
+  final String phoneE164;
+  final String? memberId;
+  final int currentQuestionOrder;
+  final String status;
+  final DateTime? startedAt;
+  final DateTime? completedAt;
+  final DateTime? lastMessageAt;
+
+  const SurveySession({
+    this.id,
+    this.surveyId,
+    required this.phoneE164,
+    this.memberId,
+    this.currentQuestionOrder = 0,
+    this.status = 'pending',
+    this.startedAt,
+    this.completedAt,
+    this.lastMessageAt,
+  });
+
+  factory SurveySession.fromJson(Map<String, dynamic> json) => SurveySession(
+        id: json['id'] as String?,
+        surveyId: json['survey_id'] as String?,
+        phoneE164: json['phone_e164'] as String? ?? '',
+        memberId: json['member_id'] as String?,
+        currentQuestionOrder: _parseSurveyInt(json['current_question_order']) ?? 0,
+        status: json['status'] as String? ?? 'pending',
+        startedAt: _parseSurveyDateTime(json['started_at']),
+        completedAt: _parseSurveyDateTime(json['completed_at']),
+        lastMessageAt: _parseSurveyDateTime(json['last_message_at']),
+      );
+}
+
+// ─── SurveyResponse ──────────────────────────────────────────────────────────
+
+class SurveyResponse {
+  final String? id;
+  final String? sessionId;
+  final String? questionId;
+  final String? rawResponse;
+  final String? parsedResponse;
+  final DateTime? respondedAt;
+
+  const SurveyResponse({
+    this.id,
+    this.sessionId,
+    this.questionId,
+    this.rawResponse,
+    this.parsedResponse,
+    this.respondedAt,
+  });
+
+  factory SurveyResponse.fromJson(Map<String, dynamic> json) => SurveyResponse(
+        id: json['id'] as String?,
+        sessionId: json['session_id'] as String?,
+        questionId: json['question_id'] as String?,
+        rawResponse: json['raw_response'] as String?,
+        parsedResponse: json['parsed_response'] as String?,
+        respondedAt: _parseSurveyDateTime(json['responded_at']),
+      );
+}
+
+// ─── Aggregate helpers ───────────────────────────────────────────────────────
+
+class SurveyResultsSummary {
+  final int totalSent;
+  final int totalResponded;
+  final int totalCompleted;
+  final int totalOptedOut;
+  final List<QuestionResultSummary> questionSummaries;
+
+  const SurveyResultsSummary({
+    this.totalSent = 0,
+    this.totalResponded = 0,
+    this.totalCompleted = 0,
+    this.totalOptedOut = 0,
+    this.questionSummaries = const [],
+  });
+
+  double get responseRate => totalSent > 0 ? totalResponded / totalSent : 0;
+  double get completionRate => totalSent > 0 ? totalCompleted / totalSent : 0;
+}
+
+class QuestionResultSummary {
+  final SurveyQuestion question;
+  final List<SurveyResponse> responses;
+
+  const QuestionResultSummary({required this.question, required this.responses});
+
+  int get responseCount => responses.length;
+
+  /// For yes/no: {"yes": 12, "no": 5}
+  /// For multiple choice: {"Option A": 8, "Option B": 3, ...}
+  /// For rating: {"1": 2, "2": 3, "3": 10, "4": 8, "5": 5}
+  Map<String, int> get distribution {
+    final counts = <String, int>{};
+    for (final r in responses) {
+      final key = r.parsedResponse ?? r.rawResponse ?? 'unknown';
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Average for rating questions
+  double? get averageRating {
+    if (question.questionType != 'rating') return null;
+    final values = responses
+        .map((r) => double.tryParse(r.parsedResponse ?? ''))
+        .whereType<double>()
+        .toList();
+    if (values.isEmpty) return null;
+    return values.reduce((a, b) => a + b) / values.length;
+  }
+}

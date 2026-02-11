@@ -23,6 +23,10 @@ import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
 import 'package:bluebubbles/widgets/event_map_widget.dart';
+import 'package:bluebubbles/models/crm/survey_model.dart';
+import 'package:bluebubbles/services/crm/survey_repository.dart';
+import 'package:bluebubbles/screens/crm/survey_builder_screen.dart';
+import 'package:bluebubbles/screens/crm/survey_results_widget.dart';
 import 'file_picker_materializer.dart';
 
 const _unityBlue = Color(0xFF273351);
@@ -162,6 +166,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   bool _analyticsLoading = false;
   int? _expandedVisitorIndex;
 
+  // Surveys state
+  final SurveyRepository _surveyRepository = SurveyRepository();
+  List<Survey> _surveys = [];
+  bool _surveysLoading = false;
+
   bool _hasText(String? value) => value?.trim().isNotEmpty == true;
 
   String? _trimmed(TextEditingController controller) {
@@ -227,6 +236,23 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       _loadAttendees();
       _startAttendeeStream();
       _loadAnalytics();
+      _loadSurveys();
+    }
+  }
+
+  Future<void> _loadSurveys() async {
+    if (_currentEvent.id == null) return;
+    setState(() => _surveysLoading = true);
+    try {
+      final surveys = await _surveyRepository.fetchSurveys(eventId: _currentEvent.id!);
+      if (mounted) {
+        setState(() {
+          _surveys = surveys;
+          _surveysLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _surveysLoading = false);
     }
   }
 
@@ -3390,7 +3416,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   @override
   Widget build(BuildContext context) {
     final hasEventId = _currentEvent.id != null;
-    final tabCount = hasEventId ? 4 : 1;
+    final tabCount = hasEventId ? 5 : 1;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -3437,6 +3463,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                             Tab(text: 'Attendees'),
                             Tab(text: 'Check-In'),
                             Tab(text: 'Analytics'),
+                            Tab(text: 'Surveys'),
                           ],
                         ),
                       ),
@@ -3468,6 +3495,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                                 ),
                               ),
                             if (hasEventId) _buildAnalyticsTab(),
+                            if (hasEventId) _buildSurveysTab(),
                           ],
                         ),
                       ),
@@ -3477,6 +3505,206 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSurveysTab() {
+    if (_surveysLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with action buttons
+          Row(
+            children: [
+              const Text(
+                'Event Surveys',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await Navigator.of(context).push<Survey>(
+                    MaterialPageRoute(
+                      builder: (_) => SurveyBuilderScreen(
+                        eventId: _currentEvent.id,
+                      ),
+                    ),
+                  );
+                  if (result != null) _loadSurveys();
+                },
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Create Survey'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _momentumBlue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          if (_surveys.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  children: [
+                    Icon(Icons.poll_outlined, size: 48, color: Colors.grey.shade600),
+                    const SizedBox(height: 12),
+                    const Text('No surveys for this event yet'),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Create a survey to collect feedback from attendees via iMessage.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ..._surveys.map((survey) => _buildSurveyEventCard(survey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSurveyEventCard(Survey survey) {
+    final statusColor = switch (survey.status) {
+      'active' => _grassrootsGreen,
+      'completed' => _momentumBlue,
+      'paused' => _sunriseGold,
+      _ => Colors.grey,
+    };
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    survey.title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    survey.status.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.help_outline, size: 14, color: Colors.grey.shade400),
+                const SizedBox(width: 4),
+                Text(
+                  '${survey.questions.length} questions',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                ),
+                if (survey.sessionCount > 0) ...[
+                  const SizedBox(width: 16),
+                  Icon(Icons.people, size: 14, color: Colors.grey.shade400),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${survey.completedCount}/${survey.sessionCount} completed',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (survey.status == 'draft') ...[
+                  OutlinedButton(
+                    onPressed: () async {
+                      final result = await Navigator.of(context).push<Survey>(
+                        MaterialPageRoute(
+                          builder: (_) => SurveyBuilderScreen(
+                            existingSurvey: survey,
+                            eventId: _currentEvent.id,
+                          ),
+                        ),
+                      );
+                      if (result != null) _loadSurveys();
+                    },
+                    child: const Text('Edit'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () async {
+                      try {
+                        await _surveyRepository.sendSurvey(survey.id!);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Survey sent!')),
+                          );
+                          _loadSurveys();
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _sunriseGold,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text('Send Now'),
+                  ),
+                ],
+                if (survey.status != 'draft') ...[
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(
+                              title: Text(survey.title),
+                              backgroundColor: _unityBlue,
+                              foregroundColor: Colors.white,
+                            ),
+                            body: SurveyResultsWidget(
+                              surveyId: survey.id!,
+                              surveyTitle: survey.title,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.bar_chart, size: 18),
+                    label: const Text('View Results'),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ),
       ),
     );
