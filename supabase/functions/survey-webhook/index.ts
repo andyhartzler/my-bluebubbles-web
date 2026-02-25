@@ -18,6 +18,12 @@ const NO_WORDS = new Set([
 ]);
 const STOP_WORDS = new Set(["stop", "unsubscribe", "quit", "cancel"]);
 const SKIP_WORDS = new Set(["skip", "pass", "next"]);
+const TRUE_WORDS = new Set([
+  "true", "t", "yes", "y", "correct", "right",
+]);
+const FALSE_WORDS = new Set([
+  "false", "f", "no", "n", "incorrect", "wrong",
+]);
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -37,7 +43,7 @@ interface ParseResult {
 function parseResponse(
   text: string,
   questionType: string,
-  options: string[] | null
+  options: any
 ): ParseResult {
   const lower = text.toLowerCase().trim();
 
@@ -48,39 +54,66 @@ function parseResponse(
       return { parsed: null, hint: 'Please reply YES or NO.' };
     }
 
+    case "true_false": {
+      if (TRUE_WORDS.has(lower)) return { parsed: "true", hint: null };
+      if (FALSE_WORDS.has(lower)) return { parsed: "false", hint: null };
+      return { parsed: null, hint: "Please reply TRUE or FALSE." };
+    }
+
     case "rating": {
+      let min = 1;
+      let max = 5;
+      if (options && !Array.isArray(options) && typeof options === "object") {
+        if (options.min != null) min = Number(options.min);
+        if (options.max != null) max = Number(options.max);
+      }
       const num = parseInt(text.trim(), 10);
-      if (!isNaN(num) && num >= 1 && num <= 5) {
+      if (!isNaN(num) && num >= min && num <= max) {
         return { parsed: String(num), hint: null };
       }
-      return { parsed: null, hint: "Please reply with a number 1-5." };
+      return { parsed: null, hint: `Please reply with a number ${min}-${max}.` };
     }
 
     case "multiple_choice": {
-      if (!options || options.length === 0) {
+      const opts = _extractOptions(options);
+      if (!opts || opts.length === 0) {
         return { parsed: text.trim(), hint: null };
       }
-      // Match by number
       const num = parseInt(text.trim(), 10);
-      if (!isNaN(num) && num >= 1 && num <= options.length) {
-        return { parsed: options[num - 1], hint: null };
+      if (!isNaN(num) && num >= 1 && num <= opts.length) {
+        return { parsed: opts[num - 1], hint: null };
       }
-      // Match by exact text (case-insensitive)
-      const exact = options.find((o) => o.toLowerCase() === lower);
+      const exact = opts.find((o) => o.toLowerCase() === lower);
       if (exact) return { parsed: exact, hint: null };
-      // Match by first letter if unambiguous
       if (lower.length === 1) {
-        const matches = options.filter(
-          (o) => o.toLowerCase().startsWith(lower)
-        );
+        const matches = opts.filter((o) => o.toLowerCase().startsWith(lower));
         if (matches.length === 1) return { parsed: matches[0], hint: null };
       }
-      const optionsList = options
-        .map((o, i) => `${i + 1}. ${o}`)
-        .join(", ");
+      const optionsList = opts.map((o, i) => `${i + 1}. ${o}`).join(", ");
+      return { parsed: null, hint: `Please reply with a number: ${optionsList}` };
+    }
+
+    case "multi_select": {
+      const opts = _extractOptions(options);
+      if (!opts || opts.length === 0) {
+        return { parsed: text.trim(), hint: null };
+      }
+      const parts = text.split(/[,\s]+/).map((p) => p.trim()).filter((p) => p.length > 0);
+      const selected: string[] = [];
+      for (const part of parts) {
+        const num = parseInt(part, 10);
+        if (!isNaN(num) && num >= 1 && num <= opts.length) {
+          const opt = opts[num - 1];
+          if (!selected.includes(opt)) selected.push(opt);
+        }
+      }
+      if (selected.length > 0) {
+        return { parsed: JSON.stringify(selected), hint: null };
+      }
+      const optionsList = opts.map((o, i) => `${i + 1}. ${o}`).join(", ");
       return {
         parsed: null,
-        hint: `Please reply with a number: ${optionsList}`,
+        hint: `Reply with numbers separated by commas (e.g. 1,3): ${optionsList}`,
       };
     }
 
@@ -90,6 +123,13 @@ function parseResponse(
     default:
       return { parsed: text.trim(), hint: null };
   }
+}
+
+function _extractOptions(options: any): string[] | null {
+  if (!options) return null;
+  if (Array.isArray(options)) return options.map(String);
+  if (options.choices && Array.isArray(options.choices)) return options.choices.map(String);
+  return null;
 }
 
 async function sendBBMessage(phone: string, message: string): Promise<void> {
@@ -376,18 +416,43 @@ function formatQuestion(
     case "yes_no":
       lines.push("Reply YES or NO");
       break;
-    case "rating":
-      lines.push("Reply 1-5 (1=Poor, 5=Excellent)");
+    case "true_false":
+      lines.push("Reply TRUE or FALSE");
       break;
-    case "multiple_choice":
-      if (question.options && Array.isArray(question.options)) {
-        question.options.forEach((opt: string, i: number) => {
+    case "rating": {
+      let min = 1;
+      let max = 5;
+      const opts = question.options;
+      if (opts && !Array.isArray(opts) && typeof opts === "object") {
+        if (opts.min != null) min = Number(opts.min);
+        if (opts.max != null) max = Number(opts.max);
+      }
+      const minLabel = opts?.labels?.[String(min)] ?? "Poor";
+      const maxLabel = opts?.labels?.[String(max)] ?? "Excellent";
+      lines.push(`Reply ${min}-${max} (${min}=${minLabel}, ${max}=${maxLabel})`);
+      break;
+    }
+    case "multiple_choice": {
+      const opts = question.options;
+      if (opts && Array.isArray(opts)) {
+        opts.forEach((opt: string, i: number) => {
           lines.push(`${i + 1}. ${opt}`);
         });
         lines.push("");
         lines.push("Reply with the number");
       }
       break;
+    }
+    case "multi_select": {
+      const opts = question.options;
+      const choices = Array.isArray(opts) ? opts : opts?.choices ?? [];
+      choices.forEach((opt: string, i: number) => {
+        lines.push(`${i + 1}. ${opt}`);
+      });
+      lines.push("");
+      lines.push("Reply with numbers separated by commas (e.g. 1,3)");
+      break;
+    }
     case "short_answer":
       lines.push("Reply with your answer");
       break;
