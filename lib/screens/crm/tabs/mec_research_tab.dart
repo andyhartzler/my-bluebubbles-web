@@ -1023,10 +1023,10 @@ class _MecResearchTabState extends State<MecResearchTab> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: BrandColors.success.withValues(alpha: 0.2),
+                    color: BrandColors.success.withOpacity( 0.2),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: BrandColors.success.withValues(alpha: 0.5),
+                      color: BrandColors.success.withOpacity( 0.5),
                       width: 0.5,
                     ),
                   ),
@@ -1047,10 +1047,10 @@ class _MecResearchTabState extends State<MecResearchTab> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.lightBlue.withValues(alpha: 0.2),
+                    color: Colors.lightBlue.withOpacity( 0.2),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: Colors.lightBlue.withValues(alpha: 0.5),
+                      color: Colors.lightBlue.withOpacity( 0.5),
                       width: 0.5,
                     ),
                   ),
