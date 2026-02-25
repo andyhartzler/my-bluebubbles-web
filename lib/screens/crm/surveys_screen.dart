@@ -144,6 +144,26 @@ class _SurveysScreenState extends State<SurveysScreen>
     );
   }
 
+  Future<void> _duplicateSurvey(Survey survey) async {
+    try {
+      final duplicated = await _repo.duplicateSurvey(survey.id!);
+      _loadSurveys();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Duplicated as "${duplicated.title}"')),
+        );
+        // Open the builder so the user can change the title/audience
+        _openBuilder(existing: duplicated);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error duplicating survey: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _deleteSurvey(Survey survey) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -531,6 +551,9 @@ class _SurveysScreenState extends State<SurveysScreen>
           case 'results':
             _openResults(survey);
             break;
+          case 'duplicate':
+            _duplicateSurvey(survey);
+            break;
           case 'delete':
             _deleteSurvey(survey);
             break;
@@ -540,6 +563,7 @@ class _SurveysScreenState extends State<SurveysScreen>
         const PopupMenuItem(value: 'edit', child: Text('Edit')),
         if (survey.status != 'draft')
           const PopupMenuItem(value: 'results', child: Text('View Results')),
+        const PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
         const PopupMenuItem(
           value: 'delete',
           child: Text('Delete', style: TextStyle(color: Colors.red)),

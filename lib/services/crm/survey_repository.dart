@@ -168,6 +168,31 @@ class SurveyRepository {
     await _writeClient.from('surveys').delete().eq('id', id);
   }
 
+  /// Duplicate a survey and all its questions as a new draft.
+  Future<Survey> duplicateSurvey(String sourceId) async {
+    if (!isReady) throw Exception('CRM not configured');
+
+    final source = await fetchSurvey(sourceId);
+    if (source == null) throw Exception('Source survey not found');
+
+    final newSurvey = source.copyWith(
+      id: null,
+      title: '${source.title} (Copy)',
+      status: 'draft',
+      createdAt: null,
+      scheduledAt: null,
+      completedAt: null,
+      sessionCount: 0,
+      completedCount: 0,
+    );
+
+    final newQuestions = source.questions
+        .map((q) => q.copyWith(id: null, surveyId: null))
+        .toList();
+
+    return createSurvey(newSurvey, newQuestions);
+  }
+
   Future<void> updateSurveyStatus(String id, String status) async {
     if (!isReady) throw Exception('CRM not configured');
     final payload = <String, dynamic>{'status': status};
