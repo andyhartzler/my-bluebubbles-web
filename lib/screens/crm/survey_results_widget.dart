@@ -341,12 +341,19 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade900.withOpacity(0.6),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: BrandColors.unityBlue.withOpacity(0.4),
+          color: BrandColors.unityBlue.withOpacity(0.15),
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -386,12 +393,12 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: BrandColors.unityBlue.withOpacity(0.3),
+                    color: BrandColors.momentumBlue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '${qs.responseCount} responses',
-                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                    style: TextStyle(fontSize: 11, color: BrandColors.unityBlue.withOpacity(0.7)),
                   ),
                 ),
               ],
@@ -546,7 +553,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: pct,
-                      backgroundColor: Colors.grey.shade800,
+                      backgroundColor: Colors.grey.shade200,
                       valueColor: const AlwaysStoppedAnimation(BrandColors.sunriseGold),
                       minHeight: 16,
                     ),
@@ -600,7 +607,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: pct,
-                    backgroundColor: Colors.grey.shade800,
+                    backgroundColor: Colors.grey.shade200,
                     valueColor: const AlwaysStoppedAnimation(BrandColors.momentumBlue),
                     minHeight: 20,
                   ),
@@ -635,9 +642,9 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade900,
+                color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade700),
+                border: Border.all(color: Colors.grey.shade200),
               ),
               child: Text(
                 r.rawResponse ?? r.parsedResponse ?? '(empty)',

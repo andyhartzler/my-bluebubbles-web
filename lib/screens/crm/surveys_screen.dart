@@ -120,6 +120,7 @@ class _SurveysScreenState extends State<SurveysScreen>
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
+          backgroundColor: Colors.grey.shade50,
           appBar: AppBar(
             title: Text(survey.title),
             elevation: 0,

@@ -302,6 +302,7 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: _buildAppBar(),
       body: Column(
         children: [
