@@ -722,106 +722,6 @@ class _CallTimeTabState extends State<CallTimeTab> {
                         decoration: _inputDecoration('Description (optional)'),
                         maxLines: 2,
                       ),
-                      const SizedBox(height: 16),
-
-                      // Smart List Builder section
-                      const Text(
-                        'Smart List Builder',
-                        style: TextStyle(
-                          color: BrandColors.sunriseGold,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Set default filters for this list (optional)',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Party filter
-                      Row(
-                        children: [
-                          const SizedBox(
-                            width: 80,
-                            child: Text('Party',
-                                style: TextStyle(color: Colors.white70, fontSize: 13)),
-                          ),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: filterParty,
-                              dropdownColor: BrandColors.unityBlue,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration(''),
-                              items: _partyOptions
-                                  .map((p) => DropdownMenuItem(
-                                        value: p,
-                                        child: Text(p,
-                                            style: TextStyle(
-                                              color: p == 'All'
-                                                  ? Colors.white
-                                                  : _partyColor(p),
-                                            )),
-                                      ))
-                                  .toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setDialogState(() => filterParty = val);
-                                }
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Year range slider
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Years: $yearFrom - $yearTo',
-                            style: const TextStyle(color: Colors.white70, fontSize: 13),
-                          ),
-                          RangeSlider(
-                            values: RangeValues(yearFrom.toDouble(), yearTo.toDouble()),
-                            min: 2002,
-                            max: DateTime.now().year.toDouble(),
-                            divisions: DateTime.now().year - 2002,
-                            labels: RangeLabels('$yearFrom', '$yearTo'),
-                            activeColor: BrandColors.sunriseGold,
-                            inactiveColor: Colors.white24,
-                            onChanged: (values) {
-                              setDialogState(() {
-                                yearFrom = values.start.round();
-                                yearTo = values.end.round();
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Min contribution total
-                      Row(
-                        children: [
-                          const SizedBox(
-                            width: 80,
-                            child: Text('Min \$',
-                                style: TextStyle(color: Colors.white70, fontSize: 13)),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: minTotalController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('Min total contributions'),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(decimal: true),
-                            ),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
@@ -1680,24 +1580,28 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
                   const SizedBox(height: 10),
 
                   // Year range slider
-                  Text(
-                    'Years: $_yearFrom - $_yearTo',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                  RangeSlider(
-                    values: RangeValues(_yearFrom.toDouble(), _yearTo.toDouble()),
-                    min: 2002,
-                    max: DateTime.now().year.toDouble(),
-                    divisions: DateTime.now().year - 2002,
-                    labels: RangeLabels('$_yearFrom', '$_yearTo'),
-                    activeColor: BrandColors.sunriseGold,
-                    inactiveColor: Colors.white24,
-                    onChanged: (values) {
-                      setState(() {
-                        _yearFrom = values.start.round();
-                        _yearTo = values.end.round();
-                      });
-                    },
+                  Row(
+                    children: [
+                      Text('$_yearFrom', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Expanded(
+                        child: RangeSlider(
+                          values: RangeValues(_yearFrom.toDouble(), _yearTo.toDouble()),
+                          min: 2002,
+                          max: DateTime.now().year.toDouble(),
+                          divisions: DateTime.now().year - 2002,
+                          labels: RangeLabels('$_yearFrom', '$_yearTo'),
+                          activeColor: BrandColors.sunriseGold,
+                          inactiveColor: Colors.white24,
+                          onChanged: (values) {
+                            setState(() {
+                              _yearFrom = values.start.round();
+                              _yearTo = values.end.round();
+                            });
+                          },
+                        ),
+                      ),
+                      Text('$_yearTo', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ],
                   ),
 
                   // Age range slider

@@ -13,6 +13,31 @@ import 'package:bluebubbles/models/crm/mec_contribution.dart';
 /// Supports unified MEC + FEC committee search via the searchCommitteesUnified RPC,
 /// with source filtering (MEC / FEC / Both), and paginated donor lists via
 /// getCommitteeDonorsPaginated RPC.
+// FEC committee type code mapping
+const _fecTypeLabels = <String, String>{
+  'H': 'House',
+  'S': 'Senate',
+  'P': 'Presidential',
+  'Q': 'PAC (Qualified)',
+  'N': 'PAC (Non-qualified)',
+  'C': 'Communication Cost',
+  'D': 'Delegate Committee',
+  'E': 'Electioneering Comm.',
+  'I': 'Independent Expenditure',
+  'O': 'Super PAC',
+  'U': 'Single Candidate PAC',
+  'V': 'PAC w/ Non-Contribution',
+  'W': 'PAC w/ Contribution',
+  'X': 'Party (Non-qualified)',
+  'Y': 'Party (Qualified)',
+  'Z': 'National Party',
+};
+
+String _fecTypeLabel(String code) {
+  if (code.isEmpty) return '';
+  return _fecTypeLabels[code.toUpperCase()] ?? code;
+}
+
 class CommitteesTab extends StatefulWidget {
   const CommitteesTab({super.key});
 
@@ -513,13 +538,14 @@ class _CommitteesTabState extends State<CommitteesTab> {
                   decoration: BoxDecoration(
                     color: isMec
                         ? BrandColors.momentumBlue.withOpacity(0.35)
-                        : BrandColors.success.withOpacity(0.35),
+                        : const Color(0xFF00E676).withOpacity(0.25),
                     borderRadius: BorderRadius.circular(8),
+                    border: isMec ? null : Border.all(color: const Color(0xFF00E676).withOpacity(0.6), width: 1),
                   ),
                   child: Text(
                     source,
                     style: TextStyle(
-                      color: isMec ? BrandColors.momentumBlue : BrandColors.success,
+                      color: isMec ? BrandColors.momentumBlue : const Color(0xFF00E676),
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
@@ -566,7 +592,7 @@ class _CommitteesTabState extends State<CommitteesTab> {
                     ),
                   ),
                 if (type.isNotEmpty)
-                  Text(type, style: BrandTextStyles.caption),
+                  Text(_fecTypeLabel(type), style: BrandTextStyles.caption),
               ],
             ),
             if (candidate.isNotEmpty) ...[
@@ -677,13 +703,14 @@ class _CommitteesTabState extends State<CommitteesTab> {
                 decoration: BoxDecoration(
                   color: isMecSource
                       ? BrandColors.momentumBlue.withOpacity(0.35)
-                      : BrandColors.success.withOpacity(0.35),
+                      : const Color(0xFF00E676).withOpacity(0.25),
                   borderRadius: BorderRadius.circular(8),
+                  border: isMecSource ? null : Border.all(color: const Color(0xFF00E676).withOpacity(0.6), width: 1),
                 ),
                 child: Text(
                   source,
                   style: TextStyle(
-                    color: isMecSource ? BrandColors.momentumBlue : BrandColors.success,
+                    color: isMecSource ? BrandColors.momentumBlue : const Color(0xFF00E676),
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -748,7 +775,7 @@ class _CommitteesTabState extends State<CommitteesTab> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              type,
+                              _fecTypeLabel(type),
                               style: const TextStyle(color: Colors.white70, fontSize: 12),
                             ),
                           ),
@@ -757,13 +784,14 @@ class _CommitteesTabState extends State<CommitteesTab> {
                           decoration: BoxDecoration(
                             color: isMecSource
                                 ? BrandColors.momentumBlue.withOpacity(0.25)
-                                : BrandColors.success.withOpacity(0.25),
+                                : const Color(0xFF00E676).withOpacity(0.25),
                             borderRadius: BorderRadius.circular(12),
+                            border: isMecSource ? null : Border.all(color: const Color(0xFF00E676).withOpacity(0.6), width: 1),
                           ),
                           child: Text(
                             source,
                             style: TextStyle(
-                              color: isMecSource ? BrandColors.momentumBlue : BrandColors.success,
+                              color: isMecSource ? BrandColors.momentumBlue : const Color(0xFF00E676),
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
                             ),

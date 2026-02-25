@@ -411,28 +411,27 @@ class _MecResearchTabState extends State<MecResearchTab> {
         // Year range slider
         Expanded(
           flex: 3,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Text(
-                'Years: $_yearFrom - $_yearTo',
-                style: BrandTextStyles.caption.copyWith(color: Colors.white70),
+              Text('$_yearFrom', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+              Expanded(
+                child: RangeSlider(
+                  values: RangeValues(_yearFrom.toDouble(), _yearTo.toDouble()),
+                  min: 2002,
+                  max: DateTime.now().year.toDouble(),
+                  divisions: DateTime.now().year - 2002,
+                  labels: RangeLabels('$_yearFrom', '$_yearTo'),
+                  activeColor: BrandColors.sunriseGold,
+                  inactiveColor: Colors.white24,
+                  onChanged: (values) {
+                    setState(() {
+                      _yearFrom = values.start.round();
+                      _yearTo = values.end.round();
+                    });
+                  },
+                ),
               ),
-              RangeSlider(
-                values: RangeValues(_yearFrom.toDouble(), _yearTo.toDouble()),
-                min: 2002,
-                max: DateTime.now().year.toDouble(),
-                divisions: DateTime.now().year - 2002,
-                labels: RangeLabels('$_yearFrom', '$_yearTo'),
-                activeColor: BrandColors.sunriseGold,
-                inactiveColor: Colors.white24,
-                onChanged: (values) {
-                  setState(() {
-                    _yearFrom = values.start.round();
-                    _yearTo = values.end.round();
-                  });
-                },
-              ),
+              Text('$_yearTo', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -1469,6 +1468,25 @@ class _MecResearchTabState extends State<MecResearchTab> {
     final ethnicity = enr?['ethnicity'] as String? ??
         donorRow?['ethnicity'] as String?;
 
+    // Address fields
+    final addressLine1 = enr?['address_line_1'] as String? ??
+        donorRow?['address_line_1'] as String? ??
+        enr?['address'] as String? ??
+        donorRow?['address'] as String?;
+    final addressLine2 = enr?['address_line_2'] as String? ??
+        donorRow?['address_line_2'] as String?;
+    final addrCity = enr?['city'] as String? ??
+        donorRow?['city'] as String?;
+    final addrState = enr?['state'] as String? ??
+        donorRow?['state'] as String?;
+    final zipCode = enr?['zip_code'] as String? ??
+        donorRow?['zip_code'] as String? ??
+        enr?['zip'] as String? ??
+        donorRow?['zip'] as String?;
+
+    final hasAddress = (addressLine1 != null && addressLine1.isNotEmpty) ||
+        (addrCity != null && addrCity.isNotEmpty);
+
     final hasContact = (phoneMobile != null && phoneMobile.isNotEmpty) ||
         (phoneHome != null && phoneHome.isNotEmpty) ||
         (emailPersonal != null && emailPersonal.isNotEmpty);
@@ -1480,12 +1498,43 @@ class _MecResearchTabState extends State<MecResearchTab> {
         wealthScore != null ||
         engagementScore != null;
 
-    if (!hasContact && !hasEmployment && !hasPolitical) {
+    if (!hasContact && !hasEmployment && !hasPolitical && !hasAddress) {
       return const SizedBox.shrink();
     }
 
     return Column(
       children: [
+        // Address
+        if (hasAddress) ...[
+          BrandedCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.location_on, color: BrandColors.sunriseGold, size: 18),
+                    SizedBox(width: 8),
+                    Text('Address', style: BrandTextStyles.title),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (addressLine1 != null && addressLine1.isNotEmpty)
+                  _buildDetailRow(Icons.home, 'Street', addressLine1),
+                if (addressLine2 != null && addressLine2.isNotEmpty)
+                  _buildDetailRow(Icons.home_outlined, 'Line 2', addressLine2),
+                if (addrCity != null && addrCity.isNotEmpty || addrState != null && addrState.isNotEmpty) ...[
+                  _buildDetailRow(Icons.place, 'City/State',
+                    [addrCity, addrState].where((s) => s != null && s.isNotEmpty).join(', ')),
+                ],
+                if (zipCode != null && zipCode.isNotEmpty)
+                  _buildDetailRow(Icons.markunread_mailbox, 'ZIP', zipCode),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
         // Contact Information
         if (hasContact) ...[
           BrandedCard(
@@ -1712,7 +1761,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
               child: Row(
                 children: [
                   Expanded(child: Text(name, style: BrandTextStyles.body.copyWith(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                  Text('$cnt gift${cnt == 1 ? '' : 's'}', style: BrandTextStyles.caption),
+                  Text('\u00D7$cnt', style: BrandTextStyles.caption),
                   const SizedBox(width: 8),
                   Text(_currencyFormat.format(total), style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w600)),
                 ],
@@ -1721,6 +1770,32 @@ class _MecResearchTabState extends State<MecResearchTab> {
           }),
           if (mecBreakdown.length > 10)
             Text('+ ${mecBreakdown.length - 10} more committees', style: BrandTextStyles.caption),
+          // Individual MEC contributions
+          const SizedBox(height: 16),
+          const Divider(color: Colors.white12),
+          const SizedBox(height: 8),
+          Text('All Contributions (${mecContribs.length})',
+            style: BrandTextStyles.caption.copyWith(color: Colors.white54, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          ...mecContribs.map((c) {
+            final amount = (c['contribution_amount'] as num?)?.toDouble() ?? 0;
+            final date = c['date'] as String? ?? c['contribution_date'] as String? ?? '';
+            final committee = c['committee_name'] as String? ?? '';
+            String displayDate = date;
+            if (date.isNotEmpty) {
+              try { displayDate = _dateFormat.format(DateTime.parse(date)); } catch (_) {}
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  SizedBox(width: 88, child: Text(displayDate, style: BrandTextStyles.caption.copyWith(fontSize: 11))),
+                  Expanded(child: Text(committee, style: BrandTextStyles.body.copyWith(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Text(_currencyFormat.format(amount), style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -1773,7 +1848,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
               child: Row(
                 children: [
                   Expanded(child: Text(name, style: BrandTextStyles.body.copyWith(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                  Text('$cnt gift${cnt == 1 ? '' : 's'}', style: BrandTextStyles.caption),
+                  Text('\u00D7$cnt', style: BrandTextStyles.caption),
                   const SizedBox(width: 8),
                   Text(_currencyFormat.format(total), style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w600)),
                 ],
@@ -1782,6 +1857,33 @@ class _MecResearchTabState extends State<MecResearchTab> {
           }),
           if (fecBreakdown.length > 10)
             Text('+ ${fecBreakdown.length - 10} more committees', style: BrandTextStyles.caption),
+          // Individual FEC contributions
+          const SizedBox(height: 16),
+          const Divider(color: Colors.white12),
+          const SizedBox(height: 8),
+          Text('All Contributions (${fecContribs.length})',
+            style: BrandTextStyles.caption.copyWith(color: Colors.white54, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          ...fecContribs.map((c) {
+            final amount = (c['contribution_amount'] as num?)?.toDouble() ??
+                (c['transaction_amount'] as num?)?.toDouble() ?? 0;
+            final date = c['date'] as String? ?? c['transaction_date'] as String? ?? '';
+            final committee = c['committee_name'] as String? ?? '';
+            String displayDate = date;
+            if (date.isNotEmpty) {
+              try { displayDate = _dateFormat.format(DateTime.parse(date)); } catch (_) {}
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  SizedBox(width: 88, child: Text(displayDate, style: BrandTextStyles.caption.copyWith(fontSize: 11))),
+                  Expanded(child: Text(committee, style: BrandTextStyles.body.copyWith(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Text(_currencyFormat.format(amount), style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
