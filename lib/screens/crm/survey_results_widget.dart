@@ -814,10 +814,14 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     switch (qs.question.questionType) {
       case 'yes_no':
         return _buildYesNoBar(qs);
+      case 'true_false':
+        return _buildTrueFalseBar(qs);
       case 'rating':
         return _buildRatingDisplay(qs);
       case 'multiple_choice':
         return _buildBarChart(qs);
+      case 'multi_select':
+        return _buildMultiSelectChart(qs);
       case 'short_answer':
         return _buildShortAnswerList(qs);
       default:
@@ -893,12 +897,81 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     );
   }
 
+  // ── True / False bar ─────────────────────────────────────────────────────────
+
+  Widget _buildTrueFalseBar(QuestionResultSummary qs) {
+    final dist = qs.distribution;
+    final trueCount = dist['true'] ?? 0;
+    final falseCount = dist['false'] ?? 0;
+    final total = trueCount + falseCount;
+    if (total == 0) {
+      return const Text('No responses yet',
+          style: TextStyle(color: Colors.grey, fontSize: 13));
+    }
+
+    final truePct = trueCount / total;
+    final falsePct = falseCount / total;
+
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: 32,
+            child: Row(
+              children: [
+                if (truePct > 0)
+                  Expanded(
+                    flex: (truePct * 100).round(),
+                    child: Container(
+                      color: BrandColors.momentumBlue,
+                      alignment: Alignment.center,
+                      child: Text(
+                        'True ${(truePct * 100).toStringAsFixed(0)}%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (falsePct > 0)
+                  Expanded(
+                    flex: (falsePct * 100).round(),
+                    child: Container(
+                      color: BrandColors.slateBlue,
+                      alignment: Alignment.center,
+                      child: Text(
+                        'False ${(falsePct * 100).toStringAsFixed(0)}%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$trueCount True, $falseCount False',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+        ),
+      ],
+    );
+  }
+
   // ── Rating display ─────────────────────────────────────────────────────────
 
   Widget _buildRatingDisplay(QuestionResultSummary qs) {
     final avg = qs.averageRating;
     final dist = qs.distribution;
     final total = qs.responseCount;
+    final maxRating = qs.question.ratingMax ?? 5;
 
     return Column(
       children: [
@@ -918,11 +991,11 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    children: List.generate(5, (i) {
+                    children: List.generate(maxRating.clamp(1, 10), (i) {
                       return Icon(
                         i < avg.round() ? Icons.star : Icons.star_border,
                         color: BrandColors.sunriseGold,
-                        size: 20,
+                        size: maxRating > 5 ? 16 : 20,
                       );
                     }),
                   ),
@@ -936,9 +1009,8 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
           ),
           const SizedBox(height: 8),
         ],
-        // Distribution bars
-        ...List.generate(5, (i) {
-          final rating = 5 - i;
+        ...List.generate(maxRating, (i) {
+          final rating = maxRating - i;
           final count = dist['$rating'] ?? 0;
           final pct = total > 0 ? count / total : 0.0;
           return Padding(
@@ -946,8 +1018,9 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
             child: Row(
               children: [
                 SizedBox(
-                  width: 16,
-                  child: Text('$rating', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                  width: maxRating > 5 ? 24 : 16,
+                  child: Text('$rating',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -956,7 +1029,8 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                     child: LinearProgressIndicator(
                       value: pct,
                       backgroundColor: Colors.grey.shade200,
-                      valueColor: const AlwaysStoppedAnimation(BrandColors.sunriseGold),
+                      valueColor:
+                          const AlwaysStoppedAnimation(BrandColors.sunriseGold),
                       minHeight: 16,
                     ),
                   ),
@@ -1034,6 +1108,100 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     );
   }
 
+  // ── Multi-select chart ─────────────────────────────────────────────────────
+
+  Widget _buildMultiSelectChart(QuestionResultSummary qs) {
+    final total = qs.responseCount;
+    if (total == 0) {
+      return const Text('No responses yet',
+          style: TextStyle(color: Colors.grey, fontSize: 13));
+    }
+
+    // Multi-select responses are JSON arrays — count each option
+    final optionCounts = <String, int>{};
+    for (final r in qs.responses) {
+      final parsed = r.parsedResponse ?? '';
+      List<String> selected = [];
+      if (parsed.startsWith('[')) {
+        try {
+          selected = parsed
+              .replaceAll(RegExp(r'[\[\]"]'), '')
+              .split(',')
+              .map((s) => s.trim())
+              .where((s) => s.isNotEmpty)
+              .toList();
+        } catch (_) {
+          selected = [parsed];
+        }
+      } else {
+        selected = [parsed];
+      }
+      for (final opt in selected) {
+        optionCounts[opt] = (optionCounts[opt] ?? 0) + 1;
+      }
+    }
+
+    final entries = optionCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              Icon(Icons.checklist, size: 16, color: Colors.grey.shade500),
+              const SizedBox(width: 6),
+              Text(
+                '$total respondents \u00B7 multiple selections',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        ),
+        ...entries.map((entry) {
+          final pct = entry.value / total;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 120,
+                  child: Text(
+                    entry.key,
+                    style: const TextStyle(fontSize: 13, color: BrandColors.unityBlue),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      backgroundColor: Colors.grey.shade200,
+                      valueColor: const AlwaysStoppedAnimation(Color(0xFF8B5CF6)),
+                      minHeight: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 50,
+                  child: Text(
+                    '${entry.value} (${(pct * 100).toStringAsFixed(0)}%)',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   // ── Short answer list ──────────────────────────────────────────────────────
 
   Widget _buildShortAnswerList(QuestionResultSummary qs) {
@@ -1042,10 +1210,19 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
           style: TextStyle(color: Colors.grey, fontSize: 13));
     }
 
+    final summary = _summary;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children:
           qs.responses.take(10).map((r) {
+            SurveySessionDetail? respondent;
+            if (summary != null) {
+              respondent = summary.sessionDetails
+                  .where((d) => d.session.id == r.sessionId)
+                  .firstOrNull;
+            }
+
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
@@ -1054,12 +1231,62 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.shade200),
               ),
-              child: Text(
-                r.rawResponse ?? r.parsedResponse ?? '(empty)',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (respondent != null) ...[
+                    _buildMiniAvatar(respondent),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (respondent != null)
+                          Text(
+                            respondent.displayName,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        if (respondent != null) const SizedBox(height: 3),
+                        Text(
+                          r.rawResponse ?? r.parsedResponse ?? '(empty)',
+                          style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             );
           }).toList(),
+    );
+  }
+
+  Widget _buildMiniAvatar(SurveySessionDetail detail) {
+    final name = detail.memberName ?? '';
+    final url = detail.profilePhotoUrl;
+    if (url != null && url.isNotEmpty) {
+      return CircleAvatar(
+        radius: 14,
+        backgroundImage: CachedNetworkImageProvider(url),
+        backgroundColor: BrandColors.unityBlue.withOpacity(0.1),
+      );
+    }
+    return CircleAvatar(
+      radius: 14,
+      backgroundColor: BrandColors.unityBlue.withOpacity(0.1),
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: const TextStyle(
+          color: BrandColors.unityBlue,
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+        ),
+      ),
     );
   }
 }
