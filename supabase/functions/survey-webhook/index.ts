@@ -133,6 +133,16 @@ serve(async (req) => {
     // BB sends: { data: { handle: { address: "+1..." }, text: "..." } }
     // or various other shapes depending on BB version
     const data = payload.data ?? payload;
+
+    // CRITICAL: Skip outgoing messages (sent by us) to prevent infinite
+    // feedback loop. BB webhooks fire for ALL messages including our own.
+    const isFromMe = data?.isFromMe ?? data?.is_from_me ?? false;
+    if (isFromMe) {
+      return new Response(JSON.stringify({ ok: true, skipped: "from_me" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const senderRaw =
       data?.handle?.address ??
       data?.chats?.[0]?.participants?.[0]?.address ??
@@ -159,6 +169,7 @@ serve(async (req) => {
       .select(
         `
         id, survey_id, current_question_order, status, phone_e164,
+        last_message_at,
         survey:surveys(id, title)
         `
       )
@@ -183,6 +194,16 @@ serve(async (req) => {
     }
 
     // ── Active session found — process the response ──
+
+    // Defense-in-depth: rate limit — ignore messages within 5s of last sent
+    if (session.last_message_at) {
+      const lastMsg = new Date(session.last_message_at).getTime();
+      if (Date.now() - lastMsg < 5000) {
+        return new Response(JSON.stringify({ ok: true, skipped: "rate_limited" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     const lower = messageText.toLowerCase().trim();
 
@@ -235,7 +256,11 @@ serve(async (req) => {
     );
 
     if (parsed === null && hint) {
-      // Unparseable — send retry hint
+      // Unparseable — send retry hint and update last_message_at for rate limiting
+      await supabase
+        .from("survey_sessions")
+        .update({ last_message_at: new Date().toISOString() })
+        .eq("id", session.id);
       await sendBBMessage(phone, hint);
       return new Response(JSON.stringify({ ok: true, action: "retry_hint" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -168,7 +168,11 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
           const SizedBox(height: 16),
           const Text(
             'Error loading results',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: BrandColors.unityBlue,
+            ),
           ),
           const SizedBox(height: 8),
           Padding(
@@ -176,7 +180,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
             child: Text(
               _error ?? '',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
           ),
           const SizedBox(height: 16),
@@ -218,13 +222,17 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
             const SizedBox(height: 16),
             const Text(
               'No responses yet',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: BrandColors.unityBlue,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               'Results will appear here once respondents start answering.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
           ],
         ),
@@ -323,12 +331,20 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
             onPressed: _exporting ? null : _exportPdf,
             icon: const Icon(Icons.picture_as_pdf, size: 18),
             label: const Text('Export PDF'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: BrandColors.unityBlue,
+              side: BorderSide(color: BrandColors.unityBlue.withOpacity(0.3)),
+            ),
           ),
           const SizedBox(width: 8),
           OutlinedButton.icon(
             onPressed: _exporting ? null : _exportExcel,
             icon: const Icon(Icons.table_chart, size: 18),
             label: const Text('Export Excel'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: BrandColors.unityBlue,
+              side: BorderSide(color: BrandColors.unityBlue.withOpacity(0.3)),
+            ),
           ),
         ],
       ),
@@ -387,6 +403,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
+                      color: BrandColors.unityBlue,
                     ),
                   ),
                 ),
@@ -433,7 +450,10 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     final yesCount = dist['yes'] ?? 0;
     final noCount = dist['no'] ?? 0;
     final total = yesCount + noCount;
-    if (total == 0) return const Text('No responses yet');
+    if (total == 0) {
+      return const Text('No responses yet',
+          style: TextStyle(color: Colors.grey, fontSize: 13));
+    }
 
     final yesPct = yesCount / total;
     final noPct = noCount / total;
@@ -485,7 +505,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
         const SizedBox(height: 4),
         Text(
           '$yesCount Yes, $noCount No',
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
         ),
       ],
     );
@@ -526,7 +546,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                   ),
                   Text(
                     '$total responses',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                   ),
                 ],
               ),
@@ -545,7 +565,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
               children: [
                 SizedBox(
                   width: 16,
-                  child: Text('$rating', style: const TextStyle(fontSize: 12)),
+                  child: Text('$rating', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -564,7 +584,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                   width: 30,
                   child: Text(
                     '$count',
-                    style: const TextStyle(fontSize: 12),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                     textAlign: TextAlign.right,
                   ),
                 ),
@@ -581,7 +601,10 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
   Widget _buildBarChart(QuestionResultSummary qs) {
     final dist = qs.distribution;
     final total = qs.responseCount;
-    if (total == 0) return const Text('No responses yet');
+    if (total == 0) {
+      return const Text('No responses yet',
+          style: TextStyle(color: Colors.grey, fontSize: 13));
+    }
 
     final entries = dist.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -597,7 +620,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                 width: 120,
                 child: Text(
                   entry.key,
-                  style: const TextStyle(fontSize: 13),
+                  style: const TextStyle(fontSize: 13, color: BrandColors.unityBlue),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -618,7 +641,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                 width: 50,
                 child: Text(
                   '${entry.value} (${(pct * 100).toStringAsFixed(0)}%)',
-                  style: const TextStyle(fontSize: 11),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                   textAlign: TextAlign.right,
                 ),
               ),
@@ -632,7 +655,10 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
   // ── Short answer list ──────────────────────────────────────────────────────
 
   Widget _buildShortAnswerList(QuestionResultSummary qs) {
-    if (qs.responses.isEmpty) return const Text('No responses yet');
+    if (qs.responses.isEmpty) {
+      return const Text('No responses yet',
+          style: TextStyle(color: Colors.grey, fontSize: 13));
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -648,7 +674,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
               ),
               child: Text(
                 r.rawResponse ?? r.parsedResponse ?? '(empty)',
-                style: const TextStyle(fontSize: 14),
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
               ),
             );
           }).toList(),

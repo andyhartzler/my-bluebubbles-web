@@ -5,6 +5,7 @@ import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 /// Selection mode for the recipient selector
@@ -215,7 +216,7 @@ class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
       // Search by name OR phone
       final nameResults = await _client
           .from('members')
-          .select('id, name, phone_e164')
+          .select('id, name, phone_e164, profile_pictures')
           .not('opt_out', 'eq', true)
           .not('phone_e164', 'is', null)
           .ilike('name', '%$query%')
@@ -225,7 +226,7 @@ class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
       if (query.contains(RegExp(r'\d'))) {
         phoneResults = List<Map<String, dynamic>>.from(await _client
             .from('members')
-            .select('id, name, phone_e164')
+            .select('id, name, phone_e164, profile_pictures')
             .not('opt_out', 'eq', true)
             .not('phone_e164', 'is', null)
             .ilike('phone_e164', '%$query%')
@@ -417,6 +418,31 @@ class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
     return '***${phone.substring(phone.length - 4)}';
   }
 
+  Widget _buildMemberAvatar(Map<String, dynamic> member) {
+    final name = member['name']?.toString() ?? '';
+    final profilePics = member['profile_pictures'];
+    final photos = MemberProfilePhoto.parseList(profilePics);
+
+    if (photos.isNotEmpty) {
+      final url = photos.first.publicUrl;
+      return CircleAvatar(
+        backgroundImage: NetworkImage(url),
+        backgroundColor: BrandColors.unityBlue.withOpacity(0.1),
+      );
+    }
+
+    return CircleAvatar(
+      backgroundColor: BrandColors.unityBlue.withOpacity(0.1),
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: const TextStyle(
+          color: BrandColors.unityBlue,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
   void _onGroupFilterChanged() {
     _updateGroupCount();
     _emitPhones();
@@ -563,9 +589,11 @@ class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: TextField(
             controller: _searchController,
+            style: const TextStyle(color: BrandColors.unityBlue),
             decoration: InputDecoration(
               hintText: 'Search by name or phone...',
-              prefixIcon: const Icon(Icons.search),
+              hintStyle: TextStyle(color: Colors.grey.shade500),
+              prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear),
@@ -639,6 +667,7 @@ class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 15,
+                                color: BrandColors.unityBlue,
                               ),
                             ),
                             subtitle: Text(
@@ -648,19 +677,7 @@ class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
                                 fontSize: 13,
                               ),
                             ),
-                            secondary: CircleAvatar(
-                              backgroundColor:
-                                  BrandColors.unityBlue.withOpacity(0.1),
-                              child: Text(
-                                name.isNotEmpty
-                                    ? name[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(
-                                  color: BrandColors.unityBlue,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                            secondary: _buildMemberAvatar(member),
                           ),
                         );
                       },

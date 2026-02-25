@@ -493,8 +493,8 @@ class _SurveysScreenState extends State<SurveysScreen>
       ),
       child: Text(
         label.toUpperCase(),
-        style: TextStyle(
-          color: color == Colors.grey ? Colors.white70 : color,
+        style: const TextStyle(
+          color: Colors.white,
           fontSize: 10,
           fontWeight: FontWeight.bold,
           letterSpacing: 0.5,
@@ -580,20 +580,20 @@ class _SurveysScreenState extends State<SurveysScreen>
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: BrandColors.momentumBlue.withOpacity(0.1),
+                color: Colors.white.withOpacity(0.15),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.poll_outlined,
                 size: 64,
-                color: BrandColors.momentumBlue,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 20),
             Text(
               title,
               style: const TextStyle(
-                color: BrandColors.unityBlue,
+                color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
@@ -602,8 +602,8 @@ class _SurveysScreenState extends State<SurveysScreen>
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: BrandColors.unityBlue.withOpacity(0.7),
+              style: const TextStyle(
+                color: Colors.white70,
                 fontSize: 14,
               ),
             ),
@@ -642,13 +642,13 @@ class _SurveysScreenState extends State<SurveysScreen>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: BrandColors.error.withOpacity(0.1),
+                color: Colors.white.withOpacity(0.15),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.error_outline,
                 size: 48,
-                color: BrandColors.error,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 16),
@@ -656,7 +656,7 @@ class _SurveysScreenState extends State<SurveysScreen>
               _error ?? 'An error occurred',
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: BrandColors.unityBlue,
+                color: Colors.white,
                 fontSize: 15,
               ),
             ),
@@ -664,8 +664,8 @@ class _SurveysScreenState extends State<SurveysScreen>
             ElevatedButton.icon(
               onPressed: _loadSurveys,
               style: ElevatedButton.styleFrom(
-                backgroundColor: BrandColors.unityBlue,
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.white,
+                foregroundColor: BrandColors.unityBlue,
               ),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
